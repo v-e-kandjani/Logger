@@ -534,3 +534,132 @@ body.dark-theme {
     font-size: 1.5rem;
     cursor: pointer;
 }
+
+/* Language Switcher */
+.lang-switcher {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 2px;
+    gap: 2px;
+}
+
+.lang-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.lang-btn:hover {
+    color: var(--text-main);
+}
+
+.lang-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+/* Storage Bar & Capacity Components */
+.storage-progress-container {
+    margin-top: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    overflow: hidden;
+    height: 10px;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.storage-progress-fill {
+    height: 100%;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #10B981 0%, #3B82F6 70%, #F59E0B 90%, #EF4444 100%);
+    transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.storage-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.storage-metric-box {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.storage-metric-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+}
+
+.storage-metric-val {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-main);
+    font-family: var(--font-mono);
+}
+
+/* Radio Cards for Custom Export Modal */
+.radio-card-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.radio-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.radio-card:hover {
+    border-color: var(--primary);
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.radio-card input[type="radio"] {
+    margin-top: 3px;
+    accent-color: var(--primary);
+}
+
+.radio-card-content strong {
+    display: block;
+    font-size: 13px;
+    color: var(--text-main);
+}
+
+.radio-card-content small {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.modal-wide {
+    width: 580px;
+    max-width: 95vw;
+}
+

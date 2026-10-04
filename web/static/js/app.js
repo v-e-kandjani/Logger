@@ -16,6 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initUserModal();
     initResetPasswordModal();
     initArchiveTrigger();
+    initCustomExportModal();
+    initStorageManagement();
+    if (window.i18n) {
+        window.i18n.setLanguage(window.i18n.currentLang);
+    }
 });
 
 // Authentication & Session Guard
@@ -84,6 +89,8 @@ function initNavigation() {
             const targetPane = document.getElementById(`pane-${tab}`);
             if (targetPane) targetPane.classList.add('active');
 
+            updateViewHeader(tab);
+
             // Refresh tab-specific views
             if (tab === 'devices') loadDevices();
             if (tab === 'unregistered') loadUnregisteredSources();
@@ -93,6 +100,7 @@ function initNavigation() {
             if (tab === 'users') loadUsers();
         });
     });
+    updateViewHeader('dashboard');
 }
 
 // Telemetry Polling (Every 2 seconds)
@@ -128,6 +136,11 @@ function startPollingTelemetry() {
 
             // Header DB health
             document.getElementById('sb-ch-status').textContent = data.clickhouse_healthy ? 'Online' : 'Degraded';
+
+            // Storage telemetry
+            if (data.storage) {
+                updateStorageUI(data.storage);
+            }
         } catch (e) {
             console.error('Telemetry error:', e);
         }
@@ -1048,5 +1061,225 @@ function initResetPasswordModal() {
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function updateViewHeader(tab) {
+    const titleEl = document.getElementById('view-title');
+    const subEl = document.getElementById('view-subtitle');
+    if (!titleEl || !subEl) return;
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    titleEl.textContent = t(`view_title_${tab}`) || tab.toUpperCase();
+    subEl.textContent = t(`view_subtitle_${tab}`) || '';
+}
+
+window.onLanguageChanged = (lang) => {
+    const activeTab = document.querySelector('.nav-item.active')?.getAttribute('data-tab') || 'dashboard';
+    updateViewHeader(activeTab);
+    if (window.i18n) {
+        window.i18n.applyTranslations();
+    }
+};
+
+function formatBytes(bytes, decimals = 2) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+function updateStorageUI(storage) {
+    if (!storage) return;
+
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const sizeStr = formatBytes(storage.total_bytes_on_disk || 0);
+    const rawStr = formatBytes(storage.uncompressed_data_bytes || 0);
+    const ratio = storage.compression_ratio ? storage.compression_ratio.toFixed(1) : '1.0';
+    const rows = Number(storage.total_rows || 0).toLocaleString();
+    const diskUsagePct = storage.disk_usage_percent ? storage.disk_usage_percent.toFixed(1) : '0';
+    const freeDiskStr = formatBytes(storage.free_disk_bytes || 0);
+
+    const statDbSize = document.getElementById('stat-db-size');
+    if (statDbSize) statDbSize.textContent = sizeStr;
+
+    const statDbSub = document.getElementById('stat-db-sub');
+    if (statDbSub) {
+        statDbSub.textContent = `${ratio}x ${t('storage_compression')} • ${freeDiskStr} ${t('storage_disk_free')}`;
+    }
+
+    const metricCompressed = document.getElementById('metric-db-compressed');
+    if (metricCompressed) metricCompressed.textContent = sizeStr;
+
+    const metricUncompressed = document.getElementById('metric-db-uncompressed');
+    if (metricUncompressed) metricUncompressed.textContent = rawStr;
+
+    const metricRatio = document.getElementById('metric-db-ratio');
+    if (metricRatio) metricRatio.textContent = `${ratio}x`;
+
+    const metricRows = document.getElementById('metric-db-rows');
+    if (metricRows) metricRows.textContent = rows;
+
+    const partsBadge = document.getElementById('storage-parts-badge');
+    if (partsBadge) partsBadge.textContent = `${storage.active_partitions || 0} ${t('storage_active_parts')}`;
+
+    const diskSummary = document.getElementById('storage-disk-summary');
+    if (diskSummary) diskSummary.textContent = `${t('storage_disk_usage')}: %${diskUsagePct}`;
+
+    const freeBadge = document.getElementById('storage-free-badge');
+    if (freeBadge) freeBadge.textContent = `${t('storage_disk_free')}: ${freeDiskStr}`;
+
+    const progressBar = document.getElementById('storage-progress-bar');
+    if (progressBar) {
+        progressBar.style.width = Math.min(100, Math.max(3, parseFloat(diskUsagePct))) + '%';
+        if (parseFloat(diskUsagePct) > 85) {
+            progressBar.style.background = '#EF4444';
+        } else if (parseFloat(diskUsagePct) > 70) {
+            progressBar.style.background = '#F59E0B';
+        } else {
+            progressBar.style.background = 'linear-gradient(90deg, #10B981 0%, #3B82F6 70%, #F59E0B 90%, #EF4444 100%)';
+        }
+    }
+}
+
+function initStorageManagement() {
+    const pruneBtn = document.getElementById('btn-prune-storage');
+    if (pruneBtn) {
+        pruneBtn.addEventListener('click', async () => {
+            const msg = window.i18n ? window.i18n.t('confirm_prune') : 'En eski log bölümü kalıcı olarak silinecektir. Devam etmek istiyor musunuz?';
+            if (!confirm(msg)) return;
+
+            pruneBtn.disabled = true;
+            pruneBtn.textContent = 'Pruning...';
+            try {
+                const res = await fetch('/api/v1/system/storage/prune', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'oldest_partition' })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Pruning failed');
+
+                const successMsg = window.i18n ? window.i18n.t('msg_prune_success') : 'Oldest partition pruned!';
+                alert(`${successMsg}\n${data.message || ''}`);
+                if (data.storage) {
+                    updateStorageUI(data.storage);
+                }
+            } catch (err) {
+                alert('Storage Prune Error: ' + err.message);
+            } finally {
+                pruneBtn.disabled = false;
+                pruneBtn.textContent = window.i18n ? window.i18n.t('btn_prune_oldest') : 'En Eski Bölümü Ez (FIFO Overwrite)';
+            }
+        });
+    }
+}
+
+function initCustomExportModal() {
+    const modal = document.getElementById('custom-export-modal');
+    if (!modal) return;
+
+    const btnClose = document.getElementById('btn-close-export-modal');
+    const btnCancel = document.getElementById('btn-cancel-export-modal');
+    const btnExecute = document.getElementById('btn-execute-export');
+    const statusAlert = document.getElementById('export-status-alert');
+    const statusText = document.getElementById('export-status-text');
+
+    const openModal = () => {
+        const now = new Date();
+        const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        const formatForInput = (d) => {
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+
+        const startInput = document.getElementById('export-start-time');
+        const endInput = document.getElementById('export-end-time');
+        if (startInput) startInput.value = formatForInput(start);
+        if (endInput) endInput.value = formatForInput(now);
+
+        if (statusAlert) statusAlert.style.display = 'none';
+        modal.style.display = 'flex';
+    };
+
+    const closeModal = () => {
+        modal.style.display = 'none';
+    };
+
+    const btnOpenTop = document.getElementById('btn-open-custom-export');
+    const btnOpenSearch = document.getElementById('btn-search-custom-export');
+    const btnOpenArchives = document.getElementById('btn-archives-custom-export');
+
+    if (btnOpenTop) btnOpenTop.addEventListener('click', openModal);
+    if (btnOpenSearch) btnOpenSearch.addEventListener('click', openModal);
+    if (btnOpenArchives) btnOpenArchives.addEventListener('click', openModal);
+
+    if (btnClose) btnClose.addEventListener('click', closeModal);
+    if (btnCancel) btnCancel.addEventListener('click', closeModal);
+
+    if (btnExecute) {
+        btnExecute.addEventListener('click', async () => {
+            const startVal = document.getElementById('export-start-time').value;
+            const endVal = document.getElementById('export-end-time').value;
+
+            if (!startVal || !endVal) {
+                alert('Lütfen hem başlangıç hem de bitiş tarihini seçin.');
+                return;
+            }
+
+            const timeFieldRadio = document.querySelector('input[name="export_time_field"]:checked');
+            const timeField = timeFieldRadio ? timeFieldRadio.value : 'event_timestamp';
+
+            const formatRadio = document.querySelector('input[name="export_format"]:checked');
+            const format = formatRadio ? formatRadio.value : 'bundle';
+
+            const seal = document.getElementById('export-seal-check').checked;
+            const register = document.getElementById('export-register-check').checked;
+
+            btnExecute.disabled = true;
+            if (statusAlert && statusText) {
+                statusText.textContent = window.i18n ? window.i18n.t('export_loading') : 'Loglar hazırlanıyor ve mühürleniyor...';
+                statusAlert.style.display = 'block';
+            }
+
+            try {
+                const res = await fetch('/api/v1/archives/export-custom', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        start: startVal,
+                        end: endVal,
+                        time_field: timeField,
+                        format: format,
+                        seal: seal,
+                        register: register
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Dışa aktarma oluşturulamadı');
+
+                // Trigger direct file download
+                if (data.download_url) {
+                    const downloadAnchor = document.createElement('a');
+                    downloadAnchor.href = data.download_url;
+                    downloadAnchor.setAttribute('download', '');
+                    document.body.appendChild(downloadAnchor);
+                    downloadAnchor.click();
+                    document.body.removeChild(downloadAnchor);
+                }
+
+                alert(`Dışa aktarma ve mühürleme tamamlandı!\nKayıt: ${data.result.record_count} adet\nDurum: ${data.result.timestamp_status}`);
+                closeModal();
+                loadArchives();
+            } catch (err) {
+                alert('Hata: ' + err.message);
+            } finally {
+                btnExecute.disabled = false;
+                if (statusAlert) statusAlert.style.display = 'none';
+            }
+        });
+    }
 }
 

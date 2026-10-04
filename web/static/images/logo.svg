@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="shieldGrad" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="innerGlow" x1="16" y1="12" x2="48" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0.05"/>
+    </linearGradient>
+    <filter id="sealGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#4f46e5" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Outer Cyber Security Shield / Seal -->
+  <path d="M32 4L10 14V30C10 44.8 19.4 56.5 32 60C44.6 56.5 54 44.8 54 30V14L32 4Z"
+        fill="url(#shieldGrad)"
+        filter="url(#sealGlow)"/>
+
+  <!-- Inner Inset Shield -->
+  <path d="M32 8L14 16.5V30C14 42.5 21.8 52.8 32 55.8C42.2 52.8 50 42.5 50 30V16.5L32 8Z"
+        fill="#0b0f19"
+        fill-opacity="0.9"
+        stroke="url(#shieldGrad)"
+        stroke-width="1.5"/>
+
+  <!-- Timestamp Chronometer Dial -->
+  <circle cx="32" cy="32" r="15" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 3" opacity="0.6"/>
+  <circle cx="32" cy="32" r="11" fill="url(#innerGlow)" stroke="#818cf8" stroke-width="1.2"/>
+
+  <!-- Digital Clock Face Indices -->
+  <circle cx="32" cy="23" r="1" fill="#38bdf8"/>
+  <circle cx="41" cy="32" r="1" fill="#38bdf8"/>
+  <circle cx="32" cy="41" r="1" fill="#38bdf8"/>
+  <circle cx="23" cy="32" r="1" fill="#38bdf8"/>
+
+  <!-- Precision Time Hands (Pointing at 10:10 - standard high-grade chronometer pose) -->
+  <line x1="32" y1="32" x2="26" y2="25" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+  <line x1="32" y1="32" x2="39" y2="26" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Central Cryptographic Core / Rivet -->
+  <circle cx="32" cy="32" r="2.5" fill="#ffffff"/>
+  <circle cx="32" cy="32" r="1" fill="#4f46e5"/>
+
+  <!-- Verification Check Accent at the Base of the Seal -->
+  <path d="M26 44L30 48L38 40" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
     <link rel="stylesheet" href="/static/css/dashboard.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,47 +15,45 @@
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="brand">
-                <div class="brand-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                    </svg>
+                <div class="brand-icon" style="background: transparent; border: none; padding: 0;">
+                    <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.1.0</span></h2>
-                    <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;">Merkezi Log Yönetimi ve Zaman Damgalama</span>
-                    <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;">“Her kayıt, zamanıyla kanıt.”</span>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.2.0</span></h2>
+                    <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
+                    <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
             </div>
 
             <nav class="nav-menu">
                 <a href="#dashboard" class="nav-item active" data-tab="dashboard">
-                    <span class="icon">📊</span> Dashboard
+                    <span class="icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span>
                 </a>
                 <a href="#live" class="nav-item" data-tab="live">
-                    <span class="icon">⚡</span> Live Stream
+                    <span class="icon">⚡</span> <span data-i18n="nav_live">Live Stream</span>
                     <span class="live-dot"></span>
                 </a>
                 <a href="#search" class="nav-item" data-tab="search">
-                    <span class="icon">🔍</span> Log Search
+                    <span class="icon">🔍</span> <span data-i18n="nav_search">Log Search</span>
                 </a>
                 <a href="#devices" class="nav-item" data-tab="devices">
-                    <span class="icon">🖥️</span> Registered Devices
+                    <span class="icon">🖥️</span> <span data-i18n="nav_devices">Registered Devices</span>
                 </a>
                 <a href="#unregistered" class="nav-item" data-tab="unregistered">
-                    <span class="icon">⚠️</span> Unknown Sources
+                    <span class="icon">⚠️</span> <span data-i18n="nav_unknown">Unknown Sources</span>
                     <span class="badge badge-warning" id="unknown-count-badge">0</span>
                 </a>
                 <a href="#archives" class="nav-item" data-tab="archives">
-                    <span class="icon">📦</span> Archives & Evidence
+                    <span class="icon">📦</span> <span data-i18n="nav_archives">Archives & Evidence</span>
                 </a>
                 <a href="#health" class="nav-item" data-tab="health">
-                    <span class="icon">💓</span> System Health
+                    <span class="icon">💓</span> <span data-i18n="nav_health">System Health</span>
                 </a>
                 <a href="#settings" class="nav-item" data-tab="settings">
-                    <span class="icon">⚙️</span> Settings & KamuSM
+                    <span class="icon">⚙️</span> <span data-i18n="nav_settings">Settings & KamuSM</span>
                 </a>
                 <a href="#users" class="nav-item" data-tab="users" id="nav-tab-users">
-                    <span class="icon">👥</span> Users & Access
+                    <span class="icon">👥</span> <span data-i18n="nav_users">Users & Access</span>
                 </a>
             </nav>
 
@@ -80,9 +79,16 @@
                     <p class="subtitle" id="view-subtitle">High-throughput ingestion & cryptographic verification</p>
                 </div>
                 <div class="top-actions">
-                    <button class="btn btn-outline" id="btn-manual-archive">Create Archive Now</button>
+                    <!-- Multilingual Switcher -->
+                    <div class="lang-switcher">
+                        <button class="lang-btn active" id="lang-btn-tr" onclick="i18n.setLanguage('tr')">🇹🇷 TR</button>
+                        <button class="lang-btn" id="lang-btn-en" onclick="i18n.setLanguage('en')">🇬🇧 EN</button>
+                    </div>
+
+                    <button class="btn btn-primary" id="btn-open-custom-export" data-i18n="btn_custom_export">Özel Aralık İndir & Mühürle</button>
+                    <button class="btn btn-outline" id="btn-manual-archive" data-i18n="btn_manual_archive">Create Archive Now</button>
                     <div class="rate-counter">
-                        <span class="label">Ingestion Rate</span>
+                        <span class="label" data-i18n="ingestion_rate">Ingestion Rate</span>
                         <span class="value" id="current-eps">0 EPS</span>
                     </div>
                     <div class="user-profile-badge">
@@ -91,33 +97,38 @@
                             <span class="user-name" id="current-user-name">admin</span>
                             <span class="user-role" id="current-user-role">Super Administrator</span>
                         </div>
-                        <button class="btn btn-outline text-red" id="btn-logout" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;">Sign Out</button>
+                        <button class="btn btn-outline text-red" id="btn-logout" data-i18n="sign_out" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;">Sign Out</button>
                     </div>
                 </div>
             </header>
 
             <!-- TAB: Dashboard -->
             <section class="tab-pane active" id="pane-dashboard">
-                <div class="stats-grid">
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
                     <div class="stat-card">
-                        <div class="stat-header">Logs Today</div>
+                        <div class="stat-header" data-i18n="stat_logs_today">Logs Today</div>
                         <div class="stat-value" id="stat-logs-today">0</div>
-                        <div class="stat-sub">ClickHouse analytical store</div>
+                        <div class="stat-sub" data-i18n="stat_logs_today_sub">ClickHouse analytical store</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-header">Total Inserted</div>
+                        <div class="stat-header" data-i18n="stat_total_inserted">Total Inserted</div>
                         <div class="stat-value" id="stat-total-inserted">0</div>
-                        <div class="stat-sub">Since daemon startup</div>
+                        <div class="stat-sub" data-i18n="stat_total_inserted_sub">Since daemon startup</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-header">Active Sources</div>
+                        <div class="stat-header" data-i18n="stat_active_sources">Active Sources</div>
                         <div class="stat-value text-green" id="stat-active-devices">0</div>
                         <div class="stat-sub" id="stat-total-devices">0 registered assets</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-header">Unknown Sources</div>
+                        <div class="stat-header" data-i18n="stat_unknown_sources">Unknown Sources</div>
                         <div class="stat-value text-yellow" id="stat-unknown-sources">0</div>
-                        <div class="stat-sub">Detected on network</div>
+                        <div class="stat-sub" data-i18n="stat_unknown_sources_sub">Detected on network</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header" data-i18n="stat_db_storage">Database Storage</div>
+                        <div class="stat-value text-blue" id="stat-db-size">0.0 MB</div>
+                        <div class="stat-sub" id="stat-db-sub">ClickHouse Store</div>
                     </div>
                 </div>
 
@@ -149,7 +160,7 @@
 
                     <div class="panel">
                         <div class="panel-header">
-                            <h3>TÜBİTAK KamuSM Zaman Damgası Status</h3>
+                            <h3 data-i18n="panel_tubitak_status">TÜBİTAK KamuSM Zaman Damgası Status</h3>
                             <span class="badge badge-primary">Law No. 5651</span>
                         </div>
                         <div class="panel-body">
@@ -168,6 +179,52 @@
                             <div class="status-row">
                                 <span>Client Command Path</span>
                                 <span class="mono-code">tss-client-console-3.1.33.jar</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Storage Capacity & FIFO Overwrite Management -->
+                    <div class="panel" style="grid-column: 1 / -1;">
+                        <div class="panel-header">
+                            <h3 data-i18n="panel_storage_management">Depolama Kapasitesi & FIFO Ezme / Overwrite Politikası</h3>
+                            <span class="badge badge-info" id="storage-parts-badge">0 Partitions</span>
+                        </div>
+                        <div class="panel-body">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-size: 13px; font-weight: 600;" id="storage-disk-summary">Host Disk Doluluk: %0.0</span>
+                                <span style="font-size: 12px; color: var(--text-muted);" id="storage-free-badge">Boş Alan: -</span>
+                            </div>
+                            <div class="storage-progress-container">
+                                <div class="storage-progress-fill" id="storage-progress-bar" style="width: 5%;"></div>
+                            </div>
+
+                            <div class="storage-metric-grid">
+                                <div class="storage-metric-box">
+                                    <div class="storage-metric-label" data-i18n="storage_table_size">ClickHouse Tablo Boyutu</div>
+                                    <div class="storage-metric-val text-blue" id="metric-db-compressed">0 MB</div>
+                                </div>
+                                <div class="storage-metric-box">
+                                    <div class="storage-metric-label" data-i18n="storage_uncompressed">Ham Veri Boyutu</div>
+                                    <div class="storage-metric-val" id="metric-db-uncompressed">0 MB</div>
+                                </div>
+                                <div class="storage-metric-box">
+                                    <div class="storage-metric-label" data-i18n="storage_compression">Sıkıştırma Verimliliği</div>
+                                    <div class="storage-metric-val text-green" id="metric-db-ratio">1.0x</div>
+                                </div>
+                                <div class="storage-metric-box">
+                                    <div class="storage-metric-label" data-i18n="storage_total_rows">Toplam Olay Kaydı</div>
+                                    <div class="storage-metric-val text-cyan" id="metric-db-rows">0</div>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                                <div style="max-width: 700px;">
+                                    <span style="font-size: 13px; font-weight: 600; color: var(--text-main); display: block;" data-i18n="storage_fifo_desc">Depolama alanı dolduğunda veri kaybını önlemek için en eski aylık log bölümünü ClickHouse seviyesinde anında temizler.</span>
+                                    <span style="font-size: 11px; color: var(--text-muted);" data-i18n="storage_auto_policy">Disk doluluk oranı kritik seviyeye ulaştığında en eski arşivlenmiş log bloklarını otomatik olarak ez.</span>
+                                </div>
+                                <button class="btn btn-outline text-red" id="btn-prune-storage" data-i18n="btn_prune_oldest" style="border-color: rgba(239, 68, 68, 0.4); padding: 8px 16px; font-weight: 600;">
+                                    🗑️ En Eski Bölümü Ez (FIFO Overwrite)
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -209,7 +266,8 @@
                         <option value="INFORMATIONAL">INFORMATIONAL</option>
                     </select>
                     <input type="text" class="input" id="search-source" placeholder="Source IP...">
-                    <button class="btn btn-primary" id="btn-search-exec">Search ClickHouse</button>
+                    <button class="btn btn-primary" id="btn-search-exec" data-i18n="btn_search_exec">Search ClickHouse</button>
+                    <button class="btn btn-outline" id="btn-search-custom-export" data-i18n="btn_custom_export">Özel Aralık İndir & Mühürle</button>
                 </div>
                 <div class="table-container">
                     <table class="data-table" id="search-results-table">
@@ -287,7 +345,8 @@
             <!-- TAB: Archives -->
             <section class="tab-pane" id="pane-archives">
                 <div class="section-actions">
-                    <h3>Immutable Log Archives & KamuSM Zaman Damgası Evidence</h3>
+                    <h3 data-i18n="archives_header">Immutable Log Archives & KamuSM Zaman Damgası Evidence</h3>
+                    <button class="btn btn-primary" id="btn-archives-custom-export" data-i18n="btn_custom_export">+ Özel Aralık Mühürle & İndir</button>
                 </div>
                 <div class="table-container">
                     <table class="data-table" id="archives-table">
@@ -660,6 +719,100 @@
         </div>
     </div>
 
+    <!-- Custom Range Export & Stamping Modal -->
+    <div class="modal-backdrop" id="custom-export-modal" style="display: none;">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h3 data-i18n="modal_export_title">Özel Tarih & Saat Aralığında Log İndir ve Mühürle</h3>
+                <button class="btn-close" id="btn-close-export-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="form-group">
+                        <label data-i18n="export_start_label">Başlangıç Tarihi ve Saati</label>
+                        <input type="datetime-local" class="input" id="export-start-time" required>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="export_end_label">Bitiş Tarihi ve Saati</label>
+                        <input type="datetime-local" class="input" id="export-end-time" required>
+                    </div>
+                </div>
+
+                <!-- Time Field Selection (Event Timestamp vs Received At) -->
+                <div class="form-group">
+                    <label data-i18n="export_time_field_label">Zaman Filtresi Referansı</label>
+                    <div class="radio-card-group">
+                        <label class="radio-card">
+                            <input type="radio" name="export_time_field" value="event_timestamp" checked>
+                            <div class="radio-card-content">
+                                <strong data-i18n="export_field_event">Olay Zamanı (Cihazın Ürettiği Log Zamanı - event_timestamp)</strong>
+                                <small>Firewall/sunucu cihazının log mesajı içine yazdığı asıl oluşma saati</small>
+                            </div>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="export_time_field" value="received_at">
+                            <div class="radio-card-content">
+                                <strong data-i18n="export_field_received">Alınma Zamanı (Sunucuya Geliş Zamanı - received_at)</strong>
+                                <small>Syslog daemonunun paketi ağ üzerinden teslim aldığı varış saati</small>
+                            </div>
+                        </label>
+                    </div>
+                    <small style="font-size: 11px; color: var(--text-muted); margin-top: 4px;" data-i18n="export_time_field_help">
+                        Not: Cihaz saat kaymalarında veya gecikmeli log iletimlerinde Olay Zamanı ve Alınma Zamanı farklılık gösterebilir.
+                    </small>
+                </div>
+
+                <!-- Format Selection -->
+                <div class="form-group">
+                    <label data-i18n="export_format_label">Dışa Aktarma Formatı</label>
+                    <div class="radio-card-group">
+                        <label class="radio-card">
+                            <input type="radio" name="export_format" value="bundle" checked>
+                            <div class="radio-card-content">
+                                <strong data-i18n="export_format_bundle">5651 Uyum Paketi (.zip: Log + .zd + .sha256 + Resmi Sertifika)</strong>
+                                <small>Mahkemeler ve denetim organları için hazır tam uyumluluk arşivi</small>
+                            </div>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="export_format" value="archive">
+                            <div class="radio-card-content">
+                                <strong data-i18n="export_format_archive">Sıkıştırılmış JSONL (.jsonl.gz ve .sha256)</strong>
+                                <small>Büyük veri analitiği ve SIEM aktarımları için deterministik gzip</small>
+                            </div>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="export_format" value="csv">
+                            <div class="radio-card-content">
+                                <strong data-i18n="export_format_csv">CSV Tablo Dosyası (.csv)</strong>
+                                <small>Excel veya tablolama araçlarında kolay inceleme için virgülle ayrılmış veri</small>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" style="gap: 8px; margin-top: 4px;">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="export-seal-check" checked>
+                        <span data-i18n="export_seal_checkbox">Kriptografik Zaman Damgası ile mühürle (.zd kanıtı oluştur)</span>
+                    </label>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="export-register-check" checked>
+                        <span data-i18n="export_register_checkbox">Bu dışa aktarmayı kalıcı Sistem Arşivleri listesine kaydet</span>
+                    </label>
+                </div>
+
+                <div id="export-status-alert" class="alert-box alert-info" style="display: none; margin-top: 8px;">
+                    <span id="export-status-text">Loglar hazırlanıyor...</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-export-modal" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" id="btn-execute-export" data-i18n="btn_export_submit">Hemen Oluştur ve İndir</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/translations.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>

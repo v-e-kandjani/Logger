@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -106,6 +107,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/archives", h.requireAuth(h.handleArchives))
 	mux.HandleFunc("/api/v1/archives/create", h.requireAuth(h.handleCreateArchiveNow))
 	mux.HandleFunc("/api/v1/archives/download", h.requireAuth(h.handleDownloadArchive))
+	mux.HandleFunc("/api/v1/archives/export-custom", h.requireAuth(h.handleExportCustomRange))
+	mux.HandleFunc("/api/v1/system/storage", h.requireAuth(h.handleStorageStats))
+	mux.HandleFunc("/api/v1/system/storage/prune", h.requireAuth(h.handleStoragePrune))
 	mux.HandleFunc("/api/v1/settings", h.requireAuth(h.handleSettings))
 	mux.HandleFunc("/api/v1/timestamp/credit", h.requireAuth(h.handleTimestampCredit))
 	mux.HandleFunc("/api/v1/users", h.requireAuth(h.handleUsersAPI))
@@ -193,6 +197,9 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Storage metrics from ClickHouse
+	storageStats, _ := h.chClient.GetStorageStats(ctx)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"logs_today":              countToday,
 		"queue_depth":             h.pipeline.QueueDepth(),
@@ -207,6 +214,7 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"clickhouse_healthy":      h.chClient.IsHealthy(),
 		"strict_device_filtering": h.pipeline.IsStrictFiltering(),
 		"dropped_unauthorized":   h.pipeline.DroppedUnauthorized.Load(),
+		"storage":                 storageStats,
 	})
 }
 
@@ -638,6 +646,200 @@ func (h *Handler) serveArchiveBundleZip(w http.ResponseWriter, r *http.Request, 
 
 func (h *Handler) handleDashboardUI(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "./web/templates/index.html")
+}
+
+func (h *Handler) handleStorageStats(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := contextWithTimeout(r, 5*time.Second)
+	defer cancel()
+
+	stats, err := h.chClient.GetStorageStats(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, stats)
+}
+
+func (h *Handler) handleStoragePrune(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx, cancel := contextWithTimeout(r, 30*time.Second)
+	defer cancel()
+
+	var req struct {
+		Action string `json:"action"` // "oldest_partition" or "retention"
+		Days   int    `json:"days"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	if req.Action == "retention" && req.Days > 0 {
+		if err := h.chClient.PruneOlderThanDays(ctx, req.Days); err != nil {
+			http.Error(w, "Prune failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		stats, _ := h.chClient.GetStorageStats(ctx)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":  "pruned",
+			"message": fmt.Sprintf("Events older than %d days successfully pruned", req.Days),
+			"storage": stats,
+		})
+		return
+	}
+
+	droppedPart, err := h.chClient.PruneOldestPartition(ctx)
+	if err != nil {
+		http.Error(w, "Pruning oldest partition: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	stats, _ := h.chClient.GetStorageStats(ctx)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":            "pruned",
+		"dropped_partition": droppedPart,
+		"message":           fmt.Sprintf("Oldest partition %s successfully removed to reclaim storage", droppedPart),
+		"storage":           stats,
+	})
+}
+
+func parseFlexibleTime(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	formats := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04",
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04",
+		"2006-01-02",
+	}
+	for _, f := range formats {
+		if t, err := time.Parse(f, s); err == nil {
+			return t.UTC(), nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unable to parse datetime: %s", s)
+}
+
+func (h *Handler) handleExportCustomRange(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := contextWithTimeout(r, 60*time.Second)
+	defer cancel()
+
+	var startStr, endStr, timeField, format string
+	seal := true
+	register := true
+
+	if r.Method == http.MethodPost {
+		var req struct {
+			Start     string `json:"start"`
+			End       string `json:"end"`
+			TimeField string `json:"time_field"`
+			Format    string `json:"format"`
+			Seal      *bool  `json:"seal"`
+			Register  *bool  `json:"register"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			startStr = req.Start
+			endStr = req.End
+			timeField = req.TimeField
+			format = req.Format
+			if req.Seal != nil {
+				seal = *req.Seal
+			}
+			if req.Register != nil {
+				register = *req.Register
+			}
+		}
+	} else {
+		// GET query params
+		startStr = r.URL.Query().Get("start")
+		endStr = r.URL.Query().Get("end")
+		timeField = r.URL.Query().Get("time_field")
+		format = r.URL.Query().Get("format")
+		if s := r.URL.Query().Get("seal"); s == "false" || s == "0" {
+			seal = false
+		}
+		if reg := r.URL.Query().Get("register"); reg == "false" || reg == "0" {
+			register = false
+		}
+	}
+
+	if startStr == "" || endStr == "" {
+		http.Error(w, "start and end dates are required", http.StatusBadRequest)
+		return
+	}
+
+	startTime, err := parseFlexibleTime(startStr)
+	if err != nil {
+		http.Error(w, "invalid start datetime: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	endTime, err := parseFlexibleTime(endStr)
+	if err != nil {
+		http.Error(w, "invalid end datetime: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if timeField != "received_at" {
+		timeField = "event_timestamp"
+	}
+	if format == "" {
+		format = "bundle"
+	}
+
+	opts := archive.CustomRangeOptions{
+		Start:     startTime,
+		End:       endTime,
+		TimeField: timeField,
+		Format:    format,
+		Seal:      seal,
+		Register:  register,
+	}
+
+	res, err := h.archEngine.CreateCustomRangeArchive(ctx, opts)
+	if err != nil {
+		http.Error(w, "generating custom archive: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// If direct download was requested via GET or download=true parameter
+	if r.Method == http.MethodGet || r.URL.Query().Get("download") == "true" {
+		targetFile := res.FilePath
+		if _, err := os.Stat(targetFile); os.IsNotExist(err) {
+			http.Error(w, "generated file not found on disk", http.StatusInternalServerError)
+			return
+		}
+
+		filename := filepath.Base(targetFile)
+		switch format {
+		case "bundle":
+			w.Header().Set("Content-Type", "application/zip")
+		case "csv":
+			w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		default:
+			w.Header().Set("Content-Type", "application/gzip")
+		}
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+		http.ServeFile(w, r, targetFile)
+		return
+	}
+
+	// Otherwise return JSON with download link & metrics
+	downloadURL := fmt.Sprintf("/api/v1/archives/export-custom?start=%s&end=%s&time_field=%s&format=%s&seal=%t&register=%t&download=true",
+		startTime.Format(time.RFC3339),
+		endTime.Format(time.RFC3339),
+		timeField,
+		format,
+		seal,
+		register,
+	)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"result":       res,
+		"download_url": downloadURL,
+	})
 }
 
 func contextWithTimeout(r *http.Request, d time.Duration) (context.Context, context.CancelFunc) {

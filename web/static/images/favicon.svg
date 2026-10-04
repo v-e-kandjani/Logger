@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="favShield" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 4L10 14V30C10 44.8 19.4 56.5 32 60C44.6 56.5 54 44.8 54 30V14L32 4Z" fill="url(#favShield)"/>
+  <path d="M32 9L15 17V30C15 42 22 51.5 32 54.5C42 51.5 49 42 49 30V17L32 9Z" fill="#0b0f19"/>
+  <circle cx="32" cy="32" r="13" stroke="#38bdf8" stroke-width="2"/>
+  <line x1="32" y1="32" x2="26" y2="25" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="32" y1="32" x2="40" y2="26" stroke="#22d3ee" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="2.5" fill="#34d399"/>
+</svg>

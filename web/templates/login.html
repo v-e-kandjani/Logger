@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Giriş Yap | Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -262,15 +263,20 @@
     <div class="ambient-grid"></div>
 
     <div class="login-card">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+            <div class="lang-switcher">
+                <button type="button" class="lang-btn active" id="lang-btn-tr" onclick="setLoginLang('tr')">🇹🇷 TR</button>
+                <button type="button" class="lang-btn" id="lang-btn-en" onclick="setLoginLang('en')">🇬🇧 EN</button>
+            </div>
+        </div>
+
         <div class="brand-header">
-            <div class="brand-logo-glow">
-                <svg fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-                </svg>
+            <div class="brand-logo-glow" style="background: transparent; border: none; box-shadow: none;">
+                <img src="/static/images/logo.svg" width="56" height="56" alt="Valtrivo LogSeal">
             </div>
             <h1 class="brand-title">Valtrivo LogSeal</h1>
-            <p class="brand-subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</p>
-            <div class="compliance-pill" style="font-style: italic; letter-spacing: 0.02em;">
+            <p class="brand-subtitle" id="login-sub-text">Merkezi Log Yönetimi ve Zaman Damgalama</p>
+            <div class="compliance-pill" id="login-tagline-text" style="font-style: italic; letter-spacing: 0.02em;">
                 “Her kayıt, zamanıyla kanıt.”
             </div>
         </div>
@@ -365,6 +371,62 @@
             errorBox.textContent = msg;
             errorBox.style.display = 'block';
         }
+
+        const loginTexts = {
+            tr: {
+                title: "Giriş Yap | Valtrivo LogSeal",
+                sub: "Merkezi Log Yönetimi ve Zaman Damgalama",
+                tagline: "“Her kayıt, zamanıyla kanıt.”",
+                username: "Kullanıcı Adı (Username)",
+                password: "Parola (Password)",
+                btnText: "Giriş Yap ve Platforma Eriş",
+                verifying: "Kimlik doğrulanıyor...",
+                granted: "Giriş Başarılı. Yönlendiriliyor...",
+                errEmpty: "Lütfen kullanıcı adı ve parolanızı girin."
+            },
+            en: {
+                title: "Login | Valtrivo LogSeal",
+                sub: "Centralized Log Management & Timestamping",
+                tagline: "“Every record, proven by time.”",
+                username: "Username",
+                password: "Password",
+                btnText: "Authenticate & Enter Platform",
+                verifying: "Verifying credentials...",
+                granted: "Access Granted. Redirecting...",
+                errEmpty: "Please enter both username and password."
+            }
+        };
+
+        let currentLoginLang = localStorage.getItem('logseal_lang') || 'tr';
+
+        function setLoginLang(lang) {
+            currentLoginLang = lang;
+            localStorage.setItem('logseal_lang', lang);
+            document.documentElement.lang = lang;
+            const t = loginTexts[lang] || loginTexts.tr;
+
+            document.title = t.title;
+            document.getElementById('login-sub-text').textContent = t.sub;
+            document.getElementById('login-tagline-text').textContent = t.tagline;
+            document.querySelector('label[for="username"]').textContent = t.username;
+            document.querySelector('label[for="password"]').textContent = t.password;
+            if (!btn.disabled) {
+                btnText.textContent = t.btnText;
+            }
+
+            const btnTr = document.getElementById('lang-btn-tr');
+            const btnEn = document.getElementById('lang-btn-en');
+            if (lang === 'tr') {
+                btnTr.classList.add('active');
+                btnEn.classList.remove('active');
+            } else {
+                btnTr.classList.remove('active');
+                btnEn.classList.add('active');
+            }
+        }
+
+        // Initialize language
+        setLoginLang(currentLoginLang);
     </script>
 </body>
 </html>

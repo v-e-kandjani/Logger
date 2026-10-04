@@ -224,3 +224,84 @@ func (c *Client) IsHealthy() bool {
 func (c *Client) QueryEvents(ctx context.Context, query string, args ...any) (driver.Rows, error) {
 	return c.conn.Query(ctx, query, args...)
 }
+
+// StorageStats encapsulates physical disk and table volume telemetry
+type StorageStats struct {
+	TotalBytesOnDisk      uint64  `json:"total_bytes_on_disk"`
+	UncompressedDataBytes uint64  `json:"uncompressed_data_bytes"`
+	TotalRows             uint64  `json:"total_rows"`
+	CompressionRatio      float64 `json:"compression_ratio"`
+	FreeDiskBytes         uint64  `json:"free_disk_bytes"`
+	TotalDiskBytes        uint64  `json:"total_disk_bytes"`
+	DiskUsagePercent      float64 `json:"disk_usage_percent"`
+	ActivePartitions      uint64  `json:"active_partitions"`
+}
+
+// GetStorageStats retrieves storage consumption and host disk allocation
+func (c *Client) GetStorageStats(ctx context.Context) (*StorageStats, error) {
+	stats := &StorageStats{}
+
+	// Query table size metrics
+	row := c.conn.QueryRow(ctx, `
+		SELECT 
+			coalesce(sum(bytes_on_disk), 0),
+			coalesce(sum(data_uncompressed_bytes), 0),
+			coalesce(sum(rows), 0),
+			count(DISTINCT partition)
+		FROM system.parts 
+		WHERE database = 'syslog' AND active = 1
+	`)
+	if err := row.Scan(&stats.TotalBytesOnDisk, &stats.UncompressedDataBytes, &stats.TotalRows, &stats.ActivePartitions); err != nil {
+		return nil, fmt.Errorf("querying parts stats: %w", err)
+	}
+
+	if stats.TotalBytesOnDisk > 0 && stats.UncompressedDataBytes > 0 {
+		stats.CompressionRatio = float64(stats.UncompressedDataBytes) / float64(stats.TotalBytesOnDisk)
+	} else {
+		stats.CompressionRatio = 1.0
+	}
+
+	// Query host disk partition metrics
+	diskRow := c.conn.QueryRow(ctx, `
+		SELECT coalesce(free_space, 0), coalesce(total_space, 0)
+		FROM system.disks
+		WHERE name = 'default'
+	`)
+	if err := diskRow.Scan(&stats.FreeDiskBytes, &stats.TotalDiskBytes); err == nil && stats.TotalDiskBytes > 0 {
+		used := stats.TotalDiskBytes - stats.FreeDiskBytes
+		stats.DiskUsagePercent = (float64(used) / float64(stats.TotalDiskBytes)) * 100
+	}
+
+	return stats, nil
+}
+
+// PruneOldestPartition drops the chronologically oldest partition to immediately reclaim disk space
+func (c *Client) PruneOldestPartition(ctx context.Context) (string, error) {
+	var oldestPartition string
+	row := c.conn.QueryRow(ctx, `
+		SELECT partition
+		FROM system.parts
+		WHERE database = 'syslog' AND table = 'syslog_events' AND active = 1
+		ORDER BY partition ASC
+		LIMIT 1
+	`)
+	if err := row.Scan(&oldestPartition); err != nil {
+		return "", fmt.Errorf("finding oldest partition: %w", err)
+	}
+	if oldestPartition == "" {
+		return "", fmt.Errorf("no active partitions found to prune")
+	}
+
+	dropQuery := fmt.Sprintf("ALTER TABLE syslog.syslog_events DROP PARTITION '%s'", oldestPartition)
+	if err := c.conn.Exec(ctx, dropQuery); err != nil {
+		return "", fmt.Errorf("dropping partition %s: %w", oldestPartition, err)
+	}
+
+	return oldestPartition, nil
+}
+
+// PruneOlderThanDays deletes events older than the retention threshold
+func (c *Client) PruneOlderThanDays(ctx context.Context, days int) error {
+	query := fmt.Sprintf("ALTER TABLE syslog.syslog_events DELETE WHERE event_timestamp < now() - INTERVAL %d DAY", days)
+	return c.conn.Exec(ctx, query)
+}
