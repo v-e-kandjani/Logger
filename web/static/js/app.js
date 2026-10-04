@@ -476,10 +476,6 @@ async function loadHealthTelemetry() {
         body.innerHTML = `<span class="text-red">Health probe error: ${e.message}</span>`;
     }
 }
-    } catch (e) {
-        body.innerHTML = `<span class="text-red">Health probe error: ${e.message}</span>`;
-    }
-}
 
 // TÜBİTAK KamuSM Settings
 function updateStampingUI() {
