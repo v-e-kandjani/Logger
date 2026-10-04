@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syslog Platform & KamuSM Zaman Damgası SIEM</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h2>Syslog Platform <span class="badge badge-secondary" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.0.0</span></h2>
+                    <span class="badge badge-primary">5651 Law / KamuSM</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#dashboard" class="nav-item active" data-tab="dashboard">
+                    <span class="icon">📊</span> Dashboard
+                </a>
+                <a href="#live" class="nav-item" data-tab="live">
+                    <span class="icon">⚡</span> Live Stream
+                    <span class="live-dot"></span>
+                </a>
+                <a href="#search" class="nav-item" data-tab="search">
+                    <span class="icon">🔍</span> Log Search
+                </a>
+                <a href="#devices" class="nav-item" data-tab="devices">
+                    <span class="icon">🖥️</span> Registered Devices
+                </a>
+                <a href="#unregistered" class="nav-item" data-tab="unregistered">
+                    <span class="icon">⚠️</span> Unknown Sources
+                    <span class="badge badge-warning" id="unknown-count-badge">0</span>
+                </a>
+                <a href="#archives" class="nav-item" data-tab="archives">
+                    <span class="icon">📦</span> Archives & Evidence
+                </a>
+                <a href="#health" class="nav-item" data-tab="health">
+                    <span class="icon">💓</span> System Health
+                </a>
+                <a href="#settings" class="nav-item" data-tab="settings">
+                    <span class="icon">⚙️</span> Settings & KamuSM
+                </a>
+                <a href="#users" class="nav-item" data-tab="users">
+                    <span class="icon">👥</span> Users & Access
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="dot green"></span> ClickHouse: <span id="sb-ch-status">Online</span>
+                </div>
+                <div class="status-indicator">
+                    <span class="dot green"></span> Postgres: <span id="sb-pg-status">Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header Bar -->
+            <header class="top-bar">
+                <div class="page-title">
+                    <h1 id="view-title">Operations Dashboard</h1>
+                    <p class="subtitle" id="view-subtitle">High-throughput ingestion & cryptographic verification</p>
+                </div>
+                <div class="top-actions">
+                    <button class="btn btn-outline" id="btn-manual-archive">Create Archive Now</button>
+                    <div class="rate-counter">
+                        <span class="label">Ingestion Rate</span>
+                        <span class="value" id="current-eps">0 EPS</span>
+                    </div>
+                    <div class="user-profile-badge">
+                        <span class="user-avatar">🛡️</span>
+                        <div class="user-info">
+                            <span class="user-name" id="current-user-name">admin</span>
+                            <span class="user-role" id="current-user-role">Super Administrator</span>
+                        </div>
+                        <button class="btn btn-outline text-red" id="btn-logout" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;">Sign Out</button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- TAB: Dashboard -->
+            <section class="tab-pane active" id="pane-dashboard">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">Logs Today</div>
+                        <div class="stat-value" id="stat-logs-today">0</div>
+                        <div class="stat-sub">ClickHouse analytical store</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">Total Inserted</div>
+                        <div class="stat-value" id="stat-total-inserted">0</div>
+                        <div class="stat-sub">Since daemon startup</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">Active Sources</div>
+                        <div class="stat-value text-green" id="stat-active-devices">0</div>
+                        <div class="stat-sub" id="stat-total-devices">0 registered assets</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">Unknown Sources</div>
+                        <div class="stat-value text-yellow" id="stat-unknown-sources">0</div>
+                        <div class="stat-sub">Detected on network</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-panels">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Syslog Listener Status</h3>
+                            <span class="badge badge-success">Port 514 / 6514</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="status-row">
+                                <span>UDP Listener (0.0.0.0:514)</span>
+                                <span class="badge badge-success">RUNNING (4 Kernel Threads)</span>
+                            </div>
+                            <div class="status-row">
+                                <span>TCP Listener (0.0.0.0:514)</span>
+                                <span class="badge badge-success">RUNNING (Non-blocking)</span>
+                            </div>
+                            <div class="status-row">
+                                <span>TLS Listener (0.0.0.0:6514)</span>
+                                <span class="badge badge-secondary">CONFIGURED</span>
+                            </div>
+                            <div class="status-row">
+                                <span>Batch Channel Queue Depth</span>
+                                <span class="badge badge-info" id="metric-queue-depth">0 / 250,000</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>TÜBİTAK KamuSM Zaman Damgası Status</h3>
+                            <span class="badge badge-primary">Law No. 5651</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="status-row">
+                                <span>Timestamp Engine</span>
+                                <span class="badge badge-success" id="ts-engine-status">Active (Mock/KamuSM Ready)</span>
+                            </div>
+                            <div class="status-row">
+                                <span>Archive Digest Algorithm</span>
+                                <span class="badge badge-info">SHA-256 (RFC 3161)</span>
+                            </div>
+                            <div class="status-row">
+                                <span>TSS Server Endpoint</span>
+                                <span class="badge badge-secondary">http://zd.kamusm.gov.tr:80</span>
+                            </div>
+                            <div class="status-row">
+                                <span>Client Command Path</span>
+                                <span class="mono-code">tss-client-console-3.1.33.jar</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: Live Stream -->
+            <section class="tab-pane" id="pane-live">
+                <div class="live-toolbar">
+                    <button class="btn btn-primary" id="btn-toggle-live">Pause Stream</button>
+                    <input type="text" class="input" id="live-filter" placeholder="Filter incoming live events (regex or text)...">
+                    <span class="badge badge-secondary" id="live-buffer-count">0 in view (Max 500)</span>
+                </div>
+                <div class="console-box" id="live-log-container">
+                    <!-- Stream rows injected here -->
+                </div>
+            </section>
+
+            <!-- TAB: Log Search -->
+            <section class="tab-pane" id="pane-search">
+                <div class="search-toolbar">
+                    <input type="text" class="input" id="search-q" placeholder="Full-text token search (e.g. WatchGuard, Deny, HTTPS)...">
+                    <select class="input" id="search-vendor">
+                        <option value="">All Vendors</option>
+                        <option value="WatchGuard">WatchGuard</option>
+                        <option value="Fortinet">Fortinet</option>
+                        <option value="Cisco">Cisco</option>
+                        <option value="Palo Alto">Palo Alto</option>
+                        <option value="Generic">Generic</option>
+                    </select>
+                    <select class="input" id="search-severity">
+                        <option value="">All Severities</option>
+                        <option value="EMERGENCY">EMERGENCY</option>
+                        <option value="ALERT">ALERT</option>
+                        <option value="CRITICAL">CRITICAL</option>
+                        <option value="ERROR">ERROR</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="NOTICE">NOTICE</option>
+                        <option value="INFORMATIONAL">INFORMATIONAL</option>
+                    </select>
+                    <input type="text" class="input" id="search-source" placeholder="Source IP...">
+                    <button class="btn btn-primary" id="btn-search-exec">Search ClickHouse</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="search-results-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp (UTC)</th>
+                                <th>Source IP</th>
+                                <th>Vendor / Device</th>
+                                <th>Severity</th>
+                                <th>Facility</th>
+                                <th>App / Action</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="search-results-body">
+                            <tr><td colspan="7" class="text-center">Execute search above to query historical records.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TAB: Devices -->
+            <section class="tab-pane" id="pane-devices">
+                <div class="section-actions">
+                    <h3>Registered Network & Security Assets</h3>
+                    <button class="btn btn-primary" id="btn-add-device-modal">+ Add Syslog Device</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="devices-table">
+                        <thead>
+                            <tr>
+                                <th>Device Name</th>
+                                <th>IP Address</th>
+                                <th>Vendor</th>
+                                <th>Type</th>
+                                <th>Activity Status</th>
+                                <th>Last Seen</th>
+                                <th>Timestamp Policy</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="devices-body">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TAB: Unknown Sources -->
+            <section class="tab-pane" id="pane-unregistered">
+                <div class="section-actions">
+                    <h3>Auto-Discovered Syslog Senders (Unregistered)</h3>
+                    <p class="subtitle">Convert discovered network senders into registered assets with one click</p>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="unreg-table">
+                        <thead>
+                            <tr>
+                                <th>Sender IP</th>
+                                <th>Packets Received</th>
+                                <th>Detected Facility</th>
+                                <th>Detected Severity</th>
+                                <th>First Seen</th>
+                                <th>Last Seen</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unreg-body">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TAB: Archives -->
+            <section class="tab-pane" id="pane-archives">
+                <div class="section-actions">
+                    <h3>Immutable Log Archives & KamuSM Zaman Damgası Evidence</h3>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="archives-table">
+                        <thead>
+                            <tr>
+                                <th>Archive Name</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
+                                <th>Records</th>
+                                <th>Size</th>
+                                <th>SHA-256 Hash</th>
+                                <th>Timestamp Status</th>
+                                <th>Evidence (.zd)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="archives-body">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TAB: Health -->
+            <section class="tab-pane" id="pane-health">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>System Health & Ingestion Telemetry</h3>
+                    </div>
+                    <div class="panel-body" id="health-telemetry-body">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: Settings & KamuSM Configuration -->
+            <section class="tab-pane" id="pane-settings">
+                <div class="dashboard-panels">
+                    <!-- TÜBİTAK KamuSM Zaman Damgası Credentials Panel -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>TÜBİTAK KamuSM Zaman Damgası Credentials</h3>
+                            <span class="badge badge-primary">Turkish Law No. 5651</span>
+                        </div>
+                        <div class="panel-body">
+                            <p class="subtitle" style="margin-bottom: 12px;">
+                                Configure your official TÜBİTAK KamuSM Zaman Damgası client account. Credentials are used when stamping archive slices.
+                            </p>
+                            <div class="form-group">
+                                <label>Timestamp Provider Mode</label>
+                                <select class="input" id="setting-provider">
+                                    <option value="mock">Mock SHA-256 (Local testing / no credits deducted)</option>
+                                    <option value="kamusm">Official TÜBİTAK KamuSM (Requires valid account)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>TSS Server Endpoint</label>
+                                <select class="input" id="setting-server-url">
+                                    <option value="http://zd.kamusm.gov.tr">http://zd.kamusm.gov.tr (Production - 5070 & 5651 Compliant)</option>
+                                    <option value="http://tzd.kamusm.gov.tr">http://tzd.kamusm.gov.tr (Test Server)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Server Port</label>
+                                <input type="number" class="input" id="setting-server-port" value="80">
+                            </div>
+                            <div class="form-group">
+                                <label>Customer Account Number (Müşteri No)</label>
+                                <input type="text" class="input" id="setting-customer-no" placeholder="e.g. 10045231">
+                            </div>
+                            <div class="form-group">
+                                <label>Customer Password (Parola - min 8 chars)</label>
+                                <input type="password" class="input" id="setting-customer-pass" placeholder="••••••••">
+                            </div>
+                            <div class="form-group">
+                                <label>Digest Type</label>
+                                <select class="input" id="setting-digest">
+                                    <option value="sha-256">SHA-256 (Default)</option>
+                                    <option value="sha-512">SHA-512</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" id="btn-save-settings" style="margin-top: 8px;">Save KamuSM Settings</button>
+                        </div>
+                    </div>
+
+                    <!-- Archival & System Retention Policies -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Archival & Retention Policies</h3>
+                            <span class="badge badge-success">Automated Slices</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="form-group">
+                                <label>Archive Interval</label>
+                                <select class="input" id="setting-archive-interval">
+                                    <option value="hourly">Hourly (Recommended for Law 5651)</option>
+                                    <option value="daily">Daily</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Default ClickHouse Retention (Days)</label>
+                                <input type="number" class="input" id="setting-retention-days" value="365">
+                            </div>
+                            <div class="status-row" style="margin-top: 16px;">
+                                <span>Java Runtime</span>
+                                <span class="mono-code">/usr/bin/java (OpenJDK 17)</span>
+                            </div>
+                            <div class="status-row">
+                                <span>KamuSM JAR Path</span>
+                                <span class="mono-code">/opt/syslog-platform/timestamp-client/tss-client-console-3.1.33.jar</span>
+                            </div>
+                            <div class="status-row">
+                                <span>Archive Destination</span>
+                                <span class="mono-code">/opt/syslog-platform/archive/YYYY/MM/DD/</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: Users & Access Control -->
+            <section class="tab-pane" id="pane-users">
+                <div class="section-actions">
+                    <div>
+                        <h3>Operator Accounts & Role Profiles</h3>
+                        <p class="subtitle">Role-Based Access Control (RBAC) with granular security profiles</p>
+                    </div>
+                    <button class="btn btn-primary" id="btn-add-user-modal">+ Add Operator</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="users-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Profile / Role</th>
+                                <th>Status</th>
+                                <th>Last Login</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-body">
+                            <tr><td colspan="8" class="text-center">Loading operators...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Add Device Modal -->
+    <div class="modal-backdrop" id="device-modal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Register Syslog Source</h3>
+                <button class="btn-close" id="btn-close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Device Name</label>
+                    <input type="text" class="input" id="dev-name" placeholder="Core-Firewall-01">
+                </div>
+                <div class="form-group">
+                    <label>IP Address</label>
+                    <input type="text" class="input" id="dev-ip" placeholder="192.168.1.1">
+                </div>
+                <div class="form-group">
+                    <label>Vendor</label>
+                    <select class="input" id="dev-vendor">
+                        <option value="WatchGuard">WatchGuard (Firebox)</option>
+                        <option value="Fortinet">Fortinet (FortiGate)</option>
+                        <option value="Cisco">Cisco (ASA / IOS / Catalyst)</option>
+                        <option value="Palo Alto">Palo Alto Networks</option>
+                        <option value="HPE Aruba">HPE Aruba Networking</option>
+                        <option value="Sophos">Sophos (XG / UTM)</option>
+                        <option value="Linux">Linux Server</option>
+                        <option value="Generic">Generic Syslog</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Device Type</label>
+                    <select class="input" id="dev-type">
+                        <option value="Firewall">Firewall</option>
+                        <option value="Switch">Switch</option>
+                        <option value="Router">Router</option>
+                        <option value="Wireless Controller">Wireless Controller</option>
+                        <option value="Server">Server</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-modal">Cancel</button>
+                <button class="btn btn-primary" id="btn-save-device">Save Asset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div class="modal-backdrop" id="user-modal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add Operator Account</h3>
+                <button class="btn-close" id="btn-close-user-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" class="input" id="new-user-username" placeholder="analyst_sec" required>
+                </div>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" class="input" id="new-user-fullname" placeholder="Security Operations Analyst">
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" class="input" id="new-user-email" placeholder="operator@corp.local">
+                </div>
+                <div class="form-group">
+                    <label>Password (Min 8 Characters)</label>
+                    <input type="password" class="input" id="new-user-password" placeholder="••••••••••••" required>
+                </div>
+                <div class="form-group">
+                    <label>Security Profile / Role</label>
+                    <select class="input" id="new-user-role">
+                        <option value="Super Administrator">Super Administrator (Full System & User Control)</option>
+                        <option value="Security Analyst" selected>Security Analyst (Live Threat Hunting & Queries)</option>
+                        <option value="Auditor">Auditor (Compliance & 5651 Evidence Verification)</option>
+                        <option value="Operator">Operator (Device Onboarding & Socket Monitoring)</option>
+                        <option value="Read Only">Read Only (Dashboard & Metric Observer)</option>
+                    </select>
+                </div>
+                <div class="status-row" id="role-description-box" style="margin-top: 10px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); padding: 10px 14px; border-radius: 8px;">
+                    <span style="font-size: 12px; color: var(--accent);" id="role-description-text">Threat hunting, live syslog stream inspection, and forensic ClickHouse queries</span>
+                </div>
+                <div class="form-group" style="margin-top: 14px; display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="new-user-enabled" checked style="width: 18px; height: 18px; cursor: pointer;">
+                    <label for="new-user-enabled" style="margin-bottom: 0; cursor: pointer;">Enable Account for Immediate Login</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-user-modal">Cancel</button>
+                <button class="btn btn-primary" id="btn-save-user">Create Operator</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+# Binaries and build outputs
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts and coverage
+*.out
+*.test
+coverage/
+
+# Runtime data & archives
+archive/
+data/
+*.log
+*.zd
+*.sha256
+*.jsonl.gz
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE configs
+.idea/
+.vscode/
+*.swp
+*~
