@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syslog Platform & KamuSM Zaman Damgası SIEM</title>
+    <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="stylesheet" href="/static/css/dashboard.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,8 +20,9 @@
                     </svg>
                 </div>
                 <div class="brand-text">
-                    <h2>Syslog Platform <span class="badge badge-secondary" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.0.0</span></h2>
-                    <span class="badge badge-primary">5651 Law / KamuSM</span>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.1.0</span></h2>
+                    <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;">Merkezi Log Yönetimi ve Zaman Damgalama</span>
+                    <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
             </div>
 
@@ -52,12 +53,15 @@
                 <a href="#settings" class="nav-item" data-tab="settings">
                     <span class="icon">⚙️</span> Settings & KamuSM
                 </a>
-                <a href="#users" class="nav-item" data-tab="users">
+                <a href="#users" class="nav-item" data-tab="users" id="nav-tab-users">
                     <span class="icon">👥</span> Users & Access
                 </a>
             </nav>
 
             <div class="sidebar-footer">
+                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-weight: 600;">
+                    Valtrivo &bull; Enterprise SIEM
+                </div>
                 <div class="status-indicator">
                     <span class="dot green"></span> ClickHouse: <span id="sb-ch-status">Online</span>
                 </div>

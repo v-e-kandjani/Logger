@@ -1,8 +1,11 @@
-# Syslog Platform & TÜBİTAK KamuSM Zaman Damgası SIEM
+# Valtrivo LogSeal
+### Merkezi Log Yönetimi ve Zaman Damgalama
+> **“Her kayıt, zamanıyla kanıt.”**  
+> Developed by **Valtrivo**
 
-An enterprise-grade, high-throughput centralized Syslog management, analytics, and legal evidence retention platform built with **Go**, **ClickHouse**, **PostgreSQL**, and **Vanilla HTML5/CSS/JavaScript**.
+An enterprise-grade, high-throughput centralized log management, analytics, and cryptographic evidence retention platform built with **Go**, **ClickHouse**, **PostgreSQL**, and **Vanilla HTML5/CSS/JavaScript**.
 
-Engineered specifically for network and security infrastructure, high-volume log aggregation, and compliance workflows adhering to **Turkish Law No. 5651** and **TÜBİTAK KamuSM Zaman Damgası** requirements.
+Engineered specifically for network and enterprise security infrastructure, high-volume log aggregation, and compliance workflows including **Turkish Law No. 5651**, **Law No. 5070**, and **TÜBİTAK KamuSM Zaman Damgası** requirements.
 
 ---
 
@@ -169,9 +172,13 @@ curl -X POST http://localhost:8080/api/v1/settings \
 
 ---
 
-## Operator Management & Password Reset
+---
 
-- **Role-Based Access Control (RBAC)**: Supports 5 security profiles: *Super Administrator*, *Security Analyst*, *Auditor*, *Operator*, and *Read Only*.
+## Operator Management & Access Governance
+
+- **Role-Based Access Control (RBAC)**: Supports 5 granular security profiles: *Super Administrator*, *Security Analyst*, *Auditor*, *Operator*, and *Read Only*.
+- **Admin-Only Visibility & Management**: Only **Super Administrators** have permission to view operator accounts or access the Users & Access Control console. All user API endpoints (`/api/v1/users`) enforce strict 403 Forbidden checks for non-administrators.
+- **Self-Deletion Protection**: An active operator **cannot delete or deactivate their own account** via the UI or API, preventing accidental administrator lockouts.
 - **Admin Password Reset**: Super Administrators can reset operator credentials directly in **Users & Access Control** > **Reset Password** (minimum 8 characters with bcrypt salted hashing).
 - **Automated Source Onboarding**: When registering auto-discovered senders, assets are assigned a Device Group / Tier (e.g. *Perimeter Firewalls*, *Core Switches & Routers*, *Datacenter Servers*) and automatically purged from the unknown sources queue.
 

@@ -188,21 +188,37 @@ func (h *Handler) handleLogoutAPI(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (h *Handler) handleMeAPI(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getSession(r *http.Request) (*Session, bool) {
 	cookie, err := r.Cookie(SessionCookieName)
 	if err != nil || cookie.Value == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-		return
+		return nil, false
 	}
+	return h.sessions.Get(cookie.Value)
+}
 
-	session, ok := h.sessions.Get(cookie.Value)
+func (h *Handler) requireAdmin(w http.ResponseWriter, r *http.Request) (*Session, bool) {
+	session, ok := h.getSession(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "session expired"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return nil, false
+	}
+	if session.Role != "Super Administrator" {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "access denied: administrator privileges required"})
+		return nil, false
+	}
+	return session, true
+}
+
+func (h *Handler) handleMeAPI(w http.ResponseWriter, r *http.Request) {
+	session, ok := h.getSession(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"authenticated": true,
+		"user_id":       session.UserID,
 		"username":      session.Username,
 		"full_name":     session.FullName,
 		"role":          session.Role,

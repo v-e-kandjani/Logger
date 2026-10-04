@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Sysguard SIEM & 5651 Platform</title>
+    <title>Giriş Yap | Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -268,13 +268,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                 </svg>
             </div>
-            <h1 class="brand-title">Sysguard SIEM</h1>
-            <p class="brand-subtitle">High-Volume Syslog & TÜBİTAK KamuSM Platform</p>
-            <div class="compliance-pill">
-                <svg style="width:12px; height:12px;" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                </svg>
-                Law No. 5651 Certified
+            <h1 class="brand-title">Valtrivo LogSeal</h1>
+            <p class="brand-subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</p>
+            <div class="compliance-pill" style="font-style: italic; letter-spacing: 0.02em;">
+                “Her kayıt, zamanıyla kanıt.”
             </div>
         </div>
 
@@ -282,7 +279,7 @@
 
         <form id="login-form">
             <div class="form-group">
-                <label class="form-label" for="username">Username</label>
+                <label class="form-label" for="username">Kullanıcı Adı (Username)</label>
                 <div class="input-wrapper">
                     <input type="text" id="username" class="login-input" placeholder="admin" required autofocus autocomplete="username">
                     <svg class="input-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -292,7 +289,7 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="password">Password</label>
+                <label class="form-label" for="password">Parola (Password)</label>
                 <div class="input-wrapper">
                     <input type="password" id="password" class="login-input" placeholder="••••••••••••" required autocomplete="current-password">
                     <svg class="input-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -303,7 +300,7 @@
 
             <button type="submit" class="btn-submit" id="btn-login">
                 <span class="spinner" id="login-spinner"></span>
-                <span id="btn-text">Authenticate & Enter Platform</span>
+                <span id="btn-text">Giriş Yap (Authenticate)</span>
             </button>
         </form>
 
@@ -312,7 +309,7 @@
         </div>
 
         <div class="login-footer">
-            Protected by SHA-256 Digest Tokens & RFC 3161 TSS
+            Valtrivo &bull; 5651 Uyumlu Güvenli Arşivleme & RFC 3161 Zaman Damgası
         </div>
     </div>
 

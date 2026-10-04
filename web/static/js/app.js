@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Authentication & Session Guard
+window.currentUser = null;
+
 async function initAuthSession() {
     try {
         const res = await fetch('/api/v1/auth/me');
@@ -27,11 +29,23 @@ async function initAuthSession() {
             return;
         }
         const data = await res.json();
+        window.currentUser = data;
+
         if (data.username) {
             const nameEl = document.getElementById('current-user-name');
             const roleEl = document.getElementById('current-user-role');
             if (nameEl) nameEl.textContent = data.username;
-            if (roleEl) roleEl.textContent = data.role || 'Administrator';
+            if (roleEl) roleEl.textContent = data.role || 'Operator';
+        }
+
+        // Only Super Administrators can see or manage users
+        const usersTab = document.getElementById('nav-tab-users');
+        if (usersTab) {
+            if (data.role !== 'Super Administrator') {
+                usersTab.style.display = 'none';
+            } else {
+                usersTab.style.display = '';
+            }
         }
     } catch (e) {
         window.location.href = '/login';
@@ -56,6 +70,13 @@ function initNavigation() {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const tab = item.getAttribute('data-tab');
+
+            // Gate access to users tab for non-admins
+            if (tab === 'users' && window.currentUser && window.currentUser.role !== 'Super Administrator') {
+                alert('Erişim Reddedildi: Yalnızca Süper Yöneticiler kullanıcıları görüntüleyebilir ve yönetebilir.');
+                return;
+            }
+
             navItems.forEach(i => i.classList.remove('active'));
             item.classList.add('active');
 
@@ -840,6 +861,10 @@ async function loadUsers() {
             window.location.href = '/login';
             return;
         }
+        if (res.status === 403) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-red">Erişim Reddedildi: Yalnızca Süper Yöneticiler operatör hesaplarını görüntüleyebilir ve yönetebilir.</td></tr>';
+            return;
+        }
         const users = await res.json();
         if (!users || users.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center">No operator accounts found.</td></tr>';
@@ -854,9 +879,14 @@ async function loadUsers() {
             'Read Only': 'badge-secondary'
         };
 
-        tbody.innerHTML = users.map(u => `
+        tbody.innerHTML = users.map(u => {
+            const isSelf = window.currentUser && (u.username === window.currentUser.username || u.id === window.currentUser.user_id);
+            return `
             <tr>
-                <td><strong>${escapeHtml(u.username)}</strong></td>
+                <td>
+                    <strong>${escapeHtml(u.username)}</strong>
+                    ${isSelf ? '<span class="badge badge-primary" style="font-size: 10px; margin-left: 4px;">You</span>' : ''}
+                </td>
                 <td>${escapeHtml(u.full_name || '-')}</td>
                 <td class="mono-code">${escapeHtml(u.email || '-')}</td>
                 <td>
@@ -872,26 +902,35 @@ async function loadUsers() {
                 <td>${u.last_login_at ? new Date(u.last_login_at).toLocaleString() : 'Never'}</td>
                 <td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
                 <td>
-                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
                         <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="openResetPasswordModal('${u.id}', '${escapeHtml(u.username)}')">
                             Reset Password
                         </button>
-                        <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="toggleUserStatus('${u.id}')">
-                            ${u.is_enabled ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button class="btn btn-outline text-red" style="padding: 3px 8px; font-size: 11px;" onclick="deleteUser('${u.id}', '${escapeHtml(u.username)}')">
-                            Delete
-                        </button>
+                        ${isSelf ? `
+                            <span class="badge badge-secondary" style="font-size: 10px;" title="Cannot deactivate or delete your own active account">Active Session</span>
+                        ` : `
+                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="toggleUserStatus('${u.id}')">
+                                ${u.is_enabled ? 'Deactivate' : 'Activate'}
+                            </button>
+                            <button class="btn btn-outline text-red" style="padding: 3px 8px; font-size: 11px;" onclick="deleteUser('${u.id}', '${escapeHtml(u.username)}')">
+                                Delete
+                            </button>
+                        `}
                     </div>
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center text-red">Failed loading users: ${e.message}</td></tr>`;
     }
 }
 
 window.toggleUserStatus = async (id) => {
+    if (window.currentUser && id === window.currentUser.user_id) {
+        alert('İşlem Engellendi: Kendi aktif hesabınızı devre dışı bırakamazsınız.');
+        return;
+    }
     try {
         const res = await fetch(`/api/v1/users/toggle?id=${id}`, { method: 'POST' });
         const data = await res.json();
@@ -903,6 +942,10 @@ window.toggleUserStatus = async (id) => {
 };
 
 window.deleteUser = async (id, username) => {
+    if (window.currentUser && (username === window.currentUser.username || id === window.currentUser.user_id)) {
+        alert('İşlem Engellendi: Kendi hesabınızı silemezsiniz!');
+        return;
+    }
     if (!confirm(`Are you sure you want to delete user account "${username}"?`)) return;
     try {
         const res = await fetch(`/api/v1/users?id=${id}`, { method: 'DELETE' });

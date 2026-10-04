@@ -55,6 +55,12 @@ func (h *Handler) handleRolesAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleUsersAPI(w http.ResponseWriter, r *http.Request) {
+	// Only Super Administrators can view or manage users
+	session, ok := h.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		ctx, cancel := contextWithTimeout(r, 5*time.Second)
@@ -62,7 +68,7 @@ func (h *Handler) handleUsersAPI(w http.ResponseWriter, r *http.Request) {
 
 		users, err := h.pgDB.ListUsers(ctx)
 		if err != nil {
-			http.Error(w, "failed listing users: "+err.Error(), http.StatusInternalServerError)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed listing users: " + err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusOK, users)
@@ -127,24 +133,21 @@ func (h *Handler) handleUsersAPI(w http.ResponseWriter, r *http.Request) {
 		idStr := r.URL.Query().Get("id")
 		id, err := uuid.Parse(idStr)
 		if err != nil {
-			http.Error(w, "invalid user id", http.StatusBadRequest)
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
 			return
 		}
 
-		// Prevent deleting currently logged-in user
-		cookie, _ := r.Cookie(SessionCookieName)
-		if cookie != nil && cookie.Value != "" {
-			if s, ok := h.sessions.Get(cookie.Value); ok && s.UserID == id {
-				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cannot delete your own active account"})
-				return
-			}
+		// A user cannot delete itself!
+		if session.UserID == id {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cannot delete your own account"})
+			return
 		}
 
 		ctx, cancel := contextWithTimeout(r, 5*time.Second)
 		defer cancel()
 
 		if err := h.pgDB.DeleteUser(ctx, id); err != nil {
-			http.Error(w, "failed deleting user: "+err.Error(), http.StatusInternalServerError)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed deleting user: " + err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
@@ -160,20 +163,22 @@ func (h *Handler) handleToggleUserAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idStr := r.URL.Query().Get("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+	session, ok := h.requireAdmin(w, r)
+	if !ok {
 		return
 	}
 
-	// Prevent disabling currently logged in user
-	cookie, _ := r.Cookie(SessionCookieName)
-	if cookie != nil && cookie.Value != "" {
-		if s, ok := h.sessions.Get(cookie.Value); ok && s.UserID == id {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cannot disable your own active account"})
-			return
-		}
+	idStr := r.URL.Query().Get("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+		return
+	}
+
+	// Prevent disabling own active account
+	if session.UserID == id {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cannot disable your own active account"})
+		return
 	}
 
 	ctx, cancel := contextWithTimeout(r, 5*time.Second)
@@ -181,7 +186,7 @@ func (h *Handler) handleToggleUserAPI(w http.ResponseWriter, r *http.Request) {
 
 	newState, err := h.pgDB.ToggleUserStatus(ctx, id)
 	if err != nil {
-		http.Error(w, "failed toggling status: "+err.Error(), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed toggling status: " + err.Error()})
 		return
 	}
 
@@ -191,6 +196,11 @@ func (h *Handler) handleToggleUserAPI(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleResetUserPasswordAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	_, ok := h.requireAdmin(w, r)
+	if !ok {
 		return
 	}
 
