@@ -104,6 +104,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/archives", h.requireAuth(h.handleArchives))
 	mux.HandleFunc("/api/v1/archives/create", h.requireAuth(h.handleCreateArchiveNow))
 	mux.HandleFunc("/api/v1/settings", h.requireAuth(h.handleSettings))
+	mux.HandleFunc("/api/v1/timestamp/credit", h.requireAuth(h.handleTimestampCredit))
 	mux.HandleFunc("/api/v1/users", h.requireAuth(h.handleUsersAPI))
 	mux.HandleFunc("/api/v1/users/toggle", h.requireAuth(h.handleToggleUserAPI))
 	mux.HandleFunc("/api/v1/roles", h.requireAuth(h.handleRolesAPI))
@@ -393,11 +394,40 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for k, v := range req {
+			if k == "kamusm_customer_password" && (v == "********" || v == "") {
+				continue // Do not overwrite existing password with mask
+			}
 			_ = h.pgDB.SaveSetting(ctx, k, v)
 		}
 
-		// Update runtime KamuSM provider if configured
-		if kp, ok := h.tsProvider.(*timestamp.KamuSMTimestampProvider); ok {
+		// Update runtime Adaptive provider if configured
+		if ap, ok := h.tsProvider.(*timestamp.AdaptiveTimestampProvider); ok {
+			if mode, ok := req["stamping_mode"]; ok && mode != "" {
+				ap.SetMode(timestamp.StampingMode(mode))
+			}
+			if af, ok := req["auto_fallback"]; ok {
+				ap.SetAutoFallback(af == "true" || af == "1")
+			}
+			currentCfg := ap.GetKamuSMConfig()
+			if url, ok := req["kamusm_server_url"]; ok && url != "" {
+				currentCfg.ServerURL = url
+			}
+			if port, ok := req["kamusm_server_port"]; ok && port != "" {
+				if p, err := strconv.Atoi(port); err == nil {
+					currentCfg.ServerPort = p
+				}
+			}
+			if custNo, ok := req["kamusm_customer_no"]; ok {
+				currentCfg.CustomerNo = custNo
+			}
+			if custPass, ok := req["kamusm_customer_password"]; ok && custPass != "********" && custPass != "" {
+				currentCfg.CustomerPass = custPass
+			}
+			if dt, ok := req["kamusm_digest_type"]; ok && dt != "" {
+				currentCfg.DigestType = dt
+			}
+			ap.UpdateKamuSMConfig(currentCfg)
+		} else if kp, ok := h.tsProvider.(*timestamp.KamuSMTimestampProvider); ok {
 			kp.UpdateConfig(timestamp.KamuSMConfig{
 				ServerURL:    req["kamusm_server_url"],
 				CustomerNo:   req["kamusm_customer_no"],
@@ -418,6 +448,12 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Include defaults if not yet set in DB
+	if _, ok := settings["stamping_mode"]; !ok {
+		settings["stamping_mode"] = "internal"
+	}
+	if _, ok := settings["auto_fallback"]; !ok {
+		settings["auto_fallback"] = "true"
+	}
 	if _, ok := settings["kamusm_server_url"]; !ok {
 		settings["kamusm_server_url"] = "http://zd.kamusm.gov.tr"
 	}
@@ -428,7 +464,7 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 		settings["kamusm_digest_type"] = "sha-256"
 	}
 	if _, ok := settings["kamusm_provider"]; !ok {
-		settings["kamusm_provider"] = "mock"
+		settings["kamusm_provider"] = "adaptive"
 	}
 	if _, ok := settings["archive_interval"]; !ok {
 		settings["archive_interval"] = "hourly"
@@ -483,6 +519,18 @@ func (h *Handler) handleCreateArchiveNow(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, arch)
+}
+
+func (h *Handler) handleTimestampCredit(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := contextWithTimeout(r, 10*time.Second)
+	defer cancel()
+
+	credit, err := h.tsProvider.QueryCredit(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "message": credit})
 }
 
 func (h *Handler) handleDashboardUI(w http.ResponseWriter, r *http.Request) {

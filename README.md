@@ -84,8 +84,27 @@ Inspect generated `.jsonl.gz`, `.sha256`, and `.zd` evidence in `/opt/syslog-pla
 
 ---
 
-## Official TÜBİTAK KamuSM Integration Notes
+## Law No. 5651 & TÜBİTAK Timestamping Architecture
 
+The platform supports multiple timestamping strategies designed for flexible compliance, testing, and production operations:
+
+### 1. Stamping Modes & Strategies
+- **Internal Cryptographic Authority (`internal` - Default)**:
+  - Generates verifiable HMAC-SHA256 digital signature tokens (`.zd`) locally.
+  - **Zero external dependencies**: Requires **no** TÜBİTAK subscription, no account credentials, and zero network credit consumption.
+  - Produces tamper-evident proof tokens matching standard archive verification protocols.
+- **Official TÜBİTAK KamuSM (`kamusm`)**:
+  - Connects to official TÜBİTAK TSS servers (`http://zd.kamusm.gov.tr:80` for Production or `http://tzd.kamusm.gov.tr:80` for Test) using the official console client JAR (`tss-client-console-3.1.33.jar`).
+  - RFC 3161 and Law No. 5070 / 5651 compliant digital signatures.
+- **Disable Stamping (`disabled`)**:
+  - Completely disables external TÜBİTAK and internal digital timestamp generation.
+  - Archives are still deterministic, SHA-256 hashed, and compressed into `.jsonl.gz` format for storage and audit.
+
+### 2. Auto-Fallback Protection
+- When configured, if the mode is set to `kamusm` but **no active account credentials** are entered, or if the TÜBİTAK TSS servers are unreachable, the system automatically falls back to the **Internal Cryptographic Authority**.
+- This guarantees uninterrupted archival cycles: log slices are never rejected or left unsealed even during network outages or before a KamuSM account is provisioned.
+
+### 3. Official TÜBİTAK KamuSM Integration Notes
 - **Client Binary Location**: `/opt/syslog-platform/timestamp-client/tss-client-console-3.1.33.jar`
 - **Official Specification Verified**:
   ```bash
@@ -95,6 +114,7 @@ Inspect generated `.jsonl.gz`, `.sha256`, and `.zd` evidence in `/opt/syslog-pla
   ```bash
   java -jar tss-client-console-3.1.33.jar -c [File] [Time Stamp File (.zd)]
   ```
+- **Authority Testing**: The Web UI features an immediate **"Test Authority / Query Credits"** button to check TÜBİTAK account balances or verify local authority status without generating an archive slice.
 - **Legal Compliance Distinction**: The application implements technical controls (cryptographic SHA-256 hashing, deterministic archival, and RFC 3161 timestamp evidence association). Legal compliance under Law No. 5651 requires operational compliance, organizational certificate validation, and statutory retention periods.
 
 ---

@@ -427,47 +427,147 @@ async function loadHealthTelemetry() {
 }
 
 // TÜBİTAK KamuSM Settings
+function updateStampingUI() {
+    const modeEl = document.getElementById('setting-stamping-mode');
+    if (!modeEl) return;
+    const mode = modeEl.value;
+
+    const banner = document.getElementById('stamping-mode-banner');
+    const title = document.getElementById('stamping-mode-title');
+    const desc = document.getElementById('stamping-mode-desc');
+    const credBox = document.getElementById('kamusm-credentials-box');
+    const statusBadge = document.getElementById('kamusm-field-status');
+
+    if (mode === 'internal') {
+        if (banner) {
+            banner.className = 'alert-box alert-info';
+            title.textContent = 'Internal Cryptographic Authority Active';
+            desc.textContent = 'Archives will be signed and sealed using the built-in SHA-256 HMAC cryptographic engine. No TÜBİTAK account, credentials, or network credits are required.';
+        }
+        if (credBox) credBox.style.opacity = '0.65';
+        if (statusBadge) {
+            statusBadge.className = 'badge badge-secondary';
+            statusBadge.textContent = 'Optional (Internal Mode Active)';
+        }
+    } else if (mode === 'kamusm') {
+        if (banner) {
+            banner.className = 'alert-box alert-success';
+            title.textContent = 'Official TÜBİTAK KamuSM Mode Active';
+            desc.textContent = 'Archives will be submitted to the official TÜBİTAK KamuSM TSS server (RFC 3161 compliant). Active Customer Account Number and Password are required below.';
+        }
+        if (credBox) credBox.style.opacity = '1.0';
+        if (statusBadge) {
+            statusBadge.className = 'badge badge-primary';
+            statusBadge.textContent = 'Required for KamuSM Mode';
+        }
+    } else if (mode === 'disabled') {
+        if (banner) {
+            banner.className = 'alert-box alert-warning';
+            title.textContent = 'Law No. 5651 Timestamping Disabled';
+            desc.textContent = 'External TÜBİTAK and internal cryptographic stamping are both disabled. Log archives will be hashed (SHA-256) and compressed without digital signature tokens.';
+        }
+        if (credBox) credBox.style.opacity = '0.4';
+        if (statusBadge) {
+            statusBadge.className = 'badge badge-danger';
+            statusBadge.textContent = 'Stamping Disabled';
+        }
+    }
+}
+
+// Law No. 5651 & TÜBİTAK Settings Controller
 async function loadSettings() {
     try {
         const res = await fetch('/api/v1/settings');
         if (!res.ok) return;
         const s = await res.json();
 
-        if (s.kamusm_provider) document.getElementById('setting-provider').value = s.kamusm_provider;
-        if (s.kamusm_server_url) document.getElementById('setting-server-url').value = s.kamusm_server_url;
-        if (s.kamusm_server_port) document.getElementById('setting-server-port').value = s.kamusm_server_port;
-        if (s.kamusm_customer_no) document.getElementById('setting-customer-no').value = s.kamusm_customer_no;
-        if (s.kamusm_customer_password && s.kamusm_customer_password !== '********') {
+        const modeEl = document.getElementById('setting-stamping-mode');
+        if (modeEl) {
+            modeEl.value = s.stamping_mode || 'internal';
+        }
+
+        const fallbackEl = document.getElementById('setting-auto-fallback');
+        if (fallbackEl) {
+            fallbackEl.checked = s.auto_fallback !== 'false';
+        }
+
+        if (s.kamusm_server_url && document.getElementById('setting-server-url')) {
+            document.getElementById('setting-server-url').value = s.kamusm_server_url;
+        }
+        if (s.kamusm_server_port && document.getElementById('setting-server-port')) {
+            document.getElementById('setting-server-port').value = s.kamusm_server_port;
+        }
+        if (s.kamusm_customer_no && document.getElementById('setting-customer-no')) {
+            document.getElementById('setting-customer-no').value = s.kamusm_customer_no;
+        }
+        if (s.kamusm_customer_password && s.kamusm_customer_password !== '********' && document.getElementById('setting-customer-pass')) {
             document.getElementById('setting-customer-pass').value = s.kamusm_customer_password;
         }
-        if (s.kamusm_digest_type) document.getElementById('setting-digest').value = s.kamusm_digest_type;
-        if (s.archive_interval) document.getElementById('setting-archive-interval').value = s.archive_interval;
-        if (s.retention_days) document.getElementById('setting-retention-days').value = s.retention_days;
+        if (s.kamusm_digest_type && document.getElementById('setting-digest')) {
+            document.getElementById('setting-digest').value = s.kamusm_digest_type;
+        }
+        if (s.archive_interval && document.getElementById('setting-archive-interval')) {
+            document.getElementById('setting-archive-interval').value = s.archive_interval;
+        }
+        if (s.retention_days && document.getElementById('setting-retention-days')) {
+            document.getElementById('setting-retention-days').value = s.retention_days;
+        }
+
+        const tsStatusBadge = document.getElementById('ts-engine-status');
+        if (tsStatusBadge) {
+            const mode = s.stamping_mode || 'internal';
+            if (mode === 'internal') {
+                tsStatusBadge.className = 'badge badge-info';
+                tsStatusBadge.textContent = 'Active (Internal Cryptographic Authority)';
+            } else if (mode === 'kamusm') {
+                tsStatusBadge.className = 'badge badge-success';
+                tsStatusBadge.textContent = 'Active (TÜBİTAK KamuSM RFC 3161)';
+            } else if (mode === 'disabled') {
+                tsStatusBadge.className = 'badge badge-warning';
+                tsStatusBadge.textContent = 'Disabled (Archival Only)';
+            }
+        }
+
+        updateStampingUI();
     } catch (e) {
         console.error('Failed loading settings:', e);
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
+
+    const modeEl = document.getElementById('setting-stamping-mode');
+    if (modeEl) {
+        modeEl.addEventListener('change', updateStampingUI);
+    }
+
     const btnSave = document.getElementById('btn-save-settings');
     if (btnSave) {
         btnSave.addEventListener('click', async () => {
             btnSave.disabled = true;
             btnSave.textContent = 'Saving Settings...';
 
+            const stampingMode = document.getElementById('setting-stamping-mode') ? document.getElementById('setting-stamping-mode').value : 'internal';
+            const autoFallback = document.getElementById('setting-auto-fallback') ? (document.getElementById('setting-auto-fallback').checked ? 'true' : 'false') : 'true';
+
             const payload = {
-                kamusm_provider: document.getElementById('setting-provider').value,
-                kamusm_server_url: document.getElementById('setting-server-url').value,
-                kamusm_server_port: document.getElementById('setting-server-port').value,
-                kamusm_customer_no: document.getElementById('setting-customer-no').value.trim(),
-                kamusm_digest_type: document.getElementById('setting-digest').value,
-                archive_interval: document.getElementById('setting-archive-interval').value,
-                retention_days: document.getElementById('setting-retention-days').value,
+                stamping_mode: stampingMode,
+                auto_fallback: autoFallback,
+                kamusm_server_url: document.getElementById('setting-server-url') ? document.getElementById('setting-server-url').value : '',
+                kamusm_server_port: document.getElementById('setting-server-port') ? document.getElementById('setting-server-port').value : '80',
+                kamusm_customer_no: document.getElementById('setting-customer-no') ? document.getElementById('setting-customer-no').value.trim() : '',
+                kamusm_digest_type: document.getElementById('setting-digest') ? document.getElementById('setting-digest').value : 'sha-256',
+                archive_interval: document.getElementById('setting-archive-interval') ? document.getElementById('setting-archive-interval').value : 'hourly',
+                retention_days: document.getElementById('setting-retention-days') ? document.getElementById('setting-retention-days').value : '365',
             };
 
-            const passVal = document.getElementById('setting-customer-pass').value.trim();
-            if (passVal && passVal !== '********') {
-                payload.kamusm_customer_password = passVal;
+            const passInput = document.getElementById('setting-customer-pass');
+            if (passInput) {
+                const passVal = passInput.value.trim();
+                if (passVal && passVal !== '********') {
+                    payload.kamusm_customer_password = passVal;
+                }
             }
 
             try {
@@ -477,12 +577,45 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(payload),
                 });
                 if (!res.ok) throw new Error(await res.text());
-                alert('TÜBİTAK KamuSM & System Settings saved successfully!');
+                alert('Stamping & System Settings saved successfully!');
+                updateStampingUI();
             } catch (e) {
                 alert('Failed saving settings: ' + e.message);
             } finally {
                 btnSave.disabled = false;
-                btnSave.textContent = 'Save KamuSM Settings';
+                btnSave.textContent = 'Save Stamping Settings';
+            }
+        });
+    }
+
+    const btnQuery = document.getElementById('btn-query-credit');
+    if (btnQuery) {
+        btnQuery.addEventListener('click', async () => {
+            btnQuery.disabled = true;
+            btnQuery.textContent = 'Testing Authority...';
+            const resultDiv = document.getElementById('credit-query-result');
+            if (resultDiv) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'alert-box alert-info';
+                resultDiv.textContent = 'Contacting timestamp provider authority...';
+            }
+
+            try {
+                const res = await fetch('/api/v1/timestamp/credit');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    resultDiv.className = 'alert-box alert-success';
+                    resultDiv.textContent = data.message;
+                } else {
+                    resultDiv.className = 'alert-box alert-warning';
+                    resultDiv.textContent = data.message;
+                }
+            } catch (e) {
+                resultDiv.className = 'alert-box alert-danger';
+                resultDiv.textContent = 'Authority test failed: ' + e.message;
+            } finally {
+                btnQuery.disabled = false;
+                btnQuery.textContent = 'Test Authority / Query Credits';
             }
         });
     }

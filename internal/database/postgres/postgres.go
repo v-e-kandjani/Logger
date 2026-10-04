@@ -226,11 +226,11 @@ func (db *DB) CreateArchiveRecord(ctx context.Context, a *models.LogArchive) err
 func (db *DB) UpdateArchiveTimestamp(ctx context.Context, id uuid.UUID, status, evidencePath, lastError string) error {
 	query := `
 		UPDATE log_archives
-		SET timestamp_status = $1,
-		    timestamp_completion_time = CASE WHEN $1 = 'STAMPED' THEN NOW() ELSE timestamp_completion_time END,
+		SET timestamp_status = $1::text,
+		    timestamp_completion_time = CASE WHEN $1::text = 'STAMPED' THEN NOW() ELSE timestamp_completion_time END,
 		    timestamp_evidence_path = $2,
 		    last_error = $3,
-		    retry_count = retry_count + CASE WHEN $1 = 'FAILED' THEN 1 ELSE 0 END
+		    retry_count = retry_count + CASE WHEN $1::text = 'FAILED' THEN 1 ELSE 0 END
 		WHERE id = $4`
 
 	_, err := db.pool.Exec(ctx, query, status, evidencePath, lastError, id)

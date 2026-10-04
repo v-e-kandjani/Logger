@@ -64,24 +64,43 @@ func main() {
 	defer chClient.Close()
 	log.Println("[ClickHouse] Connected and batch inserter worker pool running")
 
-	// 4. Initialize KamuSM / Mock Timestamp Provider
-	var tsProvider timestamp.TimestampProvider
-	if cfg.Timestamp.Provider == "kamusm" {
-		tsProvider = timestamp.NewKamuSMProvider(timestamp.KamuSMConfig{
-			JavaBinary:   cfg.Timestamp.JavaBinary,
-			JarPath:      cfg.Timestamp.JarPath,
-			ServerURL:    cfg.Timestamp.ServerURL,
-			ServerPort:   cfg.Timestamp.ServerPort,
-			CustomerNo:   cfg.Timestamp.CustomerNo,
-			CustomerPass: cfg.Timestamp.CustomerPass,
-			DigestType:   cfg.Timestamp.DigestType,
-			Timeout:      cfg.Timestamp.Timeout,
-		})
-		log.Println("[Timestamp] KamuSM Zaman Damgası client provider activated")
-	} else {
-		tsProvider = timestamp.NewMockTimestampProvider()
-		log.Println("[Timestamp] Mock SHA-256 Zaman Damgası provider activated (Development mode)")
+	// 4. Initialize Adaptive Timestamp Provider (TÜBİTAK KamuSM, Internal Standalone, or Disabled)
+	dbSettings, _ := pgDB.GetSettings(context.Background())
+	stampingMode := timestamp.StampingMode(dbSettings["stamping_mode"])
+	if stampingMode == "" {
+		if cfg.Timestamp.Provider == "kamusm" {
+			stampingMode = timestamp.ModeKamuSM
+		} else {
+			stampingMode = timestamp.ModeInternal
+		}
 	}
+	autoFallback := true
+	if val, ok := dbSettings["auto_fallback"]; ok {
+		autoFallback = val == "true" || val == "1"
+	}
+
+	kamusmCfg := timestamp.KamuSMConfig{
+		JavaBinary:   cfg.Timestamp.JavaBinary,
+		JarPath:      cfg.Timestamp.JarPath,
+		ServerURL:    cfg.Timestamp.ServerURL,
+		ServerPort:   cfg.Timestamp.ServerPort,
+		CustomerNo:   cfg.Timestamp.CustomerNo,
+		CustomerPass: cfg.Timestamp.CustomerPass,
+		DigestType:   cfg.Timestamp.DigestType,
+		Timeout:      cfg.Timestamp.Timeout,
+	}
+	if val, ok := dbSettings["kamusm_server_url"]; ok && val != "" {
+		kamusmCfg.ServerURL = val
+	}
+	if val, ok := dbSettings["kamusm_customer_no"]; ok {
+		kamusmCfg.CustomerNo = val
+	}
+	if val, ok := dbSettings["kamusm_customer_password"]; ok {
+		kamusmCfg.CustomerPass = val
+	}
+
+	tsProvider := timestamp.NewAdaptiveTimestampProvider(stampingMode, autoFallback, kamusmCfg)
+	log.Printf("[Timestamp] Adaptive timestamp provider activated (mode: %s, auto-fallback: %t)", stampingMode, autoFallback)
 
 	// 5. Initialize Archival & Integrity Engine
 	archEngine := archive.NewEngine(cfg.Archive.StoragePath, chClient, pgDB, tsProvider)

@@ -321,50 +321,89 @@
             <!-- TAB: Settings & KamuSM Configuration -->
             <section class="tab-pane" id="pane-settings">
                 <div class="dashboard-panels">
-                    <!-- TÜBİTAK KamuSM Zaman Damgası Credentials Panel -->
+                    <!-- Law No. 5651 & TÜBİTAK Stamping Panel -->
                     <div class="panel">
                         <div class="panel-header">
-                            <h3>TÜBİTAK KamuSM Zaman Damgası Credentials</h3>
-                            <span class="badge badge-primary">Turkish Law No. 5651</span>
+                            <h3>Law No. 5651 & TÜBİTAK Timestamping Configuration</h3>
+                            <span class="badge badge-primary">Turkish Law No. 5651 / 5070</span>
                         </div>
                         <div class="panel-body">
-                            <p class="subtitle" style="margin-bottom: 12px;">
-                                Configure your official TÜBİTAK KamuSM Zaman Damgası client account. Credentials are used when stamping archive slices.
+                            <p class="subtitle" style="margin-bottom: 8px;">
+                                Configure how log archives are signed and sealed. You can use official TÜBİTAK KamuSM, switch to the built-in standalone cryptographic authority (no account needed), or disable stamping completely.
                             </p>
+
+                            <!-- Timestamping Strategy Selection -->
                             <div class="form-group">
-                                <label>Timestamp Provider Mode</label>
-                                <select class="input" id="setting-provider">
-                                    <option value="mock">Mock SHA-256 (Local testing / no credits deducted)</option>
-                                    <option value="kamusm">Official TÜBİTAK KamuSM (Requires valid account)</option>
+                                <label style="font-weight: 600;">Timestamping Engine / Strategy</label>
+                                <select class="input" id="setting-stamping-mode">
+                                    <option value="internal">Internal Cryptographic Authority (Default - Standalone, No Account Needed)</option>
+                                    <option value="kamusm">Official TÜBİTAK KamuSM (Law No. 5651 Certified, Requires Account)</option>
+                                    <option value="disabled">Disable Law No. 5651 Stamping (Archival Only, No Signature)</option>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label>TSS Server Endpoint</label>
-                                <select class="input" id="setting-server-url">
-                                    <option value="http://zd.kamusm.gov.tr">http://zd.kamusm.gov.tr (Production - 5070 & 5651 Compliant)</option>
-                                    <option value="http://tzd.kamusm.gov.tr">http://tzd.kamusm.gov.tr (Test Server)</option>
-                                </select>
+
+                            <!-- Auto-Fallback Checkbox -->
+                            <div class="form-group" style="margin-top: 4px;">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="setting-auto-fallback" checked>
+                                    <span><strong>Auto-Fallback Protection:</strong> Automatically use Internal Cryptographic method if TÜBİTAK KamuSM account is inactive or unreachable</span>
+                                </label>
+                                <p class="subtitle" style="font-size: 0.78rem; margin-top: 4px; color: var(--text-muted); padding-left: 28px;">
+                                    Guarantees seamless archival operations: If TÜBİTAK account credentials are blank, expired, or the TSS server is unreachable, archives are automatically sealed with the internal cryptographic method instead of failing.
+                                </p>
                             </div>
-                            <div class="form-group">
-                                <label>Server Port</label>
-                                <input type="number" class="input" id="setting-server-port" value="80">
+
+                            <!-- Dynamic Status Banner -->
+                            <div id="stamping-mode-banner" class="alert-box alert-info" style="margin: 8px 0;">
+                                <div>
+                                    <strong id="stamping-mode-title">Internal Cryptographic Authority Active</strong>
+                                    <div id="stamping-mode-desc" style="font-size: 0.8rem; margin-top: 4px;">
+                                        Archives will be sealed with SHA-256 HMAC digital tokens locally. No TÜBİTAK account, credentials, or network credits are required.
+                                    </div>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>Customer Account Number (Müşteri No)</label>
-                                <input type="text" class="input" id="setting-customer-no" placeholder="e.g. 10045231">
+
+                            <!-- TÜBİTAK KamuSM Credentials Sub-section (Active when KamuSM is selected) -->
+                            <div id="kamusm-credentials-box" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; background-color: var(--bg-surface-elevated); margin-top: 4px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <h4 style="font-size: 0.85rem; color: var(--text-main); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+                                        TÜBİTAK KamuSM Account Credentials
+                                    </h4>
+                                    <span class="badge badge-secondary" id="kamusm-field-status">Required for KamuSM mode</span>
+                                </div>
+                                <div class="form-group">
+                                    <label>TSS Server Endpoint</label>
+                                    <select class="input" id="setting-server-url">
+                                        <option value="http://zd.kamusm.gov.tr">http://zd.kamusm.gov.tr (Production - 5070 & 5651 Compliant)</option>
+                                        <option value="http://tzd.kamusm.gov.tr">http://tzd.kamusm.gov.tr (Test Server)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Server Port</label>
+                                    <input type="number" class="input" id="setting-server-port" value="80">
+                                </div>
+                                <div class="form-group">
+                                    <label>Customer Account Number (Müşteri No)</label>
+                                    <input type="text" class="input" id="setting-customer-no" placeholder="e.g. 10045231 (Leave blank if using internal method)">
+                                </div>
+                                <div class="form-group">
+                                    <label>Customer Password (Parola - min 8 chars)</label>
+                                    <input type="password" class="input" id="setting-customer-pass" placeholder="••••••••">
+                                </div>
+                                <div class="form-group">
+                                    <label>Digest Type</label>
+                                    <select class="input" id="setting-digest">
+                                        <option value="sha-256">SHA-256 (RFC 3161 Standard)</option>
+                                        <option value="sha-512">SHA-512</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>Customer Password (Parola - min 8 chars)</label>
-                                <input type="password" class="input" id="setting-customer-pass" placeholder="••••••••">
+
+                            <div style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
+                                <button class="btn btn-primary" id="btn-save-settings">Save Stamping Settings</button>
+                                <button class="btn btn-outline" id="btn-query-credit">Test Authority / Query Credits</button>
                             </div>
-                            <div class="form-group">
-                                <label>Digest Type</label>
-                                <select class="input" id="setting-digest">
-                                    <option value="sha-256">SHA-256 (Default)</option>
-                                    <option value="sha-512">SHA-512</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary" id="btn-save-settings" style="margin-top: 8px;">Save KamuSM Settings</button>
+                            <div id="credit-query-result" style="margin-top: 10px; display: none;"></div>
                         </div>
                     </div>
 

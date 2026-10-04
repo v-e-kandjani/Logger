@@ -80,3 +80,71 @@ func TestMockTimestampAndVerify(t *testing.T) {
 		t.Errorf("expected verification failure on tampered file, but it passed")
 	}
 }
+
+func TestInternalTimestampProvider(t *testing.T) {
+	tmpDir := t.TempDir()
+	sampleFile := filepath.Join(tmpDir, "internal-archive.jsonl.gz")
+	if err := os.WriteFile(sampleFile, []byte("5651 legal log slice data\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	it := NewInternalTimestampProvider()
+	ctx := context.Background()
+
+	res, err := it.Timestamp(ctx, sampleFile)
+	if err != nil {
+		t.Fatalf("internal timestamping failed: %v", err)
+	}
+
+	if !res.Success || res.EvidenceFile == "" {
+		t.Fatalf("expected successful stamping with non-empty evidence token")
+	}
+
+	// Verify token
+	if err := it.Verify(ctx, sampleFile, res.EvidenceFile); err != nil {
+		t.Fatalf("expected valid verification: %v", err)
+	}
+
+	// Verify tampering detection
+	_ = os.WriteFile(sampleFile, []byte("corrupted slice content"), 0644)
+	if err := it.Verify(ctx, sampleFile, res.EvidenceFile); err == nil {
+		t.Fatalf("expected verification error for modified file, but got nil")
+	}
+}
+
+func TestAdaptiveTimestampProvider(t *testing.T) {
+	tmpDir := t.TempDir()
+	sampleFile := filepath.Join(tmpDir, "adaptive-archive.jsonl.gz")
+	_ = os.WriteFile(sampleFile, []byte("test compliance data\n"), 0644)
+
+	ctx := context.Background()
+
+	// 1. Mode: Internal
+	pInternal := NewAdaptiveTimestampProvider(ModeInternal, true, KamuSMConfig{})
+	res1, err := pInternal.Timestamp(ctx, sampleFile)
+	if err != nil || !res1.Success || res1.EvidenceFile == "" {
+		t.Fatalf("expected internal stamping success: %v", err)
+	}
+
+	// 2. Mode: Disabled
+	pDisabled := NewAdaptiveTimestampProvider(ModeDisabled, false, KamuSMConfig{})
+	res2, err := pDisabled.Timestamp(ctx, sampleFile)
+	if err != nil || res2.EvidenceFile != "" {
+		t.Fatalf("expected disabled stamping to have empty evidence: %v", err)
+	}
+
+	// 3. Mode: KamuSM with auto-fallback (no credentials configured)
+	pKamuSMFallback := NewAdaptiveTimestampProvider(ModeKamuSM, true, KamuSMConfig{})
+	res3, err := pKamuSMFallback.Timestamp(ctx, sampleFile)
+	if err != nil || !res3.Success || res3.EvidenceFile == "" {
+		t.Fatalf("expected auto-fallback to internal stamping when credentials missing: %v", err)
+	}
+
+	// 4. Mode: KamuSM with auto-fallback DISABLED (must return error if no credentials)
+	pKamuSMNoFallback := NewAdaptiveTimestampProvider(ModeKamuSM, false, KamuSMConfig{})
+	_, err = pKamuSMNoFallback.Timestamp(ctx, sampleFile)
+	if err == nil {
+		t.Fatalf("expected error when credentials missing and auto-fallback disabled")
+	}
+}
+
