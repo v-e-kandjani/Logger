@@ -56,6 +56,8 @@ Engineered specifically for network and enterprise security infrastructure, high
 
 ## Automated Linux Ubuntu Installation
 
+> 📖 **Comprehensive Step-by-Step Guide**: For detailed instructions, firewall guidelines, and troubleshooting, see **[HOW_TO_INSTALL.md](HOW_TO_INSTALL.md)**.
+
 For bare-metal or cloud Ubuntu servers (20.04, 22.04, 24.04 LTS), use the automated installer:
 
 ```bash
