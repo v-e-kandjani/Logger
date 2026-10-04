@@ -2,10 +2,14 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:24.3
     container_name: syslog-clickhouse
-    # Database is strictly internal; no external host ports published
+    # Database is strictly local; bound ONLY to 127.0.0.1 (loopback) to prevent external network access
+    ports:
+      - "127.0.0.1:${CLICKHOUSE_LOCAL_PORT:-9000}:9000"
+      - "127.0.0.1:${CLICKHOUSE_HTTP_LOCAL_PORT:-8123}:8123"
     environment:
-      - CLICKHOUSE_DB=syslog
-      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_DB=${CLICKHOUSE_DATABASE:-syslog}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     volumes:
       - clickhouse_data:/var/lib/clickhouse
@@ -16,7 +20,7 @@ services:
         hard: 262144
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      test: ["CMD", "clickhouse-client", "--user", "${CLICKHOUSE_USER:-default}", "--password", "${CLICKHOUSE_PASSWORD:-}", "--query", "SELECT 1"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -24,17 +28,19 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: syslog-postgres
-    # Database is strictly internal; no external host ports published
+    # Database is strictly local; bound ONLY to 127.0.0.1 (loopback) to prevent external network access
+    ports:
+      - "127.0.0.1:${POSTGRES_LOCAL_PORT:-5432}:5432"
     environment:
-      - POSTGRES_DB=syslog_manager
-      - POSTGRES_USER=syslog_admin
-      - POSTGRES_PASSWORD=syslog_secret
+      - POSTGRES_DB=${POSTGRES_DB:-syslog_manager}
+      - POSTGRES_USER=${POSTGRES_USER:-syslog_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-syslog_secret}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations/postgres:/docker-entrypoint-initdb.d
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U syslog_admin -d syslog_manager"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-syslog_admin} -d ${POSTGRES_DB:-syslog_manager}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -50,27 +56,27 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "8080:8080"       # Web Dashboard & REST API
-      - "5514:5514/udp"   # Syslog UDP Listener
-      - "5514:5514/tcp"   # Syslog TCP Listener
-      - "514:5514/udp"    # Standard Syslog UDP mapped to container
-      - "514:5514/tcp"    # Standard Syslog TCP mapped to container
-      - "6514:6514/tcp"   # Syslog TLS
+      - "${APP_PORT:-8080}:8080"       # Web Dashboard & REST API
+      - "5514:5514/udp"                # Syslog UDP Listener
+      - "5514:5514/tcp"                # Syslog TCP Listener
+      - "514:5514/udp"                 # Standard Syslog UDP mapped to container
+      - "514:5514/tcp"                 # Standard Syslog TCP mapped to container
+      - "6514:6514/tcp"                # Syslog TLS
     environment:
       - CLICKHOUSE_HOST=clickhouse
       - CLICKHOUSE_PORT=9000
-      - CLICKHOUSE_DATABASE=syslog
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-syslog}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_DB=syslog_manager
-      - POSTGRES_USER=syslog_admin
-      - POSTGRES_PASSWORD=syslog_secret
+      - POSTGRES_DB=${POSTGRES_DB:-syslog_manager}
+      - POSTGRES_USER=${POSTGRES_USER:-syslog_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-syslog_secret}
       - POSTGRES_SSLMODE=disable
       - SERVER_LISTEN_ADDR=0.0.0.0:8080
       - ARCHIVE_PATH=/opt/syslog-platform/archive
-      - TIMESTAMP_PROVIDER=mock
+      - TIMESTAMP_PROVIDER=${TIMESTAMP_PROVIDER:-mock}
     volumes:
       - syslog_archives:/opt/syslog-platform/archive
       - ./timestamp-client:/opt/syslog-platform/timestamp-client

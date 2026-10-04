@@ -54,17 +54,60 @@ Engineered specifically for network and enterprise security infrastructure, high
 
 ---
 
-## Quickstart with Docker Desktop
+## Automated Linux Ubuntu Installation
+
+For bare-metal or cloud Ubuntu servers (20.04, 22.04, 24.04 LTS), use the automated installer:
+
+```bash
+# Clone the repository
+git clone https://github.com/v-e-kandjani/Logger.git
+cd Logger
+
+# Run the installation script as root
+sudo bash install.sh
+```
+
+### What `install.sh` Does Automatically:
+1. **Interactive Setup Wizard**:
+   - Prompts for Web UI Port (e.g. `8080`, `8443`, or custom).
+   - Prompts for PostgreSQL database name, user, and password (or accepts secure defaults).
+   - Prompts for ClickHouse database name, user, and password (or accepts secure defaults).
+   - Prompts for Initial Administrator username and password.
+   - Supports automated unattended deployment via `sudo bash install.sh -y` or `--defaults`.
+2. **System Dependencies & Docker Engine**:
+   - Installs all runtime packages (`ca-certificates`, `curl`, `wget`, `gnupg`, `ufw`, `jq`, `openssl`, `git`).
+   - Automatically installs and configures official **Docker CE** and the **Docker Compose** plugin if not already installed.
+3. **UFW (Uncomplicated Firewall) Configuration**:
+   - Automatically configures UFW and allows **SSH (22/tcp)** to prevent administrator lockout.
+   - Allows Syslog Ingestion: Standard **514/udp & 514/tcp**, Alternate **5514/udp & 5514/tcp**, and Secure TLS **6514/tcp**.
+   - Allows Web Dashboard on the user-selected port (`APP_PORT/tcp`).
+   - Explicitly blocks and shields database ports (5432, 9000, 8123) from external interfaces.
+   - Non-interactively enables UFW.
+4. **Local-Only Database Shielding**:
+   - PostgreSQL and ClickHouse host ports are bound **strictly to 127.0.0.1 (loopback)**.
+   - Local administrative users on the server can connect (`psql -h 127.0.0.1`, `clickhouse-client`), while outside network traffic is completely barred.
+5. **Database Initialization & Table Creation**:
+   - Boots database containers and waits for healthchecks.
+   - Automatically executes PostgreSQL migration `migrations/postgres/001_initial_schema.sql` (devices, users, archives, audit logs, settings).
+   - Seeds the administrator account with bcrypt crypt-hashing.
+   - Automatically executes ClickHouse migration `migrations/clickhouse/001_initial_events.sql` (`syslog_events` table and `mv_events_per_minute` materialized view).
+   - Starts the full stack and validates system health.
+
+---
+
+## Quickstart with Docker Compose
 
 ### 1. Start the Platform
 ```bash
+# Copy and configure environment if needed
+cp .env.example .env
+
+# Launch containers
 docker compose up -d
 ```
-This boots ClickHouse, PostgreSQL, and the Go application.
-- **Strict Network Isolation**: ClickHouse (ports `8123`/`9000`) and PostgreSQL (port `5432`) have **no published host ports** and can only be accessed internally by `syslog-app`.
-- **Public Entrypoints**: Only `syslog-app` exposes ports to the host:
-  - Port `8080`: Web Dashboard & REST API
-  - Port `514` & `5514`: Syslog UDP/TCP listeners
+- **Local Database Access Only**: ClickHouse (`127.0.0.1:9000`, `127.0.0.1:8123`) and PostgreSQL (`127.0.0.1:5432`) are bound strictly to localhost (`127.0.0.1`) and cannot be reached from outside networks.
+- **Configurable Entrypoint**: Web UI port defaults to `${APP_PORT:-8080}`.
+- **Syslog Ingestion**: Ports `514` & `5514` (UDP/TCP) and `6514` (TLS).
 
 ### 2. Access Web Platform & Authenticate
 Open `http://localhost:8080` in your browser. All unauthenticated requests are automatically redirected to the secure login gateway (`/login`).
