@@ -1,0 +1,51 @@
+PROPRIETARY SOFTWARE — ALL RIGHTS RESERVED
+Copyright (c) 2026 Vahit Alp.
+All rights reserved.
+Company: Valtrivo
+Contact: valp@valtrivo.cloud
+1. Scope and ownership
+This notice applies to the original software and accompanying documentation
+in this repository (the "Software"), except material identified as subject
+to separate terms. The respective copyright holders retain ownership of
+the Software and all rights not expressly granted in a separate agreement.
+This is not an open-source license.
+2. No public license
+Except as permitted by applicable law, a separate written authorization
+from the relevant rights holder, or the exceptions below, no permission is
+granted to use, reproduce, modify, create derivative works of, distribute,
+publish, sell, sublicense, or make the Software available to third parties,
+including by operating a hosted service. Access to or possession of the
+Software does not itself grant any such permission.
+3. Authorized service access
+The rights holders may operate the Software as a paid hosted service or
+authorize others to do so. Customers' access to and use of that service,
+including any client-side software supplied for that purpose, are governed
+by the applicable separate service agreement or terms of service. This
+notice neither grants a service subscription nor overrides permissions
+expressly granted under those terms. A subscription does not by itself
+grant rights to obtain source code, redistribute the Software, or operate
+an independent instance of the service.
+4. Third-party material and existing rights
+Third-party components remain subject to their own licenses and copyright
+notices. This notice does not replace, restrict, or supersede those terms,
+or revoke rights previously granted under another license for earlier
+copies or versions. Preserve all applicable third-party notices and comply
+with the relevant license obligations.
+5. Legal and hosting-platform exceptions
+Nothing in this notice restricts rights that cannot lawfully be restricted
+under applicable law. Where this repository is hosted on GitHub or another
+platform, nothing in this notice limits rights granted under the applicable
+platform terms, including rights to view and fork a public repository on
+GitHub within the scope of those terms. No additional rights are granted
+by this notice.
+6. Disclaimer
+EXCEPT AS PROVIDED IN A SEPARATE APPLICABLE AGREEMENT AND TO THE MAXIMUM
+EXTENT PERMITTED BY LAW, THE SOFTWARE IS PROVIDED "AS IS," WITHOUT WARRANTY
+OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. TO THE SAME EXTENT,
+THE COPYRIGHT HOLDERS SHALL NOT BE LIABLE FOR CLAIMS, DAMAGES, OR OTHER
+LIABILITY ARISING FROM OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+THIS PARAGRAPH DOES NOT EXCLUDE LIABILITY THAT CANNOT LAWFULLY BE EXCLUDED
+OR OVERRIDE OBLIGATIONS UNDER A SEPARATE APPLICABLE AGREEMENT.
+For permissions beyond those separately granted, obtain written
+authorization from the relevant copyright holder before proceeding.
