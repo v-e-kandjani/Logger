@@ -3,9 +3,18 @@
 > **“Her kayıt, zamanıyla kanıt.”**  
 > Developed by **Valtrivo**
 
-An enterprise-grade, high-throughput centralized log management, analytics, and cryptographic evidence retention platform built with **Go**, **ClickHouse**, **PostgreSQL**, and **Vanilla HTML5/CSS/JavaScript**.
+[![Language: English](https://img.shields.io/badge/Language-English-blue.svg)](README.md)
+[![Language: Turkish](https://img.shields.io/badge/Dil-T%C3%BCrk%C3%A7e-red.svg)](README.tr.md)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary%20%2F%20Valtrivo-green.svg)](LICENSE)
+[![Platform: Linux Ubuntu](https://img.shields.io/badge/Platform-Ubuntu%2020.04%20%7C%2022.04%20%7C%2024.04-orange.svg)](HOW_TO_INSTALL.md)
 
-Engineered specifically for network and enterprise security infrastructure, high-volume log aggregation, and compliance workflows including **Turkish Law No. 5651**, **Law No. 5070**, and **TÜBİTAK KamuSM Zaman Damgası** requirements.
+---
+
+## 🌐 Language / Dil
+- 🇬🇧 **[English Documentation (Current)](README.md)**
+- 🇹🇷 **[Türkçe Dokümantasyon için Tıklayın](README.tr.md)**
+- 📖 **[Installation Guide (HOW_TO_INSTALL.md)](HOW_TO_INSTALL.md)**
+- ⚡ **[Ubuntu Installer Script (install.sh)](install.sh)**
 
 ---
 

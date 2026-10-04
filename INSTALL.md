@@ -1,5 +1,8 @@
-# Installation Guide
+# Installation Guide / Kurulum Kılavuzu
 
-For complete, step-by-step instructions on installing **Valtrivo LogSeal** on Linux Ubuntu, configuring UFW firewall, setting up database credentials, and managing port settings:
+Choose your preferred language / Lütfen tercih ettiğiniz dili seçin:
 
-👉 **[Please see HOW_TO_INSTALL.md](HOW_TO_INSTALL.md)**
+- 🇬🇧 **[English Installation Guide (HOW_TO_INSTALL.en.md)](HOW_TO_INSTALL.en.md)**
+- 🇹🇷 **[Türkçe Kurulum Kılavuzu (HOW_TO_INSTALL.tr.md)](HOW_TO_INSTALL.tr.md)**
+- 📖 **[General Overview (HOW_TO_INSTALL.md)](HOW_TO_INSTALL.md)**
+

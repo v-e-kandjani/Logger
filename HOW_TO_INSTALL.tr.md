@@ -1,24 +1,22 @@
-# Valtrivo LogSeal — Kurulum ve Dağıtım Rehberi (Installation Guide)
+# Valtrivo LogSeal — Kurulum ve Dağıtım Rehberi
 
 > **Valtrivo LogSeal: Merkezi Log Yönetimi ve Zaman Damgalama**  
 > *"Her kayıt, zamanıyla kanıt."*
-
----
-
-## 🌐 Language / Dil
-- 🇹🇷 **[Türkçe Kurulum Kılavuzu](HOW_TO_INSTALL.tr.md)**
-- 🇬🇧 **[English Installation Guide](HOW_TO_INSTALL.en.md)**
-- 🏠 **[Project Documentation / Dokümantasyon](README.md)**
-
----
 
 Bu belge, **Valtrivo LogSeal** platformunun **Linux Ubuntu (20.04 / 22.04 / 24.04 LTS)** ve Debian tabanlı sunucularda sıfırdan kurulumu, güvenlik duvarı (UFW) yapılandırması, veritabanı yalıtımı ve ilk çalıştırma adımlarını kapsamlı bir şekilde açıklamaktadır.
 
 ---
 
-## İçindekiler / Table of Contents
+## 🌐 Dil / Language
+- 🇹🇷 **[Türkçe Kurulum Kılavuzu (Geçerli)](HOW_TO_INSTALL.tr.md)**
+- 🇬🇧 **[English Installation Guide](HOW_TO_INSTALL.en.md)**
+- 🏠 **[Ana Proje Dokümantasyonu](README.tr.md)**
 
-1. [Sistem Gereksinimleri (System Requirements)](#1-sistem-gereksinimleri-system-requirements)
+---
+
+## İçindekiler
+
+1. [Sistem Gereksinimleri](#1-sistem-gereksinimleri)
 2. [Hızlı Kurulum (Otomatik Script ile 2 Dakikada)](#2-hızlı-kurulum-otomatik-script-ile-2-dakikada)
 3. [Etkileşimli Kurulum Sihirbazı Seçenekleri](#3-etkileşimli-kurulum-sihirbazı-seçenekleri)
 4. [Sessiz / Otomatik Kurulum Parametreleri (Unattended CLI Flags)](#4-sessiz--otomatik-kurulum-parametreleri-unattended-cli-flags)
@@ -32,7 +30,7 @@ Bu belge, **Valtrivo LogSeal** platformunun **Linux Ubuntu (20.04 / 22.04 / 24.0
 
 ---
 
-## 1. Sistem Gereksinimleri (System Requirements)
+## 1. Sistem Gereksinimleri
 
 | Bileşen | Minimum (Test / Küçük Ağ) | Önerilen (Üretim Ortamı / 50+ Cihaz) |
 | :--- | :--- | :--- |
@@ -199,7 +197,7 @@ Kurulum sırasında iki veritabanı motoru da otomatik olarak yapılandırılır
 - Giriş betiği: [migrations/postgres/001_initial_schema.sql](migrations/postgres/001_initial_schema.sql)
 - Oluşturulan tablolar:
   - `devices`: Kayıtlı ve tanınan ağ cihazları (FortiGate, WatchGuard, Cisco, Linux vb.).
-  - `users`: Rol tabanlı (Süper Admin, Güvenlik Denetçisi, Operatör, Salt Okunur) kullanıcılar ve bcrypt şifrelenmiş parolalar.
+  - `users`: Rol tabanlı kullanıcılar ve bcrypt şifrelenmiş parolalar.
   - `daily_summaries`: 5651 günlük log özetleri, SHA-256 hash zincirleri ve zaman damgası bilgileri.
   - `stamping_audit`: TÜBİTAK veya Dahili zaman damgası imzalama denetim günlükleri.
   - `system_settings`: Depolama limitleri, TÜBİTAK hesap ayarları, syslog kuralları.
@@ -250,10 +248,7 @@ sudo ufw --force enable
 docker compose up -d
 
 # 6. Tablo şemalarını uygulayın
-# PostgreSQL:
 docker exec -i syslog-postgres psql -U syslog_admin -d syslog_manager < migrations/postgres/001_initial_schema.sql
-
-# ClickHouse:
 docker exec -i syslog-clickhouse clickhouse-client --database syslog --multiquery < migrations/clickhouse/001_initial_events.sql
 ```
 
@@ -266,8 +261,6 @@ Tarayıcınızda şu adresi açın:
 ```text
 http://<SUNUCU_IP_ADRESI>:8080
 ```
-*(Eğer farklı bir port seçtiyseniz 8080 yerine o portu giriniz)*
-
 - **Kullanıcı Adı**: `admin` *(veya belirlediğiniz ad)*
 - **Parola**: `Admin@LogSeal2026!` *(veya belirlediğiniz parola)*
 
@@ -311,29 +304,25 @@ Kurulumdan sonra Web UI portunu veya veritabanı ayarlarını değiştirmek iste
 ```bash
 docker compose ps
 ```
-Çıktıda `syslog-app`, `syslog-postgres` ve `syslog-clickhouse` servislerinin durumunun `Up (healthy)` olması gerekir.
+Çıktıda tüm konteynerlerin durumunun `Up (healthy)` olması gerekir.
 
 ### S2: Uygulama loglarını canlı nasıl izleyebilirim?
 ```bash
 docker compose logs -f syslog-app
 ```
 
-### S3: Web arayüzüne bağlanamıyorum, ne yapmalıyım?
-1. Portun dinlendiğinden emin olun: `sudo ss -tulpn | grep 8080`
-2. UFW kuralını kontrol edin: `sudo ufw status | grep 8080`
-3. Bulut sunucusu (AWS, DigitalOcean, Azure vb.) kullanıyorsanız, bulut sağlayıcınızın Güvenlik Grubu (Security Group / Inbound Rules) üzerinden de ilgili porta izin verildiğinden emin olun.
-
-### S4: Yönetici (Admin) parolasını unuttum, nasıl sıfırlarım?
+### S3: Yönetici (Admin) parolasını unuttum, nasıl sıfırlarım?
 Sunucu terminalinde tek bir SQL sorgusuyla yeni şifre atayabilirsiniz:
 ```bash
 docker exec -i syslog-postgres psql -U syslog_admin -d syslog_manager -c \
   "UPDATE users SET password_hash = crypt('YeniGucluSifre2026!', gen_salt('bf', 10)), updated_at = NOW() WHERE username = 'admin';"
 ```
 
-### S5: Depolama alanı dolarsa ne olur?
+### S4: Depolama alanı dolarsa ne olur?
 Valtrivo LogSeal **FIFO (First-In First-Out)** akıllı disk koruma mekanizmasına sahiptir. Gösterge panelinde anlık ClickHouse ve PostgreSQL disk kullanımını görebilir; belirlenen eşik aşıldığında en eski ham logların otomatik temizlenmesini sağlayabilirsiniz.
 
 ---
 
 **Valtrivo LogSeal Ekibi**  
-*Güvenli, Yasal ve Kesintisiz Log Yönetimi.*
+*“Her kayıt, zamanıyla kanıt.”*  
+[https://github.com/v-e-kandjani/Logger](https://github.com/v-e-kandjani/Logger)
