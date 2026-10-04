@@ -142,3 +142,61 @@ The platform natively identifies, parses, enriches, and indexes logs from **Watc
 4. Enter your collector IP (`<IP of this logger>`), Port `514` (or `5514`), and select **Syslog** format.
 5. In your policies (e.g. Proxy or Packet Filter rules), enable **Send a log message**.
 
+---
+
+## Syslog Ingestion Security & Device Access Control (Zero-Trust)
+
+To prevent rogue, random, or unauthorized network devices from sending syslog traffic or flooding the ClickHouse analytical store, the platform includes a dynamic **Zero-Trust Network Ingestion Gate**:
+
+### 1. Ingestion Modes
+- **Permissive / Auto-Discovery Mode (Default)**:
+  - Accepts incoming syslog packets from any IP address.
+  - Automatically parses and enriches known devices.
+  - Senders not yet present in Asset Management are dynamically cataloged in the **Auto-Discovered Senders** table for review and 1-click registration.
+- **Strict Zero-Trust Mode**:
+  - Accepts syslog packets **ONLY** from registered devices present in the active in-memory Device Cache.
+  - Packets originating from unapproved, random, or spoofed IPs are immediately discarded at the pipeline boundary.
+  - Unregistered packets are tracked via the real-time **Dropped Unauthorized Packets** counter and exposed in health telemetry.
+
+### 2. Configuration & Live Toggle
+Toggle directly in the Web UI under **Settings** > **Network Ingestion Security & Device Access Control**, or via REST API:
+```bash
+# Enable Strict Zero-Trust Filtering
+curl -X POST http://localhost:8080/api/v1/settings \
+  -H "Content-Type: application/json" \
+  -d '{"strict_device_filtering":"true"}'
+```
+
+---
+
+## Operator Management & Password Reset
+
+- **Role-Based Access Control (RBAC)**: Supports 5 security profiles: *Super Administrator*, *Security Analyst*, *Auditor*, *Operator*, and *Read Only*.
+- **Admin Password Reset**: Super Administrators can reset operator credentials directly in **Users & Access Control** > **Reset Password** (minimum 8 characters with bcrypt salted hashing).
+- **Automated Source Onboarding**: When registering auto-discovered senders, assets are assigned a Device Group / Tier (e.g. *Perimeter Firewalls*, *Core Switches & Routers*, *Datacenter Servers*) and automatically purged from the unknown sources queue.
+
+---
+
+## Compliance Archive Downloads & Verification
+
+From the **Archives & Legal Evidence** tab, administrators and auditors can download:
+1. **Compliance Bundle (`.zip`)**: A bundled package containing the compressed log archive (`.jsonl.gz`), official KamuSM timestamp token (`.zd`), and SHA-256 digest (`.sha256`).
+2. **Raw Log Archive (`.gz`)**: Compressed RFC-compliant JSON Lines syslog slice.
+3. **KamuSM Timestamp Evidence (`.zd`)**: RFC 3161 digital signature token for independent verification via `tss-client-console-3.1.33.jar -c`.
+
+```bash
+# Download compliance bundle via API
+curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=bundle"
+```
+
+---
+
+## Release History
+
+- **v1.1.0**:
+  - Admin password reset modal and API endpoint (`POST /api/v1/users/reset-password`).
+  - Direct download links for archive bundles (`.zip`), compressed logs (`.gz`), and evidence tokens (`.zd`).
+  - Purged unknown sources immediately upon device onboarding and fixed group tier persistence.
+  - Added Zero-Trust syslog ingestion security policy (Permissive vs Strict Authorized Devices Only) with dropped packet telemetry.
+- **v1.0.1**: Initial release with TÜBİTAK KamuSM / Internal dual timestamping engine, WatchGuard parser, and ClickHouse vectorized store.
+

@@ -40,10 +40,14 @@ type Pipeline struct {
 	subscribers map[chan *models.LogEvent]struct{}
 
 	// Metrics
-	PacketsReceived atomic.Uint64
-	EventsParsed    atomic.Uint64
-	ParsingErrors   atomic.Uint64
-	DroppedPackets  atomic.Uint64
+	PacketsReceived     atomic.Uint64
+	EventsParsed        atomic.Uint64
+	ParsingErrors       atomic.Uint64
+	DroppedPackets      atomic.Uint64
+	DroppedUnauthorized atomic.Uint64
+
+	// Access Control
+	strictFilter atomic.Bool
 }
 
 func NewPipeline(
@@ -73,6 +77,16 @@ func NewPipeline(
 	}
 }
 
+// SetStrictFiltering enables or disables rejecting packets from unregistered IPs
+func (p *Pipeline) SetStrictFiltering(enabled bool) {
+	p.strictFilter.Store(enabled)
+}
+
+// IsStrictFiltering returns current authorization mode
+func (p *Pipeline) IsStrictFiltering() bool {
+	return p.strictFilter.Load()
+}
+
 // Ingest submits a raw packet into the non-blocking ring buffer
 func (p *Pipeline) Ingest(pkt RawPacket) {
 	p.PacketsReceived.Add(1)
@@ -99,6 +113,15 @@ func (p *Pipeline) workerLoop() {
 		case <-p.stopCh:
 			return
 		case pkt := <-p.inQueue:
+			ipStr := pkt.SourceIP.String()
+			dev, found := p.deviceCache.LookupIP(ipStr)
+
+			// Strict Zero-Trust Filtering: Discard packets from unauthorized / random IP senders
+			if p.strictFilter.Load() && !found {
+				p.DroppedUnauthorized.Add(1)
+				continue
+			}
+
 			event, err := p.parser.Parse(pkt.Data, pkt.SourceIP, pkt.SourcePort, pkt.Protocol)
 			if err != nil {
 				p.ParsingErrors.Add(1)
@@ -106,15 +129,20 @@ func (p *Pipeline) workerLoop() {
 			}
 
 			// Device Enrichment via in-memory DeviceCache
-			ipStr := pkt.SourceIP.String()
-			if dev, found := p.deviceCache.LookupIP(ipStr); found {
+			if found {
 				event.DeviceID = dev.ID
 				event.DeviceName = dev.Name
-				event.DeviceGroup = dev.GroupName
-				if dev.Vendor != "" && dev.Vendor != "Generic" {
+				if dev.GroupName != "" {
+					event.DeviceGroup = dev.GroupName
+				} else if dev.DeviceType != "" {
+					event.DeviceGroup = dev.DeviceType
+				} else {
+					event.DeviceGroup = "Registered"
+				}
+				if dev.Vendor != "" {
 					event.Vendor = dev.Vendor
 				}
-				if dev.DeviceType != "" && dev.DeviceType != "Unknown" && dev.DeviceType != "Other" {
+				if dev.DeviceType != "" {
 					event.Product = dev.DeviceType
 				}
 				// Asynchronously update last_seen_at in postgres
@@ -124,7 +152,7 @@ func (p *Pipeline) workerLoop() {
 					_ = p.pgDB.UpdateDeviceLastSeen(ctx, ip, time.Now())
 				}(ipStr)
 			} else {
-				// Retain parsed vendor/product or fallback if empty
+				// Permissive mode: auto-discovery
 				event.DeviceID = uuid.Nil
 				if event.DeviceName == "" {
 					if event.Hostname != "" && event.Hostname != ipStr {

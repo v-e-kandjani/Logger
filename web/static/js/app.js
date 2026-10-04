@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSearch();
     initDeviceModal();
     initUserModal();
+    initResetPasswordModal();
     initArchiveTrigger();
 });
 
@@ -307,10 +308,14 @@ async function loadUnregisteredSources() {
 window.onboardDevice = (ip, sample = '') => {
     document.getElementById('dev-ip').value = ip;
     document.getElementById('dev-name').value = `Device-${ip.replace(/\./g, '-')}`;
+    const groupSelect = document.getElementById('dev-group');
     if (sample && (sample.toLowerCase().includes('watchguard') || sample.toLowerCase().includes('firebox') || sample.includes('msg_id='))) {
         document.getElementById('dev-vendor').value = 'WatchGuard';
         document.getElementById('dev-type').value = 'Firewall';
         document.getElementById('dev-name').value = `WatchGuard-FW-${ip.replace(/\./g, '-')}`;
+        if (groupSelect) groupSelect.value = 'Perimeter Firewalls';
+    } else {
+        if (groupSelect) groupSelect.value = 'Default';
     }
     document.getElementById('device-modal').style.display = 'flex';
 };
@@ -318,12 +323,12 @@ window.onboardDevice = (ip, sample = '') => {
 // Archives & KamuSM Zaman Damgası
 async function loadArchives() {
     const tbody = document.getElementById('archives-body');
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center">Loading archives...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center">Loading archives...</td></tr>';
     try {
         const res = await fetch('/api/v1/archives');
         const list = await res.json();
         if (!list || list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No archives generated yet. Click "Create Archive Now" above.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center">No archives generated yet. Click "Create Archive Now" above.</td></tr>';
             return;
         }
 
@@ -341,10 +346,24 @@ async function loadArchives() {
                     </span>
                 </td>
                 <td class="mono-code">${a.timestamp_evidence_path ? a.timestamp_evidence_path.split('/').pop() : 'Pending'}</td>
+                <td>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <a href="/api/v1/archives/download?id=${a.id}&type=bundle" class="btn btn-primary" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download complete compliance package (.zip containing logs, .zd evidence, and .sha256 hash)" download>
+                            📦 Bundle (.zip)
+                        </a>
+                        <a href="/api/v1/archives/download?id=${a.id}&type=archive" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download raw compressed logs (.jsonl.gz)" download>
+                            📄 Logs (.gz)
+                        </a>
+                        ${a.timestamp_status === 'STAMPED' && a.timestamp_evidence_path ? `
+                        <a href="/api/v1/archives/download?id=${a.id}&type=evidence" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download legal proof / KamuSM timestamp (.zd)" download>
+                            🛡️ Evidence (.zd)
+                        </a>` : ''}
+                    </div>
+                </td>
             </tr>
         `).join('');
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-red">Failed: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-red">Failed: ${e.message}</td></tr>`;
     }
 }
 
@@ -385,10 +404,11 @@ function initDeviceModal() {
 
     document.getElementById('btn-save-device').addEventListener('click', async () => {
         const payload = {
-            name: document.getElementById('dev-name').value,
-            ip_address: document.getElementById('dev-ip').value,
+            name: document.getElementById('dev-name').value.trim(),
+            ip_address: document.getElementById('dev-ip').value.trim(),
             vendor: document.getElementById('dev-vendor').value,
             device_type: document.getElementById('dev-type').value,
+            group_name: document.getElementById('dev-group') ? document.getElementById('dev-group').value : 'Default',
         };
         try {
             const res = await fetch('/api/v1/devices', {
@@ -399,6 +419,7 @@ function initDeviceModal() {
             if (!res.ok) throw new Error(await res.text());
             modal.style.display = 'none';
             loadDevices();
+            loadUnregisteredSources();
         } catch (e) {
             alert('Failed saving asset: ' + e.message);
         }
@@ -407,20 +428,33 @@ function initDeviceModal() {
 
 async function loadHealthTelemetry() {
     const body = document.getElementById('health-telemetry-body');
+    if (!body) return;
     body.innerHTML = 'Loading health telemetry...';
     try {
         const res = await fetch('/api/v1/system/health');
         const h = await res.json();
+        const isStrict = h.strict_device_filtering === true || h.strict_device_filtering === 'true';
         body.innerHTML = `
             <div class="status-row"><span>Node Name</span><strong>${h.node}</strong></div>
             <div class="status-row"><span>ClickHouse Storage</span><span class="badge badge-success">${h.clickhouse}</span></div>
             <div class="status-row"><span>PostgreSQL Metadata</span><span class="badge badge-success">${h.postgres}</span></div>
+            <div class="status-row"><span>Ingestion Security Gate</span><span class="badge ${isStrict ? 'badge-warning' : 'badge-success'}">${isStrict ? 'Strict Zero-Trust (Authorized Only)' : 'Permissive (Auto-Discovery)'}</span></div>
+            <div class="status-row"><span>Dropped Unauthorized Packets</span><span class="badge ${h.dropped_unauthorized > 0 ? 'badge-danger' : 'badge-secondary'}">${Number(h.dropped_unauthorized || 0).toLocaleString()}</span></div>
             <div class="status-row"><span>Ingestion Channel Queue Depth</span><span>${h.queue_depth}</span></div>
             <div class="status-row"><span>Packets Received</span><span>${Number(h.packets_rx).toLocaleString()}</span></div>
             <div class="status-row"><span>Events Parsed</span><span>${Number(h.events_parsed).toLocaleString()}</span></div>
             <div class="status-row"><span>Events Inserted (ClickHouse)</span><span class="text-green">${Number(h.events_inserted).toLocaleString()}</span></div>
             <div class="status-row"><span>Insert Errors</span><span>${h.insert_errors}</span></div>
         `;
+
+        const badgeDropped = document.getElementById('badge-dropped-unauthorized');
+        if (badgeDropped) {
+            badgeDropped.textContent = Number(h.dropped_unauthorized || 0).toLocaleString();
+        }
+    } catch (e) {
+        body.innerHTML = `<span class="text-red">Health probe error: ${e.message}</span>`;
+    }
+}
     } catch (e) {
         body.innerHTML = `<span class="text-red">Health probe error: ${e.message}</span>`;
     }
@@ -475,6 +509,47 @@ function updateStampingUI() {
 }
 
 // Law No. 5651 & TÜBİTAK Settings Controller
+function updateIngestionSecurityUI(isStrict) {
+    const select = document.getElementById('setting-strict-filtering');
+    if (select) select.value = isStrict ? 'true' : 'false';
+
+    const gateStatus = document.getElementById('filter-gate-status');
+    const badge = document.getElementById('strict-filter-badge');
+    const banner = document.getElementById('filtering-mode-banner');
+    const title = document.getElementById('filtering-mode-title');
+    const desc = document.getElementById('filtering-mode-desc');
+
+    if (isStrict) {
+        if (gateStatus) {
+            gateStatus.className = 'badge badge-warning';
+            gateStatus.textContent = 'Strict Zero-Trust (Filtering ON)';
+        }
+        if (badge) {
+            badge.className = 'badge badge-warning';
+            badge.textContent = 'Zero-Trust Gate Active';
+        }
+        if (banner) {
+            banner.className = 'alert-box alert-warning';
+            if (title) title.textContent = 'Strict Zero-Trust Filtering Active';
+            if (desc) desc.textContent = 'Packets from IP addresses NOT registered in Asset Management are silently discarded at the network boundary. Unauthorized senders cannot flood ClickHouse or inject logs.';
+        }
+    } else {
+        if (gateStatus) {
+            gateStatus.className = 'badge badge-success';
+            gateStatus.textContent = 'Permissive Auto-Discovery';
+        }
+        if (badge) {
+            badge.className = 'badge badge-info';
+            badge.textContent = 'Auto-Discovery Active';
+        }
+        if (banner) {
+            banner.className = 'alert-box alert-info';
+            if (title) title.textContent = 'Permissive Auto-Discovery Active';
+            if (desc) desc.textContent = 'Incoming syslog packets from any IP address are accepted. Unregistered senders are logged in "Auto-Discovered Senders" for review and 1-click onboarding.';
+        }
+    }
+}
+
 async function loadSettings() {
     try {
         const res = await fetch('/api/v1/settings');
@@ -513,6 +588,9 @@ async function loadSettings() {
             document.getElementById('setting-retention-days').value = s.retention_days;
         }
 
+        const isStrict = s.strict_device_filtering === 'true' || s.strict_device_filtering === true;
+        updateIngestionSecurityUI(isStrict);
+
         const tsStatusBadge = document.getElementById('ts-engine-status');
         if (tsStatusBadge) {
             const mode = s.stamping_mode || 'internal';
@@ -542,6 +620,39 @@ document.addEventListener('DOMContentLoaded', () => {
         modeEl.addEventListener('change', updateStampingUI);
     }
 
+    const filterSelect = document.getElementById('setting-strict-filtering');
+    if (filterSelect) {
+        filterSelect.addEventListener('change', () => {
+            updateIngestionSecurityUI(filterSelect.value === 'true');
+        });
+    }
+
+    const btnSavePolicy = document.getElementById('btn-save-ingestion-policy');
+    if (btnSavePolicy) {
+        btnSavePolicy.addEventListener('click', async () => {
+            btnSavePolicy.disabled = true;
+            btnSavePolicy.textContent = 'Saving Policy...';
+            const isStrict = document.getElementById('setting-strict-filtering').value;
+            try {
+                const res = await fetch('/api/v1/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        strict_device_filtering: isStrict
+                    })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                alert(`Syslog Ingestion Security Policy updated! Strict Zero-Trust filtering is now ${isStrict === 'true' ? 'ENABLED' : 'DISABLED'}.`);
+                updateIngestionSecurityUI(isStrict === 'true');
+            } catch (e) {
+                alert('Failed saving ingestion policy: ' + e.message);
+            } finally {
+                btnSavePolicy.disabled = false;
+                btnSavePolicy.textContent = 'Save Ingestion Security Policy';
+            }
+        });
+    }
+
     const btnSave = document.getElementById('btn-save-settings');
     if (btnSave) {
         btnSave.addEventListener('click', async () => {
@@ -550,10 +661,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const stampingMode = document.getElementById('setting-stamping-mode') ? document.getElementById('setting-stamping-mode').value : 'internal';
             const autoFallback = document.getElementById('setting-auto-fallback') ? (document.getElementById('setting-auto-fallback').checked ? 'true' : 'false') : 'true';
+            const strictFilter = document.getElementById('setting-strict-filtering') ? document.getElementById('setting-strict-filtering').value : 'false';
 
             const payload = {
                 stamping_mode: stampingMode,
                 auto_fallback: autoFallback,
+                strict_device_filtering: strictFilter,
                 kamusm_server_url: document.getElementById('setting-server-url') ? document.getElementById('setting-server-url').value : '',
                 kamusm_server_port: document.getElementById('setting-server-port') ? document.getElementById('setting-server-port').value : '80',
                 kamusm_customer_no: document.getElementById('setting-customer-no') ? document.getElementById('setting-customer-no').value.trim() : '',
@@ -579,6 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!res.ok) throw new Error(await res.text());
                 alert('Stamping & System Settings saved successfully!');
                 updateStampingUI();
+                updateIngestionSecurityUI(strictFilter === 'true');
             } catch (e) {
                 alert('Failed saving settings: ' + e.message);
             } finally {
@@ -758,7 +872,10 @@ async function loadUsers() {
                 <td>${u.last_login_at ? new Date(u.last_login_at).toLocaleString() : 'Never'}</td>
                 <td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
                 <td>
-                    <div style="display: flex; gap: 6px;">
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="openResetPasswordModal('${u.id}', '${escapeHtml(u.username)}')">
+                            Reset Password
+                        </button>
                         <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="toggleUserStatus('${u.id}')">
                             ${u.is_enabled ? 'Deactivate' : 'Activate'}
                         </button>
@@ -796,6 +913,98 @@ window.deleteUser = async (id, username) => {
         alert('Failed deleting user: ' + e.message);
     }
 };
+
+window.openResetPasswordModal = (id, username) => {
+    document.getElementById('reset-user-id').value = id;
+    document.getElementById('reset-username-display').value = username;
+    document.getElementById('reset-new-password').value = '';
+    document.getElementById('reset-confirm-password').value = '';
+    const errBox = document.getElementById('reset-password-error');
+    if (errBox) {
+        errBox.style.display = 'none';
+        errBox.textContent = '';
+    }
+    const modal = document.getElementById('reset-password-modal');
+    if (modal) modal.style.display = 'flex';
+};
+
+function initResetPasswordModal() {
+    const modal = document.getElementById('reset-password-modal');
+    const btnClose = document.getElementById('btn-close-reset-modal');
+    const btnCancel = document.getElementById('btn-cancel-reset-modal');
+    const btnSave = document.getElementById('btn-save-reset-password');
+    const errBox = document.getElementById('reset-password-error');
+
+    const closeModal = () => {
+        if (modal) modal.style.display = 'none';
+    };
+
+    if (btnClose) btnClose.addEventListener('click', closeModal);
+    if (btnCancel) btnCancel.addEventListener('click', closeModal);
+
+    if (btnSave) {
+        btnSave.addEventListener('click', async () => {
+            const userId = document.getElementById('reset-user-id').value;
+            const newPass = document.getElementById('reset-new-password').value;
+            const confirmPass = document.getElementById('reset-confirm-password').value;
+
+            if (errBox) {
+                errBox.style.display = 'none';
+                errBox.textContent = '';
+            }
+
+            if (!newPass || newPass.length < 8) {
+                if (errBox) {
+                    errBox.textContent = 'Password must be at least 8 characters long.';
+                    errBox.style.display = 'block';
+                } else {
+                    alert('Password must be at least 8 characters long.');
+                }
+                return;
+            }
+
+            if (newPass !== confirmPass) {
+                if (errBox) {
+                    errBox.textContent = 'Passwords do not match. Please verify both fields.';
+                    errBox.style.display = 'block';
+                } else {
+                    alert('Passwords do not match.');
+                }
+                return;
+            }
+
+            btnSave.disabled = true;
+            btnSave.textContent = 'Updating...';
+
+            try {
+                const res = await fetch('/api/v1/users/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        new_password: newPass,
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed resetting password');
+
+                alert('Operator password has been successfully updated!');
+                closeModal();
+            } catch (err) {
+                if (errBox) {
+                    errBox.textContent = err.message;
+                    errBox.style.display = 'block';
+                } else {
+                    alert('Error: ' + err.message);
+                }
+            } finally {
+                btnSave.disabled = false;
+                btnSave.textContent = 'Update Password';
+            }
+        });
+    }
+}
 
 function escapeHtml(str) {
     if (!str) return '';

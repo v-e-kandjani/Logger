@@ -187,3 +187,41 @@ func (h *Handler) handleToggleUserAPI(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "is_enabled": newState})
 }
+
+func (h *Handler) handleResetUserPasswordAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		UserID      string `json:"user_id"`
+		NewPassword string `json:"new_password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		return
+	}
+
+	id, err := uuid.Parse(req.UserID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+		return
+	}
+
+	if len(req.NewPassword) < 8 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "new password must be at least 8 characters"})
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r, 5*time.Second)
+	defer cancel()
+
+	if err := h.pgDB.ResetUserPassword(ctx, id, req.NewPassword); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "failed resetting password: " + err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "password_reset_success"})
+}

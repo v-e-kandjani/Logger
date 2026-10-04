@@ -297,6 +297,7 @@
                                 <th>SHA-256 Hash</th>
                                 <th>Timestamp Status</th>
                                 <th>Evidence (.zd)</th>
+                                <th>Downloads & Compliance Bundle</th>
                             </tr>
                         </thead>
                         <tbody id="archives-body">
@@ -439,6 +440,51 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Network Ingestion Security & Device Access Control -->
+                    <div class="panel" style="grid-column: 1 / -1;">
+                        <div class="panel-header">
+                            <h3>Network Ingestion Security & Device Access Control</h3>
+                            <span class="badge badge-warning" id="strict-filter-badge">Access Filtering</span>
+                        </div>
+                        <div class="panel-body">
+                            <p class="subtitle" style="margin-bottom: 12px;">
+                                Control whether any network device can transmit logs to this collector, or strictly restrict ingestion to authorized assets only.
+                            </p>
+
+                            <div class="form-group">
+                                <label style="font-weight: 600;">Syslog Ingestion Security Policy</label>
+                                <select class="input" id="setting-strict-filtering">
+                                    <option value="false">Permissive Mode (Default): Accept syslog from any IP, catalog unknown devices in Auto-Discovery</option>
+                                    <option value="true">Strict Zero-Trust Mode: Accept ONLY Registered Devices, silently drop all unauthorized senders</option>
+                                </select>
+                            </div>
+
+                            <div id="filtering-mode-banner" class="alert-box alert-info" style="margin: 10px 0;">
+                                <div>
+                                    <strong id="filtering-mode-title">Permissive Auto-Discovery Active</strong>
+                                    <div id="filtering-mode-desc" style="font-size: 0.82rem; margin-top: 4px;">
+                                        Incoming syslog packets from any IP address are accepted. Unregistered senders are logged in "Auto-Discovered Senders" for review and 1-click onboarding.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px;">
+                                <div class="status-row" style="background: var(--bg-surface-elevated); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <span>Ingestion Gate Status</span>
+                                    <span class="badge badge-success" id="filter-gate-status">Permissive</span>
+                                </div>
+                                <div class="status-row" style="background: var(--bg-surface-elevated); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <span>Dropped Unauthorized Packets</span>
+                                    <span class="badge badge-danger" id="badge-dropped-unauthorized" style="font-size: 0.85rem;">0</span>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 10px; margin-top: 16px;">
+                                <button class="btn btn-primary" id="btn-save-ingestion-policy">Save Ingestion Security Policy</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -513,6 +559,16 @@
                         <option value="Server">Server</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Device Group / Tier</label>
+                    <select class="input" id="dev-group">
+                        <option value="Perimeter Firewalls">Perimeter Firewalls</option>
+                        <option value="Core Switches &amp; Routers">Core Switches &amp; Routers</option>
+                        <option value="Datacenter Servers">Datacenter Servers</option>
+                        <option value="Edge / Branch Office">Edge / Branch Office</option>
+                        <option value="Default" selected>Default Assets</option>
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" id="btn-cancel-modal">Cancel</button>
@@ -566,6 +622,36 @@
             <div class="modal-footer">
                 <button class="btn btn-outline" id="btn-cancel-user-modal">Cancel</button>
                 <button class="btn btn-primary" id="btn-save-user">Create Operator</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div class="modal-backdrop" id="reset-password-modal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Reset Operator Password</h3>
+                <button class="btn-close" id="btn-close-reset-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="reset-user-id">
+                <div class="form-group">
+                    <label>Operator Account</label>
+                    <input type="text" class="input" id="reset-username-display" readonly style="background: var(--bg-surface-elevated); cursor: not-allowed; opacity: 0.85;">
+                </div>
+                <div class="form-group">
+                    <label>New Password (Min 8 Characters)</label>
+                    <input type="password" class="input" id="reset-new-password" placeholder="••••••••••••" required>
+                </div>
+                <div class="form-group">
+                    <label>Confirm New Password</label>
+                    <input type="password" class="input" id="reset-confirm-password" placeholder="••••••••••••" required>
+                </div>
+                <div id="reset-password-error" class="alert-box alert-danger" style="display: none; margin-top: 8px; font-size: 0.85rem;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-reset-modal">Cancel</button>
+                <button class="btn btn-primary" id="btn-save-reset-password">Update Password</button>
             </div>
         </div>
     </div>

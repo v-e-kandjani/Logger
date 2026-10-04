@@ -116,6 +116,12 @@ func main() {
 	)
 	pipe.Start()
 	defer pipe.Stop()
+	if val, ok := dbSettings["strict_device_filtering"]; ok && (val == "true" || val == "1") {
+		pipe.SetStrictFiltering(true)
+		log.Println("[Pipeline] Strict Device Filtering ENABLED (Rejecting unregistered syslog traffic)")
+	} else {
+		log.Println("[Pipeline] Ingestion mode: Permissive Auto-Discovery (Accepting all senders)")
+	}
 	log.Printf("[Pipeline] Ingestion ring buffer started with %d workers", cfg.Syslog.Workers)
 
 	// 7. Initialize Syslog Socket Listeners (UDP/TCP/TLS)

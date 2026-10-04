@@ -159,11 +159,18 @@ func (db *DB) CreateDevice(ctx context.Context, d *models.Device) error {
 		VALUES ($1, $2::inet, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING id, created_at, updated_at`
 
-	return db.pool.QueryRow(ctx, query,
+	err := db.pool.QueryRow(ctx, query,
 		d.Name, d.IPAddress, d.Hostname, d.Description, d.Vendor, d.DeviceType,
 		d.GroupID, d.SiteLocation, d.ExpectedProtocol, d.ExpectedPort,
 		d.IsEnabled, d.RetentionDays, d.TimestampPolicy, d.Tags,
 	).Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt)
+	if err != nil {
+		return err
+	}
+
+	// Purge from unregistered sources now that it is officially registered
+	_ = db.DeleteUnregisteredSource(ctx, d.IPAddress)
+	return nil
 }
 
 func (db *DB) UpdateDeviceLastSeen(ctx context.Context, ipStr string, seenTime time.Time) error {
@@ -188,9 +195,21 @@ func (db *DB) RecordUnregisteredSource(ctx context.Context, u *models.Unregister
 	return err
 }
 
+// DeleteUnregisteredSource deletes an IP from auto-discovered sources
+func (db *DB) DeleteUnregisteredSource(ctx context.Context, ipStr string) error {
+	query := `DELETE FROM unregistered_sources WHERE ip_address = $1::inet`
+	_, err := db.pool.Exec(ctx, query, ipStr)
+	return err
+}
+
 func (db *DB) ListUnregisteredSources(ctx context.Context) ([]models.UnregisteredSource, error) {
-	query := `SELECT host(ip_address), first_seen_at, last_seen_at, packet_count, last_raw_sample, detected_facility, detected_severity
-	          FROM unregistered_sources ORDER BY last_seen_at DESC LIMIT 100`
+	// Exclude any IP that has already been registered in the devices table
+	query := `
+		SELECT host(u.ip_address), u.first_seen_at, u.last_seen_at, u.packet_count, u.last_raw_sample, u.detected_facility, u.detected_severity
+		FROM unregistered_sources u
+		LEFT JOIN devices d ON u.ip_address = d.ip_address
+		WHERE d.id IS NULL
+		ORDER BY u.last_seen_at DESC LIMIT 100`
 
 	rows, err := db.pool.Query(ctx, query)
 	if err != nil {
@@ -266,6 +285,26 @@ func (db *DB) ListArchives(ctx context.Context, limit int) ([]models.LogArchive,
 		list = append(list, a)
 	}
 	return list, nil
+}
+
+func (db *DB) GetArchive(ctx context.Context, id uuid.UUID) (*models.LogArchive, error) {
+	query := `
+		SELECT id, archive_name, start_timestamp, end_timestamp, record_count, archive_path,
+		       archive_size, hash_algorithm, hash_value, timestamp_status, timestamp_request_time,
+		       timestamp_completion_time, timestamp_evidence_path, retry_count, last_error, created_at
+		FROM log_archives
+		WHERE id = $1`
+
+	var a models.LogArchive
+	err := db.pool.QueryRow(ctx, query, id).Scan(
+		&a.ID, &a.ArchiveName, &a.StartTimestamp, &a.EndTimestamp, &a.RecordCount, &a.ArchivePath,
+		&a.ArchiveSize, &a.HashAlgorithm, &a.HashValue, &a.TimestampStatus, &a.TimestampRequestTime,
+		&a.TimestampCompletionTime, &a.TimestampEvidencePath, &a.RetryCount, &a.LastError, &a.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
 }
 
 // AuditLog recording
@@ -439,6 +478,28 @@ func (db *DB) ToggleUserStatus(ctx context.Context, id uuid.UUID) (bool, error) 
 		RETURNING is_enabled`
 	err := db.pool.QueryRow(ctx, query, id).Scan(&newState)
 	return newState, err
+}
+
+func (db *DB) ResetUserPassword(ctx context.Context, id uuid.UUID, newPassword string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hashing password: %w", err)
+	}
+
+	query := `
+		UPDATE users
+		SET password_hash = $1,
+		    updated_at = NOW()
+		WHERE id = $2`
+
+	tag, err := db.pool.Exec(ctx, query, string(hash), id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
 }
 
 

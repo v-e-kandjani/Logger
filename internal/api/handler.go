@@ -1,11 +1,13 @@
 package api
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -103,10 +105,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/unregistered", h.requireAuth(h.handleUnregisteredSources))
 	mux.HandleFunc("/api/v1/archives", h.requireAuth(h.handleArchives))
 	mux.HandleFunc("/api/v1/archives/create", h.requireAuth(h.handleCreateArchiveNow))
+	mux.HandleFunc("/api/v1/archives/download", h.requireAuth(h.handleDownloadArchive))
 	mux.HandleFunc("/api/v1/settings", h.requireAuth(h.handleSettings))
 	mux.HandleFunc("/api/v1/timestamp/credit", h.requireAuth(h.handleTimestampCredit))
 	mux.HandleFunc("/api/v1/users", h.requireAuth(h.handleUsersAPI))
 	mux.HandleFunc("/api/v1/users/toggle", h.requireAuth(h.handleToggleUserAPI))
+	mux.HandleFunc("/api/v1/users/reset-password", h.requireAuth(h.handleResetUserPasswordAPI))
 	mux.HandleFunc("/api/v1/roles", h.requireAuth(h.handleRolesAPI))
 
 	// Static Assets (Public so login page can load CSS/JS)
@@ -148,9 +152,11 @@ func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"queue_depth":     h.pipeline.QueueDepth(),
 		"packets_rx":      h.pipeline.PacketsReceived.Load(),
 		"events_parsed":   h.pipeline.EventsParsed.Load(),
-		"events_inserted": h.chClient.TotalInserted.Load(),
-		"insert_errors":   h.chClient.TotalFailed.Load(),
-		"timestamp":       time.Now().UTC(),
+		"events_inserted":        h.chClient.TotalInserted.Load(),
+		"insert_errors":          h.chClient.TotalFailed.Load(),
+		"strict_device_filtering": h.pipeline.IsStrictFiltering(),
+		"dropped_unauthorized":   h.pipeline.DroppedUnauthorized.Load(),
+		"timestamp":              time.Now().UTC(),
 	})
 }
 
@@ -188,17 +194,19 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"logs_today":          countToday,
-		"queue_depth":         h.pipeline.QueueDepth(),
-		"packets_rx":          h.pipeline.PacketsReceived.Load(),
-		"total_inserted":      h.chClient.TotalInserted.Load(),
-		"total_devices":       len(devices),
-		"active_devices":      activeCount,
-		"warning_devices":     warningCount,
-		"offline_devices":     offlineCount,
-		"unknown_sources":     len(unreg),
-		"recent_archives":     archives,
-		"clickhouse_healthy":  h.chClient.IsHealthy(),
+		"logs_today":              countToday,
+		"queue_depth":             h.pipeline.QueueDepth(),
+		"packets_rx":              h.pipeline.PacketsReceived.Load(),
+		"total_inserted":          h.chClient.TotalInserted.Load(),
+		"total_devices":           len(devices),
+		"active_devices":          activeCount,
+		"warning_devices":         warningCount,
+		"offline_devices":         offlineCount,
+		"unknown_sources":         len(unreg),
+		"recent_archives":         archives,
+		"clickhouse_healthy":      h.chClient.IsHealthy(),
+		"strict_device_filtering": h.pipeline.IsStrictFiltering(),
+		"dropped_unauthorized":   h.pipeline.DroppedUnauthorized.Load(),
 	})
 }
 
@@ -436,6 +444,10 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
+		if sdf, ok := req["strict_device_filtering"]; ok {
+			h.pipeline.SetStrictFiltering(sdf == "true" || sdf == "1")
+		}
+
 		writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
 		return
 	}
@@ -448,6 +460,9 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Include defaults if not yet set in DB
+	if _, ok := settings["strict_device_filtering"]; !ok {
+		settings["strict_device_filtering"] = strconv.FormatBool(h.pipeline.IsStrictFiltering())
+	}
 	if _, ok := settings["stamping_mode"]; !ok {
 		settings["stamping_mode"] = "internal"
 	}
@@ -531,6 +546,94 @@ func (h *Handler) handleTimestampCredit(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "success", "message": credit})
+}
+
+func (h *Handler) handleDownloadArchive(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	fileType := r.URL.Query().Get("type") // "archive" (default), "evidence", "hash", "bundle"
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "invalid archive id", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r, 10*time.Second)
+	defer cancel()
+
+	arch, err := h.pgDB.GetArchive(ctx, id)
+	if err != nil {
+		http.Error(w, "archive not found: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	switch fileType {
+	case "evidence":
+		targetPath := arch.ArchivePath + ".zd"
+		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+			http.Error(w, "evidence file does not exist (archive may be unstamped)", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.zd\"", arch.ArchiveName))
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.ServeFile(w, r, targetPath)
+		return
+
+	case "hash":
+		targetPath := arch.ArchivePath + ".sha256"
+		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+			http.Error(w, "hash file does not exist", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.sha256\"", arch.ArchiveName))
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.ServeFile(w, r, targetPath)
+		return
+
+	case "bundle":
+		h.serveArchiveBundleZip(w, r, arch)
+		return
+
+	default: // "archive" or empty
+		targetPath := arch.ArchivePath
+		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+			http.Error(w, "archive file not found on disk", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.jsonl.gz\"", arch.ArchiveName))
+		w.Header().Set("Content-Type", "application/gzip")
+		http.ServeFile(w, r, targetPath)
+		return
+	}
+}
+
+func (h *Handler) serveArchiveBundleZip(w http.ResponseWriter, r *http.Request, arch *models.LogArchive) {
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-compliance-bundle.zip\"", arch.ArchiveName))
+	w.Header().Set("Content-Type", "application/zip")
+
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+
+	filesToBundle := []struct {
+		diskPath string
+		zipName  string
+	}{
+		{arch.ArchivePath, arch.ArchiveName + ".jsonl.gz"},
+		{arch.ArchivePath + ".zd", arch.ArchiveName + ".jsonl.gz.zd"},
+		{arch.ArchivePath + ".sha256", arch.ArchiveName + ".sha256"},
+	}
+
+	for _, f := range filesToBundle {
+		data, err := os.ReadFile(f.diskPath)
+		if err != nil {
+			continue // Skip if file is not on disk (e.g. .zd when disabled)
+		}
+		zf, err := zw.Create(f.zipName)
+		if err != nil {
+			continue
+		}
+		_, _ = zf.Write(data)
+	}
 }
 
 func (h *Handler) handleDashboardUI(w http.ResponseWriter, r *http.Request) {
