@@ -3,6 +3,10 @@ build:
 	go build -o bin/syslog-platform cmd/server/main.go
 	go build -o bin/syslog-loadtest scripts/loadtest.go
 
+build-linux:
+	CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o bin/syslog-platform-linux cmd/server/main.go
+
+
 # Start Docker Desktop containers
 docker-up:
 	docker compose up -d

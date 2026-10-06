@@ -430,6 +430,14 @@ success "ClickHouse analytical table '${CH_DB}.syslog_events' and materialized v
 # 10. Build and Launch Application Container
 echo ""
 echo -e "${BOLD}${BLUE}--- 8. Building & Starting Valtrivo LogSeal Daemon ---${NC}"
+
+# Pre-compile host binary if Go toolchain is installed
+if command -v go &> /dev/null && [[ ! -f "bin/syslog-platform-linux" ]]; then
+    info "Detected Go compiler on host. Building bin/syslog-platform-linux..."
+    mkdir -p bin
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o bin/syslog-platform-linux ./cmd/server/main.go 2>/dev/null || true
+fi
+
 docker compose build syslog-app
 docker compose up -d
 

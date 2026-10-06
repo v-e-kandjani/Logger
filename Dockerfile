@@ -1,7 +1,22 @@
-# Dockerfile for Syslog Platform (Go Backend + Web Dashboard)
-# Since the binary is already natively built for Linux/cross-compilation or can be copied directly:
-# Build locally with: CGO_ENABLED=0 GOOS=linux go build -o bin/syslog-platform-linux ./cmd/server/main.go
+# Dockerfile for Valtrivo LogSeal (Go Backend + Web Dashboard)
+# Multi-stage build compiles Go binary cleanly inside container without host prerequisites
 
+# Stage 1: Compile Go binary
+FROM golang:alpine AS builder
+
+WORKDIR /app
+
+# Cache dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build static Linux binary
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /app/bin/syslog-platform ./cmd/server/main.go
+
+# Stage 2: Minimal runtime image
 FROM alpine:3.20
 
 WORKDIR /opt/syslog-platform
@@ -18,8 +33,8 @@ RUN mkdir -p /opt/syslog-platform/bin \
              /opt/syslog-platform/web/templates \
              /opt/syslog-platform/web/static
 
-# Copy compiled Linux binary
-COPY bin/syslog-platform-linux /opt/syslog-platform/bin/syslog-platform
+# Copy compiled Linux binary from builder stage
+COPY --from=builder /app/bin/syslog-platform /opt/syslog-platform/bin/syslog-platform
 
 # Copy web assets
 COPY web/templates/ /opt/syslog-platform/web/templates/
