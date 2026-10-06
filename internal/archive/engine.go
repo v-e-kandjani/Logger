@@ -35,6 +35,55 @@ func NewEngine(baseDir string, chClient *clickhouse.Client, pgDB *postgres.DB, p
 	}
 }
 
+// StartAutoArchiving starts background worker that triggers periodic hourly archiving and timestamping
+func (e *Engine) StartAutoArchiving(ctx context.Context, interval string, scheduleMinute int) {
+	if scheduleMinute < 0 || scheduleMinute > 59 {
+		scheduleMinute = 5
+	}
+	go func() {
+		log.Printf("[Archive Engine] Periodic auto-archiving scheduler started (interval: %s, schedule_minute: %d)", interval, scheduleMinute)
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		var lastArchivedHour time.Time
+
+		for {
+			select {
+			case <-ctx.Done():
+				log.Println("[Archive Engine] Periodic auto-archiving scheduler stopped")
+				return
+			case now := <-ticker.C:
+				utcNow := now.UTC()
+				if utcNow.Minute() == scheduleMinute {
+					currentHour := utcNow.Truncate(time.Hour)
+					prevHour := currentHour.Add(-1 * time.Hour)
+
+					if !prevHour.Equal(lastArchivedHour) {
+						lastArchivedHour = prevHour
+						sliceStart := prevHour
+						sliceEnd := currentHour
+
+						log.Printf("[Archive Engine] Triggering scheduled archive for slice: %s to %s",
+							sliceStart.Format("2006-01-02 15:04:05"), sliceEnd.Format("15:04:05"))
+
+						sliceCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+						arch, err := e.CreateArchiveSlice(sliceCtx, sliceStart, sliceEnd)
+						cancel()
+
+						if err != nil {
+							log.Printf("[Archive Engine] Auto-archive error for slice %s: %v", sliceStart.Format(time.RFC3339), err)
+						} else {
+							log.Printf("[Archive Engine] Auto-archive completed: %s (Logs: %d, SHA-256: %s, Status: %s)",
+								arch.ArchiveName, arch.RecordCount, arch.HashValue, arch.TimestampStatus)
+						}
+					}
+				}
+			}
+		}
+	}()
+}
+
+
 // CreateArchiveSlice queries an immutable time slice, writes deterministic JSONL.GZ, computes SHA-256, and submits to KamuSM
 func (e *Engine) CreateArchiveSlice(ctx context.Context, start, end time.Time) (*models.LogArchive, error) {
 	// Construct directory: /archive/YYYY/MM/DD/

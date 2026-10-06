@@ -118,6 +118,11 @@ func main() {
 
 	// 5. Initialize Archival & Integrity Engine
 	archEngine := archive.NewEngine(cfg.Archive.StoragePath, chClient, pgDB, tsProvider)
+	appCtx, appCancel := context.WithCancel(context.Background())
+	defer appCancel()
+	if cfg.Archive.Enabled {
+		archEngine.StartAutoArchiving(appCtx, cfg.Archive.Interval, cfg.Archive.ScheduleMinutes)
+	}
 
 	// 6. Initialize Processing Pipeline
 	pipe := pipeline.NewPipeline(
