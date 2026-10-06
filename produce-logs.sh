@@ -19,10 +19,13 @@ cd "$SCRIPT_DIR"
 
 echo "Producing $COUNT test logs (vendor: $VENDOR) -> $TARGET..."
 
-if docker compose ps syslog-app &>/dev/null; then
-    docker compose exec -T syslog-app /opt/syslog-platform/bin/syslog-platform produce-logs --count "$COUNT" --vendor "$VENDOR" --target "$TARGET"
-elif [ -f "./bin/syslog-platform" ]; then
-    ./bin/syslog-platform produce-logs --count "$COUNT" --vendor "$VENDOR" --target "$TARGET"
+DOCKER_CMD="docker compose"
+if ! docker compose ps syslog-app &>/dev/null 2>&1 && sudo docker compose ps syslog-app &>/dev/null 2>&1; then
+    DOCKER_CMD="sudo docker compose"
+fi
+
+if $DOCKER_CMD ps syslog-app &>/dev/null 2>&1; then
+    $DOCKER_CMD exec -T syslog-app /opt/syslog-platform/bin/syslog-platform produce-logs --count "$COUNT" --vendor "$VENDOR" --target "$TARGET"
 else
     # Fallback to python probe if containers aren't ready
     python3 -c "
