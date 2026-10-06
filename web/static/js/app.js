@@ -92,6 +92,7 @@ function initNavigation() {
             updateViewHeader(tab);
 
             // Refresh tab-specific views
+            if (tab === 'search') document.getElementById('btn-search-exec').click();
             if (tab === 'devices') loadDevices();
             if (tab === 'unregistered') loadUnregisteredSources();
             if (tab === 'archives') loadArchives();
@@ -161,6 +162,38 @@ function initLiveStream() {
         toggleBtn.className = isLivePaused ? 'btn btn-outline' : 'btn btn-primary';
     });
 
+    // Pre-populate with recent logs from ClickHouse so stream is not blank on page load
+    const preloadRecentLogs = async () => {
+        try {
+            const res = await fetch('/api/v1/logs?limit=50&range=all');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.logs && data.logs.length > 0 && liveLogCount === 0) {
+                const recent = [...data.logs].reverse();
+                recent.forEach(log => {
+                    const row = document.createElement('div');
+                    row.className = 'log-row';
+                    const timeStr = log.timestamp ? log.timestamp.substring(11, 23) : '';
+                    const vendorBadge = log.vendor === 'WatchGuard' ? '<span class="badge badge-primary">WatchGuard</span> ' : log.vendor ? `[${log.vendor}] ` : '';
+                    row.innerHTML = `
+                        <span class="log-time">${timeStr}</span>
+                        <span class="log-src">${log.source_ip}:${log.port}</span>
+                        <span class="log-dev">${vendorBadge}${escapeHtml(log.device_name || 'UNKNOWN')}</span>
+                        <span class="log-sev sev-${log.severity}">${log.severity}</span>
+                        <span class="log-msg">${escapeHtml(log.message)}</span>
+                    `;
+                    container.appendChild(row);
+                    liveLogCount++;
+                });
+                container.scrollTop = container.scrollHeight;
+                document.getElementById('live-buffer-count').textContent = `${liveLogCount} in view (Max ${MAX_LIVE_ROWS})`;
+            }
+        } catch (e) {
+            console.error('Failed to preload live logs:', e);
+        }
+    };
+    preloadRecentLogs();
+
     const connect = () => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         liveSocket = new WebSocket(`${protocol}//${window.location.host}/api/v1/logs/live`);
@@ -216,6 +249,8 @@ function initSearch() {
         const vendor = document.getElementById('search-vendor').value;
         const severity = document.getElementById('search-severity').value;
         const source = document.getElementById('search-source').value;
+        const rangeEl = document.getElementById('search-range');
+        const range = rangeEl ? rangeEl.value : '24h';
 
         btn.disabled = true;
         btn.textContent = 'Searching ClickHouse...';
@@ -229,6 +264,7 @@ function initSearch() {
             if (vendor) params.set('vendor', vendor);
             if (severity) params.set('severity', severity);
             if (source) params.set('source', source);
+            if (range) params.set('range', range);
 
             const res = await fetch(`/api/v1/logs?${params.toString()}`);
             const data = await res.json();

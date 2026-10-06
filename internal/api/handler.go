@@ -186,10 +186,10 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	unreg, _ := h.pgDB.ListUnregisteredSources(ctx)
 	archives, _ := h.pgDB.ListArchives(ctx, 5)
 
-	// Query today's logs from ClickHouse
+	// Query today's logs from ClickHouse (match either event_timestamp or received_at to protect against device clock drift)
 	todayStart := time.Now().UTC().Truncate(24 * time.Hour)
 	var countToday uint64
-	row, err := h.chClient.QueryEvents(ctx, "SELECT count() FROM syslog.syslog_events WHERE event_timestamp >= ?", todayStart)
+	row, err := h.chClient.QueryEvents(ctx, "SELECT count() FROM syslog.syslog_events WHERE event_timestamp >= ? OR received_at >= ?", todayStart, todayStart)
 	if err == nil && row != nil {
 		defer row.Close()
 		if row.Next() {
@@ -233,15 +233,31 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 	severity := strings.TrimSpace(r.URL.Query().Get("severity"))
 	source := strings.TrimSpace(r.URL.Query().Get("source"))
 	vendorFilter := strings.TrimSpace(r.URL.Query().Get("vendor"))
+	timeRange := strings.TrimSpace(r.URL.Query().Get("range"))
 
 	var conditions []string
 	var args []any
 
-	// Default to last 24 hours if no time range provided
 	now := time.Now().UTC()
-	start := now.Add(-24 * time.Hour)
-	conditions = append(conditions, "event_timestamp >= ?")
-	args = append(args, start)
+	switch timeRange {
+	case "15m":
+		conditions = append(conditions, "(event_timestamp >= ? OR received_at >= ?)")
+		args = append(args, now.Add(-15*time.Minute), now.Add(-15*time.Minute))
+	case "1h":
+		conditions = append(conditions, "(event_timestamp >= ? OR received_at >= ?)")
+		args = append(args, now.Add(-1*time.Hour), now.Add(-1*time.Hour))
+	case "7d":
+		conditions = append(conditions, "(event_timestamp >= ? OR received_at >= ?)")
+		args = append(args, now.Add(-7*24*time.Hour), now.Add(-7*24*time.Hour))
+	case "30d":
+		conditions = append(conditions, "(event_timestamp >= ? OR received_at >= ?)")
+		args = append(args, now.Add(-30*24*time.Hour), now.Add(-30*24*time.Hour))
+	case "all":
+		// No time restriction
+	default: // "24h" or empty
+		conditions = append(conditions, "(event_timestamp >= ? OR received_at >= ?)")
+		args = append(args, now.Add(-24*time.Hour), now.Add(-24*time.Hour))
+	}
 
 	if vendorFilter != "" {
 		conditions = append(conditions, "vendor = ?")
@@ -257,16 +273,24 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 		args = append(args, severity)
 	}
 	if source != "" {
-		conditions = append(conditions, "source_ip = ?")
-		args = append(args, net.ParseIP(source))
+		if parsedIP := net.ParseIP(source); parsedIP != nil {
+			conditions = append(conditions, "source_ip = ?")
+			args = append(args, parsedIP)
+		} else {
+			conditions = append(conditions, "hasToken(toString(source_ip), ?)")
+			args = append(args, source)
+		}
 	}
 
-	whereClause := strings.Join(conditions, " AND ")
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + strings.Join(conditions, " AND ")
+	}
 	sql := fmt.Sprintf(`
 		SELECT internal_id, event_timestamp, source_ip, source_port, transport_protocol,
 		       device_name, vendor, severity, facility, hostname, application_name, message, raw_message
 		FROM syslog.syslog_events
-		WHERE %s
+		%s
 		ORDER BY event_timestamp DESC
 		LIMIT %d`, whereClause, limit)
 

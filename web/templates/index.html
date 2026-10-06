@@ -266,6 +266,14 @@
                         <option value="INFORMATIONAL">INFORMATIONAL</option>
                     </select>
                     <input type="text" class="input" id="search-source" placeholder="Source IP...">
+                    <select class="input" id="search-range">
+                        <option value="24h" selected>Son 24 Saat (Last 24h)</option>
+                        <option value="all">Tüm Zamanlar (All Time)</option>
+                        <option value="15m">Son 15 Dakika (Last 15m)</option>
+                        <option value="1h">Son 1 Saat (Last 1h)</option>
+                        <option value="7d">Son 7 Gün (Last 7d)</option>
+                        <option value="30d">Son 30 Gün (Last 30d)</option>
+                    </select>
                     <button class="btn btn-primary" id="btn-search-exec" data-i18n="btn_search_exec">Search ClickHouse</button>
                     <button class="btn btn-outline" id="btn-search-custom-export" data-i18n="btn_custom_export">Özel Aralık İndir & Mühürle</button>
                 </div>
