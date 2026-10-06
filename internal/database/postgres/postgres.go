@@ -152,11 +152,37 @@ func (db *DB) ListDevices(ctx context.Context) ([]models.Device, error) {
 }
 
 func (db *DB) CreateDevice(ctx context.Context, d *models.Device) error {
+	// If GroupName is provided but GroupID is nil, resolve or create the group
+	if d.GroupID == nil && d.GroupName != "" {
+		var gid uuid.UUID
+		err := db.pool.QueryRow(ctx, `
+			INSERT INTO device_groups (name, description)
+			VALUES ($1, 'Auto-created group')
+			ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+			RETURNING id`, d.GroupName).Scan(&gid)
+		if err == nil {
+			d.GroupID = &gid
+		}
+	}
+
+	if d.Tags == nil {
+		d.Tags = []string{}
+	}
+
 	query := `
 		INSERT INTO devices (name, ip_address, hostname, description, vendor, device_type,
 		                     group_id, site_location, expected_protocol, expected_port,
 		                     is_enabled, retention_days, timestamping_policy, tags)
 		VALUES ($1, $2::inet, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		ON CONFLICT (ip_address) DO UPDATE
+		SET name = EXCLUDED.name,
+		    hostname = CASE WHEN EXCLUDED.hostname != '' THEN EXCLUDED.hostname ELSE devices.hostname END,
+		    description = CASE WHEN EXCLUDED.description != '' THEN EXCLUDED.description ELSE devices.description END,
+		    vendor = EXCLUDED.vendor,
+		    device_type = EXCLUDED.device_type,
+		    group_id = COALESCE(EXCLUDED.group_id, devices.group_id),
+		    is_enabled = TRUE,
+		    updated_at = NOW()
 		RETURNING id, created_at, updated_at`
 
 	err := db.pool.QueryRow(ctx, query,

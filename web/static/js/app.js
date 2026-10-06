@@ -354,40 +354,64 @@ async function loadUnregisteredSources() {
             return;
         }
 
-        tbody.innerHTML = sources.map(s => {
-            const rawSample = (s.last_raw_sample || '').replace(/'/g, "\\'");
-            return `
+        window._unregisteredSources = sources;
+        tbody.innerHTML = sources.map((s, idx) => `
             <tr>
-                <td class="mono-code text-yellow">${s.ip_address}</td>
+                <td class="mono-code text-yellow">${escapeHtml(s.ip_address)}</td>
                 <td>${Number(s.packet_count).toLocaleString()}</td>
-                <td>${s.detected_facility}</td>
-                <td>${s.detected_severity}</td>
+                <td>${escapeHtml(s.detected_facility || '-')}</td>
+                <td>${escapeHtml(s.detected_severity || '-')}</td>
                 <td>${new Date(s.first_seen_at).toLocaleString()}</td>
                 <td>${new Date(s.last_seen_at).toLocaleString()}</td>
                 <td>
-                    <button class="btn btn-outline" onclick="onboardDevice('${s.ip_address}', '${rawSample}')">+ Register</button>
+                    <button class="btn btn-outline btn-register-unreg" data-idx="${idx}">+ Register</button>
                 </td>
             </tr>
-            `;
-        }).join('');
+        `).join('');
+
+        tbody.querySelectorAll('.btn-register-unreg').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const idx = parseInt(btn.getAttribute('data-idx'), 10);
+                const s = window._unregisteredSources[idx];
+                if (s) {
+                    onboardDevice(s.ip_address, s.last_raw_sample || '');
+                }
+            });
+        });
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="7" class="text-center text-red">Failed: ${e.message}</td></tr>`;
     }
 }
 
 window.onboardDevice = (ip, sample = '') => {
-    document.getElementById('dev-ip').value = ip;
-    document.getElementById('dev-name').value = `Device-${ip.replace(/\./g, '-')}`;
+    const ipInput = document.getElementById('dev-ip');
+    const nameInput = document.getElementById('dev-name');
+    if (ipInput) ipInput.value = ip;
+    if (nameInput) nameInput.value = `Device-${ip.replace(/\./g, '-')}`;
+
+    const vendorSelect = document.getElementById('dev-vendor');
+    const typeSelect = document.getElementById('dev-type');
     const groupSelect = document.getElementById('dev-group');
+
     if (sample && (sample.toLowerCase().includes('watchguard') || sample.toLowerCase().includes('firebox') || sample.includes('msg_id='))) {
-        document.getElementById('dev-vendor').value = 'WatchGuard';
-        document.getElementById('dev-type').value = 'Firewall';
-        document.getElementById('dev-name').value = `WatchGuard-FW-${ip.replace(/\./g, '-')}`;
+        if (vendorSelect) vendorSelect.value = 'WatchGuard';
+        if (typeSelect) typeSelect.value = 'Firewall';
+        if (nameInput) nameInput.value = `WatchGuard-FW-${ip.replace(/\./g, '-')}`;
         if (groupSelect) groupSelect.value = 'Perimeter Firewalls';
+    } else if (sample && (sample.toLowerCase().includes('cisco') || sample.includes('%SYS-') || sample.includes('%LINK-'))) {
+        if (vendorSelect) vendorSelect.value = 'Cisco';
+        if (typeSelect) typeSelect.value = 'Switch';
+        if (nameInput) nameInput.value = `Cisco-SW-${ip.replace(/\./g, '-')}`;
+        if (groupSelect) groupSelect.value = 'Core Switches & Routers';
     } else {
         if (groupSelect) groupSelect.value = 'Default';
     }
-    document.getElementById('device-modal').style.display = 'flex';
+
+    const modal = document.getElementById('device-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
 };
 
 // Archives & KamuSM Zaman Damgası
