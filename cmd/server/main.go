@@ -17,11 +17,18 @@ import (
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
 	"github.com/syslog-platform/logger/internal/syslog/listener"
+	"github.com/syslog-platform/logger/internal/syslog/generator"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 	"github.com/syslog-platform/logger/internal/timestamp"
 )
 
 func main() {
+	// CLI Subcommand: produce-logs / test-logs
+	if len(os.Args) > 1 && (os.Args[1] == "produce-logs" || os.Args[1] == "test-logs") {
+		runProduceLogsCLI(os.Args[2:])
+		return
+	}
+
 	configPath := flag.String("config", "config/config.yaml", "Path to YAML configuration")
 	flag.Parse()
 
@@ -40,9 +47,16 @@ func main() {
 	defer pgDB.Close()
 	log.Println("[PostgreSQL] Connected and connection pool initialized")
 
-	// Seed initial assets (e.g. WatchGuard Firebox) if database empty
-	if err := pgDB.SeedDefaultDevices(context.Background()); err != nil {
-		log.Printf("[PostgreSQL] Warning seeding default devices: %v", err)
+	// Seed initial assets ONLY if explicitly enabled (SEED_DEMO_DEVICES=true)
+	seedDemo := os.Getenv("SEED_DEMO_DEVICES") == "true" || cfg.Syslog.SeedDemoDevices
+	if seedDemo {
+		if err := pgDB.SeedDefaultDevices(context.Background()); err != nil {
+			log.Printf("[PostgreSQL] Warning seeding default devices: %v", err)
+		} else {
+			log.Println("[PostgreSQL] Demo devices seeded")
+		}
+	} else {
+		log.Println("[PostgreSQL] Demo device seeding disabled (Clean inventory mode)")
 	}
 
 	// Seed default administrator if users table empty
@@ -161,4 +175,32 @@ func main() {
 
 	_ = httpServer.Shutdown(shutdownCtx)
 	fmt.Println("[Syslog Platform] Graceful shutdown completed safely.")
+}
+
+func runProduceLogsCLI(args []string) {
+	fs := flag.NewFlagSet("produce-logs", flag.ExitOnError)
+	target := fs.String("target", "127.0.0.1:514", "Destination syslog socket (e.g. 127.0.0.1:514)")
+	protocol := fs.String("protocol", "udp", "Transport protocol ('udp' or 'tcp')")
+	vendor := fs.String("vendor", "all", "Log vendor profile ('all', 'watchguard', 'fortinet', 'cisco', 'linux')")
+	count := fs.Int("count", 25, "Number of test syslog packets to produce")
+	delayMs := fs.Int("delay", 40, "Delay in milliseconds between packets")
+	_ = fs.Parse(args)
+
+	fmt.Printf("=== Valtrivo LogSeal Synthetic Log Generator ===\n")
+	fmt.Printf("Target:   %s (%s)\n", *target, *protocol)
+	fmt.Printf("Vendor:   %s\n", *vendor)
+	fmt.Printf("Count:    %d packets\n", *count)
+	fmt.Println("Sending test logs...")
+
+	sent, err := generator.ProduceLogs(generator.Options{
+		Target:   *target,
+		Protocol: *protocol,
+		Vendor:   *vendor,
+		Count:    *count,
+		Delay:    time.Duration(*delayMs) * time.Millisecond,
+	})
+	if err != nil {
+		log.Fatalf("Error producing logs: %v\n", err)
+	}
+	fmt.Printf("Successfully produced and sent %d syslog packets to %s!\n", sent, *target)
 }

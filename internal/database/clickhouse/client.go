@@ -74,6 +74,15 @@ func NewClient(cfg config.ClickHouseConfig) (*Client, error) {
 	return c, nil
 }
 
+// Database returns the configured ClickHouse database name with fallback
+func (c *Client) Database() string {
+	if c.cfg.Database != "" {
+		return c.cfg.Database
+	}
+	return "syslog"
+}
+
+
 // Enqueue delivers an event into the batch buffer
 func (c *Client) Enqueue(event *models.LogEvent) {
 	select {
@@ -145,15 +154,16 @@ func (c *Client) flushBatch(events []*models.LogEvent) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	batch, err := c.conn.PrepareBatch(ctx, `
-		INSERT INTO syslog.syslog_events (
+	batchQuery := fmt.Sprintf(`
+		INSERT INTO %s.syslog_events (
 			internal_id, event_timestamp, received_at, source_ip, source_port,
 			transport_protocol, device_id, device_name, device_group, vendor,
 			product, facility_code, facility, severity_code, severity,
 			hostname, application_name, process_id, message_id, structured_data,
 			message, raw_message, collector_node, parser_status, ingestion_timestamp
 		)
-	`)
+	`, c.Database())
+	batch, err := c.conn.PrepareBatch(ctx, batchQuery)
 	if err != nil {
 		return fmt.Errorf("prepare batch: %w", err)
 	}
@@ -292,7 +302,7 @@ func (c *Client) PruneOldestPartition(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("no active partitions found to prune")
 	}
 
-	dropQuery := fmt.Sprintf("ALTER TABLE syslog.syslog_events DROP PARTITION '%s'", oldestPartition)
+	dropQuery := fmt.Sprintf("ALTER TABLE %s.syslog_events DROP PARTITION '%s'", c.Database(), oldestPartition)
 	if err := c.conn.Exec(ctx, dropQuery); err != nil {
 		return "", fmt.Errorf("dropping partition %s: %w", oldestPartition, err)
 	}
@@ -302,6 +312,6 @@ func (c *Client) PruneOldestPartition(ctx context.Context) (string, error) {
 
 // PruneOlderThanDays deletes events older than the retention threshold
 func (c *Client) PruneOlderThanDays(ctx context.Context, days int) error {
-	query := fmt.Sprintf("ALTER TABLE syslog.syslog_events DELETE WHERE event_timestamp < now() - INTERVAL %d DAY", days)
+	query := fmt.Sprintf("ALTER TABLE %s.syslog_events DELETE WHERE event_timestamp < now() - INTERVAL %d DAY", c.Database(), days)
 	return c.conn.Exec(ctx, query)
 }

@@ -52,15 +52,15 @@ func (e *Engine) CreateArchiveSlice(ctx context.Context, start, end time.Time) (
 	archiveFilePath := filepath.Join(dirPath, archiveBaseName+".jsonl.gz")
 
 	// Query ClickHouse for records strictly inside bounds
-	query := `
+	query := fmt.Sprintf(`
 		SELECT internal_id, event_timestamp, received_at, source_ip, source_port,
 		       transport_protocol, device_id, device_name, device_group, vendor,
 		       product, facility_code, facility, severity_code, severity,
 		       hostname, application_name, process_id, message_id, structured_data,
 		       message, raw_message, collector_node, parser_status, ingestion_timestamp
-		FROM syslog.syslog_events
+		FROM %s.syslog_events
 		WHERE event_timestamp >= ? AND event_timestamp < ?
-		ORDER BY event_timestamp ASC, internal_id ASC`
+		ORDER BY event_timestamp ASC, internal_id ASC`, e.chClient.Database())
 
 	rows, err := e.chClient.QueryEvents(ctx, query, start, end)
 	if err != nil {
@@ -240,9 +240,9 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 		       product, facility_code, facility, severity_code, severity,
 		       hostname, application_name, process_id, message_id, structured_data,
 		       message, raw_message, collector_node, parser_status, ingestion_timestamp
-		FROM syslog.syslog_events
+		FROM %s.syslog_events
 		WHERE %s >= ? AND %s <= ?
-		ORDER BY %s ASC, internal_id ASC`, timeCol, timeCol, timeCol)
+		ORDER BY %s ASC, internal_id ASC`, e.chClient.Database(), timeCol, timeCol, timeCol)
 
 	rows, err := e.chClient.QueryEvents(ctx, query, opts.Start, opts.End)
 	if err != nil {

@@ -189,7 +189,8 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	// Query today's logs from ClickHouse (match either event_timestamp or received_at to protect against device clock drift)
 	todayStart := time.Now().UTC().Truncate(24 * time.Hour)
 	var countToday uint64
-	row, err := h.chClient.QueryEvents(ctx, "SELECT count() FROM syslog.syslog_events WHERE event_timestamp >= ? OR received_at >= ?", todayStart, todayStart)
+	countQuery := fmt.Sprintf("SELECT count() FROM %s.syslog_events WHERE event_timestamp >= ? OR received_at >= ?", h.chClient.Database())
+	row, err := h.chClient.QueryEvents(ctx, countQuery, todayStart, todayStart)
 	if err == nil && row != nil {
 		defer row.Close()
 		if row.Next() {
@@ -289,10 +290,10 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 	sql := fmt.Sprintf(`
 		SELECT internal_id, event_timestamp, source_ip, source_port, transport_protocol,
 		       device_name, vendor, severity, facility, hostname, application_name, message, raw_message
-		FROM syslog.syslog_events
+		FROM %s.syslog_events
 		%s
 		ORDER BY event_timestamp DESC
-		LIMIT %d`, whereClause, limit)
+		LIMIT %d`, h.chClient.Database(), whereClause, limit)
 
 	rows, err := h.chClient.QueryEvents(ctx, sql, args...)
 	if err != nil {

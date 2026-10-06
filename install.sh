@@ -312,6 +312,7 @@ server:
 
 syslog:
   accept_unknown_sources: true
+  seed_demo_devices: false
   udp:
     enabled: true
     listen_addr: "0.0.0.0:5514"
@@ -418,6 +419,10 @@ SQL
 )
 echo "$SEED_SQL" | docker compose exec -T postgres psql -U "$PG_USER" -d "$PG_DB" > /dev/null
 success "Administrator user '${ADMIN_USER}' provisioned and password crypt-hashed."
+
+# Ensure database starts clean without fake/dummy assets
+docker compose exec -T postgres psql -U "$PG_USER" -d "$PG_DB" -c "DELETE FROM devices WHERE ip_address = '10.0.1.1' AND name = 'HQ-WatchGuard-Firebox';" &>/dev/null || true
+
 
 # B) ClickHouse Tables
 info "Executing ClickHouse migrations (migrations/clickhouse/001_initial_events.sql)..."

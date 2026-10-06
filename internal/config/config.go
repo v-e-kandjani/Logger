@@ -30,6 +30,7 @@ type ServerConfig struct {
 
 type SyslogConfig struct {
 	AcceptUnknownSources bool              `yaml:"accept_unknown_sources"`
+	SeedDemoDevices      bool              `yaml:"seed_demo_devices"`
 	UDP                  ListenerConfig    `yaml:"udp"`
 	TCP                  ListenerConfig    `yaml:"tcp"`
 	TLS                  TLSListenerConfig `yaml:"tls"`

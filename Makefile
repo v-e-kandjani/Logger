@@ -26,3 +26,8 @@ run:
 # Run synthetic load test (1,000 EPS for 10s)
 loadtest:
 	go run scripts/loadtest.go -target 127.0.0.1:514 -eps 1000 -duration 10s
+
+# Produce test logs via CLI subcommand
+produce-logs:
+	go run cmd/server/main.go produce-logs --count 50 --vendor all
+

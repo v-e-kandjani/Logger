@@ -77,6 +77,7 @@ services:
       - SERVER_LISTEN_ADDR=0.0.0.0:8080
       - ARCHIVE_PATH=/opt/syslog-platform/archive
       - TIMESTAMP_PROVIDER=${TIMESTAMP_PROVIDER:-mock}
+      - SEED_DEMO_DEVICES=${SEED_DEMO_DEVICES:-false}
     volumes:
       - syslog_archives:/opt/syslog-platform/archive
       - ./timestamp-client:/opt/syslog-platform/timestamp-client
