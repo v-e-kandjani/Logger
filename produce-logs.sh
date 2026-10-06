@@ -25,7 +25,11 @@ if ! docker compose ps syslog-app &>/dev/null 2>&1 && sudo docker compose ps sys
 fi
 
 if $DOCKER_CMD ps syslog-app &>/dev/null 2>&1; then
-    $DOCKER_CMD exec -T syslog-app /opt/syslog-platform/bin/syslog-platform produce-logs --count "$COUNT" --vendor "$VENDOR" --target "$TARGET"
+    CONTAINER_TARGET="$TARGET"
+    if [ "$TARGET" = "127.0.0.1:514" ] || [ "$TARGET" = "localhost:514" ]; then
+        CONTAINER_TARGET="127.0.0.1:5514"
+    fi
+    $DOCKER_CMD exec -T syslog-app /opt/syslog-platform/bin/syslog-platform produce-logs --count "$COUNT" --vendor "$VENDOR" --target "$CONTAINER_TARGET"
 else
     # Fallback to python probe if containers aren't ready
     python3 -c "
