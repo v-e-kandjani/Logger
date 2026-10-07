@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=2.4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -136,10 +136,10 @@
                     </div>
                 </div>
 
-                <!-- Real-Time Telemetry & Performance Graphs Grid -->
-                <div class="telemetry-grid">
+                <!-- Real-Time Telemetry & Performance Graphs Grid (Strict 2x2 Layout) -->
+                <div class="telemetry-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 28px;">
                     <!-- 1. CPU Utilization Card -->
-                    <div class="telemetry-card">
+                    <div class="telemetry-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px 20px 14px 20px;">
                         <div class="telemetry-card-header">
                             <div>
                                 <span class="telemetry-title" data-i18n="telemetry_cpu_title">CPU Utilization</span>
@@ -150,13 +150,13 @@
                                 <span class="telemetry-sub" id="chart-sub-cpu">Active Load</span>
                             </div>
                         </div>
-                        <div class="telemetry-canvas-wrap">
-                            <canvas id="chart-canvas-cpu"></canvas>
+                        <div class="telemetry-canvas-wrap" style="width: 100%; height: 130px; position: relative; overflow: hidden;">
+                            <canvas id="chart-canvas-cpu" style="width: 100%; height: 130px; display: block;"></canvas>
                         </div>
                     </div>
 
                     <!-- 2. RAM Memory Usage Card -->
-                    <div class="telemetry-card">
+                    <div class="telemetry-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px 20px 14px 20px;">
                         <div class="telemetry-card-header">
                             <div>
                                 <span class="telemetry-title" data-i18n="telemetry_ram_title">RAM Memory Usage</span>
@@ -167,13 +167,13 @@
                                 <span class="telemetry-sub" id="chart-sub-ram">Total: -</span>
                             </div>
                         </div>
-                        <div class="telemetry-canvas-wrap">
-                            <canvas id="chart-canvas-ram"></canvas>
+                        <div class="telemetry-canvas-wrap" style="width: 100%; height: 130px; position: relative; overflow: hidden;">
+                            <canvas id="chart-canvas-ram" style="width: 100%; height: 130px; display: block;"></canvas>
                         </div>
                     </div>
 
                     <!-- 3. Logs Received Rate (EPS) Card -->
-                    <div class="telemetry-card">
+                    <div class="telemetry-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px 20px 14px 20px;">
                         <div class="telemetry-card-header">
                             <div>
                                 <span class="telemetry-title" data-i18n="telemetry_logs_title">Logs Received Rate</span>
@@ -184,13 +184,13 @@
                                 <span class="telemetry-sub" id="chart-sub-packets">Total: 0 rx</span>
                             </div>
                         </div>
-                        <div class="telemetry-canvas-wrap">
-                            <canvas id="chart-canvas-logs"></canvas>
+                        <div class="telemetry-canvas-wrap" style="width: 100%; height: 130px; position: relative; overflow: hidden;">
+                            <canvas id="chart-canvas-logs" style="width: 100%; height: 130px; display: block;"></canvas>
                         </div>
                     </div>
 
                     <!-- 4. Network Throughput (In / Out) Card -->
-                    <div class="telemetry-card">
+                    <div class="telemetry-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px 20px 14px 20px;">
                         <div class="telemetry-card-header">
                             <div>
                                 <span class="telemetry-title" data-i18n="telemetry_net_title">Network Throughput (In / Out)</span>
@@ -201,8 +201,8 @@
                                 <span class="telemetry-sub" id="chart-sub-net">Bandwidth Rate</span>
                             </div>
                         </div>
-                        <div class="telemetry-canvas-wrap">
-                            <canvas id="chart-canvas-net"></canvas>
+                        <div class="telemetry-canvas-wrap" style="width: 100%; height: 130px; position: relative; overflow: hidden;">
+                            <canvas id="chart-canvas-net" style="width: 100%; height: 130px; display: block;"></canvas>
                         </div>
                     </div>
                 </div>

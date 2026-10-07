@@ -1675,6 +1675,7 @@ function renderAllTelemetryCharts(data) {
 
     const points = data.points;
     const timestamps = points.map(p => p.timestamp);
+    const maxPoints = data.max_points || 60;
 
     // 1. CPU Chart (Cyan area)
     drawSmoothAreaChart('chart-canvas-cpu', [
@@ -1688,7 +1689,8 @@ function renderAllTelemetryCharts(data) {
         fixedMax: 100,
         showLabels: true,
         formatLabel: val => `${Math.round(val)}%`,
-        timestamps: timestamps
+        timestamps: timestamps,
+        maxPoints: maxPoints
     });
 
     // 2. RAM Chart (Purple area)
@@ -1703,7 +1705,8 @@ function renderAllTelemetryCharts(data) {
         fixedMax: 100,
         showLabels: true,
         formatLabel: val => `${Math.round(val)}%`,
-        timestamps: timestamps
+        timestamps: timestamps,
+        maxPoints: maxPoints
     });
 
     // 3. Logs Received (EPS) Chart (Green area)
@@ -1717,7 +1720,8 @@ function renderAllTelemetryCharts(data) {
         fixedMin: 0,
         showLabels: true,
         formatLabel: val => `${Math.round(val)}`,
-        timestamps: timestamps
+        timestamps: timestamps,
+        maxPoints: maxPoints
     });
 
     // 4. Network Throughput Chart (Dual series: In / Rx Amber, Out / Tx Sky Blue)
@@ -1738,7 +1742,8 @@ function renderAllTelemetryCharts(data) {
         fixedMin: 0,
         showLabels: true,
         formatLabel: val => formatTelemetryRate(val),
-        timestamps: timestamps
+        timestamps: timestamps,
+        maxPoints: maxPoints
     });
 }
 
@@ -1746,24 +1751,25 @@ function drawSmoothAreaChart(canvasId, seriesList, options = {}) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const wrap = canvas.parentElement;
+    const width = (wrap && wrap.clientWidth > 50) ? wrap.clientWidth : (canvas.clientWidth || 340);
+    const height = 130; // Constant fixed height: guaranteed never to shrink or collapse!
+
+    // Lock CSS dimensions
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
 
-    if (rect.width === 0 || rect.height === 0) return;
-
-    // Set canvas internal resolution to match screen DPI
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const width = rect.width;
-    const height = rect.height;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // Explicitly resets transform matrix to prevent scale compounding
 
     const padTop = 12;
     const padBottom = 22;
     const padLeft = 8;
-    const padRight = 36; // space for Y-axis labels
+    const padRight = 38; // space for Y-axis scale labels
 
     const plotW = width - padLeft - padRight;
     const plotH = height - padTop - padBottom;
@@ -1782,7 +1788,7 @@ function drawSmoothAreaChart(canvasId, seriesList, options = {}) {
 
     if (maxVal <= minVal) maxVal = minVal + 10;
     if (options.fixedMax === undefined) {
-        maxVal = maxVal * 1.2; // 20% headroom
+        maxVal = maxVal * 1.25; // 25% headroom
     }
 
     const valRange = maxVal - minVal;
@@ -1811,20 +1817,34 @@ function drawSmoothAreaChart(canvasId, seriesList, options = {}) {
     });
     ctx.setLineDash([]); // reset dash
 
+    const maxSlots = options.maxPoints || 60;
+    const stepX = plotW / (maxSlots - 1);
+
     // Draw each series
     seriesList.forEach(series => {
         const data = series.data || [];
-        if (data.length < 2) return;
+        if (data.length === 0) return;
 
         const count = data.length;
-        const stepX = plotW / (count - 1);
 
+        // Position points from right edge backwards so scale never shrinks as points are added
         const points = data.map((val, idx) => {
-            const x = padLeft + idx * stepX;
+            const fromRight = (count - 1 - idx) * stepX;
+            const x = Math.max(padLeft, padLeft + plotW - fromRight);
             const clampedVal = Math.max(minVal, Math.min(maxVal, val));
             const y = padTop + plotH * (1 - (clampedVal - minVal) / valRange);
             return { x, y, val };
         });
+
+        if (points.length === 1) {
+            // Draw single point indicator
+            const pt = points[0];
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = series.color;
+            ctx.fill();
+            return;
+        }
 
         // 1. Fill Area with smooth gradient
         const grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
@@ -1858,7 +1878,7 @@ function drawSmoothAreaChart(canvasId, seriesList, options = {}) {
         ctx.lineWidth = 2.2;
         ctx.stroke();
 
-        // 3. Glowing live end point indicator
+        // 3. Glowing live end point indicator on latest point
         const lastPt = points[points.length - 1];
         ctx.beginPath();
         ctx.arc(lastPt.x, lastPt.y, 3.5, 0, Math.PI * 2);
