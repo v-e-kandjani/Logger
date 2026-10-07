@@ -254,6 +254,9 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.2.4**:
+  - Web UI system upgrade live progress modal with real-time SSE event streaming, percentage progress bar, and terminal activity console.
+  - Automatic countdown dashboard reloader upon upgrade completion.
 - **v1.2.3**:
   - Full Turkish documentation (`README.tr.md`) synchronized with all telemetry, host networking, dynamic CPU scaling, and upgrade features.
 - **v1.2.2**:

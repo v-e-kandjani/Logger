@@ -1401,12 +1401,12 @@ async function loadUpdateStatus() {
         const repoEl = document.getElementById('upd-repo-link');
         const branchEl = document.getElementById('upd-branch');
 
-        const curVersion = data.current_version || 'v1.2.3';
+        const curVersion = data.current_version || 'v1.2.4';
         if (verEl) verEl.textContent = curVersion;
         const brandVer = document.getElementById('brand-version');
         if (brandVer) brandVer.textContent = curVersion;
 
-        if (commitEl) commitEl.textContent = data.current_commit || 'e0347e5';
+        if (commitEl) commitEl.textContent = data.current_commit || '0a5ea80';
         if (dateEl) dateEl.textContent = `Build: ${data.build_date || '2026-10-08'}`;
         if (repoEl) {
             repoEl.textContent = data.repository || 'v-e-kandjani/Logger';
@@ -1548,6 +1548,217 @@ function initUpdatesManagement() {
         });
     }
 
+    // Live Upgrade Progress Modal Controller
+    let upgradeReloadTimer = null;
+
+    function openUpgradeModal() {
+        const modal = document.getElementById('upgrade-modal');
+        if (modal) modal.style.display = 'flex';
+
+        const closeBtn = document.getElementById('btn-close-upgrade-modal');
+        const dismissBtn = document.getElementById('btn-dismiss-upgrade-modal');
+        const reloadBtn = document.getElementById('btn-reload-after-upgrade');
+        if (closeBtn) closeBtn.style.display = 'none';
+        if (dismissBtn) dismissBtn.style.display = 'none';
+        if (reloadBtn) reloadBtn.style.display = 'none';
+
+        const fill = document.getElementById('upd-progress-fill');
+        if (fill) fill.style.width = '0%';
+
+        const pct = document.getElementById('upd-progress-percent');
+        if (pct) pct.textContent = '0%';
+
+        const stageBadge = document.getElementById('upd-progress-stage-badge');
+        if (stageBadge) {
+            stageBadge.className = 'badge badge-info';
+            stageBadge.textContent = 'STARTING';
+        }
+
+        const stageText = document.getElementById('upd-progress-stage-text');
+        if (stageText) stageText.textContent = 'Connecting to GitHub...';
+
+        const msg = document.getElementById('upd-progress-msg');
+        if (msg) msg.textContent = 'Preparing platform upgrade sequence...';
+
+        const footerStatus = document.getElementById('upd-modal-footer-status');
+        if (footerStatus) {
+            footerStatus.innerHTML = '⚠️ Please do not close this browser tab while the update is being applied.';
+            footerStatus.style.color = 'var(--text-muted)';
+        }
+
+        const consoleLog = document.getElementById('upd-console-log');
+        if (consoleLog) {
+            consoleLog.innerHTML = `<div class="upd-log-line" style="color: var(--text-muted);">[${new Date().toLocaleTimeString()}] Live upgrade session started.</div>`;
+        }
+
+        const stats = document.getElementById('upd-console-stats');
+        if (stats) stats.textContent = '1 event';
+    }
+
+    function addUpgradeLog(message, type = 'info') {
+        const consoleLog = document.getElementById('upd-console-log');
+        if (!consoleLog) return;
+        const line = document.createElement('div');
+        line.className = 'upd-log-line' + (type === 'success' ? ' success' : type === 'error' ? ' error' : type === 'warn' ? ' warn' : '');
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        consoleLog.appendChild(line);
+        consoleLog.scrollTop = consoleLog.scrollHeight;
+
+        const stats = document.getElementById('upd-console-stats');
+        if (stats) stats.textContent = `${consoleLog.children.length} events`;
+    }
+
+    function updateUpgradeProgress(data) {
+        const percent = Math.min(100, Math.max(0, data.percent || 0));
+        const fill = document.getElementById('upd-progress-fill');
+        if (fill) fill.style.width = `${percent}%`;
+
+        const pct = document.getElementById('upd-progress-percent');
+        if (pct) pct.textContent = `${percent}%`;
+
+        const stageBadge = document.getElementById('upd-progress-stage-badge');
+        const stageText = document.getElementById('upd-progress-stage-text');
+        const msg = document.getElementById('upd-progress-msg');
+
+        if (data.stage && stageBadge) {
+            stageBadge.textContent = data.stage;
+            if (data.stage === 'ERROR' || !data.success) {
+                stageBadge.className = 'badge badge-danger';
+            } else if (data.done) {
+                stageBadge.className = 'badge badge-success';
+            } else {
+                stageBadge.className = 'badge badge-info';
+            }
+        }
+
+        if (stageText && data.stage) {
+            switch (data.stage) {
+                case 'INIT': stageText.textContent = 'Initializing engine'; break;
+                case 'GITHUB_CHECK': stageText.textContent = 'Contacting GitHub'; break;
+                case 'COMMIT_RESOLVED': stageText.textContent = 'Verifying release'; break;
+                case 'GIT_SYNC':
+                case 'GIT_PULL': stageText.textContent = 'Synchronizing Git delta'; break;
+                case 'HOT_PATCH': stageText.textContent = 'Hot-patching files'; break;
+                case 'VERSION_STATE': stageText.textContent = 'Writing version configuration'; break;
+                case 'AUDIT_LOG': stageText.textContent = 'Writing audit trail'; break;
+                case 'COMPLETE': stageText.textContent = 'Upgrade Complete!'; break;
+                case 'ERROR': stageText.textContent = 'Upgrade Failed'; break;
+                default: stageText.textContent = data.stage;
+            }
+        }
+
+        if (msg && data.message) {
+            msg.textContent = data.message;
+        }
+
+        if (data.message) {
+            let lineType = 'info';
+            if (data.stage === 'ERROR' || !data.success) lineType = 'error';
+            else if (data.done || data.stage === 'COMPLETE') lineType = 'success';
+            else if (data.stage === 'HOT_PATCH') lineType = 'info';
+            addUpgradeLog(data.message, lineType);
+        }
+
+        if (data.done && data.success) {
+            handleUpgradeCompleted(data);
+        } else if (data.done && !data.success) {
+            handleUpgradeFailed(data.message || 'Unknown error occurred during upgrade');
+        }
+    }
+
+    function handleUpgradeCompleted(data) {
+        const fill = document.getElementById('upd-progress-fill');
+        if (fill) fill.style.width = '100%';
+
+        const pct = document.getElementById('upd-progress-percent');
+        if (pct) pct.textContent = '100%';
+
+        const footerStatus = document.getElementById('upd-modal-footer-status');
+        if (footerStatus) {
+            footerStatus.innerHTML = `✓ <strong>Platform upgraded to ${data.new_version || 'latest'}!</strong> Reloading dashboard...`;
+            footerStatus.style.color = '#10b981';
+        }
+
+        const closeBtn = document.getElementById('btn-close-upgrade-modal');
+        const dismissBtn = document.getElementById('btn-dismiss-upgrade-modal');
+        const reloadBtn = document.getElementById('btn-reload-after-upgrade');
+        if (closeBtn) closeBtn.style.display = 'block';
+        if (dismissBtn) dismissBtn.style.display = 'block';
+        if (reloadBtn) reloadBtn.style.display = 'inline-flex';
+
+        if (data.new_commit) {
+            const commitEl = document.getElementById('upd-current-commit');
+            if (commitEl) commitEl.textContent = data.new_commit;
+        }
+
+        if (badge) {
+            badge.className = 'badge badge-success';
+            badge.textContent = 'Updated to ' + (data.new_commit || 'latest');
+        }
+
+        showToast(`✓ Platform upgraded to ${data.new_version || 'latest'}!`, 'success');
+
+        // Auto reload countdown
+        let remaining = 4;
+        const countdownEl = document.getElementById('upd-reload-countdown');
+        if (countdownEl) countdownEl.textContent = `${remaining}s`;
+
+        if (upgradeReloadTimer) clearInterval(upgradeReloadTimer);
+        upgradeReloadTimer = setInterval(() => {
+            remaining--;
+            if (countdownEl) countdownEl.textContent = `${remaining}s`;
+            if (remaining <= 0) {
+                clearInterval(upgradeReloadTimer);
+                window.location.reload(true);
+            }
+        }, 1000);
+    }
+
+    function handleUpgradeFailed(errMessage) {
+        const stageBadge = document.getElementById('upd-progress-stage-badge');
+        if (stageBadge) {
+            stageBadge.className = 'badge badge-danger';
+            stageBadge.textContent = 'FAILED';
+        }
+        const footerStatus = document.getElementById('upd-modal-footer-status');
+        if (footerStatus) {
+            footerStatus.innerHTML = `❌ <strong>Upgrade failed:</strong> ${errMessage}`;
+            footerStatus.style.color = '#ef4444';
+        }
+        const closeBtn = document.getElementById('btn-close-upgrade-modal');
+        const dismissBtn = document.getElementById('btn-dismiss-upgrade-modal');
+        if (closeBtn) closeBtn.style.display = 'block';
+        if (dismissBtn) dismissBtn.style.display = 'block';
+        showToast('Upgrade failed: ' + errMessage, 'error');
+    }
+
+    // Modal dismiss listeners
+    const btnCloseModal = document.getElementById('btn-close-upgrade-modal');
+    if (btnCloseModal) {
+        btnCloseModal.addEventListener('click', () => {
+            const m = document.getElementById('upgrade-modal');
+            if (m) m.style.display = 'none';
+            if (upgradeReloadTimer) clearInterval(upgradeReloadTimer);
+        });
+    }
+
+    const btnDismissModal = document.getElementById('btn-dismiss-upgrade-modal');
+    if (btnDismissModal) {
+        btnDismissModal.addEventListener('click', () => {
+            const m = document.getElementById('upgrade-modal');
+            if (m) m.style.display = 'none';
+            if (upgradeReloadTimer) clearInterval(upgradeReloadTimer);
+        });
+    }
+
+    const btnReloadNow = document.getElementById('btn-reload-after-upgrade');
+    if (btnReloadNow) {
+        btnReloadNow.addEventListener('click', () => {
+            if (upgradeReloadTimer) clearInterval(upgradeReloadTimer);
+            window.location.reload(true);
+        });
+    }
+
     if (btnApply) {
         btnApply.addEventListener('click', async () => {
             if (!confirm('Apply available updates from GitHub to this server? Web assets and templates will be updated immediately.')) {
@@ -1555,34 +1766,55 @@ function initUpdatesManagement() {
             }
 
             btnApply.disabled = true;
-            btnApply.textContent = 'Downloading from GitHub...';
+            btnApply.textContent = 'Upgrading Platform...';
+
+            openUpgradeModal();
+            addUpgradeLog('🚀 Initializing upgrade sequence from Web UI...');
 
             try {
-                const res = await fetch('/api/v1/system/update/apply', { method: 'POST' });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Failed applying updates');
+                const res = await fetch('/api/v1/system/update/apply', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'text/event-stream'
+                    }
+                });
 
-                showToast(`✓ ${data.message}`, 'success');
-
-                // Update local commit display
-                if (data.new_commit) {
-                    const commitEl = document.getElementById('upd-current-commit');
-                    if (commitEl) commitEl.textContent = data.new_commit;
+                if (!res.ok) {
+                    throw new Error(`HTTP server error: ${res.status}`);
                 }
 
-                if (badge) {
-                    badge.className = 'badge badge-success';
-                    badge.textContent = 'Updated to ' + (data.new_commit || 'latest');
+                if (!res.body || !res.body.getReader) {
+                    // Fallback for environments without stream reader
+                    const data = await res.json();
+                    updateUpgradeProgress({ percent: 100, stage: 'COMPLETE', message: data.message, done: true, success: data.success });
+                    return;
                 }
 
-                if (data.binary_changed) {
-                    showToast('Web assets hot-patched! Backend Go changes require container restart.', 'info');
-                }
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
 
-                // Refresh status
-                setTimeout(loadUpdateStatus, 1500);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep trailing incomplete line
+
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (trimmed.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(trimmed.slice(6));
+                                updateUpgradeProgress(data);
+                            } catch (e) {
+                                console.error('Error parsing SSE event:', e);
+                            }
+                        }
+                    }
+                }
             } catch (err) {
-                showToast('Failed applying upgrade: ' + err.message, 'error');
+                handleUpgradeFailed(err.message);
             } finally {
                 btnApply.disabled = false;
                 btnApply.textContent = '🚀 Apply Upgrade (Changed Files)';

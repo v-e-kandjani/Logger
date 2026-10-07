@@ -245,6 +245,9 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ## Sürüm Geçmişi (Release History)
 
+- **v1.2.4**:
+  - Web arayüzü üzerinden sistem güncellemede SSE (Server-Sent Events) akışı ile canlı ilerleme çubuğu (progress bar) ve terminal sistem konsolu.
+  - Güncelleme tamamlandığında otomatik geri sayımlı panel yenileyici.
 - **v1.2.3**:
   - Türkçe dokümantasyon (`README.tr.md`) son telemetri, host networking ve yükseltme geliştirmeleriyle tam senkronize edildi.
 - **v1.2.2**:

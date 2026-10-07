@@ -247,58 +247,134 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	flusher, isFlusher := w.(http.Flusher)
+	isStream := strings.Contains(r.Header.Get("Accept"), "text/event-stream") && isFlusher
+
+	if isStream {
+		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache, no-transform")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("X-Accel-Buffering", "no")
+	}
+
+	sendProgress := func(pct int, stage, msg string, done, success bool, extra map[string]interface{}) {
+		if !isStream {
+			return
+		}
+		payload := map[string]interface{}{
+			"percent": pct,
+			"stage":   stage,
+			"message": msg,
+			"time":    time.Now().Format("15:04:05"),
+			"done":    done,
+			"success": success,
+		}
+		for k, v := range extra {
+			payload[k] = v
+		}
+		data, _ := json.Marshal(payload)
+		fmt.Fprintf(w, "data: %s\n\n", string(data))
+		flusher.Flush()
+	}
+
+	sendProgress(5, "INIT", "Initializing platform upgrade engine...", false, true, nil)
+
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
 
 	// 1. Fetch latest commit info from GitHub
+	sendProgress(12, "GITHUB_CHECK", fmt.Sprintf("Connecting to GitHub API (%s/%s on branch %s)...", version.RepoOwner, version.RepoName, version.Branch), false, true, nil)
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", version.RepoOwner, version.RepoName, version.Branch)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		sendProgress(0, "ERROR", "Failed to build GitHub request: "+err.Error(), true, false, nil)
+		if !isStream {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
 		return
 	}
 	req.Header.Set("User-Agent", "Valtrivo-LogSeal-Updater/1.0")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "Failed contacting GitHub: " + err.Error()})
+		sendProgress(0, "ERROR", "Failed contacting GitHub API: "+err.Error(), true, false, nil)
+		if !isStream {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "Failed contacting GitHub: " + err.Error()})
+		}
 		return
 	}
 	defer resp.Body.Close()
 
-	var latest GitHubCommit
-	if err := json.NewDecoder(resp.Body).Decode(&latest); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed decoding commit: " + err.Error()})
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		errMsg := fmt.Sprintf("GitHub API returned HTTP %d: %s", resp.StatusCode, string(body))
+		sendProgress(0, "ERROR", errMsg, true, false, nil)
+		if !isStream {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": errMsg})
+		}
 		return
 	}
 
+	var latest GitHubCommit
+	if err := json.NewDecoder(resp.Body).Decode(&latest); err != nil {
+		sendProgress(0, "ERROR", "Failed decoding GitHub commit metadata: "+err.Error(), true, false, nil)
+		if !isStream {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed decoding commit: " + err.Error()})
+		}
+		return
+	}
+
+	shortSHA := latest.SHA
+	if len(shortSHA) > 7 {
+		shortSHA = shortSHA[:7]
+	}
+	commitMsg := latest.Commit.Message
+	if idx := strings.Index(commitMsg, "\n"); idx != -1 {
+		commitMsg = commitMsg[:idx]
+	}
+
+	sendProgress(25, "COMMIT_RESOLVED", fmt.Sprintf("Target remote commit: %s (\"%s\")", shortSHA, commitMsg), false, true, nil)
+
 	// 2. If local git CLI is present and workspace is a git repository, try running git pull
+	sendProgress(35, "GIT_SYNC", "Checking local Git repository status...", false, true, nil)
 	gitSuccess := false
 	if _, gitErr := exec.LookPath("git"); gitErr == nil {
+		sendProgress(40, "GIT_PULL", "Local Git CLI detected. Executing 'git pull origin "+version.Branch+"'...", false, true, nil)
 		cmd := exec.CommandContext(ctx, "git", "pull", "origin", version.Branch)
 		if out, err := cmd.CombinedOutput(); err == nil && !strings.Contains(string(out), "error") {
 			gitSuccess = true
+			sendProgress(50, "GIT_PULL", fmt.Sprintf("Git pull successful: %s", strings.TrimSpace(string(out))), false, true, nil)
+		} else {
+			sendProgress(50, "GIT_PULL", "Git pull notice: "+strings.TrimSpace(string(out))+"; proceeding with raw asset sync.", false, true, nil)
 		}
+	} else {
+		sendProgress(50, "GIT_SYNC", "Container running without git CLI; streaming raw file updates directly.", false, true, nil)
 	}
 
 	// 3. Pull files from GitHub raw contents
-	// Hot-updatable list of paths: web templates, web static assets, migrations, configs
 	hotPaths := []string{
 		"web/static/js/app.js",
+		"web/static/js/translations.js",
 		"web/static/js/i18n.js",
 		"web/static/css/dashboard.css",
 		"web/templates/index.html",
 		"web/templates/login.html",
+		"internal/version/version.go",
+		"upgrade.sh",
 		"produce-logs.sh",
+		"HOW_TO_INSTALL.md",
 		"HOW_TO_INSTALL.en.md",
 		"HOW_TO_INSTALL.tr.md",
 		"UPGRADE.md",
+		"README.md",
+		"README.tr.md",
 	}
 
 	var updatedFiles []string
 	var skippedFiles []string
 	binaryChanged := false
 
-	for _, relPath := range hotPaths {
+	for i, relPath := range hotPaths {
+		pct := 50 + int(float64(i+1)/float64(len(hotPaths))*35) // 50% -> 85%
 		rawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s",
 			version.RepoOwner, version.RepoName, version.Branch, relPath)
 
@@ -341,16 +417,13 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 		}
 		if wroteAny {
 			updatedFiles = append(updatedFiles, relPath)
+			sendProgress(pct, "HOT_PATCH", fmt.Sprintf("Hot-patched %s (%d bytes)", relPath, len(content)), false, true, nil)
 		} else {
 			skippedFiles = append(skippedFiles, relPath)
 		}
 	}
 
 	// 4. Update runtime version configuration
-	shortSHA := latest.SHA
-	if len(shortSHA) > 7 {
-		shortSHA = shortSHA[:7]
-	}
 	version.CommitSHA = shortSHA
 
 	// Attempt to extract updated version from updated internal/version/version.go
@@ -364,6 +437,8 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	sendProgress(90, "VERSION_STATE", fmt.Sprintf("Updated runtime version state to %s (%s)", version.Version, shortSHA), false, true, nil)
+
 	versionInfoContent := fmt.Sprintf("COMMIT_SHA=%s\nVERSION=%s\nBUILD_DATE=%s\nUPDATED_AT=%s\nUPDATED_BY=%s\n",
 		shortSHA, version.Version, time.Now().Format("2006-01-02"), time.Now().UTC().Format(time.RFC3339), session.Username)
 
@@ -371,6 +446,7 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 	_ = os.WriteFile("config/.version_info", []byte(versionInfoContent), 0644)
 
 	// 5. Record audit log
+	sendProgress(95, "AUDIT_LOG", "Recording upgrade event in system audit trail...", false, true, nil)
 	auditEntry := &models.AuditLog{
 		Username: session.Username,
 		SourceIP: r.RemoteAddr,
@@ -381,23 +457,33 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 			"new_commit":    shortSHA,
 			"files_updated": len(updatedFiles),
 			"git_pulled":    gitSuccess,
+			"version":       version.Version,
 		},
 		CreatedAt: time.Now().UTC(),
 	}
 	_ = h.pgDB.InsertAuditLog(ctx, auditEntry)
 
-	msg := fmt.Sprintf("Successfully updated %d web templates and static assets to commit %s!", len(updatedFiles), shortSHA)
+	msg := fmt.Sprintf("Upgrade completed successfully! %d files hot-patched to %s (%s).", len(updatedFiles), version.Version, shortSHA)
 	cliCmd := "sudo bash upgrade.sh\n# or\ngit pull origin main && docker compose build syslog-app && docker compose up -d"
 
-	writeJSON(w, http.StatusOK, UpdateApplyResponse{
-		Success:        true,
-		UpdatedFiles:   updatedFiles,
-		SkippedFiles:   skippedFiles,
-		BinaryChanged:  binaryChanged,
-		NewCommit:      shortSHA,
-		Message:        msg,
-		CLIInstruction: cliCmd,
+	sendProgress(100, "COMPLETE", msg, true, true, map[string]interface{}{
+		"new_version":     version.Version,
+		"new_commit":      shortSHA,
+		"updated_files":   len(updatedFiles),
+		"cli_instruction": cliCmd,
 	})
+
+	if !isStream {
+		writeJSON(w, http.StatusOK, UpdateApplyResponse{
+			Success:        true,
+			UpdatedFiles:   updatedFiles,
+			SkippedFiles:   skippedFiles,
+			BinaryChanged:  binaryChanged,
+			NewCommit:      shortSHA,
+			Message:        msg,
+			CLIInstruction: cliCmd,
+		})
+	}
 }
 
 // isHotApplicable checks if a file can be updated live without recompiling the Go binary

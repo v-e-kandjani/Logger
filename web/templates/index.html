@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=2.7">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=2.8">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.2.3</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.2.4</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -681,12 +681,12 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.2.3</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.2.4</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">e0347e5</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">0a5ea80</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-08</div>
                     </div>
                     <div class="stat-card">
@@ -996,7 +996,67 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=2.7"></script>
-    <script src="/static/js/app.js?v=2.7"></script>
+    <!-- System Upgrade Progress & Console Modal -->
+    <div class="modal-backdrop" id="upgrade-modal" style="display: none;">
+        <div class="modal" style="max-width: 680px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.4rem;">🚀</span>
+                    <div>
+                        <h3 id="upd-modal-title" style="margin: 0; font-size: 1.15rem;">Platform Upgrade in Progress</h3>
+                        <div style="font-size: 11px; color: var(--text-muted);">Synchronizing with origin/main repository</div>
+                    </div>
+                </div>
+                <button class="btn-close" id="btn-close-upgrade-modal" style="display: none;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <!-- Stage and Percentage Header -->
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge badge-info" id="upd-progress-stage-badge">PREPARING</span>
+                        <strong id="upd-progress-stage-text" style="font-size: 13px; color: var(--text-main);">Connecting to server...</strong>
+                    </div>
+                    <span id="upd-progress-percent" style="font-size: 1.25rem; font-weight: 700; font-family: var(--font-mono); color: #10b981;">0%</span>
+                </div>
+
+                <!-- Animated Progress Track & Fill -->
+                <div class="upd-progress-track" style="margin-bottom: 8px;">
+                    <div class="upd-progress-fill" id="upd-progress-fill" style="width: 0%;"></div>
+                </div>
+
+                <!-- Subtitle / Active Action Message -->
+                <div id="upd-progress-msg" style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px; min-height: 18px;">
+                    Initializing update sequence...
+                </div>
+
+                <!-- Real-Time Activity Terminal Console -->
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;">System Activity Stream</span>
+                        <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);" id="upd-console-stats">0 events</span>
+                    </div>
+                    <div class="upd-console" id="upd-console-log">
+                        <div class="upd-log-line" style="color: var(--text-muted);">Ready to stream upgrade operations...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.15);">
+                <div id="upd-modal-footer-status" style="font-size: 12px; color: var(--text-muted);">
+                    ⚠️ Please do not close this browser tab while the update is being applied.
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" id="btn-reload-after-upgrade" style="display: none;">
+                        🔄 Reload Dashboard Now (<span id="upd-reload-countdown">5s</span>)
+                    </button>
+                    <button class="btn btn-outline" id="btn-dismiss-upgrade-modal" style="display: none;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/translations.js?v=2.8"></script>
+    <script src="/static/js/app.js?v=2.8"></script>
 </body>
 </html>
