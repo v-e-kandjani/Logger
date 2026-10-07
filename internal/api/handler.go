@@ -20,6 +20,7 @@ import (
 	"github.com/syslog-platform/logger/internal/archive"
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
+	"github.com/syslog-platform/logger/internal/metrics"
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 	"github.com/syslog-platform/logger/internal/timestamp"
@@ -31,14 +32,15 @@ var upgrader = websocket.Upgrader{
 }
 
 type Handler struct {
-	pipeline    *pipeline.Pipeline
-	chClient    *clickhouse.Client
-	pgDB        *postgres.DB
-	deviceCache *postgres.DeviceCache
-	archEngine  *archive.Engine
-	tsProvider  timestamp.TimestampProvider
-	nodeName    string
-	sessions    *SessionManager
+	pipeline         *pipeline.Pipeline
+	chClient         *clickhouse.Client
+	pgDB             *postgres.DB
+	deviceCache      *postgres.DeviceCache
+	archEngine       *archive.Engine
+	tsProvider       timestamp.TimestampProvider
+	metricsCollector *metrics.Collector
+	nodeName         string
+	sessions         *SessionManager
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
@@ -52,17 +54,19 @@ func NewHandler(
 	dc *postgres.DeviceCache,
 	ae *archive.Engine,
 	ts timestamp.TimestampProvider,
+	mc *metrics.Collector,
 	node string,
 ) *Handler {
 	return &Handler{
-		pipeline:    pipe,
-		chClient:    ch,
-		pgDB:        pg,
-		deviceCache: dc,
-		archEngine:  ae,
-		tsProvider:  ts,
-		nodeName:    node,
-		sessions:    NewSessionManager(),
+		pipeline:         pipe,
+		chClient:         ch,
+		pgDB:             pg,
+		deviceCache:      dc,
+		archEngine:       ae,
+		tsProvider:       ts,
+		metricsCollector: mc,
+		nodeName:         node,
+		sessions:         NewSessionManager(),
 	}
 }
 
@@ -125,6 +129,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/system/update/status", h.requireAuth(h.handleSystemUpdateStatus))
 	mux.HandleFunc("/api/v1/system/update/check", h.requireAuth(h.handleSystemUpdateCheck))
 	mux.HandleFunc("/api/v1/system/update/apply", h.requireAuth(h.handleSystemUpdateApply))
+	mux.HandleFunc("/api/v1/system/metrics", h.requireAuth(h.handleMetricsCurrent))
+	mux.HandleFunc("/api/v1/system/metrics/history", h.requireAuth(h.handleMetricsHistory))
 
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))
@@ -225,7 +231,24 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"strict_device_filtering": h.pipeline.IsStrictFiltering(),
 		"dropped_unauthorized":   h.pipeline.DroppedUnauthorized.Load(),
 		"storage":                 storageStats,
+		"metrics":                 h.metricsCollector.GetCurrent(),
 	})
+}
+
+func (h *Handler) handleMetricsCurrent(w http.ResponseWriter, r *http.Request) {
+	if h.metricsCollector == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "disabled"})
+		return
+	}
+	writeJSON(w, http.StatusOK, h.metricsCollector.GetCurrent())
+}
+
+func (h *Handler) handleMetricsHistory(w http.ResponseWriter, r *http.Request) {
+	if h.metricsCollector == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "disabled", "points": []any{}})
+		return
+	}
+	writeJSON(w, http.StatusOK, h.metricsCollector.GetHistory())
 }
 
 func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {

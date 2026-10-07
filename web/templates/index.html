@@ -136,6 +136,77 @@
                     </div>
                 </div>
 
+                <!-- Real-Time Telemetry & Performance Graphs Grid -->
+                <div class="telemetry-grid">
+                    <!-- 1. CPU Utilization Card -->
+                    <div class="telemetry-card">
+                        <div class="telemetry-card-header">
+                            <div>
+                                <span class="telemetry-title" data-i18n="telemetry_cpu_title">CPU Utilization</span>
+                                <div class="telemetry-metric-large text-cyan" id="chart-metric-cpu">0.0%</div>
+                            </div>
+                            <div class="telemetry-meta">
+                                <span class="badge badge-info" id="chart-meta-cores">Host CPU</span>
+                                <span class="telemetry-sub" id="chart-sub-cpu">Active Load</span>
+                            </div>
+                        </div>
+                        <div class="telemetry-canvas-wrap">
+                            <canvas id="chart-canvas-cpu"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 2. RAM Memory Usage Card -->
+                    <div class="telemetry-card">
+                        <div class="telemetry-card-header">
+                            <div>
+                                <span class="telemetry-title" data-i18n="telemetry_ram_title">RAM Memory Usage</span>
+                                <div class="telemetry-metric-large text-purple" id="chart-metric-ram">0 MB</div>
+                            </div>
+                            <div class="telemetry-meta">
+                                <span class="badge badge-secondary" id="chart-meta-ram-pct">0%</span>
+                                <span class="telemetry-sub" id="chart-sub-ram">Total: -</span>
+                            </div>
+                        </div>
+                        <div class="telemetry-canvas-wrap">
+                            <canvas id="chart-canvas-ram"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 3. Logs Received Rate (EPS) Card -->
+                    <div class="telemetry-card">
+                        <div class="telemetry-card-header">
+                            <div>
+                                <span class="telemetry-title" data-i18n="telemetry_logs_title">Logs Received Rate</span>
+                                <div class="telemetry-metric-large text-green" id="chart-metric-logs">0 EPS</div>
+                            </div>
+                            <div class="telemetry-meta">
+                                <span class="badge badge-success">Ingestion</span>
+                                <span class="telemetry-sub" id="chart-sub-packets">Total: 0 rx</span>
+                            </div>
+                        </div>
+                        <div class="telemetry-canvas-wrap">
+                            <canvas id="chart-canvas-logs"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 4. Network Throughput (In / Out) Card -->
+                    <div class="telemetry-card">
+                        <div class="telemetry-card-header">
+                            <div>
+                                <span class="telemetry-title" data-i18n="telemetry_net_title">Network Throughput (In / Out)</span>
+                                <div class="telemetry-metric-large text-yellow" id="chart-metric-net">↓ 0 KB/s | ↑ 0 KB/s</div>
+                            </div>
+                            <div class="telemetry-meta">
+                                <span class="badge badge-warning">Interface I/O</span>
+                                <span class="telemetry-sub" id="chart-sub-net">Bandwidth Rate</span>
+                            </div>
+                        </div>
+                        <div class="telemetry-canvas-wrap">
+                            <canvas id="chart-canvas-net"></canvas>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="dashboard-panels">
                     <div class="panel">
                         <div class="panel-header">
@@ -925,7 +996,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=2.2"></script>
-    <script src="/static/js/app.js?v=2.2"></script>
+    <script src="/static/js/translations.js?v=2.3"></script>
+    <script src="/static/js/app.js?v=2.3"></script>
 </body>
 </html>

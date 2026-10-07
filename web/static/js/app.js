@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initLiveStream();
     startPollingTelemetry();
+    initTelemetryCharts();
     initSearch();
     initDeviceModal();
     initUserModal();
@@ -93,6 +94,7 @@ function initNavigation() {
             updateViewHeader(tab);
 
             // Refresh tab-specific views
+            if (tab === 'dashboard') fetchAndRenderTelemetryCharts();
             if (tab === 'search') document.getElementById('btn-search-exec').click();
             if (tab === 'devices') loadDevices();
             if (tab === 'unregistered') loadUnregisteredSources();
@@ -1574,6 +1576,319 @@ function initUpdatesManagement() {
                 btnApply.textContent = '🚀 Apply Upgrade (Changed Files)';
             }
         });
+    }
+}
+
+// ==============================================================================
+// Real-Time System Telemetry & Performance Charts Engine (Canvas-based)
+// Visualizes: CPU (%), RAM (Used/Total), Logs Received (EPS), Network I/O (KB/s)
+// ==============================================================================
+let telemetryChartTimer = null;
+let telemetryHistoryData = null;
+
+function initTelemetryCharts() {
+    const canvasCPU = document.getElementById('chart-canvas-cpu');
+    const canvasRAM = document.getElementById('chart-canvas-ram');
+    const canvasLogs = document.getElementById('chart-canvas-logs');
+    const canvasNet = document.getElementById('chart-canvas-net');
+
+    if (!canvasCPU || !canvasRAM || !canvasLogs || !canvasNet) return;
+
+    // Attach resize listeners to re-render smoothly
+    window.addEventListener('resize', () => {
+        if (telemetryHistoryData) renderAllTelemetryCharts(telemetryHistoryData);
+    });
+
+    // Start polling every 2 seconds
+    fetchAndRenderTelemetryCharts();
+    if (!telemetryChartTimer) {
+        telemetryChartTimer = setInterval(fetchAndRenderTelemetryCharts, 2000);
+    }
+}
+
+async function fetchAndRenderTelemetryCharts() {
+    // Only render if dashboard tab is active
+    const dashPane = document.getElementById('pane-dashboard');
+    if (dashPane && !dashPane.classList.contains('active')) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/v1/system/metrics/history');
+        if (!res.ok) return;
+        const data = await res.json();
+        telemetryHistoryData = data;
+
+        // Update Big Numeric Labels
+        if (data.current) {
+            const cur = data.current;
+
+            // 1. CPU Label
+            const elCpu = document.getElementById('chart-metric-cpu');
+            if (elCpu) elCpu.textContent = `${(cur.cpu_percent || 0).toFixed(1)}%`;
+            const elCores = document.getElementById('chart-meta-cores');
+            if (elCores) elCores.textContent = `${cur.cpu_cores || 1} Cores (${cur.os || 'Linux'})`;
+
+            // 2. RAM Label
+            const elRam = document.getElementById('chart-metric-ram');
+            if (elRam) {
+                const usedGB = ((cur.ram_used_mb || 0) / 1024).toFixed(1);
+                const totalGB = ((cur.ram_total_mb || 0) / 1024).toFixed(1);
+                elRam.textContent = `${usedGB} / ${totalGB} GB`;
+            }
+            const elRamPct = document.getElementById('chart-meta-ram-pct');
+            if (elRamPct) elRamPct.textContent = `${(cur.ram_percent || 0).toFixed(0)}%`;
+            const elRamSub = document.getElementById('chart-sub-ram');
+            if (elRamSub) elRamSub.textContent = `Allocated: ${(cur.ram_percent || 0).toFixed(1)}%`;
+
+            // 3. Logs Received (EPS) Label
+            const elLogs = document.getElementById('chart-metric-logs');
+            if (elLogs) elLogs.textContent = `${Math.round(cur.logs_received_rate || 0).toLocaleString()} EPS`;
+            const elPackets = document.getElementById('chart-sub-packets');
+            if (elPackets) elPackets.textContent = `Total: ${(cur.total_packets_rx || 0).toLocaleString()} rx`;
+
+            // 4. Network Throughput (In / Out) Label
+            const elNet = document.getElementById('chart-metric-net');
+            if (elNet) {
+                const inFmt = formatTelemetryRate(cur.net_in_kbps || 0);
+                const outFmt = formatTelemetryRate(cur.net_out_kbps || 0);
+                elNet.textContent = `↓ ${inFmt} | ↑ ${outFmt}`;
+            }
+        }
+
+        renderAllTelemetryCharts(data);
+    } catch (e) {
+        console.error('Error fetching telemetry metrics:', e);
+    }
+}
+
+function formatTelemetryRate(kbps) {
+    if (!kbps || kbps < 0) kbps = 0;
+    if (kbps >= 1024) {
+        return `${(kbps / 1024).toFixed(2)} MB/s`;
+    }
+    return `${kbps.toFixed(1)} KB/s`;
+}
+
+function renderAllTelemetryCharts(data) {
+    if (!data || !data.points || data.points.length === 0) return;
+
+    const points = data.points;
+    const timestamps = points.map(p => p.timestamp);
+
+    // 1. CPU Chart (Cyan area)
+    drawSmoothAreaChart('chart-canvas-cpu', [
+        {
+            data: points.map(p => p.cpu_percent),
+            color: '#06B6D4',
+            fillColor: 'rgba(6, 182, 212, 0.28)'
+        }
+    ], {
+        fixedMin: 0,
+        fixedMax: 100,
+        showLabels: true,
+        formatLabel: val => `${Math.round(val)}%`,
+        timestamps: timestamps
+    });
+
+    // 2. RAM Chart (Purple area)
+    drawSmoothAreaChart('chart-canvas-ram', [
+        {
+            data: points.map(p => p.ram_percent),
+            color: '#A855F7',
+            fillColor: 'rgba(168, 85, 247, 0.28)'
+        }
+    ], {
+        fixedMin: 0,
+        fixedMax: 100,
+        showLabels: true,
+        formatLabel: val => `${Math.round(val)}%`,
+        timestamps: timestamps
+    });
+
+    // 3. Logs Received (EPS) Chart (Green area)
+    drawSmoothAreaChart('chart-canvas-logs', [
+        {
+            data: points.map(p => p.logs_received_rate),
+            color: '#10B981',
+            fillColor: 'rgba(16, 185, 129, 0.28)'
+        }
+    ], {
+        fixedMin: 0,
+        showLabels: true,
+        formatLabel: val => `${Math.round(val)}`,
+        timestamps: timestamps
+    });
+
+    // 4. Network Throughput Chart (Dual series: In / Rx Amber, Out / Tx Sky Blue)
+    drawSmoothAreaChart('chart-canvas-net', [
+        {
+            data: points.map(p => p.net_in_kbps),
+            color: '#F59E0B',
+            fillColor: 'rgba(245, 158, 11, 0.22)',
+            label: 'In (Rx)'
+        },
+        {
+            data: points.map(p => p.net_out_kbps),
+            color: '#38BDF8',
+            fillColor: 'rgba(56, 189, 248, 0.12)',
+            label: 'Out (Tx)'
+        }
+    ], {
+        fixedMin: 0,
+        showLabels: true,
+        formatLabel: val => formatTelemetryRate(val),
+        timestamps: timestamps
+    });
+}
+
+function drawSmoothAreaChart(canvasId, seriesList, options = {}) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+
+    if (rect.width === 0 || rect.height === 0) return;
+
+    // Set canvas internal resolution to match screen DPI
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const width = rect.width;
+    const height = rect.height;
+
+    const padTop = 12;
+    const padBottom = 22;
+    const padLeft = 8;
+    const padRight = 36; // space for Y-axis labels
+
+    const plotW = width - padLeft - padRight;
+    const plotH = height - padTop - padBottom;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Calculate value range
+    let minVal = options.fixedMin !== undefined ? options.fixedMin : 0;
+    let maxVal = options.fixedMax !== undefined ? options.fixedMax : 0;
+
+    seriesList.forEach(s => {
+        if (!s.data || s.data.length === 0) return;
+        const sMax = Math.max(...s.data);
+        if (sMax > maxVal) maxVal = sMax;
+    });
+
+    if (maxVal <= minVal) maxVal = minVal + 10;
+    if (options.fixedMax === undefined) {
+        maxVal = maxVal * 1.2; // 20% headroom
+    }
+
+    const valRange = maxVal - minVal;
+
+    // Subtle horizontal grid lines at 0%, 50%, 100%
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+
+    [0, 0.5, 1.0].forEach(pct => {
+        const y = padTop + plotH * (1 - pct);
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(width - padRight, y);
+        ctx.stroke();
+
+        // Right-aligned scale label
+        if (options.showLabels) {
+            ctx.fillStyle = 'rgba(142, 155, 176, 0.7)';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'left';
+            const labelVal = minVal + valRange * pct;
+            const text = options.formatLabel ? options.formatLabel(labelVal) : Math.round(labelVal);
+            ctx.fillText(text, width - padRight + 4, y + 3);
+        }
+    });
+    ctx.setLineDash([]); // reset dash
+
+    // Draw each series
+    seriesList.forEach(series => {
+        const data = series.data || [];
+        if (data.length < 2) return;
+
+        const count = data.length;
+        const stepX = plotW / (count - 1);
+
+        const points = data.map((val, idx) => {
+            const x = padLeft + idx * stepX;
+            const clampedVal = Math.max(minVal, Math.min(maxVal, val));
+            const y = padTop + plotH * (1 - (clampedVal - minVal) / valRange);
+            return { x, y, val };
+        });
+
+        // 1. Fill Area with smooth gradient
+        const grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
+        grad.addColorStop(0, series.fillColor || `${series.color}40`);
+        grad.addColorStop(1, `${series.color}00`);
+
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, padTop + plotH);
+        ctx.lineTo(points[0].x, points[0].y);
+
+        for (let i = 0; i < points.length - 1; i++) {
+            const cpX = (points[i].x + points[i + 1].x) / 2;
+            ctx.bezierCurveTo(cpX, points[i].y, cpX, points[i + 1].y, points[i + 1].x, points[i + 1].y);
+        }
+
+        ctx.lineTo(points[points.length - 1].x, padTop + plotH);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // 2. Draw Curve Stroke Line
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+
+        for (let i = 0; i < points.length - 1; i++) {
+            const cpX = (points[i].x + points[i + 1].x) / 2;
+            ctx.bezierCurveTo(cpX, points[i].y, cpX, points[i + 1].y, points[i + 1].x, points[i + 1].y);
+        }
+
+        ctx.strokeStyle = series.color;
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+
+        // 3. Glowing live end point indicator
+        const lastPt = points[points.length - 1];
+        ctx.beginPath();
+        ctx.arc(lastPt.x, lastPt.y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = series.color;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(lastPt.x, lastPt.y, 6.5, 0, Math.PI * 2);
+        ctx.strokeStyle = series.color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    });
+
+    // Bottom time baseline
+    ctx.strokeStyle = 'rgba(45, 51, 67, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padLeft, height - padBottom);
+    ctx.lineTo(width - padRight, height - padBottom);
+    ctx.stroke();
+
+    // Time axis labels
+    if (options.timestamps && options.timestamps.length >= 2) {
+        ctx.fillStyle = 'rgba(142, 155, 176, 0.7)';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(options.timestamps[0], padLeft, height - 6);
+
+        ctx.textAlign = 'right';
+        ctx.fillText(options.timestamps[options.timestamps.length - 1], width - padRight, height - 6);
     }
 }
 

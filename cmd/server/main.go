@@ -16,6 +16,7 @@ import (
 	"github.com/syslog-platform/logger/internal/config"
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
+	"github.com/syslog-platform/logger/internal/metrics"
 	"github.com/syslog-platform/logger/internal/syslog/listener"
 	"github.com/syslog-platform/logger/internal/syslog/generator"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
@@ -150,8 +151,14 @@ func main() {
 	}
 	defer syslogServer.Stop()
 
-	// 8. Initialize REST & WebSocket HTTP Server
-	apiHandler := api.NewHandler(pipe, chClient, pgDB, deviceCache, archEngine, tsProvider, cfg.Server.CollectorNode)
+	// 8. Initialize System Telemetry & Performance Metrics Engine
+	metricsCollector := metrics.NewCollector(pipe)
+	metricsCollector.Start(context.Background())
+	defer metricsCollector.Stop()
+	log.Println("[Telemetry] Real-time CPU, RAM, EPS & Network I/O metrics collector running")
+
+	// 9. Initialize REST & WebSocket HTTP Server
+	apiHandler := api.NewHandler(pipe, chClient, pgDB, deviceCache, archEngine, tsProvider, metricsCollector, cfg.Server.CollectorNode)
 	mux := http.NewServeMux()
 	apiHandler.RegisterRoutes(mux)
 

@@ -57,6 +57,10 @@ const translations = {
         stat_unknown_sources_sub: "Ağda tespit edilen",
         stat_db_storage: "Veritabanı Boyutu",
         stat_db_storage_sub: "Sıkıştırma ve Disk Durumu",
+        telemetry_cpu_title: "İşlemci Kullanımı (CPU)",
+        telemetry_ram_title: "Bellek Kullanımı (RAM)",
+        telemetry_logs_title: "Gelen Log Hacmi (EPS)",
+        telemetry_net_title: "Ağ Giriş / Çıkış Hacmi",
 
         // Dashboard Panels
         panel_syslog_status: "Syslog Dinleyici Durumu",
@@ -242,6 +246,10 @@ const translations = {
         stat_unknown_sources_sub: "Detected on network",
         stat_db_storage: "Database Storage",
         stat_db_storage_sub: "Compression & Disk Space",
+        telemetry_cpu_title: "CPU Utilization",
+        telemetry_ram_title: "RAM Memory Usage",
+        telemetry_logs_title: "Logs Received Rate",
+        telemetry_net_title: "Network Throughput (In / Out)",
 
         // Dashboard Panels
         panel_syslog_status: "Syslog Listener Status",
