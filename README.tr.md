@@ -18,6 +18,7 @@
 
 - 🇬🇧 **[English Documentation (İngilizce Dokümantasyon)](README.md)**
 - 📖 **[Ayrıntılı Kurulum Kılavuzu (HOW_TO_INSTALL.md)](HOW_TO_INSTALL.md)**
+- 🔄 **[Sistem Güncelleme & Bakım Kılavuzu (UPGRADE.md)](UPGRADE.md)**
 - ⚡ **[Otomatik Kurulum Betiği (install.sh)](install.sh)**
 
 ---
@@ -25,6 +26,10 @@
 ## Öne Çıkan Özellikler
 
 - **Yüksek Hacimli Veri Toplama**: Bloklamasız çalışan UDP, TCP ve TLS soket dinleyicileri ve halka tampon (ring buffer) mimarisi ile saniyede on binlerce log (EPS) işleme kapasitesi.
+- **Orijinal Kaynak IP Koruma (Host Ağı)**: `network_mode: host` ile Docker köprüsünün IP maskelemesini ortadan kaldırarak ağ cihazlarının (Firewall, Switch vb.) gerçek kaynak IP'lerini doğrudan kaydeder; 514 ve 5514 portlarını eş zamanlı dinler.
+- **Gerçek Zamanlı 2x2 Telemetri Paneli**: İşlemci (CPU), Bellek (RAM), Saniyedeki Log Sayısı (EPS) ve Ağ Veri Akışı (In/Out KB/s) için anlık kayan zaman serisi grafikleri.
+- **Dinamik Çekirdek Tespiti & GOMAXPROCS Ölçekleme**: Sanal sunucularda (VMware, Proxmox vb.) yapılan canlı CPU artırımlarını (hot-plug) anında algılar ve Go çalışma zamanını otomatik optimize eder.
+- **Süper Admin Web & CLI Güncelleme Yöneticisi**: Web paneli üzerinden GitHub ile tek tıkla senkronizasyon ve tek komutla otomatik sunucu güncelleme (`sudo bash upgrade.sh`).
 - **ClickHouse Sütun Bazlı Depolama**: Milyarlarca log satırı üzerinde saniyelik vektörel sorgulama, token bloom filtre indeksleri, ZSTD sıkıştırma ve aylık (`toYYYYMM`) bölümleme.
 - **TÜBİTAK KamuSM Zaman Damgası İstemcisi**: RFC 3161 uyumlu kriptografik zaman damgası kanıtı (`.zd` belirteci) üretimi için resmi konsol entegrasyonu (`tss-client-console-3.1.33.jar`).
 - **İlişkisel Metaveri Deposu**: Cihaz envanteri, otomatik keşfedilen ağ kaynakları, arşiv kataloglama ve yönetici denetim izleri için PostgreSQL 16.
@@ -212,6 +217,51 @@ Yetkisiz veya rastgele cihazların log göndererek veritabanını doldurmasını
 1. **Yasal Uyum Paketi (`.zip`)**: Sıkıştırılmış log arşivi (`.jsonl.gz`), zaman damgası belirteci (`.zd`) ve SHA-256 özetini (`.sha256`) tek zip içinde barındırır.
 2. **Ham Log Arşivi (`.gz`)**: RFC uyumlu JSON Lines log dilimi.
 3. **Zaman Damgası Kanıtı (`.zd`)**: `tss-client-console-3.1.33.jar -c` ile bağımsız olarak doğrulanabilir zaman damgası belirteci.
+
+```bash
+# API üzerinden uyum paketini indirme
+curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=bundle"
+```
+
+---
+
+## Sistem Güncelleme & Yükseltme Yöntemleri
+
+Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevcuttur:
+
+1. **Hızlı CLI Yükseltme (Önerilen - Tek Komut)**:
+   ```bash
+   cd ~/Logger
+   sudo bash upgrade.sh
+   ```
+2. **Web Arayüzünden Süper Admin Güncellemesi**:
+   - Web arayüzüne giriş yapıp **Sistem Güncelleme** sekmesine gidin.
+   - **Güncellemeleri Kontrol Et** butonuna tıklayarak GitHub'daki son değişiklikleri inceleyin.
+   - **Güncellemeleri Uygula** butonuna basarak dosyaları tek tıkla canlı olarak çekin.
+
+> Ayrıntılı adımlar, geri alma (rollback) prosedürleri ve SSS için **[UPGRADE.md](UPGRADE.md)** belgesine bakınız.
+
+---
+
+## Sürüm Geçmişi (Release History)
+
+- **v1.2.3**:
+  - Türkçe dokümantasyon (`README.tr.md`) son telemetri, host networking ve yükseltme geliştirmeleriyle tam senkronize edildi.
+- **v1.2.2**:
+  - Çekirdek seviyesinde dinamik işlemci tespiti (`/sys/devices/system/cpu/online` ve `/proc/stat`) ile canlı CPU hot-plug desteği.
+  - İşlemci çekirdek artırımlarında Go `GOMAXPROCS` çalışma zamanı iş parçacıklarının otomatik ölçeklenmesi.
+- **v1.2.1**:
+  - İşlemci (CPU), Bellek (RAM), Saniyedeki Log Hızı (EPS) ve Ağ Veri Akışı (In/Out) için ölçeği sabit kalan 2x2 anlık operasyon grafikleri.
+  - Ağ cihazlarının gerçek istemci IP adreslerini korumak için host ağ moduna geçiş (`network_mode: host`) ve eş zamanlı çift port (`514` & `5514`) dinleme desteği.
+  - Süper Admin web tabanlı GitHub güncelleme konsolu ve otomatik CLI yükseltme betiği (`upgrade.sh`).
+  - Web paneli ve API genelinde dinamik sürüm algılama ve senkronizasyon.
+- **v1.1.0**:
+  - Yönetici şifre sıfırlama penceresi ve API uç noktası (`POST /api/v1/users/reset-password`).
+  - Arşiv paketleri (`.zip`), sıkıştırılmış loglar (`.gz`) ve kanıt belirteçleri (`.zd`) için doğrudan indirme bağlantıları.
+  - Kayıt edilen cihazların bilinmeyen kaynaklar listesinden anında temizlenmesi ve cihaz grubu sürekliliği.
+  - Sıfır Güven (Zero-Trust) syslog filtreleme ilkesi (Serbest vs Katı Yetkili Cihazlar) ve düşürülen paket sayacı.
+- **v1.0.1**:
+  - TÜBİTAK KamuSM / Dahili çift zaman damgası motoru, WatchGuard ayrıştırıcısı ve ClickHouse vektörel log deposu ile ilk sürüm.
 
 ---
 

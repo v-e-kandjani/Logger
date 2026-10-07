@@ -254,6 +254,8 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.2.3**:
+  - Full Turkish documentation (`README.tr.md`) synchronized with all telemetry, host networking, dynamic CPU scaling, and upgrade features.
 - **v1.2.2**:
   - Dynamic kernel CPU core detection (`/sys/devices/system/cpu/online` and `/proc/stat`) supporting live CPU hot-plugging without process restart.
   - Automatic `GOMAXPROCS` runtime auto-tuning upon CPU allocation expansion.
