@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -37,6 +38,12 @@ func NewDB(cfg config.PostgresConfig) (*DB, error) {
 	}
 
 	if err := pool.Ping(ctx); err != nil {
+		if cfg.Host != "127.0.0.1" && cfg.Host != "localhost" {
+			log.Printf("[PostgreSQL] Host '%s' connection failed (%v), falling back to 127.0.0.1...", cfg.Host, err)
+			fallbackCfg := cfg
+			fallbackCfg.Host = "127.0.0.1"
+			return NewDB(fallbackCfg)
+		}
 		return nil, fmt.Errorf("pinging postgres: %w", err)
 	}
 

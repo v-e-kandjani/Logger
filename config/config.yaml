@@ -8,10 +8,10 @@ syslog:
   accept_unknown_sources: true
   udp:
     enabled: true
-    listen_addr: "0.0.0.0:5514"
+    listen_addr: "0.0.0.0:514,0.0.0.0:5514"
   tcp:
     enabled: true
-    listen_addr: "0.0.0.0:5514"
+    listen_addr: "0.0.0.0:514,0.0.0.0:5514"
   tls:
     enabled: false
     listen_addr: "0.0.0.0:6514"

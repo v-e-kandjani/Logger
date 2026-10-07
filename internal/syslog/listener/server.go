@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,8 +19,8 @@ import (
 type Server struct {
 	cfg      config.SyslogConfig
 	pipeline *pipeline.Pipeline
-	udpConn  *net.UDPConn
-	tcpLn    net.Listener
+	udpConns []*net.UDPConn
+	tcpLns   []net.Listener
 	tlsLn    net.Listener
 	wg       sync.WaitGroup
 	stopCh   chan struct{}
@@ -57,31 +58,47 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) startUDP() error {
-	addr, err := net.ResolveUDPAddr("udp", s.cfg.UDP.ListenAddr)
-	if err != nil {
-		return err
+	rawAddrs := strings.Split(s.cfg.UDP.ListenAddr, ",")
+	started := 0
+
+	for _, raw := range rawAddrs {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		addr, err := net.ResolveUDPAddr("udp", raw)
+		if err != nil {
+			log.Printf("[Syslog] UDP resolve error on %s: %v", raw, err)
+			continue
+		}
+
+		conn, err := net.ListenUDP("udp", addr)
+		if err != nil {
+			log.Printf("[Syslog] Warning: UDP listen error on %s: %v", raw, err)
+			continue
+		}
+		// Increase OS socket receive buffer to prevent kernel packet drops during bursts
+		_ = conn.SetReadBuffer(16 * 1024 * 1024)
+
+		s.udpConns = append(s.udpConns, conn)
+		log.Printf("[Syslog] UDP listener started on %s", raw)
+		started++
+
+		// Spawn multiple concurrent UDP readers for this socket
+		numReaders := 4
+		for i := 0; i < numReaders; i++ {
+			s.wg.Add(1)
+			go s.udpReaderLoop(conn)
+		}
 	}
 
-	conn, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		return err
-	}
-	// Increase OS socket receive buffer to prevent kernel packet drops during bursts
-	_ = conn.SetReadBuffer(16 * 1024 * 1024)
-
-	s.udpConn = conn
-	log.Printf("[Syslog] UDP listener started on %s", s.cfg.UDP.ListenAddr)
-
-	// Spawn multiple concurrent UDP readers
-	numReaders := 4
-	for i := 0; i < numReaders; i++ {
-		s.wg.Add(1)
-		go s.udpReaderLoop()
+	if started == 0 {
+		return fmt.Errorf("no UDP listeners could be started on %s", s.cfg.UDP.ListenAddr)
 	}
 	return nil
 }
 
-func (s *Server) udpReaderLoop() {
+func (s *Server) udpReaderLoop(conn *net.UDPConn) {
 	defer s.wg.Done()
 	buf := make([]byte, 65535)
 
@@ -90,7 +107,7 @@ func (s *Server) udpReaderLoop() {
 		case <-s.stopCh:
 			return
 		default:
-			n, raddr, err := s.udpConn.ReadFromUDP(buf)
+			n, raddr, err := conn.ReadFromUDP(buf)
 			if err != nil {
 				select {
 				case <-s.stopCh:
@@ -116,15 +133,30 @@ func (s *Server) udpReaderLoop() {
 }
 
 func (s *Server) startTCP() error {
-	ln, err := net.Listen("tcp", s.cfg.TCP.ListenAddr)
-	if err != nil {
-		return err
-	}
-	s.tcpLn = ln
-	log.Printf("[Syslog] TCP listener started on %s", s.cfg.TCP.ListenAddr)
+	rawAddrs := strings.Split(s.cfg.TCP.ListenAddr, ",")
+	started := 0
 
-	s.wg.Add(1)
-	go s.acceptLoop(ln, "TCP")
+	for _, raw := range rawAddrs {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		ln, err := net.Listen("tcp", raw)
+		if err != nil {
+			log.Printf("[Syslog] Warning: TCP listen error on %s: %v", raw, err)
+			continue
+		}
+		s.tcpLns = append(s.tcpLns, ln)
+		log.Printf("[Syslog] TCP listener started on %s", raw)
+		started++
+
+		s.wg.Add(1)
+		go s.acceptLoop(ln, "TCP")
+	}
+
+	if started == 0 {
+		return fmt.Errorf("no TCP listeners could be started on %s", s.cfg.TCP.ListenAddr)
+	}
 	return nil
 }
 
@@ -212,11 +244,15 @@ func (s *Server) handleTCPConnection(conn net.Conn, proto string) {
 
 func (s *Server) Stop() {
 	close(s.stopCh)
-	if s.udpConn != nil {
-		_ = s.udpConn.Close()
+	for _, conn := range s.udpConns {
+		if conn != nil {
+			_ = conn.Close()
+		}
 	}
-	if s.tcpLn != nil {
-		_ = s.tcpLn.Close()
+	for _, ln := range s.tcpLns {
+		if ln != nil {
+			_ = ln.Close()
+		}
 	}
 	if s.tlsLn != nil {
 		_ = s.tlsLn.Close()

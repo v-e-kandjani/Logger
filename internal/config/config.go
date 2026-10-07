@@ -131,11 +131,11 @@ func DefaultConfig() *Config {
 			AcceptUnknownSources: true,
 			UDP: ListenerConfig{
 				Enabled:    true,
-				ListenAddr: "0.0.0.0:514",
+				ListenAddr: "0.0.0.0:514,0.0.0.0:5514",
 			},
 			TCP: ListenerConfig{
 				Enabled:    true,
-				ListenAddr: "0.0.0.0:514",
+				ListenAddr: "0.0.0.0:514,0.0.0.0:5514",
 			},
 			TLS: TLSListenerConfig{
 				Enabled:    false,
@@ -230,6 +230,12 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("COLLECTOR_NODE"); v != "" {
 		cfg.Server.CollectorNode = v
+	}
+	if v := os.Getenv("SYSLOG_UDP_LISTEN_ADDR"); v != "" {
+		cfg.Syslog.UDP.ListenAddr = v
+	}
+	if v := os.Getenv("SYSLOG_TCP_LISTEN_ADDR"); v != "" {
+		cfg.Syslog.TCP.ListenAddr = v
 	}
 
 	if v := os.Getenv("CLICKHOUSE_HOST"); v != "" {

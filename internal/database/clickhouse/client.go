@@ -56,6 +56,12 @@ func NewClient(cfg config.ClickHouseConfig) (*Client, error) {
 	defer cancel()
 
 	if err := conn.Ping(ctx); err != nil {
+		if cfg.Host != "127.0.0.1" && cfg.Host != "localhost" {
+			log.Printf("[ClickHouse] Host '%s' connection failed (%v), falling back to 127.0.0.1...", cfg.Host, err)
+			fallbackCfg := cfg
+			fallbackCfg.Host = "127.0.0.1"
+			return NewClient(fallbackCfg)
+		}
 		return nil, fmt.Errorf("clickhouse ping: %w", err)
 	}
 

@@ -55,26 +55,24 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    ports:
-      - "${APP_PORT:-8080}:8080"       # Web Dashboard & REST API
-      - "5514:5514/udp"                # Syslog UDP Listener
-      - "5514:5514/tcp"                # Syslog TCP Listener
-      - "514:5514/udp"                 # Standard Syslog UDP mapped to container
-      - "514:5514/tcp"                 # Standard Syslog TCP mapped to container
-      - "6514:6514/tcp"                # Syslog TLS
+    # Host networking allows the container to receive syslog UDP/TCP packets
+    # directly from the host network interfaces (ens192) without docker-proxy SNAT rewriting source IPs.
+    network_mode: host
     environment:
-      - CLICKHOUSE_HOST=clickhouse
-      - CLICKHOUSE_PORT=9000
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-127.0.0.1}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT:-9000}
       - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-syslog}
       - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=${POSTGRES_HOST:-127.0.0.1}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_DB=${POSTGRES_DB:-syslog_manager}
       - POSTGRES_USER=${POSTGRES_USER:-syslog_admin}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-syslog_secret}
       - POSTGRES_SSLMODE=disable
-      - SERVER_LISTEN_ADDR=0.0.0.0:8080
+      - SERVER_LISTEN_ADDR=0.0.0.0:${APP_PORT:-8080}
+      - SYSLOG_UDP_LISTEN_ADDR=0.0.0.0:514,0.0.0.0:5514
+      - SYSLOG_TCP_LISTEN_ADDR=0.0.0.0:514,0.0.0.0:5514
       - ARCHIVE_PATH=/opt/syslog-platform/archive
       - TIMESTAMP_PROVIDER=${TIMESTAMP_PROVIDER:-mock}
       - SEED_DEMO_DEVICES=${SEED_DEMO_DEVICES:-false}
