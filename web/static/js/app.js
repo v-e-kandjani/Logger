@@ -461,25 +461,56 @@ async function loadArchives() {
     }
 }
 
+// Toast Notification System
+function showToast(message, type = 'info') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    const bg = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6';
+    toast.style.cssText = `background:${bg};color:#fff;padding:10px 16px;border-radius:6px;font-size:13px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.25);pointer-events:auto;transition:all 0.3s ease;opacity:0;transform:translateY(10px);`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+    });
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 4500);
+}
+
 function initArchiveTrigger() {
     const btn = document.getElementById('btn-manual-archive');
+    if (!btn) return;
     btn.addEventListener('click', async () => {
+        if (btn.disabled) return;
+        btn.blur();
         btn.disabled = true;
         btn.textContent = 'Generating & Stamping...';
         try {
             const res = await fetch('/api/v1/archives/create', { method: 'POST' });
             if (!res.ok) {
                 const err = await res.text();
-                alert('Archive error: ' + err);
+                showToast('Archive error: ' + err, 'error');
             } else {
-                alert('Archive created and submitted to KamuSM Zaman Damgası engine!');
+                showToast('✓ Archive created and submitted to KamuSM Zaman Damgası engine!', 'success');
                 loadArchives();
             }
         } catch (e) {
-            alert('Request failed: ' + e.message);
+            showToast('Request failed: ' + e.message, 'error');
         } finally {
-            btn.disabled = false;
-            btn.textContent = 'Create Archive Now';
+            // Keep button disabled for 5 seconds after response to prevent rapid re-triggering
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = 'Create Archive Now';
+            }, 5000);
         }
     });
 }

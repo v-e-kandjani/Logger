@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,6 +39,10 @@ type Handler struct {
 	tsProvider  timestamp.TimestampProvider
 	nodeName    string
 	sessions    *SessionManager
+
+	manualArchiving   atomic.Bool
+	archiveMu         sync.Mutex
+	lastManualArchive time.Time
 }
 
 func NewHandler(
@@ -555,7 +561,26 @@ func (h *Handler) handleCreateArchiveNow(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	ctx, cancel := contextWithTimeout(r, 30*time.Second)
+
+	// Prevent overlapping manual archiving runs
+	if !h.manualArchiving.CompareAndSwap(false, true) {
+		http.Error(w, "Archive generation is already in progress. Please wait for it to complete.", http.StatusConflict)
+		return
+	}
+	defer h.manualArchiving.Store(false)
+
+	// Rate-limit manual triggers to once every 30 seconds
+	h.archiveMu.Lock()
+	if !h.lastManualArchive.IsZero() && time.Since(h.lastManualArchive) < 30*time.Second {
+		remaining := int(30 - time.Since(h.lastManualArchive).Seconds())
+		h.archiveMu.Unlock()
+		http.Error(w, fmt.Sprintf("Please wait %d seconds before creating another manual archive.", remaining), http.StatusTooManyRequests)
+		return
+	}
+	h.lastManualArchive = time.Now()
+	h.archiveMu.Unlock()
+
+	ctx, cancel := contextWithTimeout(r, 120*time.Second)
 	defer cancel()
 
 	end := time.Now().UTC()

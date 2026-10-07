@@ -123,8 +123,8 @@ func (e *Engine) CreateArchiveSlice(ctx context.Context, start, end time.Time) (
 	}
 	defer outFile.Close()
 
-	// Deterministic Gzip compression
-	gw, err := gzip.NewWriterLevel(outFile, gzip.BestCompression)
+	// Deterministic Gzip compression (DefaultCompression provides fast compression without high CPU overhead)
+	gw, err := gzip.NewWriterLevel(outFile, gzip.DefaultCompression)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +360,7 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 			return nil, fmt.Errorf("creating archive file: %w", err)
 		}
 
-		gw, err := gzip.NewWriterLevel(outFile, gzip.BestCompression)
+		gw, err := gzip.NewWriterLevel(outFile, gzip.DefaultCompression)
 		if err != nil {
 			outFile.Close()
 			return nil, err
