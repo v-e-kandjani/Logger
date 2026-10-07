@@ -153,6 +153,11 @@ func (c *Collector) sample() {
 		NetOutKBps:       math.Round(netOutKBps*10) / 10,
 	}
 
+	onlineCores := getOnlineCPUCores()
+	if onlineCores > runtime.GOMAXPROCS(0) {
+		runtime.GOMAXPROCS(onlineCores)
+	}
+
 	current := CurrentMetrics{
 		CPUPercent:       point.CPUPercent,
 		RAMUsedMB:        point.RAMUsedMB,
@@ -162,7 +167,7 @@ func (c *Collector) sample() {
 		TotalPacketsRx:   totalPackets,
 		NetInKBps:        point.NetInKBps,
 		NetOutKBps:       point.NetOutKBps,
-		CPUCores:         runtime.NumCPU(),
+		CPUCores:         onlineCores,
 		OS:               runtime.GOOS,
 		Timestamp:        tsStr,
 	}
@@ -342,3 +347,60 @@ func (c *Collector) GetCurrent() CurrentMetrics {
 	defer c.mu.RUnlock()
 	return c.current
 }
+
+// getOnlineCPUCores dynamically reads the number of active online CPUs from the Linux kernel
+// to support CPU hot-plugging without requiring binary or container restart, falling back to runtime.NumCPU().
+func getOnlineCPUCores() int {
+	// 1. Check /sys/devices/system/cpu/online (e.g. "0-3" or "0-1,2-3")
+	if data, err := os.ReadFile("/sys/devices/system/cpu/online"); err == nil {
+		if cores := parseCPUOnlineRange(strings.TrimSpace(string(data))); cores > 0 {
+			return cores
+		}
+	}
+
+	// 2. Count active core lines in /proc/stat (cpu0, cpu1, cpu2, cpu3...)
+	if data, err := os.ReadFile("/proc/stat"); err == nil {
+		count := 0
+		scanner := bufio.NewScanner(bytes.NewReader(data))
+		for scanner.Scan() {
+			line := scanner.Text()
+			if len(line) > 3 && line[:3] == "cpu" && line[3] >= '0' && line[3] <= '9' {
+				count++
+			}
+		}
+		if count > 0 {
+			return count
+		}
+	}
+
+	// 3. Fallback to runtime.NumCPU()
+	return runtime.NumCPU()
+}
+
+// parseCPUOnlineRange parses a Linux CPU range string like "0-3", "0-1,2-3", or "0"
+func parseCPUOnlineRange(s string) int {
+	if s == "" {
+		return 0
+	}
+	total := 0
+	parts := strings.Split(s, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if strings.Contains(part, "-") {
+			rangeParts := strings.SplitN(part, "-", 2)
+			if len(rangeParts) == 2 {
+				start, err1 := strconv.Atoi(rangeParts[0])
+				end, err2 := strconv.Atoi(rangeParts[1])
+				if err1 == nil && err2 == nil && end >= start {
+					total += (end - start + 1)
+					continue
+				}
+			}
+		}
+		if _, err := strconv.Atoi(part); err == nil {
+			total++
+		}
+	}
+	return total
+}
+

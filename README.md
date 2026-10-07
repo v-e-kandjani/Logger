@@ -254,6 +254,9 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.2.2**:
+  - Dynamic kernel CPU core detection (`/sys/devices/system/cpu/online` and `/proc/stat`) supporting live CPU hot-plugging without process restart.
+  - Automatic `GOMAXPROCS` runtime auto-tuning upon CPU allocation expansion.
 - **v1.2.1**:
   - Real-time CPU, RAM, EPS, and Network throughput 2x2 telemetry graphs with stable non-collapsing scaling.
   - Container host networking mode with dual-port listening (514 & 5514) to preserve authentic device client IPs.

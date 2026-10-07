@@ -1401,12 +1401,12 @@ async function loadUpdateStatus() {
         const repoEl = document.getElementById('upd-repo-link');
         const branchEl = document.getElementById('upd-branch');
 
-        const curVersion = data.current_version || 'v1.2.1';
+        const curVersion = data.current_version || 'v1.2.2';
         if (verEl) verEl.textContent = curVersion;
         const brandVer = document.getElementById('brand-version');
         if (brandVer) brandVer.textContent = curVersion;
 
-        if (commitEl) commitEl.textContent = data.current_commit || 'f061ee0';
+        if (commitEl) commitEl.textContent = data.current_commit || '684fa6f';
         if (dateEl) dateEl.textContent = `Build: ${data.build_date || '2026-10-08'}`;
         if (repoEl) {
             repoEl.textContent = data.repository || 'v-e-kandjani/Logger';
