@@ -2,13 +2,14 @@ package version
 
 import (
 	"os"
+	"os/exec"
 	"strings"
 )
 
 var (
-	Version   = "v1.1.0"
-	BuildDate = "2026-10-07"
-	CommitSHA = "1a17918"
+	Version   = "v1.2.1"
+	BuildDate = "2026-10-08"
+	CommitSHA = "f061ee0"
 	Platform  = "Valtrivo LogSeal"
 	Company   = "Valtrivo"
 	Tagline   = "Her kayıt, zamanıyla kanıt."
@@ -18,6 +19,14 @@ var (
 )
 
 func init() {
+	// Attempt to detect current Git commit SHA dynamically if running in a repo
+	if out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output(); err == nil {
+		s := strings.TrimSpace(string(out))
+		if s != "" {
+			CommitSHA = s
+		}
+	}
+
 	// Attempt to load runtime version overrides from .version_info if updated dynamically
 	paths := []string{
 		"/opt/syslog-platform/config/.version_info",

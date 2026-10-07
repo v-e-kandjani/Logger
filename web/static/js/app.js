@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCustomExportModal();
     initStorageManagement();
     initUpdatesManagement();
+    loadUpdateStatus();
     if (window.i18n) {
         window.i18n.setLanguage(window.i18n.currentLang);
     }
@@ -579,6 +580,13 @@ async function loadHealthTelemetry() {
         const badgeDropped = document.getElementById('badge-dropped-unauthorized');
         if (badgeDropped) {
             badgeDropped.textContent = Number(h.dropped_unauthorized || 0).toLocaleString();
+        }
+
+        if (h.version) {
+            const brandVer = document.getElementById('brand-version');
+            if (brandVer) brandVer.textContent = h.version;
+            const updVer = document.getElementById('upd-current-version');
+            if (updVer) updVer.textContent = h.version;
         }
     } catch (e) {
         body.innerHTML = `<span class="text-red">Health probe error: ${e.message}</span>`;
@@ -1393,9 +1401,13 @@ async function loadUpdateStatus() {
         const repoEl = document.getElementById('upd-repo-link');
         const branchEl = document.getElementById('upd-branch');
 
-        if (verEl) verEl.textContent = data.current_version || 'v1.1.0';
-        if (commitEl) commitEl.textContent = data.current_commit || 'unknown';
-        if (dateEl) dateEl.textContent = `Build: ${data.build_date || '-'}`;
+        const curVersion = data.current_version || 'v1.2.1';
+        if (verEl) verEl.textContent = curVersion;
+        const brandVer = document.getElementById('brand-version');
+        if (brandVer) brandVer.textContent = curVersion;
+
+        if (commitEl) commitEl.textContent = data.current_commit || 'f061ee0';
+        if (dateEl) dateEl.textContent = `Build: ${data.build_date || '2026-10-08'}`;
         if (repoEl) {
             repoEl.textContent = data.repository || 'v-e-kandjani/Logger';
             repoEl.href = data.repo_url || 'https://github.com/v-e-kandjani/Logger';

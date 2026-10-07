@@ -127,6 +127,7 @@ else
 fi
 
 FINAL_COMMIT=$(git rev-parse --short HEAD)
+CURRENT_VER=$(grep -E 'Version\s*=\s*' internal/version/version.go 2>/dev/null | cut -d'"' -f2 || echo "v1.2.1")
 SERVER_IP=$(ip -4 addr show scope global 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1 || echo "127.0.0.1")
 
 echo ""
@@ -134,7 +135,7 @@ cat << EOF
 ================================================================================
         VALTRIVO LOGSEAL - UPGRADE COMPLETED SUCCESSFULLY!
 ================================================================================
-  Installed Version : ${FINAL_COMMIT} (Previous: ${PREV_COMMIT})
+  Installed Version : ${CURRENT_VER} (${FINAL_COMMIT}) (Previous: ${PREV_COMMIT})
   Dashboard URL     : http://${SERVER_IP}:${APP_PORT}/
   Status            : All containers updated and healthy
 

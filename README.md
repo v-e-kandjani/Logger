@@ -254,6 +254,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.2.1**:
+  - Real-time CPU, RAM, EPS, and Network throughput 2x2 telemetry graphs with stable non-collapsing scaling.
+  - Container host networking mode with dual-port listening (514 & 5514) to preserve authentic device client IPs.
+  - Super Admin web-based system upgrade and Git synchronization manager with automated CLI upgrade script (`upgrade.sh`).
+  - Dynamic runtime version detection and synchronization across dashboard and API.
 - **v1.1.0**:
   - Admin password reset modal and API endpoint (`POST /api/v1/users/reset-password`).
   - Direct download links for archive bundles (`.zip`), compressed logs (`.gz`), and evidence tokens (`.zd`).

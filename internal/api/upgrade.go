@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -351,6 +352,18 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 		shortSHA = shortSHA[:7]
 	}
 	version.CommitSHA = shortSHA
+
+	// Attempt to extract updated version from updated internal/version/version.go
+	for _, p := range []string{"internal/version/version.go", "/opt/syslog-platform/internal/version/version.go"} {
+		if data, err := os.ReadFile(p); err == nil {
+			re := regexp.MustCompile(`Version\s*=\s*"([^"]+)"`)
+			if m := re.FindStringSubmatch(string(data)); len(m) > 1 && m[1] != "" {
+				version.Version = m[1]
+				break
+			}
+		}
+	}
+
 	versionInfoContent := fmt.Sprintf("COMMIT_SHA=%s\nVERSION=%s\nBUILD_DATE=%s\nUPDATED_AT=%s\nUPDATED_BY=%s\n",
 		shortSHA, version.Version, time.Now().Format("2006-01-02"), time.Now().UTC().Format(time.RFC3339), session.Username)
 
