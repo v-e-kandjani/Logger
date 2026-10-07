@@ -24,6 +24,8 @@ const translations = {
         view_subtitle_settings: "Zaman damgası sağlayıcıları, arşivleme sıklığı ve ağ erişim ilkeleri",
         view_title_users: "Kullanıcı Hesapları & Erişim Denetimi",
         view_subtitle_users: "Operatör rolleri, güvenlik profilleri ve kullanıcı yönetimi",
+        view_title_updates: "Sistem Güncelleme & Sürüm Yönetimi",
+        view_subtitle_updates: "GitHub deposu ile senkronizasyon, değişen dosyaların analizi ve tek tıkla güncelleme",
 
         // Topbar
         btn_manual_archive: "Hemen Arşivle",
@@ -41,6 +43,7 @@ const translations = {
         nav_health: "Sistem Sağlığı",
         nav_settings: "Ayarlar & TÜBİTAK",
         nav_users: "Kullanıcılar & Yetkiler",
+        nav_updates: "Sistem Güncelleme",
         sidebar_corp: "Valtrivo • Kurumsal SIEM",
 
         // Dashboard Stats
@@ -206,6 +209,8 @@ const translations = {
         view_subtitle_settings: "Timestamping providers, archival schedules, and network access policies",
         view_title_users: "User Accounts & Access Control",
         view_subtitle_users: "Operator roles, security profiles, and credential governance",
+        view_title_updates: "System Upgrade & Version Control",
+        view_subtitle_updates: "GitHub repository synchronization, changed files inspection, and 1-click upgrades",
 
         // Topbar
         btn_manual_archive: "Create Archive Now",
@@ -223,6 +228,7 @@ const translations = {
         nav_health: "System Health",
         nav_settings: "Settings & KamuSM",
         nav_users: "Users & Access",
+        nav_updates: "System Upgrade",
         sidebar_corp: "Valtrivo • Enterprise SIEM",
 
         // Dashboard Stats

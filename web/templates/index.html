@@ -55,6 +55,10 @@
                 <a href="#users" class="nav-item" data-tab="users" id="nav-tab-users">
                     <span class="icon">👥</span> <span data-i18n="nav_users">Users & Access</span>
                 </a>
+                <a href="#updates" class="nav-item" data-tab="updates" id="nav-tab-updates">
+                    <span class="icon">🔄</span> <span data-i18n="nav_updates">System Upgrade</span>
+                    <span class="badge badge-primary" id="update-indicator-badge" style="display: none; font-size: 10px; margin-left: auto;">New</span>
+                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -586,6 +590,107 @@
                             <tr><td colspan="8" class="text-center">Loading operators...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </section>
+
+            <!-- TAB: System Upgrade & Version Control -->
+            <section class="tab-pane" id="pane-updates">
+                <div class="section-actions">
+                    <div>
+                        <h3 data-i18n="view_title_updates">System Upgrade & Version Control</h3>
+                        <p class="subtitle" data-i18n="view_subtitle_updates">GitHub repository synchronization, changed files inspection, and 1-click upgrades</p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" id="btn-check-updates">🔍 Check for Updates</button>
+                        <button class="btn btn-primary" id="btn-apply-updates" disabled title="Check for updates first">🚀 Apply Upgrade (Changed Files)</button>
+                    </div>
+                </div>
+
+                <!-- Version & Git Status Cards -->
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
+                    <div class="stat-card">
+                        <div class="stat-header">Installed Version</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.1.0</div>
+                        <div class="stat-sub">Valtrivo LogSeal Platform</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">Installed Commit</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">1a17918</div>
+                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-07</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">GitHub Repository</div>
+                        <div class="stat-value" style="font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <a href="https://github.com/v-e-kandjani/Logger" target="_blank" style="color: var(--primary); text-decoration: none;" id="upd-repo-link">v-e-kandjani/Logger</a>
+                        </div>
+                        <div class="stat-sub">Branch: <span class="badge badge-outline" id="upd-branch">main</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">Synchronization Status</div>
+                        <div class="stat-value" id="upd-status-badge-container">
+                            <span class="badge badge-outline" id="upd-status-badge">Not Checked</span>
+                        </div>
+                        <div class="stat-sub" id="upd-last-checked-label">Click 'Check for Updates' to query GitHub</div>
+                    </div>
+                </div>
+
+                <!-- Update Details & Changed Files Box -->
+                <div class="panel" id="upd-details-panel" style="margin-bottom: 20px; display: none;">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0;">📦 Available Remote Updates from GitHub</h4>
+                        <span class="badge badge-warning" id="upd-commits-behind-badge">0 commits behind</span>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Latest Commit Highlight -->
+                        <div style="background: rgba(59, 130, 246, 0.08); border-left: 4px solid var(--primary); padding: 12px 16px; border-radius: 4px; margin-bottom: 16px;">
+                            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;" id="upd-latest-message">Loading commit message...</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">
+                                Author: <span id="upd-latest-author">-</span> &bull; 
+                                Date: <span id="upd-latest-date">-</span> &bull; 
+                                Commit: <span class="mono-code" id="upd-latest-sha">-</span> &bull; 
+                                <a href="#" target="_blank" id="upd-latest-url" style="color: var(--primary);">View on GitHub ↗</a>
+                            </div>
+                        </div>
+
+                        <!-- Changed Files Table -->
+                        <h5 style="margin: 12px 0 8px 0;">Modified & Added Files in this Release:</h5>
+                        <div class="table-container" style="max-height: 280px; overflow-y: auto;">
+                            <table class="data-table" id="upd-files-table">
+                                <thead>
+                                    <tr>
+                                        <th>File Path</th>
+                                        <th>Status</th>
+                                        <th>Changes</th>
+                                        <th>Upgrade Compatibility</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="upd-files-body">
+                                    <tr><td colspan="4" class="text-center">No files to show</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div id="upd-binary-warning" style="display: none; margin-top: 14px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; padding: 12px; font-size: 13px;">
+                            ⚠️ <strong>Go Core Engine Changed:</strong> Some files modify backend Go source code. Applying the upgrade from Web UI will hot-patch templates and static assets. To activate compiled Go backend changes, run the CLI upgrade script below or restart the Docker container.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CLI Terminal Upgrade Instructions Card -->
+                <div class="panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0;">💻 Terminal / CLI Full Upgrade (Recommended for Production)</h4>
+                        <button class="btn btn-outline" id="btn-copy-upgrade-cli" style="padding: 4px 10px; font-size: 12px;">📋 Copy Command</button>
+                    </div>
+                    <div class="panel-body">
+                        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+                            For complete server-wide upgrades including database schema migrations, Docker container rebuilding, and Go compiler optimization, run the automated CLI upgrade script directly on your VPS terminal:
+                        </p>
+                        <pre style="background: #0f172a; color: #38bdf8; padding: 14px 16px; border-radius: 6px; font-size: 13px; overflow-x: auto; border: 1px solid #1e293b; margin: 0;"><code id="upgrade-cli-code">cd ~/Logger && sudo bash upgrade.sh</code></pre>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                            Or manual Docker Compose command: <code>git pull origin main && sudo docker compose build syslog-app && sudo docker compose up -d</code>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>

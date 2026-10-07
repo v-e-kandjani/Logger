@@ -122,6 +122,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/users/toggle", h.requireAuth(h.handleToggleUserAPI))
 	mux.HandleFunc("/api/v1/users/reset-password", h.requireAuth(h.handleResetUserPasswordAPI))
 	mux.HandleFunc("/api/v1/roles", h.requireAuth(h.handleRolesAPI))
+	mux.HandleFunc("/api/v1/system/update/status", h.requireAuth(h.handleSystemUpdateStatus))
+	mux.HandleFunc("/api/v1/system/update/check", h.requireAuth(h.handleSystemUpdateCheck))
+	mux.HandleFunc("/api/v1/system/update/apply", h.requireAuth(h.handleSystemUpdateApply))
 
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))

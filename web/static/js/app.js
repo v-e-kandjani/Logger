@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initArchiveTrigger();
     initCustomExportModal();
     initStorageManagement();
+    initUpdatesManagement();
     if (window.i18n) {
         window.i18n.setLanguage(window.i18n.currentLang);
     }
@@ -43,14 +44,14 @@ async function initAuthSession() {
             if (roleEl) roleEl.textContent = data.role || 'Operator';
         }
 
-        // Only Super Administrators can see or manage users
+        // Only Super Administrators can see or manage users & system upgrades
         const usersTab = document.getElementById('nav-tab-users');
         if (usersTab) {
-            if (data.role !== 'Super Administrator') {
-                usersTab.style.display = 'none';
-            } else {
-                usersTab.style.display = '';
-            }
+            usersTab.style.display = data.role === 'Super Administrator' ? '' : 'none';
+        }
+        const updatesTab = document.getElementById('nav-tab-updates');
+        if (updatesTab) {
+            updatesTab.style.display = data.role === 'Super Administrator' ? '' : 'none';
         }
     } catch (e) {
         window.location.href = '/login';
@@ -76,9 +77,9 @@ function initNavigation() {
             e.preventDefault();
             const tab = item.getAttribute('data-tab');
 
-            // Gate access to users tab for non-admins
-            if (tab === 'users' && window.currentUser && window.currentUser.role !== 'Super Administrator') {
-                alert('Erişim Reddedildi: Yalnızca Süper Yöneticiler kullanıcıları görüntüleyebilir ve yönetebilir.');
+            // Gate access to users and updates tab for non-admins
+            if ((tab === 'users' || tab === 'updates') && window.currentUser && window.currentUser.role !== 'Super Administrator') {
+                showToast('Erişim Reddedildi: Yalnızca Süper Yöneticiler bu bölüme erişebilir.', 'error');
                 return;
             }
 
@@ -99,6 +100,7 @@ function initNavigation() {
             if (tab === 'health') loadHealthTelemetry();
             if (tab === 'settings') loadSettings();
             if (tab === 'users') loadUsers();
+            if (tab === 'updates') loadUpdateStatus();
         });
     });
     updateViewHeader('dashboard');
@@ -1369,6 +1371,207 @@ function initCustomExportModal() {
             } finally {
                 btnExecute.disabled = false;
                 if (statusAlert) statusAlert.style.display = 'none';
+            }
+        });
+    }
+}
+
+// System Updates & GitHub Synchronization
+let lastUpdateData = null;
+
+async function loadUpdateStatus() {
+    try {
+        const res = await fetch('/api/v1/system/update/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        const verEl = document.getElementById('upd-current-version');
+        const commitEl = document.getElementById('upd-current-commit');
+        const dateEl = document.getElementById('upd-build-date');
+        const repoEl = document.getElementById('upd-repo-link');
+        const branchEl = document.getElementById('upd-branch');
+
+        if (verEl) verEl.textContent = data.current_version || 'v1.1.0';
+        if (commitEl) commitEl.textContent = data.current_commit || 'unknown';
+        if (dateEl) dateEl.textContent = `Build: ${data.build_date || '-'}`;
+        if (repoEl) {
+            repoEl.textContent = data.repository || 'v-e-kandjani/Logger';
+            repoEl.href = data.repo_url || 'https://github.com/v-e-kandjani/Logger';
+        }
+        if (branchEl) branchEl.textContent = data.branch || 'main';
+    } catch (e) {
+        console.error('Failed loading update status:', e);
+    }
+}
+
+function initUpdatesManagement() {
+    const btnCheck = document.getElementById('btn-check-updates');
+    const btnApply = document.getElementById('btn-apply-updates');
+    const btnCopyCli = document.getElementById('btn-copy-upgrade-cli');
+    const badge = document.getElementById('upd-status-badge');
+    const lastCheckedLabel = document.getElementById('upd-last-checked-label');
+    const detailsPanel = document.getElementById('upd-details-panel');
+
+    if (btnCopyCli) {
+        btnCopyCli.addEventListener('click', () => {
+            const code = document.getElementById('upgrade-cli-code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                showToast('✓ CLI Upgrade command copied to clipboard!', 'success');
+                btnCopyCli.textContent = '✓ Copied!';
+                setTimeout(() => { btnCopyCli.textContent = '📋 Copy Command'; }, 2500);
+            }).catch(() => {
+                showToast('Could not copy automatically. Please copy the command manually.', 'info');
+            });
+        });
+    }
+
+    if (btnCheck) {
+        btnCheck.addEventListener('click', async () => {
+            btnCheck.disabled = true;
+            btnCheck.textContent = 'Connecting to GitHub...';
+            if (badge) {
+                badge.className = 'badge badge-warning';
+                badge.textContent = 'Querying GitHub...';
+            }
+
+            try {
+                const res = await fetch('/api/v1/system/update/check', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed checking GitHub API');
+
+                lastUpdateData = data;
+                if (lastCheckedLabel) {
+                    lastCheckedLabel.textContent = `Checked: ${new Date(data.last_checked).toLocaleTimeString()}`;
+                }
+
+                if (data.has_update) {
+                    if (badge) {
+                        badge.className = 'badge badge-warning';
+                        badge.textContent = `Update Available (${data.commits_behind} new commits)`;
+                    }
+                    const navBadge = document.getElementById('update-indicator-badge');
+                    if (navBadge) {
+                        navBadge.style.display = 'inline-block';
+                        navBadge.textContent = `${data.commits_behind} New`;
+                    }
+
+                    if (btnApply) {
+                        btnApply.disabled = false;
+                        btnApply.title = 'Click to pull and hot-patch changed web assets';
+                    }
+
+                    if (detailsPanel) detailsPanel.style.display = 'block';
+
+                    // Populate commit details
+                    if (data.latest_commit) {
+                        document.getElementById('upd-commits-behind-badge').textContent = `${data.commits_behind} commit(s) behind`;
+                        document.getElementById('upd-latest-message').textContent = data.latest_commit.commit.message.split('\n')[0];
+                        document.getElementById('upd-latest-author').textContent = data.latest_commit.commit.author.name;
+                        document.getElementById('upd-latest-date').textContent = new Date(data.latest_commit.commit.author.date).toLocaleString();
+                        const sha = data.latest_commit.sha.substring(0, 7);
+                        document.getElementById('upd-latest-sha').textContent = sha;
+                        const linkEl = document.getElementById('upd-latest-url');
+                        if (linkEl) linkEl.href = data.latest_commit.html_url;
+                    }
+
+                    // Populate files table
+                    const tbody = document.getElementById('upd-files-body');
+                    if (tbody && data.changed_files && data.changed_files.length > 0) {
+                        tbody.innerHTML = data.changed_files.map(f => `
+                            <tr>
+                                <td class="mono-code"><strong>${escapeHtml(f.filename)}</strong></td>
+                                <td>
+                                    <span class="badge ${f.status === 'added' ? 'badge-success' : f.status === 'removed' ? 'badge-danger' : 'badge-primary'}">
+                                        ${f.status}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style="color: #10b981;">+${f.additions}</span> / 
+                                    <span style="color: #ef4444;">-${f.deletions}</span>
+                                </td>
+                                <td>
+                                    ${f.can_hot_apply 
+                                        ? '<span class="badge badge-success">✓ Web Asset (Hot-Patchable)</span>' 
+                                        : '<span class="badge badge-warning">⚙️ Go Engine (Rebuild Required)</span>'}
+                                </td>
+                            </tr>
+                        `).join('');
+                    } else if (tbody) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center">Files listed in release commits.</td></tr>';
+                    }
+
+                    const binWarning = document.getElementById('upd-binary-warning');
+                    if (binWarning) {
+                        binWarning.style.display = data.binary_changed ? 'block' : 'none';
+                    }
+
+                    showToast(`Update available! Found ${data.commits_behind} new commit(s) on origin/main.`, 'info');
+                } else {
+                    if (badge) {
+                        badge.className = 'badge badge-success';
+                        badge.textContent = 'Up to Date (origin/main)';
+                    }
+                    const navBadge = document.getElementById('update-indicator-badge');
+                    if (navBadge) navBadge.style.display = 'none';
+
+                    if (btnApply) {
+                        btnApply.disabled = true;
+                    }
+                    if (detailsPanel) detailsPanel.style.display = 'none';
+
+                    showToast('✓ Platform is running the latest version from origin/main.', 'success');
+                }
+            } catch (err) {
+                if (badge) {
+                    badge.className = 'badge badge-danger';
+                    badge.textContent = 'Check Failed';
+                }
+                showToast('Update check failed: ' + err.message, 'error');
+            } finally {
+                btnCheck.disabled = false;
+                btnCheck.textContent = '🔍 Check for Updates';
+            }
+        });
+    }
+
+    if (btnApply) {
+        btnApply.addEventListener('click', async () => {
+            if (!confirm('Apply available updates from GitHub to this server? Web assets and templates will be updated immediately.')) {
+                return;
+            }
+
+            btnApply.disabled = true;
+            btnApply.textContent = 'Downloading from GitHub...';
+
+            try {
+                const res = await fetch('/api/v1/system/update/apply', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed applying updates');
+
+                showToast(`✓ ${data.message}`, 'success');
+
+                // Update local commit display
+                if (data.new_commit) {
+                    const commitEl = document.getElementById('upd-current-commit');
+                    if (commitEl) commitEl.textContent = data.new_commit;
+                }
+
+                if (badge) {
+                    badge.className = 'badge badge-success';
+                    badge.textContent = 'Updated to ' + (data.new_commit || 'latest');
+                }
+
+                if (data.binary_changed) {
+                    showToast('Web assets hot-patched! Backend Go changes require container restart.', 'info');
+                }
+
+                // Refresh status
+                setTimeout(loadUpdateStatus, 1500);
+            } catch (err) {
+                showToast('Failed applying upgrade: ' + err.message, 'error');
+            } finally {
+                btnApply.disabled = false;
+                btnApply.textContent = '🚀 Apply Upgrade (Changed Files)';
             }
         });
     }
