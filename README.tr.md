@@ -251,6 +251,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ## Sürüm Geçmişi (Release History)
 
+- **v1.3.8** (Önem Derecesine Duyarlı FortiGate IPS Sınıflandırması):
+  - **IPS İmza Önem Derecesi Dikkate Alınıyor**: FortiGate IPS olayları artık FortiGuard imzasının `severity` alanına göre derecelendiriliyor. Engellenen `info`/`low` imzalar (`ZGrab.Scanner`, Masscan, Nmap gibi sıradan internet tarayıcıları) P1 `PERIM-004` olayı açmak yerine `threat / ips-recon-blocked` (LOW, risk 15, MITRE `T1595` Aktif Tarama) olarak normalize edilir. `medium` imzalar `intrusion-blocked` / `intrusion-detected`, `high`/`critical` (veya belirtilmemiş) imzalar ise `intrusion-high-priority` olarak yükseltilmeye devam eder.
+  - **İzin Verilen Yüksek Önemli Saldırılar Artık Alarm Üretiyor**: `PERIM-004` önceden yalnızca `outcome=blocked` durumunda tetikleniyordu; izleme modundaki bir IPS sensörünün geçirdiği kritik imza hiç alarm üretmiyordu. Artık hem engellenen hem tespit edilen sonuçlarda tetiklenir (engellenmediğinde risk 95).
+  - **Saldırı Bağlamı Korunuyor**: IPS `attack` adı ve `attackid` değeri analist incelemesi için normalize edilmiş olaya taşınır.
+
 - **v1.3.7** (Fortinet UTM Yanlış Alarm Giderme, Kategori İndeksli SIEM & Yüksek Başarımlı CPU Optimizasyonu):
   - **Fortinet UTM Alt Tip Hassas Normalizasyonu**: FortiOS UTM normalizasyonu baştan yapılandırılarak Uygulama Denetimi (`subtype="app-ctrl"`), Web Filtreleme (`subtype="webfilter"`), DNS Filtreleme (`subtype="dns"`) ve gerçek tehditler (`subtype="ips"`, `subtype="virus"`, `subtype="waf"`) birbirinden tam olarak ayrıştırıldı. İzin verilen standart trafik (`action="pass"`, `action="passthrough"`, `eventtype="ftgd_allow"` veya şifreli SSL göstergesi `apprisk="elevated"` / `apprisk="medium"`) doğru şekilde `network` / `app-control-allowed` ya da `web-filter-allowed` olarak bilgilendirici önem düzeyine normalize edildi; böylece `PERIM-004` (Yüksek öncelikli saldırı/ihlal olayı) kuralının tetiklediği binlerce yanlış alarm (false positive) tamamen ortadan kaldırıldı.
   - **Kategori İndeksli Korelasyon Motoru & Hızlı Baypas**: `Engine.Evaluate` motoru kuralları `MatchCategory` bazında indeksleyecek şekilde yenilendi. İzin verilen olağan ağ trafiği kural döngüsüne dahi girmeden <5 nanosaniyede baypas edilir. Sıradan akışlar için 72 kurallı döngü maliyeti sıfıra indirildi.

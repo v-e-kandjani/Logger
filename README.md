@@ -262,6 +262,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.3.8** (Severity-Aware FortiGate IPS Triage):
+  - **IPS Signature Severity Honoured**: FortiGate IPS events are now graded by the FortiGuard signature `severity` field. Blocked `info`/`low` signatures (commodity internet scanners such as `ZGrab.Scanner`, Masscan, Nmap probes) normalize to `threat / ips-recon-blocked` (LOW, risk 15, MITRE `T1595` Active Scanning) instead of raising a P1 `PERIM-004` incident. `medium` signatures map to `intrusion-blocked` / `intrusion-detected`; `high`/`critical` (or unspecified) still escalate to `intrusion-high-priority`.
+  - **Allowed High-Severity Intrusions Now Alert**: `PERIM-004` previously required `outcome=blocked`, so a critical signature passed by a monitor-mode IPS sensor raised nothing. It now fires on both blocked and detected outcomes (risk 95 when not blocked).
+  - **Attack Context Retained**: IPS `attack` name and `attackid` are carried into the normalized event for analyst triage.
+
 - **v1.3.7** (Fortinet UTM False Positive Elimination, Category-Indexed SIEM Engine & High-Throughput CPU Optimization):
   - **Fortinet UTM Accurate Subtype Normalization**: Overhauled FortiOS UTM normalization to precisely differentiate Application Control (`subtype="app-ctrl"`), Web Filtering (`subtype="webfilter"`), DNS Filtering (`subtype="dns"`), and true threats (`subtype="ips"`, `subtype="virus"`, `subtype="waf"`). Benign permitted traffic (`action="pass"`, `action="passthrough"`, `eventtype="ftgd_allow"`, or FortiGuard encrypted SSL classification `apprisk="elevated"` / `apprisk="medium"`) is accurately mapped to `network` / `app-control-allowed` or `web-filter-allowed` with informational severity, eliminating false-positive triggers for `PERIM-004` (High-priority intrusion event).
   - **Category-Indexed Correlation Engine & Fast-Path Bypass**: Re-architected `Engine.Evaluate` to index detection rules by `MatchCategory`, bypassing rule iterations entirely for standard permitted network traffic (<5ns execution). Reduced evaluation overhead from 72 sequential rule checks to zero for benign flows.

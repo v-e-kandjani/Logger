@@ -256,7 +256,11 @@ func (e *Engine) matchesRule(rule *models.SIEMRule, event *models.NormalizedEven
 		}
 	}
 	if rule.MatchOutcome != "" && rule.MatchOutcome != event.EventOutcome {
-		return false
+		if rule.ID == "PERIM-004" && event.EventOutcome == "detected" {
+			// high-priority intrusion that passed the sensor (monitor mode) must still alert
+		} else {
+			return false
+		}
 	}
 	return true
 }

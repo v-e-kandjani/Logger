@@ -109,23 +109,76 @@ func (n *Normalizer) normalizeFortinet(event *models.LogEvent, norm *models.Norm
 	// 1. Explicit Intrusion / Malware / Threat Subtypes
 	case subtype == "ips" || subtype == "virus" || subtype == "antivirus" || subtype == "waf" || kv["attack"] != "" || kv["virus"] != "":
 		norm.EventCategory = "threat"
-		if action == "drop" || action == "deny" || action == "block" || action == "dropped" || action == "blocked" || action == "reset" {
-			if subtype == "ips" {
-				norm.EventAction = "intrusion-high-priority"
-			} else {
-				norm.EventAction = "malware-blocked"
-			}
+		blocked := action == "drop" || action == "deny" || action == "block" || action == "dropped" || action == "blocked" || action == "reset" ||
+			action == "clear_session" || action == "reset_client" || action == "reset_server"
+		if blocked {
 			norm.EventOutcome = "blocked"
-			norm.Severity = "CRITICAL"
-			norm.RiskScore = 85
 		} else {
-			norm.EventAction = "threat-detected"
 			norm.EventOutcome = "detected"
-			norm.Severity = "HIGH"
-			norm.RiskScore = 70
 		}
-		norm.MitreTactic = "Initial Access"
-		norm.MitreTechnique = "T1190"
+		if kv["attack"] != "" {
+			norm.Extra["attack"] = kv["attack"]
+		}
+		if kv["attackid"] != "" {
+			norm.Extra["attack_id"] = kv["attackid"]
+		}
+
+		// FortiGuard IPS signature severity: info | low | medium | high | critical
+		sigSeverity := strings.ToLower(kv["severity"])
+		if subtype == "ips" || kv["attack"] != "" {
+			switch sigSeverity {
+			case "info", "information", "low":
+				// Commodity internet scanners (ZGrab, Masscan, Nmap probes...) - reconnaissance telemetry, not an incident
+				if blocked {
+					norm.EventAction = "ips-recon-blocked"
+					norm.Severity = "LOW"
+					norm.RiskScore = 15
+				} else {
+					norm.EventAction = "ips-recon-detected"
+					norm.Severity = "WARNING"
+					norm.RiskScore = 35
+				}
+				norm.MitreTactic = "Reconnaissance"
+				norm.MitreTechnique = "T1595"
+			case "medium":
+				if blocked {
+					norm.EventAction = "intrusion-blocked"
+					norm.Severity = "WARNING"
+					norm.RiskScore = 45
+				} else {
+					norm.EventAction = "intrusion-detected"
+					norm.Severity = "HIGH"
+					norm.RiskScore = 65
+				}
+				norm.MitreTactic = "Initial Access"
+				norm.MitreTechnique = "T1190"
+			default:
+				// high / critical / unspecified: escalate (PERIM-004). An allowed high-severity attack is worse than a blocked one.
+				norm.EventAction = "intrusion-high-priority"
+				if blocked {
+					norm.Severity = "CRITICAL"
+					norm.RiskScore = 85
+				} else {
+					norm.Severity = "CRITICAL"
+					norm.RiskScore = 95
+				}
+				norm.MitreTactic = "Initial Access"
+				norm.MitreTechnique = "T1190"
+			}
+		} else {
+			// Antivirus / WAF
+			if blocked {
+				norm.EventAction = "malware-blocked"
+				norm.Severity = "CRITICAL"
+				norm.RiskScore = 85
+			} else {
+				norm.EventAction = "threat-detected"
+				norm.Severity = "HIGH"
+				norm.RiskScore = 70
+			}
+			norm.MitreTactic = "Initial Access"
+			norm.MitreTechnique = "T1190"
+		}
 
 	// 2. Application Control Subtype (app-ctrl)
 	case subtype == "app-ctrl":

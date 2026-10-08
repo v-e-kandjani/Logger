@@ -185,4 +185,31 @@ func TestNormalizer(t *testing.T) {
 			t.Errorf("expected CRITICAL, got %s", norm.Severity)
 		}
 	})
+
+	t.Run("Fortinet IPS Low-Severity Scanner Dropped (ZGrab user sample)", func(t *testing.T) {
+		raw := `<185>date=2026-10-09 time=00:57:17 devname="FGT-1" devid="FG200ETK20907839" eventtime=1791496637490672551 tz="+0300" logid="0419016384" type="utm" subtype="ips" eventtype="signature" level="alert" vd="1WARE" severity="low" srcip=138.68.153.47 srccountry="United Kingdom" dstip=10.10.200.133 dstcountry="Reserved" srcintf="port3" srcintfrole="undefined" dstintf="port4" dstintfrole="lan" sessionid=1154541640 action="dropped" proto=6 service="HTTP" policyid=6 poluuid="ce3dfde8-84ca-51e9-4d22-981302c8abc3" policytype="policy" attack="ZGrab.Scanner" srcport=55050 dstport=80 hostname="185.121.124.16" url="/" agent="Mozilla/5.0 zgrab/0.x" httpmethod="GET" direction="outgoing" attackid=48805 profile="g-default" ref="http://www.fortinet.com/ids/VID48805" incidentserialno=297467798 msg="applications3: ZGrab.Scanner" crscore=5 craction=32768 crlevel="low"`
+		norm := n.Normalize(&models.LogEvent{EventTimestamp: time.Now(), Vendor: "Fortinet", RawMessage: raw})
+
+		if norm.EventCategory != "threat" || norm.EventAction != "ips-recon-blocked" || norm.EventOutcome != "blocked" {
+			t.Errorf("expected threat/ips-recon-blocked/blocked, got %s/%s/%s", norm.EventCategory, norm.EventAction, norm.EventOutcome)
+		}
+		if norm.Severity != "LOW" || norm.RiskScore != 15 {
+			t.Errorf("expected LOW/15, got %s/%d", norm.Severity, norm.RiskScore)
+		}
+		if norm.MitreTechnique != "T1595" {
+			t.Errorf("expected T1595, got %s", norm.MitreTechnique)
+		}
+		if norm.SourceIP != "138.68.153.47" || norm.Extra["attack"] != "ZGrab.Scanner" {
+			t.Errorf("unexpected src/attack: %s / %s", norm.SourceIP, norm.Extra["attack"])
+		}
+	})
+
+	t.Run("Fortinet IPS High-Severity Allowed Escalates", func(t *testing.T) {
+		raw := `date=2026-10-09 time=00:10:00 devname="FGT-1" type="utm" subtype="ips" severity="critical" action="detected" attack="Apache.Log4j.Error.Log.Remote.Code.Execution" srcip=198.51.100.9 dstip=10.10.1.20 srcport=40000 dstport=443`
+		norm := n.Normalize(&models.LogEvent{EventTimestamp: time.Now(), Vendor: "Fortinet", RawMessage: raw})
+
+		if norm.EventAction != "intrusion-high-priority" || norm.EventOutcome != "detected" || norm.Severity != "CRITICAL" {
+			t.Errorf("expected intrusion-high-priority/detected/CRITICAL, got %s/%s/%s", norm.EventAction, norm.EventOutcome, norm.Severity)
+		}
+	})
 }
