@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.3.5</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.3.6</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -912,7 +912,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.3.5</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.3.6</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -1233,13 +1233,62 @@
                     </label>
                 </div>
 
+                <!-- Live Server Activity & Progress Panel -->
+                <div id="export-live-panel" style="display: none; margin-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 14px;">
+                    <!-- Stage and Percentage Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="badge badge-info" id="export-stage-badge">BAŞLATILIYOR</span>
+                            <strong id="export-stage-text" style="font-size: 13px; color: var(--text-main);">Sunucu işlemi başlatılıyor...</strong>
+                        </div>
+                        <span id="export-progress-percent" style="font-size: 1.25rem; font-weight: 700; font-family: var(--font-mono); color: #10b981;">0%</span>
+                    </div>
+
+                    <!-- Animated Progress Track & Fill -->
+                    <div class="upd-progress-track" style="margin-bottom: 8px;">
+                        <div class="upd-progress-fill" id="export-progress-fill" style="width: 0%;"></div>
+                    </div>
+
+                    <!-- Active Subtitle Message -->
+                    <div id="export-progress-msg" style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px; min-height: 18px;">
+                        Log arşivi oluşturma ve mühürleme görevi hazırlanıyor...
+                    </div>
+
+                    <!-- Real-Time Activity Terminal Console -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;" data-i18n="export_live_title">Sunucu İşlem Günlüğü (Canlı Terminal)</span>
+                            <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);" id="export-console-stats">0 log</span>
+                        </div>
+                        <div class="upd-console" id="export-console-log" style="height: 150px; max-height: 150px; overflow-y: auto;">
+                            <div class="upd-log-line" style="color: var(--text-muted);">İşlem başlatılmayı bekliyor...</div>
+                        </div>
+                    </div>
+
+                    <!-- Success Summary Box -->
+                    <div id="export-success-box" class="alert-box alert-success" style="display: none; margin-top: 12px; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 600;">
+                            <span>✅ Dışa aktarma ve mühürleme başarıyla tamamlandı!</span>
+                        </div>
+                        <div id="export-success-details" style="font-size: 11.5px; color: var(--text-main); font-family: var(--font-mono); line-height: 1.5;"></div>
+                        <div style="margin-top: 4px; display: flex; gap: 8px;">
+                            <a id="export-btn-redownload" class="btn btn-sm btn-primary" href="#" target="_blank" style="text-decoration: none;" data-i18n="export_btn_redownload">⬇️ Dosyayı Tekrar İndir</a>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="export-status-alert" class="alert-box alert-info" style="display: none; margin-top: 8px;">
                     <span id="export-status-text">Loglar hazırlanıyor...</span>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" id="btn-cancel-export-modal" data-i18n="btn_cancel">İptal</button>
-                <button class="btn btn-primary" id="btn-execute-export" data-i18n="btn_export_submit">Hemen Oluştur ve İndir</button>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <div id="export-footer-status" style="font-size: 12px; color: var(--text-muted);">
+                    5651 Sayılı Kanun Uyumlu Kriptografik Arşivleme
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-outline" id="btn-cancel-export-modal" data-i18n="btn_cancel">Kapat</button>
+                    <button class="btn btn-primary" id="btn-execute-export" data-i18n="btn_export_submit">Hemen Oluştur ve İndir</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1590,7 +1639,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.3.5"></script>
-    <script src="/static/js/app.js?v=1.3.5"></script>
+    <script src="/static/js/translations.js?v=1.3.6"></script>
+    <script src="/static/js/app.js?v=1.3.6"></script>
 </body>
 </html>

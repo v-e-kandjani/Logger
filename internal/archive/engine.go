@@ -246,11 +246,27 @@ type CustomArchiveResult struct {
 	ArchiveRecord   *models.LogArchive `json:"archive_record,omitempty"`
 }
 
+// ExportProgressCallback defines progress and log feedback during export operations
+type ExportProgressCallback func(stage string, percent int, logMsg string, currentCount int64, totalCount int64)
+
 // CreateCustomRangeArchive queries logs in an arbitrary period using either event_timestamp or received_at,
 // generates the requested format (.jsonl.gz, .csv, or .zip compliance bundle), and applies a cryptographic seal if requested.
 func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeOptions) (*CustomArchiveResult, error) {
+	return e.CreateCustomRangeArchiveWithProgress(ctx, opts, nil)
+}
+
+// CreateCustomRangeArchiveWithProgress performs custom range export while reporting granular stage and console telemetry
+func (e *Engine) CreateCustomRangeArchiveWithProgress(ctx context.Context, opts CustomRangeOptions, progressFn ExportProgressCallback) (*CustomArchiveResult, error) {
+	notify := func(stage string, percent int, msg string, cur, tot int64) {
+		if progressFn != nil {
+			progressFn(stage, percent, msg, cur, tot)
+		}
+	}
+
 	if opts.End.Before(opts.Start) {
-		return nil, fmt.Errorf("end time (%s) must be after start time (%s)", opts.End.Format(time.RFC3339), opts.Start.Format(time.RFC3339))
+		err := fmt.Errorf("end time (%s) must be after start time (%s)", opts.End.Format(time.RFC3339), opts.Start.Format(time.RFC3339))
+		notify("FAILED", 0, "HATA: "+err.Error(), 0, 0)
+		return nil, err
 	}
 
 	timeCol := "event_timestamp"
@@ -266,6 +282,8 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 		opts.Format = "bundle"
 	}
 
+	notify("INITIALIZING", 5, "Dışa aktarma parametreleri ve hedef dizin hazırlanıyor...", 0, 0)
+
 	dirPath := filepath.Join(
 		e.baseDir,
 		"exports",
@@ -274,6 +292,7 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 		fmt.Sprintf("%02d", opts.Start.Day()),
 	)
 	if err := os.MkdirAll(dirPath, 0755); err != nil {
+		notify("FAILED", 0, "Dizin oluşturulamadı: "+err.Error(), 0, 0)
 		return nil, fmt.Errorf("creating export directory: %w", err)
 	}
 
@@ -282,6 +301,25 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 		prefix = "logseal-rx"
 	}
 	baseName := fmt.Sprintf("%s-%s-%s", prefix, opts.Start.Format("20060102-150405"), opts.End.Format("20060102-150405"))
+
+	// Pre-count total matching events for progress percentage calculation
+	var estimatedCount uint64
+	countQuery := fmt.Sprintf("SELECT count() FROM %s.syslog_events WHERE %s >= ? AND %s <= ?", e.chClient.Database(), timeCol, timeCol)
+	notify("QUERYING", 8, fmt.Sprintf("ClickHouse veritabanı taranıyor (%s - %s, referans: %s)...", opts.Start.Format("2006-01-02 15:04:05"), opts.End.Format("2006-01-02 15:04:05"), opts.TimeField), 0, 0)
+
+	countRows, err := e.chClient.QueryEvents(ctx, countQuery, opts.Start, opts.End)
+	if err == nil {
+		if countRows.Next() {
+			_ = countRows.Scan(&estimatedCount)
+		}
+		countRows.Close()
+	}
+
+	if estimatedCount == 0 {
+		notify("QUERYING", 12, "Seçilen tarih aralığında log kaydı bulunamadı (0 kayıt). Boş arşiv dosyası oluşturulacak.", 0, 0)
+	} else {
+		notify("EXTRACTING", 15, fmt.Sprintf("ClickHouse üzerinde toplam %d adet log kaydı bulundu. Veri akışı ve sıkıştırma başlatılıyor...", estimatedCount), 0, int64(estimatedCount))
+	}
 
 	query := fmt.Sprintf(`
 		SELECT internal_id, event_timestamp, received_at, source_ip, source_port,
@@ -295,17 +333,20 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 
 	rows, err := e.chClient.QueryEvents(ctx, query, opts.Start, opts.End)
 	if err != nil {
+		notify("FAILED", 0, "ClickHouse sorgu hatası: "+err.Error(), 0, int64(estimatedCount))
 		return nil, fmt.Errorf("querying clickhouse for custom range: %w", err)
 	}
 	defer rows.Close()
 
 	var recordCount int64
 	var targetDataFilePath string
+	lastNotifyTime := time.Now()
 
 	if opts.Format == "csv" {
 		targetDataFilePath = filepath.Join(dirPath, baseName+".csv")
 		f, err := os.Create(targetDataFilePath)
 		if err != nil {
+			notify("FAILED", 0, "CSV dosyası oluşturulamadı: "+err.Error(), 0, int64(estimatedCount))
 			return nil, fmt.Errorf("creating csv file: %w", err)
 		}
 		cw := csv.NewWriter(f)
@@ -326,6 +367,7 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 			); err != nil {
 				cw.Flush()
 				f.Close()
+				notify("FAILED", 0, "Log satırı okunamadı: "+err.Error(), recordCount, int64(estimatedCount))
 				return nil, fmt.Errorf("scanning csv row: %w", err)
 			}
 
@@ -349,6 +391,18 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 				ev.Message,
 			})
 			recordCount++
+
+			if recordCount%1000 == 0 || time.Since(lastNotifyTime) > 800*time.Millisecond {
+				pct := 15
+				if estimatedCount > 0 {
+					pct = 15 + int((float64(recordCount)/float64(estimatedCount))*55.0)
+					if pct > 70 {
+						pct = 70
+					}
+				}
+				notify("STREAMING", pct, fmt.Sprintf("CSV tablosuna yazılıyor: %d / %d kayıt (%%%d)", recordCount, estimatedCount, pct), recordCount, int64(estimatedCount))
+				lastNotifyTime = time.Now()
+			}
 		}
 		cw.Flush()
 		f.Close()
@@ -357,12 +411,14 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 		targetDataFilePath = filepath.Join(dirPath, baseName+".jsonl.gz")
 		outFile, err := os.Create(targetDataFilePath)
 		if err != nil {
+			notify("FAILED", 0, "Arşiv dosyası oluşturulamadı: "+err.Error(), 0, int64(estimatedCount))
 			return nil, fmt.Errorf("creating archive file: %w", err)
 		}
 
 		gw, err := gzip.NewWriterLevel(outFile, gzip.DefaultCompression)
 		if err != nil {
 			outFile.Close()
+			notify("FAILED", 0, "Gzip başlatılamadı: "+err.Error(), 0, int64(estimatedCount))
 			return nil, err
 		}
 		gw.Header.Name = baseName + ".jsonl"
@@ -379,6 +435,7 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 			); err != nil {
 				gw.Close()
 				outFile.Close()
+				notify("FAILED", 0, "Log satırı okunamadı: "+err.Error(), recordCount, int64(estimatedCount))
 				return nil, fmt.Errorf("scanning row: %w", err)
 			}
 
@@ -386,22 +443,40 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 			if err != nil {
 				gw.Close()
 				outFile.Close()
+				notify("FAILED", 0, "JSON serileştirme hatası: "+err.Error(), recordCount, int64(estimatedCount))
 				return nil, err
 			}
 			if _, err := gw.Write(append(line, '\n')); err != nil {
 				gw.Close()
 				outFile.Close()
+				notify("FAILED", 0, "Gzip yazma hatası: "+err.Error(), recordCount, int64(estimatedCount))
 				return nil, err
 			}
 			recordCount++
+
+			if recordCount%1000 == 0 || time.Since(lastNotifyTime) > 800*time.Millisecond {
+				pct := 15
+				if estimatedCount > 0 {
+					pct = 15 + int((float64(recordCount)/float64(estimatedCount))*55.0)
+					if pct > 70 {
+						pct = 70
+					}
+				}
+				notify("STREAMING", pct, fmt.Sprintf("Log kayıtları sıkıştırılıyor: %d / %d kayıt (%%%d)", recordCount, estimatedCount, pct), recordCount, int64(estimatedCount))
+				lastNotifyTime = time.Now()
+			}
 		}
 		gw.Close()
 		outFile.Close()
 	}
 
+	notify("STREAMING", 72, fmt.Sprintf("Tüm log kayıtları yazıldı ve sıkıştırıldı (Toplam: %d kayıt).", recordCount), recordCount, int64(estimatedCount))
+
 	// Compute Cryptographic SHA-256 for the data file
+	notify("HASHING", 75, fmt.Sprintf("FIPS 180-4 SHA-256 kriptografik özeti hesaplanıyor (%s)...", filepath.Base(targetDataFilePath)), recordCount, int64(estimatedCount))
 	hashVal, err := timestamp.ComputeSHA256(targetDataFilePath)
 	if err != nil {
+		notify("FAILED", 75, "SHA-256 hesaplama hatası: "+err.Error(), recordCount, int64(estimatedCount))
 		return nil, fmt.Errorf("computing sha256: %w", err)
 	}
 
@@ -410,24 +485,29 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 
 	fi, _ := os.Stat(targetDataFilePath)
 	archiveSize := fi.Size()
+	notify("HASHING", 82, fmt.Sprintf("SHA-256 özeti oluşturuldu: %s (Boyut: %d bayt)", hashVal, archiveSize), recordCount, int64(estimatedCount))
 
 	tsStatus := "ARCHIVED_NO_STAMP"
 	evidencePath := ""
 
 	// Perform Cryptographic Sealing if requested or if bundle format
 	if (opts.Seal || opts.Format == "bundle") && e.provider != nil {
-		tsCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		notify("STAMPING", 85, "Kriptografik Zaman Damgası servisine bağlanılıyor (KamuSM / Entegre TSA)...", recordCount, int64(estimatedCount))
+		tsCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		res, err := e.provider.Timestamp(tsCtx, targetDataFilePath)
 		cancel()
 		if err != nil {
 			log.Printf("[Custom Export] Timestamp warning for %s: %v", targetDataFilePath, err)
 			tsStatus = "TIMESTAMP_FAILED"
+			notify("STAMPING", 88, fmt.Sprintf("Zaman damgası uyarısı: %v (arşiv damgasız mühürlendi)", err), recordCount, int64(estimatedCount))
 		} else {
 			if res.EvidenceFile != "" {
 				tsStatus = "STAMPED"
 				evidencePath = res.EvidenceFile
+				notify("STAMPING", 90, fmt.Sprintf("Zaman damgası mühürleme başarılı! .zd kanıtı oluşturuldu (%s)", filepath.Base(evidencePath)), recordCount, int64(estimatedCount))
 			} else {
 				tsStatus = "ARCHIVED_NO_STAMP"
+				notify("STAMPING", 90, "Zaman damgası sağlayıcısı kanıt üretmedi.", recordCount, int64(estimatedCount))
 			}
 		}
 	}
@@ -448,9 +528,11 @@ func (e *Engine) CreateCustomRangeArchive(ctx context.Context, opts CustomRangeO
 
 	// If format is bundle, wrap everything into a compliance .zip
 	if opts.Format == "bundle" {
+		notify("PACKAGING", 92, "5651 Sayılı Kanun Uyumlu ZIP paketi ve adli sertifika (Valtrivo LogSeal) derleniyor...", recordCount, int64(estimatedCount))
 		zipPath := filepath.Join(dirPath, baseName+"-compliance-bundle.zip")
 		zf, err := os.Create(zipPath)
 		if err != nil {
+			notify("FAILED", 92, "ZIP paketi oluşturulamadı: "+err.Error(), recordCount, int64(estimatedCount))
 			return nil, fmt.Errorf("creating compliance zip: %w", err)
 		}
 		zw := zip.NewWriter(zf)
@@ -531,10 +613,12 @@ Doğrulama için TÜBİTAK KamuSM doğrulayıcı veya LogSeal dahili doğrulayı
 		result.BundlePath = zipPath
 		result.FilePath = zipPath
 		result.ArchiveSize = zipFi.Size()
+		notify("PACKAGING", 96, fmt.Sprintf("5651 Uyum paketi oluşturuldu: %s (%d bayt)", filepath.Base(zipPath), zipFi.Size()), recordCount, int64(estimatedCount))
 	}
 
 	// Register in PostgreSQL catalog if requested
 	if opts.Register {
+		notify("REGISTERING", 97, "Arşiv kaydı PostgreSQL sistem kataloğuna tescil ediliyor...", recordCount, int64(estimatedCount))
 		rec := &models.LogArchive{
 			ArchiveName:           baseName,
 			StartTimestamp:        opts.Start,
@@ -549,11 +633,14 @@ Doğrulama için TÜBİTAK KamuSM doğrulayıcı veya LogSeal dahili doğrulayı
 		}
 		if err := e.pgDB.CreateArchiveRecord(ctx, rec); err == nil {
 			result.ArchiveRecord = rec
+			notify("REGISTERING", 99, "PostgreSQL tescil işlemi tamamlandı.", recordCount, int64(estimatedCount))
 		} else {
 			log.Printf("[Custom Export] Registering in pg catalog warning: %v", err)
+			notify("REGISTERING", 99, "PostgreSQL kayıt uyarısı: "+err.Error(), recordCount, int64(estimatedCount))
 		}
 	}
 
+	notify("COMPLETED", 100, fmt.Sprintf("Dışa aktarma ve mühürleme tamamlandı! Toplam %d kayıt arşivlendi.", recordCount), recordCount, int64(estimatedCount))
 	return result, nil
 }
 

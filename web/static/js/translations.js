@@ -3,7 +3,7 @@ const translations = {
     tr: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.3.5",
+        app_version: "v1.3.6",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         view_title_dashboard: "Operasyon & Güvenlik Paneli",
@@ -219,8 +219,11 @@ const translations = {
         export_seal_checkbox: "TÜBİTAK KamuSM / Yerel Kriptografik Zaman Damgası ile mühürle (.zd oluştur)",
         export_register_checkbox: "Bu aralığı kalıcı Sistem Arşivleri listesine kaydet",
         btn_export_submit: "Hemen Oluştur ve İndir",
-        btn_cancel: "İptal",
+        btn_cancel: "Kapat",
         export_loading: "Loglar ClickHouse'dan çekiliyor ve mühürleniyor, lütfen bekleyin...",
+        export_live_title: "Sunucu İşlem Günlüğü (Canlı Terminal)",
+        export_btn_redownload: "Dosyayı Tekrar İndir",
+        export_success_title: "Dışa aktarma ve mühürleme başarıyla tamamlandı!",
 
         // Settings
         settings_title: "5651 Sayılı Kanun & TÜBİTAK Zaman Damgası Yapılandırması",
@@ -267,7 +270,7 @@ const translations = {
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.3.5",
+        app_version: "v1.3.6",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         view_title_dashboard: "Operations & Security Dashboard",
@@ -483,8 +486,11 @@ const translations = {
         export_seal_checkbox: "Cryptographically seal with TÜBİTAK KamuSM / Local Authority (generate .zd proof)",
         export_register_checkbox: "Register this export in the permanent System Archives catalog",
         btn_export_submit: "Generate & Download Now",
-        btn_cancel: "Cancel",
+        btn_cancel: "Close",
         export_loading: "Querying ClickHouse and applying cryptographic seal, please wait...",
+        export_live_title: "Server Activity Stream (Live Terminal)",
+        export_btn_redownload: "Re-download File",
+        export_success_title: "Export and cryptographic sealing completed successfully!",
 
         // Settings
         settings_title: "Law No. 5651 & TÜBİTAK Timestamping Configuration",

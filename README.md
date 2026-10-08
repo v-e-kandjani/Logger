@@ -262,6 +262,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.3.6** (Real-Time Export & Sealing Progress Terminal, Background Job Engine & Zero-Drop Streamers):
+  - **Live Server Activity Terminal & Progress Tracking**: Integrated real-time stage badges, percentage progress meters, and glowing terminal consoles inside the Custom Date & Time Range Log Export & Seal modal (`#custom-export-modal`), streaming every backend operation in real-time.
+  - **Asynchronous Export Job Manager**: Offloaded long-running multi-range log extractions and sealing into decoupled background goroutines (`POST /api/v1/archives/export-custom/start`), eliminating 60s HTTP request aborts and preventing browser hangs on large datasets (100k+ logs).
+  - **Server-Sent Events (SSE) Live Feed**: Added `/api/v1/archives/export-custom/progress` SSE stream broadcasting granular stage transitions (`INITIALIZING`, `QUERYING`, `EXTRACTING`, `STREAMING`, `HASHING`, `STAMPING`, `PACKAGING`, `REGISTERING`, `COMPLETED`), record counts, and timestamped console output with automatic proxy keep-alives.
+  - **HTTP Write-Timeout Zero-Drop Streaming**: Configured `write_timeout: 0s` and per-connection `http.ResponseController.SetWriteDeadline` across all streaming and archive download handlers, preventing connection severance during multi-minute queries and multi-gigabyte bundle transfers.
+  - **Instant Post-Seal Auto-Download**: Automatically initiates the browser file download upon task completion while displaying full cryptographic audit metadata (record counts, file size, SHA-256 hash, KamuSM RFC 3161 evidence status) and one-click re-download options.
 - **v1.3.5** (Fortinet Traffic Actions Normalization & Clean API 401 Session Handling):
   - **Fortinet Session Teardown & Close Normalization**: Expanded `normalizeFortinet` to natively recognize FortiOS traffic session outcomes `client-rst`, `server-rst`, `close`, `timeout`, and `ip-conn`, accurately normalizing them to `network / connection-allowed` and preventing unclassified network events.
   - **Embedded Device Name Attribution**: Extracts `devname` from Fortinet syslog payloads (e.g. `devname="FGT-1"`) into `NormalizedEvent.DeviceName`.

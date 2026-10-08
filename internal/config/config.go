@@ -123,8 +123,8 @@ func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
 			ListenAddr:    "0.0.0.0:8080",
-			ReadTimeout:   15 * time.Second,
-			WriteTimeout:  15 * time.Second,
+			ReadTimeout:   60 * time.Second,
+			WriteTimeout:  0, // 0 allows long-running SSE streams, WebSocket, and large log archive downloads
 			CollectorNode: "node-01",
 		},
 		Syslog: SyslogConfig{

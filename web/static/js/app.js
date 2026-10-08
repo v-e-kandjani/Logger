@@ -1485,8 +1485,39 @@ function initCustomExportModal() {
     const btnClose = document.getElementById('btn-close-export-modal');
     const btnCancel = document.getElementById('btn-cancel-export-modal');
     const btnExecute = document.getElementById('btn-execute-export');
+    const livePanel = document.getElementById('export-live-panel');
+    const stageBadge = document.getElementById('export-stage-badge');
+    const stageText = document.getElementById('export-stage-text');
+    const percentEl = document.getElementById('export-progress-percent');
+    const fillEl = document.getElementById('export-progress-fill');
+    const msgEl = document.getElementById('export-progress-msg');
+    const consoleLog = document.getElementById('export-console-log');
+    const consoleStats = document.getElementById('export-console-stats');
+    const successBox = document.getElementById('export-success-box');
+    const successDetails = document.getElementById('export-success-details');
+    const btnRedownload = document.getElementById('export-btn-redownload');
     const statusAlert = document.getElementById('export-status-alert');
-    const statusText = document.getElementById('export-status-text');
+
+    const formatBytes = (bytes) => {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    const addExportLog = (lineText, type = 'info') => {
+        if (!consoleLog) return;
+        const line = document.createElement('div');
+        line.className = 'upd-log-line';
+        if (type === 'error') line.style.color = '#ef4444';
+        else if (type === 'success') line.style.color = '#10b981';
+        else if (type === 'warn') line.style.color = '#f59e0b';
+        line.textContent = lineText;
+        consoleLog.appendChild(line);
+        consoleLog.scrollTop = consoleLog.scrollHeight;
+        if (consoleStats) consoleStats.textContent = `${consoleLog.children.length} log`;
+    };
 
     const openModal = () => {
         const now = new Date();
@@ -1499,8 +1530,8 @@ function initCustomExportModal() {
 
         const startInput = document.getElementById('export-start-time');
         const endInput = document.getElementById('export-end-time');
-        if (startInput) startInput.value = formatForInput(start);
-        if (endInput) endInput.value = formatForInput(now);
+        if (startInput && !startInput.value) startInput.value = formatForInput(start);
+        if (endInput && !endInput.value) endInput.value = formatForInput(now);
 
         if (statusAlert) statusAlert.style.display = 'none';
         modal.style.display = 'flex';
@@ -1540,14 +1571,30 @@ function initCustomExportModal() {
             const seal = document.getElementById('export-seal-check').checked;
             const register = document.getElementById('export-register-check').checked;
 
-            btnExecute.disabled = true;
-            if (statusAlert && statusText) {
-                statusText.textContent = window.i18n ? window.i18n.t('export_loading') : 'Loglar hazırlanıyor ve mühürleniyor...';
-                statusAlert.style.display = 'block';
+            // Activate live progress panel
+            if (livePanel) livePanel.style.display = 'block';
+            if (successBox) successBox.style.display = 'none';
+            if (fillEl) fillEl.style.width = '2%';
+            if (percentEl) percentEl.textContent = '2%';
+            if (stageBadge) {
+                stageBadge.className = 'badge badge-info';
+                stageBadge.textContent = 'BAŞLATILIYOR';
             }
+            if (stageText) stageText.textContent = 'Sunucuya bağlanılıyor...';
+            if (msgEl) msgEl.textContent = 'Dışa aktarma görevi başlatılıyor...';
+
+            if (consoleLog) {
+                consoleLog.innerHTML = `<div class="upd-log-line" style="color: var(--text-muted);">[${new Date().toLocaleTimeString()}] Dışa aktarma oturumu başlatıldı.</div>`;
+            }
+            if (consoleStats) consoleStats.textContent = '1 log';
+
+            btnExecute.disabled = true;
+            btnExecute.textContent = 'İşlem Yürütülüyor...';
 
             try {
-                const res = await fetch('/api/v1/archives/export-custom', {
+                addExportLog(`[${new Date().toLocaleTimeString()}] İstek sunucuya gönderiliyor (POST /api/v1/archives/export-custom/start)...`);
+
+                const startRes = await fetch('/api/v1/archives/export-custom/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1560,27 +1607,177 @@ function initCustomExportModal() {
                     })
                 });
 
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Dışa aktarma oluşturulamadı');
+                if (!startRes.ok) {
+                    const errData = await startRes.json().catch(() => ({}));
+                    throw new Error(errData.error || `Sunucu hatası: HTTP ${startRes.status}`);
+                }
 
-                // Trigger direct file download
-                if (data.download_url) {
+                const jobData = await startRes.json();
+                const jobId = jobData.job_id;
+                addExportLog(`[${new Date().toLocaleTimeString()}] İş kuyruğa alındı (İş ID: ${jobId}). Canlı işlem günlüğü dinleniyor...`);
+
+                // Listen to SSE progress stream
+                const streamUrl = `/api/v1/archives/export-custom/progress?job_id=${encodeURIComponent(jobId)}`;
+                const progressRes = await fetch(streamUrl, {
+                    headers: { 'Accept': 'text/event-stream' }
+                });
+
+                if (!progressRes.ok) {
+                    throw new Error(`Canlı akışa bağlanılamadı: HTTP ${progressRes.status}`);
+                }
+
+                const seenLogs = new Set();
+                let lastSnap = null;
+
+                const handleSnapshot = (snap) => {
+                    if (!snap) return;
+                    lastSnap = snap;
+
+                    // Update percentage and track
+                    const pct = Math.min(100, Math.max(0, snap.percent || 0));
+                    if (fillEl) fillEl.style.width = `${pct}%`;
+                    if (percentEl) percentEl.textContent = `${pct}%`;
+
+                    // Update stage badge
+                    if (stageBadge && snap.stage) {
+                        stageBadge.textContent = snap.stage;
+                        if (snap.status === 'FAILED' || snap.stage === 'FAILED') {
+                            stageBadge.className = 'badge badge-danger';
+                        } else if (snap.status === 'COMPLETED' || snap.stage === 'COMPLETED') {
+                            stageBadge.className = 'badge badge-success';
+                        } else {
+                            stageBadge.className = 'badge badge-info';
+                        }
+                    }
+
+                    // Update stage text and active message
+                    if (stageText && snap.stage_text) {
+                        stageText.textContent = snap.stage_text;
+                    }
+                    if (msgEl && snap.latest_log) {
+                        msgEl.textContent = snap.latest_log;
+                    }
+
+                    // Append any new log lines
+                    if (snap.logs && Array.isArray(snap.logs)) {
+                        snap.logs.forEach(logLine => {
+                            if (!seenLogs.has(logLine)) {
+                                seenLogs.add(logLine);
+                                const isErr = logLine.includes('HATA') || logLine.includes('FAILED');
+                                const isSuccess = logLine.includes('başarıyla') || logLine.includes('hazır') || logLine.includes('Tamamlandı');
+                                addExportLog(logLine, isErr ? 'error' : isSuccess ? 'success' : 'info');
+                            }
+                        });
+                    }
+                };
+
+                if (progressRes.body && progressRes.body.getReader) {
+                    const reader = progressRes.body.getReader();
+                    const decoder = new TextDecoder('utf-8');
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const blocks = buffer.split('\n\n');
+                        buffer = blocks.pop(); // Keep unfinished tail
+
+                        for (const block of blocks) {
+                            const trimmed = block.trim();
+                            if (!trimmed || trimmed.startsWith(':')) continue; // skip comments / pings
+
+                            for (const line of trimmed.split('\n')) {
+                                if (line.startsWith('data:')) {
+                                    try {
+                                        const snap = JSON.parse(line.substring(5).trim());
+                                        handleSnapshot(snap);
+                                    } catch (e) {
+                                        // json parse err
+                                    }
+                                }
+                            }
+                        }
+
+                        if (lastSnap && (lastSnap.status === 'COMPLETED' || lastSnap.status === 'FAILED')) {
+                            break;
+                        }
+                    }
+                } else {
+                    // Fallback polling loop if getReader is unavailable
+                    let isDone = false;
+                    while (!isDone) {
+                        await new Promise(r => setTimeout(r, 1500));
+                        const pollRes = await fetch(`/api/v1/archives/export-custom/status?job_id=${encodeURIComponent(jobId)}`);
+                        if (pollRes.ok) {
+                            const snap = await pollRes.json();
+                            handleSnapshot(snap);
+                            if (snap.status === 'COMPLETED' || snap.status === 'FAILED') {
+                                isDone = true;
+                            }
+                        }
+                    }
+                }
+
+                // Handle completion
+                if (lastSnap && lastSnap.status === 'COMPLETED') {
+                    if (fillEl) fillEl.style.width = '100%';
+                    if (percentEl) percentEl.textContent = '100%';
+                    if (stageBadge) {
+                        stageBadge.className = 'badge badge-success';
+                        stageBadge.textContent = 'TAMAMLANDI';
+                    }
+                    if (stageText) stageText.textContent = 'Dışa aktarma ve mühürleme tamamlandı!';
+                    if (msgEl) msgEl.textContent = 'Dosya indiriliyor...';
+
+                    const downloadUrl = lastSnap.download_url || `/api/v1/archives/export-custom/download?job_id=${encodeURIComponent(jobId)}`;
+
+                    // Trigger direct file download
+                    addExportLog(`[${new Date().toLocaleTimeString()}] İndirme bağlantısı tetikleniyor: ${downloadUrl}`, 'success');
                     const downloadAnchor = document.createElement('a');
-                    downloadAnchor.href = data.download_url;
+                    downloadAnchor.href = downloadUrl;
                     downloadAnchor.setAttribute('download', '');
                     document.body.appendChild(downloadAnchor);
                     downloadAnchor.click();
                     document.body.removeChild(downloadAnchor);
-                }
 
-                alert(`Dışa aktarma ve mühürleme tamamlandı!\nKayıt: ${data.result.record_count} adet\nDurum: ${data.result.timestamp_status}`);
-                closeModal();
-                loadArchives();
+                    // Show success details box
+                    if (successBox) {
+                        successBox.style.display = 'flex';
+                        if (successDetails && lastSnap.result) {
+                            const r = lastSnap.result;
+                            successDetails.innerHTML = `
+                                <div><strong>Kayıt Adedi:</strong> ${Number(r.record_count || 0).toLocaleString()} adet</div>
+                                <div><strong>Dosya Boyutu:</strong> ${formatBytes(r.archive_size)}</div>
+                                <div><strong>SHA-256 Hash:</strong> <span style="font-size: 11px; word-break: break-all;">${r.hash_sha256}</span></div>
+                                <div><strong>Zaman Damgası:</strong> <span class="badge ${r.timestamp_status === 'STAMPED' ? 'badge-success' : 'badge-warning'}">${r.timestamp_status}</span></div>
+                            `;
+                        }
+                        if (btnRedownload) {
+                            btnRedownload.href = downloadUrl;
+                        }
+                    }
+
+                    if (typeof loadArchives === 'function') {
+                        loadArchives();
+                    }
+                    btnExecute.textContent = 'Yeni Dışa Aktarma Yap';
+                } else if (lastSnap && lastSnap.status === 'FAILED') {
+                    throw new Error(lastSnap.error || 'Dışa aktarma sırasında bir hata oluştu');
+                }
             } catch (err) {
-                alert('Hata: ' + err.message);
+                addExportLog(`[${new Date().toLocaleTimeString()}] HATA: ${err.message}`, 'error');
+                if (stageBadge) {
+                    stageBadge.className = 'badge badge-danger';
+                    stageBadge.textContent = 'HATA';
+                }
+                if (stageText) stageText.textContent = 'İşlem Başarısız';
+                if (msgEl) msgEl.textContent = err.message;
+                alert('Dışa aktarma hatası: ' + err.message);
+                btnExecute.textContent = 'Tekrar Dene';
             } finally {
                 btnExecute.disabled = false;
-                if (statusAlert) statusAlert.style.display = 'none';
             }
         });
     }

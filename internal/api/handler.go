@@ -45,6 +45,7 @@ type Handler struct {
 	metricsCollector *metrics.Collector
 	mitreCatalog     *mitre.Catalog
 	syslogServer     *listener.Server
+	exportJobMgr     *archive.ExportJobManager
 	nodeName         string
 	sessions         *SessionManager
 
@@ -76,6 +77,7 @@ func NewHandler(
 		tsProvider:       ts,
 		metricsCollector: mc,
 		mitreCatalog:     mitre.NewCatalog(),
+		exportJobMgr:     archive.NewExportJobManager(ae),
 		nodeName:         node,
 		sessions:         NewSessionManager(),
 	}
@@ -139,6 +141,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/archives/create", h.requireAuth(h.handleCreateArchiveNow))
 	mux.HandleFunc("/api/v1/archives/download", h.requireAuth(h.handleDownloadArchive))
 	mux.HandleFunc("/api/v1/archives/export-custom", h.requireAuth(h.handleExportCustomRange))
+	mux.HandleFunc("/api/v1/archives/export-custom/start", h.requireAuth(h.handleExportCustomStart))
+	mux.HandleFunc("/api/v1/archives/export-custom/progress", h.requireAuth(h.handleExportCustomProgress))
+	mux.HandleFunc("/api/v1/archives/export-custom/status", h.requireAuth(h.handleExportCustomStatus))
+	mux.HandleFunc("/api/v1/archives/export-custom/download", h.requireAuth(h.handleExportCustomDownload))
 	mux.HandleFunc("/api/v1/system/storage", h.requireAuth(h.handleStorageStats))
 	mux.HandleFunc("/api/v1/system/storage/prune", h.requireAuth(h.handleStoragePrune))
 	mux.HandleFunc("/api/v1/settings", h.requireAuth(h.handleSettings))
@@ -1042,9 +1048,215 @@ func parseFlexibleTime(s string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("unable to parse datetime: %s", s)
 }
 
+func (h *Handler) handleExportCustomStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Start     string `json:"start"`
+		End       string `json:"end"`
+		TimeField string `json:"time_field"`
+		Format    string `json:"format"`
+		Seal      *bool  `json:"seal"`
+		Register  *bool  `json:"register"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request payload: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.Start == "" || req.End == "" {
+		http.Error(w, "start and end dates are required", http.StatusBadRequest)
+		return
+	}
+
+	startTime, err := parseFlexibleTime(req.Start)
+	if err != nil {
+		http.Error(w, "invalid start datetime: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	endTime, err := parseFlexibleTime(req.End)
+	if err != nil {
+		http.Error(w, "invalid end datetime: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	timeField := req.TimeField
+	if timeField != "received_at" {
+		timeField = "event_timestamp"
+	}
+	format := req.Format
+	if format == "" {
+		format = "bundle"
+	}
+
+	seal := true
+	if req.Seal != nil {
+		seal = *req.Seal
+	}
+	register := true
+	if req.Register != nil {
+		register = *req.Register
+	}
+
+	opts := archive.CustomRangeOptions{
+		Start:     startTime,
+		End:       endTime,
+		TimeField: timeField,
+		Format:    format,
+		Seal:      seal,
+		Register:  register,
+	}
+
+	job, err := h.exportJobMgr.StartJob(opts)
+	if err != nil {
+		http.Error(w, "starting export job: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"job_id":       job.ID,
+		"status":       job.Status,
+		"progress_url": fmt.Sprintf("/api/v1/archives/export-custom/progress?job_id=%s", job.ID),
+		"status_url":   fmt.Sprintf("/api/v1/archives/export-custom/status?job_id=%s", job.ID),
+		"download_url": fmt.Sprintf("/api/v1/archives/export-custom/download?job_id=%s", job.ID),
+	})
+}
+
+func (h *Handler) handleExportCustomProgress(w http.ResponseWriter, r *http.Request) {
+	jobID := r.URL.Query().Get("job_id")
+	if jobID == "" {
+		http.Error(w, "missing job_id parameter", http.StatusBadRequest)
+		return
+	}
+
+	flusher, isFlusher := w.(http.Flusher)
+	if !isFlusher {
+		http.Error(w, "streaming not supported", http.StatusBadRequest)
+		return
+	}
+
+	// Disable write deadline for persistent SSE streaming
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
+
+	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	subCh, unsubscribe, ok := h.exportJobMgr.Subscribe(jobID)
+	if !ok {
+		http.Error(w, "job not found", http.StatusNotFound)
+		return
+	}
+	defer unsubscribe()
+
+	flusher.Flush()
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case snap, open := <-subCh:
+			if !open {
+				return
+			}
+			data, err := json.Marshal(snap)
+			if err == nil {
+				fmt.Fprintf(w, "data: %s\n\n", string(data))
+				flusher.Flush()
+			}
+			if snap.Status == archive.JobStatusCompleted || snap.Status == archive.JobStatusFailed {
+				return
+			}
+		case <-ticker.C:
+			// Ping keep-alive comment
+			fmt.Fprintf(w, ": ping\n\n")
+			flusher.Flush()
+		}
+	}
+}
+
+func (h *Handler) handleExportCustomStatus(w http.ResponseWriter, r *http.Request) {
+	jobID := r.URL.Query().Get("job_id")
+	if jobID == "" {
+		http.Error(w, "missing job_id parameter", http.StatusBadRequest)
+		return
+	}
+
+	job, ok := h.exportJobMgr.GetJob(jobID)
+	if !ok {
+		http.Error(w, "job not found", http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, job.Snapshot())
+}
+
+func (h *Handler) handleExportCustomDownload(w http.ResponseWriter, r *http.Request) {
+	jobID := r.URL.Query().Get("job_id")
+	if jobID == "" {
+		http.Error(w, "missing job_id parameter", http.StatusBadRequest)
+		return
+	}
+
+	job, ok := h.exportJobMgr.GetJob(jobID)
+	if !ok {
+		http.Error(w, "export job not found", http.StatusNotFound)
+		return
+	}
+
+	snap := job.Snapshot()
+	if snap.Status != archive.JobStatusCompleted {
+		http.Error(w, "export job not completed yet (current: "+string(snap.Status)+")", http.StatusBadRequest)
+		return
+	}
+
+	if snap.Result == nil || snap.Result.FilePath == "" {
+		http.Error(w, "export result file is missing", http.StatusInternalServerError)
+		return
+	}
+
+	targetFile := snap.Result.FilePath
+	if _, err := os.Stat(targetFile); os.IsNotExist(err) {
+		http.Error(w, "export file not found on disk: "+filepath.Base(targetFile), http.StatusNotFound)
+		return
+	}
+
+	// Disable write deadline for large file downloads
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
+
+	filename := filepath.Base(targetFile)
+	switch snap.Result.Format {
+	case "bundle":
+		w.Header().Set("Content-Type", "application/zip")
+	case "csv":
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	default:
+		w.Header().Set("Content-Type", "application/gzip")
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	http.ServeFile(w, r, targetFile)
+}
+
 func (h *Handler) handleExportCustomRange(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := contextWithTimeout(r, 60*time.Second)
-	defer cancel()
+	// If a job_id is provided for downloading pre-generated export
+	if jobID := r.URL.Query().Get("job_id"); jobID != "" {
+		h.handleExportCustomDownload(w, r)
+		return
+	}
+
+	// Disable write timeout on response
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Time{})
 
 	var startStr, endStr, timeField, format string
 	seal := true
@@ -1058,6 +1270,7 @@ func (h *Handler) handleExportCustomRange(w http.ResponseWriter, r *http.Request
 			Format    string `json:"format"`
 			Seal      *bool  `json:"seal"`
 			Register  *bool  `json:"register"`
+			Async     *bool  `json:"async"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
 			startStr = req.Start
@@ -1069,6 +1282,37 @@ func (h *Handler) handleExportCustomRange(w http.ResponseWriter, r *http.Request
 			}
 			if req.Register != nil {
 				register = *req.Register
+			}
+			// If async is not explicitly false, delegate to start endpoint
+			if req.Async == nil || *req.Async {
+				startTime, sErr := parseFlexibleTime(startStr)
+				endTime, eErr := parseFlexibleTime(endStr)
+				if sErr == nil && eErr == nil {
+					if timeField != "received_at" {
+						timeField = "event_timestamp"
+					}
+					if format == "" {
+						format = "bundle"
+					}
+					job, err := h.exportJobMgr.StartJob(archive.CustomRangeOptions{
+						Start:     startTime,
+						End:       endTime,
+						TimeField: timeField,
+						Format:    format,
+						Seal:      seal,
+						Register:  register,
+					})
+					if err == nil {
+						writeJSON(w, http.StatusAccepted, map[string]any{
+							"job_id":       job.ID,
+							"status":       job.Status,
+							"progress_url": fmt.Sprintf("/api/v1/archives/export-custom/progress?job_id=%s", job.ID),
+							"status_url":   fmt.Sprintf("/api/v1/archives/export-custom/status?job_id=%s", job.ID),
+							"download_url": fmt.Sprintf("/api/v1/archives/export-custom/download?job_id=%s", job.ID),
+						})
+						return
+					}
+				}
 			}
 		}
 	} else {
@@ -1117,6 +1361,10 @@ func (h *Handler) handleExportCustomRange(w http.ResponseWriter, r *http.Request
 		Seal:      seal,
 		Register:  register,
 	}
+
+	// Use generous 15-minute timeout for synchronous fallback requests
+	ctx, cancel := contextWithTimeout(r, 15*time.Minute)
+	defer cancel()
 
 	res, err := h.archEngine.CreateCustomRangeArchive(ctx, opts)
 	if err != nil {

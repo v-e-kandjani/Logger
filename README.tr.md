@@ -251,6 +251,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ## Sürüm Geçmişi (Release History)
 
+- **v1.3.6** (Canlı Dışa Aktarma & Mühürleme Terminali, Asenkron İş Motoru & Kesintisiz Veri Akışı):
+  - **Canlı Sunucu İşlem Terminali & Aşama Takibi**: Özel Tarih & Saat Aralığında Log İndir ve Mühürle modalı (`#custom-export-modal`) içerisine gerçek zamanlı aşama rozetleri, yüzdelik ilerleme çubuğu ve koyu temalı terminal işlem günlüğü entegre edildi; sunucunun her adımı anlık olarak izlenebilir kılındı.
+  - **Asenkron Dışa Aktarma İş Yöneticisi**: Uzun süren geniş tarih aralıklı log çekme ve mühürleme işlemleri bağımsız arka plan goroutine'lerine taşındı (`POST /api/v1/archives/export-custom/start`); 60 saniyelik HTTP kesilmeleri ve yüz binlerce log içeren sorgularda tarayıcının askıda kalması önlendi.
+  - **Server-Sent Events (SSE) Canlı İlerleme Akışı**: `/api/v1/archives/export-custom/progress` uç noktası üzerinden anlık aşama geçişleri (`INITIALIZING`, `QUERYING`, `EXTRACTING`, `STREAMING`, `HASHING`, `STAMPING`, `PACKAGING`, `REGISTERING`, `COMPLETED`), kayıt sayıları ve zaman damgalı terminal çıktıları proxy canlı tutma (ping) paketleriyle kesintisiz iletildi.
+  - **Sıfır Kesintili HTTP Yazma Zaman Aşımı Desteği**: Sunucu yapılandırmasında `write_timeout: 0s` ve SSE ile arşiv indirme rotalarında bağlantı bazlı `http.ResponseController.SetWriteDeadline` uygulanarak dakikalar süren sorgu ve gigabaytlarca büyük paket indirmelerinde bağlantının kopması engellendi.
+  - **Mühürleme Sonrası Otomatik İndirme**: Mühürleme ve paketleme tamamlandığı anda tarayıcı dosya indirme tetikleyicisi otomatik olarak çalıştırılır; ekranda tam kriptografik denetim metaverileri (kayıt adedi, dosya boyutu, SHA-256 özeti, KamuSM RFC 3161 durumu) ve tek tıkla tekrar indirme bağlantısı sunulur.
 - **v1.3.5** (Fortinet Trafik Olayları Normalizasyonu & Temiz API 401 Oturum Yönetimi):
   - **Fortinet Oturum Kapanış & Reset Normalizasyonu**: `normalizeFortinet` fonksiyonuna FortiOS trafik aksiyonları `client-rst`, `server-rst`, `close`, `timeout` ve `ip-conn` durumları eklenerek `network / connection-allowed` sınıfına doğru şekilde normalize edilmesi sağlandı.
   - **Gömülü Cihaz Adı Ayrıştırma**: Fortinet loglarındaki `devname` anahtarı (örn. `devname="FGT-1"`) doğrudan `NormalizedEvent.DeviceName` alanına aktarılarak varlık kimliği netleştirildi.
