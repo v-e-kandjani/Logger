@@ -52,6 +52,11 @@ type Handler struct {
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
 	lastManualArchive time.Time
+
+	statsCacheMu    sync.RWMutex
+	lastStatsTime   time.Time
+	cachedLogsToday uint64
+	cachedStorage   *clickhouse.StorageStats
 }
 
 func (h *Handler) SetSyslogServer(s *listener.Server) {
@@ -239,20 +244,38 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	unreg, _ := h.pgDB.ListUnregisteredSources(ctx)
 	archives, _ := h.pgDB.ListArchives(ctx, 5)
 
-	// Query today's logs from ClickHouse (match either event_timestamp or received_at to protect against device clock drift)
-	todayStart := time.Now().UTC().Truncate(24 * time.Hour)
+	// Query today's logs and storage metrics from ClickHouse (cached for 10s to prevent disk query thrashing)
 	var countToday uint64
-	countQuery := fmt.Sprintf("SELECT count() FROM %s.syslog_events WHERE event_timestamp >= ? OR received_at >= ?", h.chClient.Database())
-	row, err := h.chClient.QueryEvents(ctx, countQuery, todayStart, todayStart)
-	if err == nil && row != nil {
-		defer row.Close()
-		if row.Next() {
-			_ = row.Scan(&countToday)
-		}
-	}
+	var storageStats *clickhouse.StorageStats
 
-	// Storage metrics from ClickHouse
-	storageStats, _ := h.chClient.GetStorageStats(ctx)
+	h.statsCacheMu.RLock()
+	cacheValid := time.Since(h.lastStatsTime) < 10*time.Second && h.cachedStorage != nil
+	if cacheValid {
+		countToday = h.cachedLogsToday
+		storageStats = h.cachedStorage
+	}
+	h.statsCacheMu.RUnlock()
+
+	if !cacheValid {
+		todayStart := time.Now().UTC().Truncate(24 * time.Hour)
+		// Partition-pruned count query on event_timestamp
+		countQuery := fmt.Sprintf("SELECT count() FROM %s.syslog_events WHERE event_timestamp >= ?", h.chClient.Database())
+		row, err := h.chClient.QueryEvents(ctx, countQuery, todayStart)
+		if err == nil && row != nil {
+			if row.Next() {
+				_ = row.Scan(&countToday)
+			}
+			row.Close()
+		}
+
+		storageStats, _ = h.chClient.GetStorageStats(ctx)
+
+		h.statsCacheMu.Lock()
+		h.lastStatsTime = time.Now()
+		h.cachedLogsToday = countToday
+		h.cachedStorage = storageStats
+		h.statsCacheMu.Unlock()
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"logs_today":              countToday,

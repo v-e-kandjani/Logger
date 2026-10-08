@@ -53,6 +53,10 @@ type Pipeline struct {
 
 	// SIEM Detection & Normalization Engine
 	siemEngine *correlation.Engine
+	siemQueue  chan *models.LogEvent
+
+	// Cooldown cache for rate-limiting PostgreSQL device metadata writes
+	lastDeviceSeen sync.Map
 }
 
 func NewPipeline(
@@ -72,6 +76,7 @@ func NewPipeline(
 
 	return &Pipeline{
 		inQueue:     make(chan RawPacket, capacity),
+		siemQueue:   make(chan *models.LogEvent, 65536),
 		parser:      parser.NewUniversalParser(nodeName),
 		chClient:    chClient,
 		deviceCache: deviceCache,
@@ -118,6 +123,23 @@ func (p *Pipeline) Start() {
 		p.wg.Add(1)
 		go p.workerLoop()
 	}
+	// Start decoupled SIEM background consumer
+	p.wg.Add(1)
+	go p.siemWorkerLoop()
+}
+
+func (p *Pipeline) siemWorkerLoop() {
+	defer p.wg.Done()
+	for {
+		select {
+		case <-p.stopCh:
+			return
+		case event := <-p.siemQueue:
+			if p.siemEngine != nil {
+				p.siemEngine.ProcessLogEvent(event)
+			}
+		}
+	}
 }
 
 func (p *Pipeline) workerLoop() {
@@ -143,6 +165,14 @@ func (p *Pipeline) workerLoop() {
 				continue
 			}
 
+			// Cooldown rate-limiting: only persist device metadata updates to PostgreSQL once every 30 seconds per source
+			now := time.Now()
+			shouldUpdateDB := false
+			if last, ok := p.lastDeviceSeen.Load(ipStr); !ok || now.Sub(last.(time.Time)) > 30*time.Second {
+				p.lastDeviceSeen.Store(ipStr, now)
+				shouldUpdateDB = true
+			}
+
 			// Device Enrichment via in-memory DeviceCache
 			if found {
 				event.DeviceID = dev.ID
@@ -166,12 +196,14 @@ func (p *Pipeline) workerLoop() {
 					detection := detector.Detect(event.RawMessage, event.Hostname, event.ApplicationName)
 					event.Product = detection.DeviceType
 				}
-				// Asynchronously update last_seen_at in postgres
-				go func(ip string) {
-					ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-					defer cancel()
-					_ = p.pgDB.UpdateDeviceLastSeen(ctx, ip, time.Now())
-				}(ipStr)
+				// Asynchronously update last_seen_at in postgres (rate-limited)
+				if shouldUpdateDB {
+					go func(ip string) {
+						ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+						defer cancel()
+						_ = p.pgDB.UpdateDeviceLastSeen(ctx, ip, time.Now())
+					}(ipStr)
+				}
 			} else {
 				// Permissive mode: auto-discovery with deep device type & vendor fingerprinting
 				event.DeviceID = uuid.Nil
@@ -198,22 +230,24 @@ func (p *Pipeline) workerLoop() {
 					event.Product = detection.DeviceType
 				}
 
-				// Fire-and-forget record unknown sender with auto-discovered metadata
-				go func(ip, host, vendor, devType, conf, sample, fac, sev string) {
-					ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-					defer cancel()
-					_ = p.pgDB.RecordUnregisteredSource(ctx, &models.UnregisteredSource{
-						IPAddress:        ip,
-						Hostname:         host,
-						DetectedVendor:   vendor,
-						DetectedType:     devType,
-						Confidence:       conf,
-						LastSeenAt:       time.Now(),
-						LastRawSample:    sample,
-						DetectedFacility: fac,
-						DetectedSeverity: sev,
-					})
-				}(ipStr, detection.Hostname, detection.Vendor, detection.DeviceType, detection.Confidence, event.RawMessage, event.Facility, event.Severity)
+				// Fire-and-forget record unknown sender with auto-discovered metadata (rate-limited)
+				if shouldUpdateDB {
+					go func(ip, host, vendor, devType, conf, sample, fac, sev string) {
+						ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+						defer cancel()
+						_ = p.pgDB.RecordUnregisteredSource(ctx, &models.UnregisteredSource{
+							IPAddress:        ip,
+							Hostname:         host,
+							DetectedVendor:   vendor,
+							DetectedType:     devType,
+							Confidence:       conf,
+							LastSeenAt:       time.Now(),
+							LastRawSample:    sample,
+							DetectedFacility: fac,
+							DetectedSeverity: sev,
+						})
+					}(ipStr, detection.Hostname, detection.Vendor, detection.DeviceType, detection.Confidence, event.RawMessage, event.Facility, event.Severity)
+				}
 			}
 
 			p.EventsParsed.Add(1)
@@ -226,9 +260,13 @@ func (p *Pipeline) workerLoop() {
 			// 2. Broadcast to connected Live Stream clients (non-blocking)
 			p.broadcast(event)
 
-			// 3. Evaluate in SIEM correlation & normalization engine
+			// 3. Evaluate in SIEM correlation & normalization engine (non-blocking decoupled ring buffer)
 			if p.siemEngine != nil {
-				p.siemEngine.ProcessLogEvent(event)
+				select {
+				case p.siemQueue <- event:
+				default:
+					// Ring buffer saturated during heavy spike; avoid blocking ingestion pipeline
+				}
 			}
 		}
 	}

@@ -30,7 +30,7 @@ func NewNormalizer() *Normalizer {
 // Normalize inspects a raw or partially parsed LogEvent and produces a standardized SIEM event
 func (n *Normalizer) Normalize(event *models.LogEvent) *models.NormalizedEvent {
 	norm := &models.NormalizedEvent{
-		EventID:         uuid.New(),
+		EventID:         uuid.Nil,
 		Timestamp:       event.EventTimestamp,
 		ReceivedAt:      event.ReceivedAt,
 		DeviceID:        event.DeviceID,
@@ -102,33 +102,82 @@ func (n *Normalizer) normalizeFortinet(event *models.LogEvent, norm *models.Norm
 	}
 
 	action := strings.ToLower(kv["action"])
-	logType := strings.ToLower(kv["type"])
 	subtype := strings.ToLower(kv["subtype"])
+	eventtype := strings.ToLower(kv["eventtype"])
 
 	switch {
-	case logType == "utm" || subtype == "ips" || subtype == "virus" || subtype == "waf":
+	// 1. Explicit Intrusion / Malware / Threat Subtypes
+	case subtype == "ips" || subtype == "virus" || subtype == "antivirus" || subtype == "waf" || kv["attack"] != "" || kv["virus"] != "":
 		norm.EventCategory = "threat"
-		norm.EventAction = "malware-blocked"
-		norm.EventOutcome = "blocked"
-		norm.Severity = "CRITICAL"
-		norm.RiskScore = 85
+		if action == "drop" || action == "deny" || action == "block" || action == "dropped" || action == "blocked" || action == "reset" {
+			if subtype == "ips" {
+				norm.EventAction = "intrusion-high-priority"
+			} else {
+				norm.EventAction = "malware-blocked"
+			}
+			norm.EventOutcome = "blocked"
+			norm.Severity = "CRITICAL"
+			norm.RiskScore = 85
+		} else {
+			norm.EventAction = "threat-detected"
+			norm.EventOutcome = "detected"
+			norm.Severity = "HIGH"
+			norm.RiskScore = 70
+		}
 		norm.MitreTactic = "Initial Access"
 		norm.MitreTechnique = "T1190"
-	case action == "deny" || action == "block" || action == "drop" || action == "reset":
-		norm.EventCategory = "network"
-		norm.EventAction = "connection-denied"
-		norm.EventOutcome = "blocked"
-		norm.Severity = "WARNING"
-		norm.RiskScore = 30
-		norm.MitreTactic = "Discovery"
-		norm.MitreTechnique = "T1046"
-	case action == "accept" || action == "allow" || action == "permit" ||
-		action == "client-rst" || action == "server-rst" || action == "close" || action == "timeout" || action == "ip-conn":
-		norm.EventCategory = "network"
-		norm.EventAction = "connection-allowed"
-		norm.EventOutcome = "allowed"
-		norm.Severity = "INFORMATIONAL"
-		norm.RiskScore = 5
+
+	// 2. Application Control Subtype (app-ctrl)
+	case subtype == "app-ctrl":
+		if action == "block" || action == "deny" || action == "drop" || action == "reset" {
+			norm.EventCategory = "policy"
+			norm.EventAction = "app-control-blocked"
+			norm.EventOutcome = "blocked"
+			norm.Severity = "WARNING"
+			norm.RiskScore = 30
+			norm.MitreTactic = "Discovery"
+			norm.MitreTechnique = "T1046"
+		} else {
+			norm.EventCategory = "network"
+			norm.EventAction = "app-control-allowed"
+			norm.EventOutcome = "allowed"
+			norm.Severity = "INFORMATIONAL"
+			norm.RiskScore = 5
+		}
+
+	// 3. Web Filtering Subtype (webfilter)
+	case subtype == "webfilter":
+		if action == "block" || action == "deny" {
+			norm.EventCategory = "policy"
+			norm.EventAction = "web-filter-blocked"
+			norm.EventOutcome = "blocked"
+			norm.Severity = "WARNING"
+			norm.RiskScore = 35
+		} else {
+			norm.EventCategory = "network"
+			norm.EventAction = "web-filter-allowed"
+			norm.EventOutcome = "allowed"
+			norm.Severity = "INFORMATIONAL"
+			norm.RiskScore = 5
+		}
+
+	// 4. DNS Filter Subtype (dns)
+	case subtype == "dns":
+		if action == "block" || action == "deny" {
+			norm.EventCategory = "policy"
+			norm.EventAction = "dns-filter-blocked"
+			norm.EventOutcome = "blocked"
+			norm.Severity = "WARNING"
+			norm.RiskScore = 35
+		} else {
+			norm.EventCategory = "network"
+			norm.EventAction = "dns-allowed"
+			norm.EventOutcome = "allowed"
+			norm.Severity = "INFORMATIONAL"
+			norm.RiskScore = 5
+		}
+
+	// 5. Authentication Subtype
 	case subtype == "auth" || strings.Contains(event.RawMessage, "login"):
 		norm.EventCategory = "authentication"
 		if action == "failed" || strings.Contains(strings.ToLower(event.RawMessage), "failed") {
@@ -144,6 +193,27 @@ func (n *Normalizer) normalizeFortinet(event *models.LogEvent, norm *models.Norm
 			norm.Severity = "INFORMATIONAL"
 			norm.RiskScore = 10
 		}
+
+	// 6. Generic Firewall Block / Deny
+	case action == "deny" || action == "block" || action == "drop" || action == "reset":
+		norm.EventCategory = "network"
+		norm.EventAction = "connection-denied"
+		norm.EventOutcome = "blocked"
+		norm.Severity = "WARNING"
+		norm.RiskScore = 30
+		norm.MitreTactic = "Discovery"
+		norm.MitreTechnique = "T1046"
+
+	// 7. Generic Firewall Permit / Accept / RST / Close / Pass
+	case action == "accept" || action == "allow" || action == "permit" || action == "pass" || action == "passthrough" ||
+		action == "client-rst" || action == "server-rst" || action == "close" || action == "timeout" || action == "ip-conn" ||
+		eventtype == "ftgd_allow":
+		norm.EventCategory = "network"
+		norm.EventAction = "connection-allowed"
+		norm.EventOutcome = "allowed"
+		norm.Severity = "INFORMATIONAL"
+		norm.RiskScore = 5
+
 	default:
 		if norm.EventCategory == "" {
 			norm.EventCategory = "network"

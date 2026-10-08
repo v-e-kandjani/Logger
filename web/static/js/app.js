@@ -154,7 +154,7 @@ function startPollingTelemetry() {
         }
     };
     poll();
-    setInterval(poll, 2000);
+    setInterval(poll, 5000);
 }
 
 // Live WebSocket Stream with bounded ring buffer

@@ -113,4 +113,76 @@ func TestNormalizer(t *testing.T) {
 			t.Errorf("expected 443, got %d", norm.DestinationPort)
 		}
 	})
+
+	t.Run("Fortinet UTM App-Ctrl Allowed (User False Positive Sample)", func(t *testing.T) {
+		raw := `<190>date=2026-10-09 time=00:07:20 devname="FGT-1" devid="FG200ETK20907839" eventtime=1791493640783911952 tz="+0300" logid="1059028704" type="utm" subtype="app-ctrl" eventtype="signature" level="information" vd="TEKMAR" appid=15895 srcip=10.21.91.222 srccountry="Reserved" dstip=185.121.124.195 dstcountry="Turkey" srcport=57670 dstport=443 srcintf="Medmar-Vlan-915" srcintfrole="lan" dstintf="port5" dstintfrole="wan" proto=6 service="HTTPS" direction="outgoing" policyid=47 poluuid="e4c783b2-4df5-51f1-cddd-7b50e2139216" policytype="policy" sessionid=1153775136 applist="Medmar-Application-Control" action="pass" appcat="Network.Service" app="SSL" incidentserialno=297439689 msg="Network.Service: SSL" apprisk="elevated"`
+		event := &models.LogEvent{
+			EventTimestamp: time.Now(),
+			Vendor:         "Fortinet",
+			RawMessage:     raw,
+		}
+		norm := n.Normalize(event)
+
+		if norm.EventCategory != "network" {
+			t.Errorf("expected network, got %s", norm.EventCategory)
+		}
+		if norm.EventAction != "app-control-allowed" {
+			t.Errorf("expected app-control-allowed, got %s", norm.EventAction)
+		}
+		if norm.EventOutcome != "allowed" {
+			t.Errorf("expected allowed, got %s", norm.EventOutcome)
+		}
+		if norm.Severity != "INFORMATIONAL" {
+			t.Errorf("expected INFORMATIONAL, got %s", norm.Severity)
+		}
+		if norm.RiskScore != 5 {
+			t.Errorf("expected RiskScore 5, got %d", norm.RiskScore)
+		}
+		if norm.MitreTactic != "" || norm.MitreTechnique != "" {
+			t.Errorf("expected empty MITRE tactic/technique on benign app flow, got %s / %s", norm.MitreTactic, norm.MitreTechnique)
+		}
+	})
+
+	t.Run("Fortinet UTM WebFilter Allowed", func(t *testing.T) {
+		raw := `<189>date=2026-10-09 time=00:39:03 devname="FGT-1" devid="FG200ETK20907839" eventtime=1791495542756106249 tz="+0300" logid="0317013312" type="utm" subtype="webfilter" eventtype="ftgd_allow" level="notice" vd="1WARE" policyid=32 poluuid="2ba79f32-fdf3-51ea-e34e-3827612db846" policytype="policy" sessionid=1154263185 srcip=10.10.200.123 srcport=53765 srccountry="Reserved" srcintf="port4" srcintfrole="lan" srcuuid="51c8ac44-478d-51ec-09c0-5db5ff7c50eb" dstip=20.190.151.37 dstport=443 dstcountry="United States" dstintf="port3" dstintfrole="undefined" dstuuid="bc052d00-7c8b-51e9-2cf1-805c3c127fd2" proto=6 service="HTTPS" hostname="graph.microsoft.com" profile="g-default" action="passthrough" reqtype="direct" url="https://graph.microsoft.com/" sentbyte=207 rcvdbyte=0 direction="outgoing" msg="URL belongs to an allowed category in policy"`
+		event := &models.LogEvent{
+			EventTimestamp: time.Now(),
+			Vendor:         "Fortinet",
+			RawMessage:     raw,
+		}
+		norm := n.Normalize(event)
+
+		if norm.EventCategory != "network" {
+			t.Errorf("expected network, got %s", norm.EventCategory)
+		}
+		if norm.EventAction != "web-filter-allowed" {
+			t.Errorf("expected web-filter-allowed, got %s", norm.EventAction)
+		}
+		if norm.EventOutcome != "allowed" {
+			t.Errorf("expected allowed, got %s", norm.EventOutcome)
+		}
+		if norm.Severity != "INFORMATIONAL" {
+			t.Errorf("expected INFORMATIONAL, got %s", norm.Severity)
+		}
+	})
+
+	t.Run("Fortinet UTM IPS True Threat", func(t *testing.T) {
+		raw := `date=2026-10-09 time=00:10:00 devname="FGT-1" type="utm" subtype="ips" action="dropped" attack="SQL.Injection" srcip=198.51.100.5 dstip=10.10.1.20 srcport=44211 dstport=80`
+		event := &models.LogEvent{
+			EventTimestamp: time.Now(),
+			Vendor:         "Fortinet",
+			RawMessage:     raw,
+		}
+		norm := n.Normalize(event)
+
+		if norm.EventCategory != "threat" {
+			t.Errorf("expected threat, got %s", norm.EventCategory)
+		}
+		if norm.EventAction != "intrusion-high-priority" {
+			t.Errorf("expected intrusion-high-priority, got %s", norm.EventAction)
+		}
+		if norm.Severity != "CRITICAL" {
+			t.Errorf("expected CRITICAL, got %s", norm.Severity)
+		}
+	})
 }
