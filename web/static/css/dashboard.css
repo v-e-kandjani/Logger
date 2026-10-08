@@ -812,4 +812,172 @@ body.dark-theme {
     color: #fbbf24;
 }
 
+/* ==========================================================================
+   SIEM & Security Operations Center (SOC) Styles
+   ========================================================================== */
+
+.badge-mitre {
+    background: rgba(147, 51, 234, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(147, 51, 234, 0.3);
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.badge-status-new {
+    background: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    font-weight: 600;
+}
+
+.badge-status-investigating {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    font-weight: 600;
+}
+
+.badge-status-resolved {
+    background: rgba(16, 185, 129, 0.18);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    font-weight: 600;
+}
+
+.badge-status-false_positive {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    font-weight: 500;
+}
+
+.badge-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.soc-entity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.soc-entity-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    font-size: 12.5px;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.soc-entity-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.soc-entity-key {
+    font-family: var(--font-mono, monospace);
+    font-weight: 500;
+    color: var(--text-main);
+}
+
+.btn-filter {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+
+.btn-filter:hover {
+    color: var(--text-main);
+}
+
+.btn-filter.active {
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+}
+
+.sim-card:hover {
+    border-color: var(--primary) !important;
+    background: rgba(59, 130, 246, 0.08) !important;
+    transform: translateY(-1px);
+}
+
+/* Switch Toggle UI */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 38px;
+    height: 20px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #334155;
+    transition: .3s;
+    border-radius: 20px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--primary);
+}
+
+input:checked + .slider:before {
+    transform: translateX(18px);
+}
+
+@keyframes pulse {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.98); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+.pulsing-alert {
+    animation: pulse 1.5s infinite;
+}
+
+
 

@@ -17,8 +17,10 @@ import (
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
 	"github.com/syslog-platform/logger/internal/metrics"
-	"github.com/syslog-platform/logger/internal/syslog/listener"
+	"github.com/syslog-platform/logger/internal/siem/correlation"
+	"github.com/syslog-platform/logger/internal/siem/normalizer"
 	"github.com/syslog-platform/logger/internal/syslog/generator"
+	"github.com/syslog-platform/logger/internal/syslog/listener"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 	"github.com/syslog-platform/logger/internal/timestamp"
 )
@@ -65,6 +67,13 @@ func main() {
 		log.Printf("[PostgreSQL] Warning seeding default admin user: %v", err)
 	} else {
 		log.Println("[PostgreSQL] Security administrator verified (admin / admin5651!)")
+	}
+
+	// Verify & auto-migrate SIEM detection rules and alert schema
+	if err := pgDB.EnsureSIEMSchema(context.Background()); err != nil {
+		log.Printf("[PostgreSQL] Warning ensuring SIEM schema: %v", err)
+	} else {
+		log.Println("[PostgreSQL] SIEM tables and out-of-the-box detection rules verified")
 	}
 
 	// 2. Initialize in-memory Device Cache
@@ -134,6 +143,14 @@ func main() {
 		deviceCache,
 		pgDB,
 	)
+	// Initialize SIEM Detection & Correlation Engine
+	siemNormalizer := normalizer.NewNormalizer()
+	siemEngine := correlation.NewEngine(siemNormalizer, pgDB)
+	_ = siemEngine.LoadRulesFromDB(context.Background())
+	defer siemEngine.Stop()
+	pipe.SetSIEMEngine(siemEngine)
+	log.Println("[SIEM] Detection & Correlation Engine active with real-time sliding windows")
+
 	pipe.Start()
 	defer pipe.Stop()
 	if val, ok := dbSettings["strict_device_filtering"]; ok && (val == "true" || val == "1") {

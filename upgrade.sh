@@ -93,6 +93,9 @@ if docker compose ps -q postgres &>/dev/null && [ "$(docker compose ps -q postgr
     if [ -f "migrations/postgres/001_initial_schema.sql" ]; then
         docker compose exec -T postgres psql -U "$PG_USER" -d "$PG_DB" < migrations/postgres/001_initial_schema.sql >/dev/null 2>&1 || true
     fi
+    if [ -f "migrations/postgres/002_siem_tables.sql" ]; then
+        docker compose exec -T postgres psql -U "$PG_USER" -d "$PG_DB" < migrations/postgres/002_siem_tables.sql >/dev/null 2>&1 || true
+    fi
     if [ -f "migrations/clickhouse/001_initial_events.sql" ]; then
         docker compose exec -T clickhouse clickhouse-client --user "$CH_USER" --database "$CH_DB" --multiquery < migrations/clickhouse/001_initial_events.sql >/dev/null 2>&1 || true
     fi

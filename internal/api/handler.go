@@ -132,6 +132,15 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/system/metrics", h.requireAuth(h.handleMetricsCurrent))
 	mux.HandleFunc("/api/v1/system/metrics/history", h.requireAuth(h.handleMetricsHistory))
 
+	// Protected SIEM & SOC Endpoints
+	mux.HandleFunc("/api/v1/siem/overview", h.requireAuth(h.handleSIEMOverview))
+	mux.HandleFunc("/api/v1/siem/alerts", h.requireAuth(h.handleSIEMAlerts))
+	mux.HandleFunc("/api/v1/siem/alerts/", h.requireAuth(h.handleSIEMAlertSubroutes))
+	mux.HandleFunc("/api/v1/siem/rules", h.requireAuth(h.handleSIEMRules))
+	mux.HandleFunc("/api/v1/siem/rules/", h.requireAuth(h.handleSIEMRuleSubroutes))
+	mux.HandleFunc("/api/v1/siem/simulate", h.requireAuth(h.handleSIEMSimulate))
+	mux.HandleFunc("/api/v1/siem/live", h.requireAuth(h.handleSIEMLiveStream))
+
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fs))

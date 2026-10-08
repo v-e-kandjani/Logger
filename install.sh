@@ -407,7 +407,11 @@ echo -e "${BOLD}${BLUE}--- 7. Applying Database Schemas & Table Creation ---${NC
 # A) PostgreSQL Tables
 info "Executing PostgreSQL migrations (migrations/postgres/001_initial_schema.sql)..."
 docker compose exec -T postgres psql -U "$PG_USER" -d "$PG_DB" < migrations/postgres/001_initial_schema.sql > /dev/null
-success "PostgreSQL tables initialized (devices, unregistered_sources, users, log_archives, audit_logs, system_settings)."
+if [ -f "migrations/postgres/002_siem_tables.sql" ]; then
+    info "Executing SIEM detection rules & alert tables (migrations/postgres/002_siem_tables.sql)..."
+    docker compose exec -T postgres psql -U "$PG_USER" -d "$PG_DB" < migrations/postgres/002_siem_tables.sql > /dev/null
+fi
+success "PostgreSQL tables initialized (devices, users, log_archives, audit_logs, siem_rules, siem_alerts)."
 
 # Seed Admin User in PostgreSQL with bcrypt password
 info "Seeding initial Super Administrator account (${ADMIN_USER})..."

@@ -245,6 +245,13 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ## Sürüm Geçmişi (Release History)
 
+- **v1.3.0** (Faz 5 - Kurumsal SIEM Dönüşümü):
+  - **SIEM Normalizasyon Motoru**: Fortinet FortiGate, WatchGuard Firebox, Cisco ASA/IOS, Linux Auth/SSH/Sudo ve Windows Syslog loglarını Ortak Olay Modeline (`event.category`, `event.action`, `source.ip`, `destination.ip`, `user.name`, `severity`, `risk_score`, MITRE ATT&CK) dönüştüren evrensel standartlaştırıcı.
+  - **Gerçek Zamanlı Korelasyon & Tespit Motoru**: Kayan zaman pencerelerinde çalışan ve ön tanımlı tespit kuralları (Kaba Kuvvet Parola Saldırısı `AUTH-001`, Parola Püskürtme `AUTH-002`, Ağ Port Taraması `NET-001`, Güvenlik Duvarı Paket Boğma `NET-002`, Yetki Yükseltme Girişimi `SYS-001`, Kalıcılık/Kullanıcı Oluşturma `SYS-002`, Tehdit/İstismar Engellendi `THREAT-001`) barındıran tespit çekirdeği.
+  - **Güvenlik Operasyon Merkezi (SOC) Web Paneli**: Tehdit Skor Tablosu, Tehdit Risk Endeksi (0-100), En Çok Saldıran IP'ler, Hedef Alınan Hesap & Varlıklar ve MITRE ATT&CK taktik matrisi içeren özel SOC yönetim ekranı.
+  - **Vaka & Olay Yönetimi (Incident Triage) & Adli Kanıtlar**: Vaka durum döngüsü (`NEW`, `INVESTIGATING`, `RESOLVED`, `FALSE_POSITIVE`), analist atama, vaka inceleme notları geçmişi ve alarmı tetikleyen ham syslog kayıtlarını inceleme alanı.
+  - **Etkileşimli Kural Yönetimi ve Saldırı Simülatörü**: Tespit kurallarını dinamik olarak açıp kapatma ve tek tıkla SOC doğrulama saldırı simülasyonları (Brute force, Port scan, Privilege escalation, Threat blocked).
+  - **Canlı WebSocket Alarm Akışı**: Tespit edilen kritik ve yüksek seviyeli güvenlik alarmlarının bağlı analist ekranlarına anlık bildirilmesi.
 - **v1.2.4**:
   - Web arayüzü üzerinden sistem güncellemede SSE (Server-Sent Events) akışı ile canlı ilerleme çubuğu (progress bar) ve terminal sistem konsolu.
   - Güncelleme tamamlandığında otomatik geri sayımlı panel yenileyici.

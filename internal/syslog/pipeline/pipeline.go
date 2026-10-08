@@ -12,6 +12,7 @@ import (
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
 	"github.com/syslog-platform/logger/internal/models"
+	"github.com/syslog-platform/logger/internal/siem/correlation"
 	"github.com/syslog-platform/logger/internal/syslog/parser"
 )
 
@@ -48,6 +49,9 @@ type Pipeline struct {
 
 	// Access Control
 	strictFilter atomic.Bool
+
+	// SIEM Detection & Normalization Engine
+	siemEngine *correlation.Engine
 }
 
 func NewPipeline(
@@ -85,6 +89,16 @@ func (p *Pipeline) SetStrictFiltering(enabled bool) {
 // IsStrictFiltering returns current authorization mode
 func (p *Pipeline) IsStrictFiltering() bool {
 	return p.strictFilter.Load()
+}
+
+// SetSIEMEngine connects the security correlation and detection engine
+func (p *Pipeline) SetSIEMEngine(engine *correlation.Engine) {
+	p.siemEngine = engine
+}
+
+// GetSIEMEngine returns the active SIEM correlation engine
+func (p *Pipeline) GetSIEMEngine() *correlation.Engine {
+	return p.siemEngine
 }
 
 // Ingest submits a raw packet into the non-blocking ring buffer
@@ -192,6 +206,11 @@ func (p *Pipeline) workerLoop() {
 
 			// 2. Broadcast to connected Live Stream clients (non-blocking)
 			p.broadcast(event)
+
+			// 3. Evaluate in SIEM correlation & normalization engine
+			if p.siemEngine != nil {
+				p.siemEngine.ProcessLogEvent(event)
+			}
 		}
 	}
 }

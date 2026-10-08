@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initStorageManagement();
     initUpdatesManagement();
     loadUpdateStatus();
+    initSIEMManagement();
     if (window.i18n) {
         window.i18n.setLanguage(window.i18n.currentLang);
     }
@@ -97,6 +98,7 @@ function initNavigation() {
             // Refresh tab-specific views
             if (tab === 'dashboard') fetchAndRenderTelemetryCharts();
             if (tab === 'search') document.getElementById('btn-search-exec').click();
+            if (tab === 'siem') loadSIEMData();
             if (tab === 'devices') loadDevices();
             if (tab === 'unregistered') loadUnregisteredSources();
             if (tab === 'archives') loadArchives();
@@ -2156,3 +2158,539 @@ function drawSmoothAreaChart(canvasId, seriesList, options = {}) {
     }
 }
 
+// ==========================================================================
+// SIEM & Security Operations Center (SOC) Controller
+// ==========================================================================
+let siemFilterStatus = 'ALL';
+let siemFilterSeverity = 'ALL';
+let siemSearchQuery = '';
+let currentInvestigatingAlertID = null;
+let siemLiveSocket = null;
+
+function initSIEMManagement() {
+    // 1. Initial overview count to populate badge
+    loadSIEMOverview();
+
+    // 2. Connect Live Alert WebSocket
+    connectSIEMLiveStream();
+
+    // 3. Status filter buttons
+    const statusFilterBtns = document.querySelectorAll('#siem-status-filters button');
+    statusFilterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            statusFilterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            siemFilterStatus = btn.getAttribute('data-status') || 'ALL';
+            loadSIEMAlerts();
+        });
+    });
+
+    // 4. Severity select filter
+    const sevSelect = document.getElementById('siem-filter-severity');
+    if (sevSelect) {
+        sevSelect.addEventListener('change', () => {
+            siemFilterSeverity = sevSelect.value;
+            loadSIEMAlerts();
+        });
+    }
+
+    // 5. Search input with debounce
+    const searchInput = document.getElementById('siem-search-input');
+    if (searchInput) {
+        let debounceTimer;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                siemSearchQuery = searchInput.value.trim();
+                loadSIEMAlerts();
+            }, 300);
+        });
+    }
+
+    // 6. Action buttons
+    const btnRefresh = document.getElementById('btn-refresh-siem');
+    if (btnRefresh) {
+        btnRefresh.addEventListener('click', () => {
+            loadSIEMData();
+            showToast('SIEM telemetrisi güncellendi', 'info');
+        });
+    }
+
+    const btnOpenRules = document.getElementById('btn-open-siem-rules');
+    if (btnOpenRules) {
+        btnOpenRules.addEventListener('click', openSIEMRulesModal);
+    }
+
+    const btnOpenSimulate = document.getElementById('btn-open-siem-simulate');
+    if (btnOpenSimulate) {
+        btnOpenSimulate.addEventListener('click', () => {
+            const modal = document.getElementById('siem-simulate-modal');
+            if (modal) modal.style.display = 'flex';
+        });
+    }
+
+    // 7. Modal close triggers
+    const btnCloseInv = document.getElementById('btn-close-siem-inv');
+    if (btnCloseInv) {
+        btnCloseInv.addEventListener('click', () => {
+            document.getElementById('siem-investigate-modal').style.display = 'none';
+        });
+    }
+
+    const btnCloseRules = document.getElementById('btn-close-siem-rules');
+    if (btnCloseRules) {
+        btnCloseRules.addEventListener('click', () => {
+            document.getElementById('siem-rules-modal').style.display = 'none';
+        });
+    }
+
+    const btnCloseSim = document.getElementById('btn-close-siem-simulate');
+    if (btnCloseSim) {
+        btnCloseSim.addEventListener('click', () => {
+            document.getElementById('siem-simulate-modal').style.display = 'none';
+        });
+    }
+
+    // Backdrop dismissal
+    ['siem-investigate-modal', 'siem-rules-modal', 'siem-simulate-modal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('click', (e) => {
+                if (e.target === el) el.style.display = 'none';
+            });
+        }
+    });
+
+    // 8. Triage and Note triggers
+    const btnSaveStatus = document.getElementById('btn-save-siem-status');
+    if (btnSaveStatus) {
+        btnSaveStatus.addEventListener('click', saveSIEMAlertStatus);
+    }
+
+    const btnAddNote = document.getElementById('btn-add-siem-note');
+    if (btnAddNote) {
+        btnAddNote.addEventListener('click', addSIEMAlertNote);
+    }
+
+    // 9. Simulation scenario triggers
+    document.querySelectorAll('.sim-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const scenario = card.getAttribute('data-scenario');
+            if (scenario) runSIEMSimulation(scenario);
+        });
+    });
+}
+
+function loadSIEMData() {
+    loadSIEMOverview();
+    loadSIEMAlerts();
+}
+
+async function loadSIEMOverview() {
+    try {
+        const res = await fetch('/api/v1/siem/overview');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Update Scoreboard
+        const elActive = document.getElementById('siem-stat-active');
+        if (elActive) elActive.textContent = (data.active_incidents || 0).toLocaleString();
+
+        const elCritical = document.getElementById('siem-stat-critical');
+        if (elCritical) elCritical.textContent = ((data.critical_alerts || 0) + (data.high_alerts || 0)).toLocaleString();
+
+        const elCritSub = document.getElementById('siem-stat-critical-sub');
+        if (elCritSub) elCritSub.textContent = `${data.critical_alerts || 0} Critical, ${data.high_alerts || 0} High`;
+
+        const elRisk = document.getElementById('siem-stat-risk');
+        if (elRisk) elRisk.textContent = `${data.mean_risk_score || 0} / 100`;
+
+        const elRiskSub = document.getElementById('siem-stat-risk-sub');
+        if (elRiskSub) {
+            const score = data.mean_risk_score || 0;
+            if (score > 70) elRiskSub.textContent = 'High perimeter threat activity';
+            else if (score > 35) elRiskSub.textContent = 'Moderate security alerts detected';
+            else elRiskSub.textContent = 'Low perimeter threat activity';
+        }
+
+        const elTotal = document.getElementById('siem-stat-total');
+        if (elTotal) elTotal.textContent = (data.total_alerts || 0).toLocaleString();
+
+        const elResolved = document.getElementById('siem-stat-resolved');
+        if (elResolved) elResolved.textContent = (data.resolved_incidents || 0).toLocaleString();
+
+        // Update Sidebar Badge
+        const badge = document.getElementById('siem-active-badge');
+        if (badge) {
+            const active = data.active_incidents || 0;
+            if (active > 0) {
+                badge.style.display = 'inline-block';
+                badge.textContent = active > 99 ? '99+' : active;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // Render Top Attackers
+        renderEntityList('siem-top-attackers-list', data.top_attackers || [], 'IP', 'events');
+
+        // Render Top Targets (merge users & devices)
+        const combinedTargets = (data.top_target_users || []).concat(data.top_target_devices || []);
+        renderEntityList('siem-top-targets-list', combinedTargets, 'Asset', 'events');
+
+        // Render MITRE ATT&CK Tactics
+        renderEntityList('siem-mitre-tactics-list', data.mitre_tactic_distribution || [], 'Tactic', 'hits');
+
+    } catch (e) {
+        console.error('Failed to load SIEM overview:', e);
+    }
+}
+
+function renderEntityList(containerId, list, typeLabel, unitLabel) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+
+    if (!list || list.length === 0) {
+        el.innerHTML = `<div class="text-muted text-center" style="padding: 12px 0;">No active ${typeLabel.toLowerCase()}s recorded</div>`;
+        return;
+    }
+
+    el.innerHTML = list.map(item => `
+        <div class="soc-entity-item">
+            <span class="soc-entity-key">${escapeHtml(item.key)}</span>
+            <span class="badge badge-outline" style="font-size: 11px;">${item.count.toLocaleString()} ${unitLabel}</span>
+        </div>
+    `).join('');
+}
+
+async function loadSIEMAlerts() {
+    const tbody = document.getElementById('siem-alerts-body');
+    if (!tbody) return;
+
+    try {
+        const params = new URLSearchParams();
+        if (siemFilterStatus && siemFilterStatus !== 'ALL') params.append('status', siemFilterStatus);
+        if (siemFilterSeverity && siemFilterSeverity !== 'ALL') params.append('severity', siemFilterSeverity);
+        if (siemSearchQuery) params.append('search', siemSearchQuery);
+
+        const res = await fetch(`/api/v1/siem/alerts?${params.toString()}`);
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+        const alerts = data.alerts || [];
+
+        const countBadge = document.getElementById('siem-table-count');
+        if (countBadge) countBadge.textContent = `${data.total || alerts.length} Incidents`;
+
+        if (alerts.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted" style="padding: 24px;">No security incidents match the current filters.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = alerts.map(alert => {
+            const sevBadge = getSeverityBadgeHTML(alert.severity);
+            const statusBadge = `<span class="badge badge-status-${(alert.status || 'new').toLowerCase()}">${escapeHtml(alert.status)}</span>`;
+            const mitreBadge = alert.mitre_technique ? `<span class="badge badge-mitre" title="${escapeHtml(alert.mitre_tactic || '')}">${escapeHtml(alert.mitre_technique)}</span>` : '<span class="text-muted">-</span>';
+            const threatVector = `${escapeHtml(alert.source_ip || 'unknown')} &rarr; ${escapeHtml(alert.username || alert.device_name || alert.destination_ip || 'host')}`;
+            const timeStr = formatRelativeTime(alert.created_at);
+
+            return `
+                <tr>
+                    <td>${sevBadge}</td>
+                    <td style="font-size: 12px; color: var(--text-muted);">${timeStr}</td>
+                    <td>
+                        <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(alert.rule_name)}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(alert.category)}</div>
+                    </td>
+                    <td>${mitreBadge}</td>
+                    <td><span class="mono-code" style="font-size: 12px;">${threatVector}</span></td>
+                    <td><span class="badge badge-outline">${alert.event_count || 1} pkts</span></td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size: 12px;">${escapeHtml(alert.assigned_to || 'Unassigned')}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-outline btn-sm" onclick="openSIEMInvestigate('${alert.id}')">🔍 Investigate</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-red" style="padding: 20px;">Failed to load alerts: ${e.message}</td></tr>`;
+    }
+}
+
+function getSeverityBadgeHTML(sev) {
+    switch ((sev || '').toUpperCase()) {
+        case 'CRITICAL':
+            return '<span class="badge badge-danger pulsing-alert" style="font-weight: 700;">CRITICAL</span>';
+        case 'HIGH':
+            return '<span class="badge badge-danger" style="font-weight: 600;">HIGH</span>';
+        case 'MEDIUM':
+            return '<span class="badge badge-warning" style="font-weight: 600;">MEDIUM</span>';
+        case 'LOW':
+            return '<span class="badge badge-secondary">LOW</span>';
+        default:
+            return `<span class="badge badge-outline">${escapeHtml(sev || 'INFO')}</span>`;
+    }
+}
+
+function formatRelativeTime(isoStr) {
+    if (!isoStr) return '-';
+    const date = new Date(isoStr);
+    const now = new Date();
+    const diffSec = Math.floor((now - date) / 1000);
+
+    if (diffSec < 60) return `${diffSec}s ago`;
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+async function openSIEMInvestigate(alertID) {
+    currentInvestigatingAlertID = alertID;
+    const modal = document.getElementById('siem-investigate-modal');
+    if (!modal) return;
+
+    modal.style.display = 'flex';
+
+    try {
+        const res = await fetch(`/api/v1/siem/alerts/${alertID}`);
+        if (!res.ok) throw new Error('Alert not found');
+        const data = await res.json();
+        const alert = data.alert;
+        const notes = data.notes || [];
+
+        // Header
+        document.getElementById('siem-inv-title').textContent = alert.rule_name || 'Incident Details';
+        document.getElementById('siem-inv-rule-badge').textContent = alert.rule_id || 'ALERT';
+        document.getElementById('siem-inv-summary').textContent = alert.summary || 'Security event summary';
+
+        // Details Grid
+        document.getElementById('siem-inv-severity').innerHTML = getSeverityBadgeHTML(alert.severity);
+        document.getElementById('siem-inv-risk').textContent = `${alert.risk_score || 0} / 100`;
+        document.getElementById('siem-inv-src-ip').textContent = alert.source_ip || 'N/A';
+        document.getElementById('siem-inv-user').textContent = alert.username || 'N/A';
+        document.getElementById('siem-inv-device').textContent = alert.device_name || 'N/A';
+        document.getElementById('siem-inv-mitre').textContent = `${alert.mitre_technique || 'N/A'} (${alert.mitre_tactic || 'General'})`;
+        document.getElementById('siem-inv-count').textContent = `${alert.event_count || 1} logs matched`;
+        document.getElementById('siem-inv-timeline').textContent = `${new Date(alert.first_seen).toLocaleTimeString()} - ${new Date(alert.last_seen).toLocaleTimeString()}`;
+
+        // Triage Controls
+        document.getElementById('siem-inv-status-select').value = alert.status || 'NEW';
+        document.getElementById('siem-inv-assigned-input').value = alert.assigned_to || (window.currentUser ? window.currentUser.username : 'admin');
+
+        // Forensic Evidence Logs
+        const evidenceEl = document.getElementById('siem-inv-evidence-logs');
+        const evidenceCountEl = document.getElementById('siem-inv-evidence-count');
+        const evLogs = alert.evidence_logs || [];
+        evidenceCountEl.textContent = `${evLogs.length} events`;
+        if (evLogs.length > 0) {
+            evidenceEl.textContent = evLogs.join('\n');
+        } else {
+            evidenceEl.textContent = 'No raw log evidence attached to this alert.';
+        }
+
+        // Render Case Notes
+        renderSIEMNotes(notes);
+
+    } catch (e) {
+        showToast(`Adli detaylar yüklenemedi: ${e.message}`, 'error');
+    }
+}
+
+function renderSIEMNotes(notes) {
+    const notesStream = document.getElementById('siem-inv-notes-stream');
+    if (!notesStream) return;
+
+    if (!notes || notes.length === 0) {
+        notesStream.innerHTML = '<div class="text-muted text-center" style="font-size: 12px; padding: 10px;">Henüz adli analiz notu eklenmedi.</div>';
+        return;
+    }
+
+    notesStream.innerHTML = notes.map(n => `
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 8px 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span style="font-weight: 600; color: var(--primary);">👤 ${escapeHtml(n.author)}</span>
+                <span style="color: var(--text-muted);">${new Date(n.created_at).toLocaleString()}</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-main); white-space: pre-wrap;">${escapeHtml(n.note)}</div>
+        </div>
+    `).join('');
+}
+
+async function saveSIEMAlertStatus() {
+    if (!currentInvestigatingAlertID) return;
+
+    const status = document.getElementById('siem-inv-status-select').value;
+    const assignedTo = document.getElementById('siem-inv-assigned-input').value.trim() || 'admin';
+
+    try {
+        const res = await fetch(`/api/v1/siem/alerts/${currentInvestigatingAlertID}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status, assigned_to: assignedTo }),
+        });
+
+        if (!res.ok) throw new Error('Update failed');
+        showToast('Vaka durumu ve atama başarıyla kaydedildi', 'success');
+
+        loadSIEMData();
+    } catch (e) {
+        showToast(`Durum güncellenemedi: ${e.message}`, 'error');
+    }
+}
+
+async function addSIEMAlertNote() {
+    if (!currentInvestigatingAlertID) return;
+
+    const noteInput = document.getElementById('siem-inv-new-note');
+    const noteText = noteInput.value.trim();
+    if (!noteText) {
+        showToast('Lütfen bir not metni giriniz', 'warning');
+        return;
+    }
+
+    const author = window.currentUser ? window.currentUser.username : 'Analyst';
+
+    try {
+        const res = await fetch(`/api/v1/siem/alerts/${currentInvestigatingAlertID}/notes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ author, note: noteText }),
+        });
+
+        if (!res.ok) throw new Error('Note failed');
+
+        noteInput.value = '';
+        showToast('Adli not eklendi', 'success');
+
+        // Refresh notes in modal
+        const alertRes = await fetch(`/api/v1/siem/alerts/${currentInvestigatingAlertID}`);
+        if (alertRes.ok) {
+            const data = await alertRes.json();
+            renderSIEMNotes(data.notes || []);
+        }
+    } catch (e) {
+        showToast(`Not eklenemedi: ${e.message}`, 'error');
+    }
+}
+
+async function openSIEMRulesModal() {
+    const modal = document.getElementById('siem-rules-modal');
+    const tbody = document.getElementById('siem-rules-body');
+    if (!modal || !tbody) return;
+
+    modal.style.display = 'flex';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Kurallar yükleniyor...</td></tr>';
+
+    try {
+        const res = await fetch('/api/v1/siem/rules');
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+        const rules = data.rules || [];
+
+        if (rules.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">Kayıtlı kural bulunamadı.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rules.map(rule => `
+            <tr>
+                <td><span class="mono-code" style="font-weight: 700; color: var(--primary);">${escapeHtml(rule.id)}</span></td>
+                <td>
+                    <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(rule.name)}</div>
+                    <div style="font-size: 11.5px; color: var(--text-muted);">${escapeHtml(rule.description || '')}</div>
+                </td>
+                <td>${getSeverityBadgeHTML(rule.severity)}</td>
+                <td style="font-size: 12px;"><span class="badge badge-outline">${rule.threshold} ev / ${rule.timeframe_seconds}s</span></td>
+                <td><span class="badge badge-mitre" title="${escapeHtml(rule.mitre_tactic)}">${escapeHtml(rule.mitre_technique || rule.mitre_tactic)}</span></td>
+                <td style="text-align: center;">
+                    <label class="switch">
+                        <input type="checkbox" ${rule.is_enabled ? 'checked' : ''} onchange="toggleSIEMRule('${rule.id}', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </td>
+            </tr>
+        `).join('');
+
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-red">Hata: ${e.message}</td></tr>`;
+    }
+}
+
+async function toggleSIEMRule(ruleID, enabled) {
+    try {
+        const res = await fetch(`/api/v1/siem/rules/${ruleID}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+        });
+        if (!res.ok) throw new Error('Toggle error');
+        showToast(`Kural ${ruleID} ${enabled ? 'etkinleştirildi' : 'devre dışı bırakıldı'}`, 'info');
+    } catch (e) {
+        showToast(`Kural durumu güncellenemedi: ${e.message}`, 'error');
+    }
+}
+
+async function runSIEMSimulation(scenario) {
+    try {
+        showToast(`Saldırı senaryosu başlatılıyor (${scenario})...`, 'info');
+        const res = await fetch('/api/v1/siem/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scenario }),
+        });
+
+        if (!res.ok) throw new Error('Simulation failed');
+
+        document.getElementById('siem-simulate-modal').style.display = 'none';
+        showToast('Saldırı simülasyonu korelasyon motorunda başarıyla tetiklendi!', 'success');
+
+        // Automatically reload SIEM data after brief delay to capture new alert
+        setTimeout(() => {
+            loadSIEMData();
+        }, 600);
+    } catch (e) {
+        showToast(`Simülasyon başarısız: ${e.message}`, 'error');
+    }
+}
+
+function connectSIEMLiveStream() {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${proto}//${window.location.host}/api/v1/siem/live`;
+
+    try {
+        siemLiveSocket = new WebSocket(wsUrl);
+
+        siemLiveSocket.onmessage = (event) => {
+            try {
+                const alert = JSON.parse(event.data);
+                handleLiveIncomingAlert(alert);
+            } catch (err) {
+                console.error('Error parsing live SIEM alert:', err);
+            }
+        };
+
+        siemLiveSocket.onclose = () => {
+            // Reconnect after 5 seconds
+            setTimeout(connectSIEMLiveStream, 5000);
+        };
+    } catch (e) {
+        console.warn('SIEM WebSocket connection failed:', e);
+    }
+}
+
+function handleLiveIncomingAlert(alert) {
+    // Show toast for critical or high alerts
+    if (alert.severity === 'CRITICAL' || alert.severity === 'HIGH') {
+        showToast(`🚨 [${alert.severity}] ${alert.rule_name} (${alert.source_ip || 'Ağ'})`, 'warning');
+    }
+
+    // Refresh overview & counters
+    loadSIEMOverview();
+
+    // If currently on SIEM tab, refresh alerts table
+    const activeTab = document.querySelector('.nav-item.active')?.getAttribute('data-tab');
+    if (activeTab === 'siem') {
+        loadSIEMAlerts();
+    }
+}

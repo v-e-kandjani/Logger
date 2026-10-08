@@ -254,6 +254,13 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.3.0** (Phase 5 - Enterprise SIEM Evolution):
+  - **SIEM Normalization Engine**: Universal standardizer normalizing Fortinet FortiGate, WatchGuard Firebox, Cisco ASA/IOS, Linux Auth/SSH/Sudo, and Windows Syslog into Common Event Model (`event.category`, `event.action`, `source.ip`, `destination.ip`, `user.name`, `severity`, `risk_score`, MITRE ATT&CK mapping).
+  - **Real-Time Correlation & Detection Engine**: Sliding window bucket evaluator with out-of-the-box detection rules (Brute Force `AUTH-001`, Password Spraying `AUTH-002`, Port Scan `NET-001`, Firewall Denial Flood `NET-002`, Privilege Escalation `SYS-001`, Persistence Account Creation `SYS-002`, Threat/Malware Exploit Blocked `THREAT-001`).
+  - **Security Operations Center (SOC) Web Dashboard**: Dedicated SOC navigation pane with Threat Scoreboard, Threat Risk Index, Top Attacker IPs, Top Targeted Users & Assets, and MITRE ATT&CK matrix tactics breakdown.
+  - **Incident Case Management & Forensic Evidence**: Incident triage workflow (`NEW`, `INVESTIGATING`, `RESOLVED`, `FALSE_POSITIVE`), assignment tracking, analyst case notes history, and raw forensic log evidence viewer.
+  - **Interactive Rule Management & Simulation Engine**: Dynamic rule toggling and 1-click test simulation triggers for rapid SOC validation.
+  - **Live WebSocket Alert Stream**: Real-time push notifications of critical security incidents to connected SOC analysts.
 - **v1.2.4**:
   - Web UI system upgrade live progress modal with real-time SSE event streaming, percentage progress bar, and terminal activity console.
   - Automatic countdown dashboard reloader upon upgrade completion.
