@@ -262,6 +262,13 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.3.9** (Persistent MITRE ATT&CK Catalog & Automatic Release Activation):
+  - **Synced Catalog Survives Restarts/Upgrades**: The official STIX catalog was held only in memory, so every restart or web upgrade silently reverted the matrix to the 30-technique embedded baseline. The parsed catalog is now persisted in PostgreSQL (`mitre_catalog_cache`, ~430 KB) and restored at startup.
+  - **Automatic New-Release Activation**: A background watcher checks the official feed (first check ~45 s after start, then every 24 h) with a conditional ETag request — unchanged feeds cost a `304`, new ATT&CK releases are downloaded, parsed and activated without operator action. Techniques introduced by a new release are flagged **NEW** with a release banner. Toggle in the matrix modal or via `MITRE_AUTO_SYNC=false`; tune with `MITRE_SYNC_INTERVAL_HOURS` and `MITRE_STIX_URL` (internal mirror for air-gapped sites). API: `GET/POST /api/v1/siem/mitre/autosync`.
+  - **Dynamic Tactics & Full Catalog**: Tactics are read from the STIX `x-mitre-tactic`/`x-mitre-matrix` objects instead of a hard-coded list (ATT&CK v19 adds *Defense Impairment* TA0112 and renames Defense Evasion to *Stealth*). Techniques are placed under **every** tactic they belong to, sub-techniques carry their parent name, and the ATT&CK version is shown. Verified: v19.2 → 15 tactics, 222 techniques + 475 sub-techniques.
+  - **Accurate Coverage Counts**: Alert attribution aggregates all alerts per technique in SQL (previously only the latest 200), and a data race in coverage report generation was fixed. New index `idx_siem_alerts_technique`.
+  - **Matrix UI**: Filters (All / Covered / Uncovered / With Alerts / New), search, sub-technique toggle, collapsible tactics, watcher status and “Check for New Release” button. Manual sync timeout raised to 5 minutes.
+
 - **v1.3.8** (Severity-Aware FortiGate IPS Triage):
   - **IPS Signature Severity Honoured**: FortiGate IPS events are now graded by the FortiGuard signature `severity` field. Blocked `info`/`low` signatures (commodity internet scanners such as `ZGrab.Scanner`, Masscan, Nmap probes) normalize to `threat / ips-recon-blocked` (LOW, risk 15, MITRE `T1595` Active Scanning) instead of raising a P1 `PERIM-004` incident. `medium` signatures map to `intrusion-blocked` / `intrusion-detected`; `high`/`critical` (or unspecified) still escalate to `intrusion-high-priority`.
   - **Allowed High-Severity Intrusions Now Alert**: `PERIM-004` previously required `outcome=blocked`, so a critical signature passed by a monitor-mode IPS sensor raised nothing. It now fires on both blocked and detected outcomes (risk 95 when not blocked).

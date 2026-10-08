@@ -206,6 +206,7 @@ func main() {
 	// 10. Initialize REST & WebSocket HTTP Server
 	apiHandler := api.NewHandler(pipe, chClient, pgDB, deviceCache, archEngine, tsProvider, metricsCollector, cfg.Server.CollectorNode)
 	apiHandler.SetSyslogServer(syslogServer)
+	apiHandler.StartMitreAutoSync(appCtx)
 	mux := http.NewServeMux()
 	apiHandler.RegisterRoutes(mux)
 

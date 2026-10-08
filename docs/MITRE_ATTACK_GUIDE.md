@@ -265,3 +265,20 @@ When an incident triggers in the **SOC Operations Console**:
 2. Clicking the technique tag displays official MITRE mitigation recommendations, detection strategies, and common adversary groups (APT28, APT29, FIN7).
 3. The analyst can view all **Raw Forensic Evidence Logs** captured inside the detection sliding window.
 4. The analyst records case notes and transitions the state (`NEW` ➔ `INVESTIGATING` ➔ `RESOLVED` / `FALSE_POSITIVE`).
+
+---
+
+## Automatic Release Activation & Persistence (v1.3.9+)
+
+- **Persistence**: Every successful sync stores the parsed catalog (tactics, techniques, sub-techniques, ATT&CK version, feed ETag) in PostgreSQL table `mitre_catalog_cache`. It is restored at startup, so restarts and upgrades no longer revert to the embedded 30-technique baseline.
+- **Release watcher**: ~45 s after startup and then every `MITRE_SYNC_INTERVAL_HOURS` (default 24) the server sends a conditional `If-None-Match` request to the feed. `304 Not Modified` → nothing to do. A changed feed is downloaded, parsed and activated immediately; techniques that did not exist in the previous catalog are flagged `is_new` and shown with a **NEW** badge plus a release banner in the matrix.
+- **Dynamic tactics**: Tactics and their order come from the STIX `x-mitre-tactic` / `x-mitre-matrix` objects, so newly introduced tactics (e.g. ATT&CK v19 *Defense Impairment* TA0112) appear without a code change. Techniques are listed under every tactic they belong to.
+- **Controls**:
+  | Setting | Purpose |
+  |---|---|
+  | Matrix modal → “Auto-activate new ATT&CK releases” | Enable/disable the watcher (persisted in settings) |
+  | Matrix modal → “Check for New Release” | Run the conditional check now |
+  | `MITRE_AUTO_SYNC=false` | Disable watcher by default |
+  | `MITRE_SYNC_INTERVAL_HOURS=24` | Check interval |
+  | `MITRE_STIX_URL=<url>` | Internal mirror for air-gapped networks |
+- **API**: `GET /api/v1/siem/mitre/autosync` (status), `POST {"enabled":bool}` or `POST {"check_now":true}`.

@@ -174,6 +174,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/siem/live", h.requireAuth(h.handleSIEMLiveStream))
 	mux.HandleFunc("/api/v1/siem/mitre", h.requireAuth(h.handleSIEMMitreMatrix))
 	mux.HandleFunc("/api/v1/siem/mitre/sync", h.requireAuth(h.handleSIEMMitreSync))
+	mux.HandleFunc("/api/v1/siem/mitre/autosync", h.requireAuth(h.handleSIEMMitreAutoSync))
 
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))

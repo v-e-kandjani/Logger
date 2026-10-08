@@ -3189,11 +3189,114 @@ function handleLiveIncomingAlert(alert) {
     }
 }
 
+// ─── MITRE ATT&CK Matrix ──────────────────────────────────────────────────────
+// The backend keeps the official STIX catalog persisted in PostgreSQL and a
+// release watcher (conditional ETag GET, default every 24h) activates new
+// ATT&CK versions automatically. The UI renders the cached report client-side
+// so filtering/searching ~700 techniques doesn't hit the server.
+const mitreUIState = { report: null, filter: 'all', search: '', showSub: true, wired: false };
+
+function mitreFmtTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    if (isNaN(d.getTime()) || d.getFullYear() < 2000) return '—';
+    return d.toLocaleString();
+}
+
+function wireSIEMMitreControls() {
+    if (mitreUIState.wired) return;
+    mitreUIState.wired = true;
+
+    document.querySelectorAll('.mitre-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            mitreUIState.filter = btn.getAttribute('data-filter') || 'all';
+            document.querySelectorAll('.mitre-filter-btn').forEach(b => {
+                b.classList.toggle('btn-primary', b === btn);
+                b.classList.toggle('btn-outline', b !== btn);
+            });
+            renderSIEMMitreMatrix();
+        });
+    });
+
+    const search = document.getElementById('mitre-search-input');
+    if (search) {
+        let t = null;
+        search.addEventListener('input', () => {
+            clearTimeout(t);
+            t = setTimeout(() => {
+                mitreUIState.search = search.value.trim().toLowerCase();
+                renderSIEMMitreMatrix();
+            }, 180);
+        });
+    }
+
+    const sub = document.getElementById('mitre-show-subtechniques');
+    if (sub) {
+        sub.addEventListener('change', () => {
+            mitreUIState.showSub = sub.checked;
+            renderSIEMMitreMatrix();
+        });
+    }
+
+    const toggle = document.getElementById('mitre-autosync-toggle');
+    if (toggle) {
+        toggle.addEventListener('change', async () => {
+            toggle.disabled = true;
+            try {
+                const res = await fetch('/api/v1/siem/mitre/autosync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: toggle.checked }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Request failed');
+                renderSIEMMitreAutoSync(data.status);
+                showToast(toggle.checked
+                    ? 'Yeni MITRE ATT&CK sürümleri otomatik etkinleştirilecek'
+                    : 'Otomatik MITRE ATT&CK güncellemesi kapatıldı', 'success');
+            } catch (e) {
+                toggle.checked = !toggle.checked;
+                showToast(`Hata: ${e.message}`, 'error');
+            } finally {
+                toggle.disabled = false;
+            }
+        });
+    }
+
+    const btnCheck = document.getElementById('btn-check-mitre-release');
+    if (btnCheck) btnCheck.addEventListener('click', checkSIEMMitreRelease);
+}
+
 async function openSIEMMitreModal() {
     const modal = document.getElementById('siem-mitre-modal');
     if (!modal) return;
     modal.style.display = 'flex';
+    wireSIEMMitreControls();
     loadSIEMMitreMatrix();
+}
+
+function renderSIEMMitreAutoSync(st) {
+    const toggle = document.getElementById('mitre-autosync-toggle');
+    const el = document.getElementById('mitre-autosync-status');
+    if (!st) return;
+    if (toggle) toggle.checked = !!st.enabled;
+    if (!el) return;
+
+    const parts = [];
+    if (st.enabled) {
+        parts.push(`Every ${st.interval_hours || 24}h`);
+        parts.push(`Next check: ${mitreFmtTime(st.next_check)}`);
+    } else {
+        parts.push('Watcher disabled');
+    }
+    parts.push(`Last check: ${mitreFmtTime(st.last_check)}`);
+    if (st.last_result) parts.push(st.last_result);
+    parts.push(st.persisted ? '💾 Persisted' : '⚠ Not persisted');
+
+    el.innerHTML = escapeHtml(parts.join(' • '));
+    if (st.last_error) {
+        el.innerHTML += ` • <span class="text-red">${escapeHtml(st.last_error)}</span>`;
+    }
 }
 
 async function loadSIEMMitreMatrix() {
@@ -3209,83 +3312,171 @@ async function loadSIEMMitreMatrix() {
         }
         if (!res.ok) throw new Error('Failed loading MITRE ATT&CK report');
         const report = await res.json();
+        mitreUIState.report = report;
 
-        // Update stats
+        // Stats
+        const total = report.total_techniques || 0;
         const elTactics = document.getElementById('mitre-stat-tactics');
-        if (elTactics) elTactics.textContent = report.total_tactics || 14;
+        if (elTactics) elTactics.textContent = report.total_tactics || (report.tactics || []).length;
 
         const elTechs = document.getElementById('mitre-stat-techniques');
-        if (elTechs) elTechs.textContent = (report.total_techniques || 0).toLocaleString();
+        if (elTechs) elTechs.textContent = total.toLocaleString();
+        const elTechsSub = elTechs?.parentElement?.querySelector('.stat-sub');
+        if (elTechsSub && (report.total_parent_techniques || report.total_sub_techniques)) {
+            elTechsSub.textContent = `${report.total_parent_techniques || 0} techniques • ${report.total_sub_techniques || 0} sub-techniques`;
+        }
 
         const elCovered = document.getElementById('mitre-stat-covered');
         if (elCovered) elCovered.textContent = (report.covered_techniques || 0).toLocaleString();
 
         const elCovPct = document.getElementById('mitre-stat-coverage-pct');
-        if (elCovPct && report.total_techniques > 0) {
-            const pct = ((report.covered_techniques / report.total_techniques) * 100).toFixed(1);
+        if (elCovPct && total > 0) {
+            const pct = ((report.covered_techniques / total) * 100).toFixed(1);
             elCovPct.textContent = `${pct}% Active Detection Coverage`;
         }
 
         const elAlerts = document.getElementById('mitre-stat-alerts');
         if (elAlerts) elAlerts.textContent = (report.total_alerts_mapped || 0).toLocaleString();
 
-        if (versionLabel && report.version) {
-            versionLabel.textContent = `${report.version} • Source: ${report.source || 'Official Feed'}`;
+        if (versionLabel) {
+            const ver = report.attack_version || report.version || 'Enterprise ATT&CK';
+            const src = report.is_baseline ? 'Embedded baseline (not yet synced)' : (report.source || 'Official Feed');
+            let txt = `${ver} • ${src} • Updated ${mitreFmtTime(report.last_updated)}`;
+            if (report.previous_version && report.previous_version !== ver) txt += ` • previous: ${report.previous_version}`;
+            versionLabel.textContent = txt;
         }
 
-        // Render Tactics and Techniques
-        const tactics = report.tactics || [];
-        if (tactics.length === 0) {
-            container.innerHTML = '<div class="text-center text-muted" style="padding: 20px;">No tactics found.</div>';
-            return;
+        // New release banner
+        const banner = document.getElementById('mitre-new-release-banner');
+        if (banner) {
+            if ((report.new_techniques || 0) > 0) {
+                const ids = (report.new_technique_ids || []).slice(0, 12).map(id => `<span class="mono-code">${escapeHtml(id)}</span>`).join(', ');
+                const more = (report.new_technique_ids || []).length > 12 ? ` +${report.new_technique_ids.length - 12} more` : '';
+                banner.innerHTML = `✨ <strong>${escapeHtml(report.attack_version || 'New ATT&CK release')}</strong> activated` +
+                    (report.previous_version ? ` (from ${escapeHtml(report.previous_version)})` : '') +
+                    ` — <strong>${report.new_techniques}</strong> new technique(s) added to the matrix: ${ids}${more}. ` +
+                    `<a href="#" id="mitre-banner-show-new" style="color: var(--primary);">Show them</a>`;
+                banner.style.display = 'block';
+                const link = document.getElementById('mitre-banner-show-new');
+                if (link) link.addEventListener('click', ev => {
+                    ev.preventDefault();
+                    document.querySelector('.mitre-filter-btn[data-filter="new"]')?.click();
+                });
+            } else if (report.is_baseline) {
+                banner.innerHTML = 'ℹ️ Only the embedded baseline is loaded. The full official catalog will be fetched automatically ' +
+                    'shortly after startup, or click <strong>Sync Official Feed</strong> now.';
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+            }
         }
 
-        container.innerHTML = tactics.map(tac => {
-            const covPct = (tac.coverage_percent || 0).toFixed(0);
-            const covClass = tac.covered_techniques > 0 ? 'border-accent' : '';
-            return `
-                <div class="panel ${covClass}" style="margin-bottom: 0; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
-                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-color);">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="mono-code" style="font-weight: 700; color: var(--primary); font-size: 11px;">${escapeHtml(tac.id)}</span>
-                            <span style="font-weight: 600; font-size: 13.5px; color: var(--text-main);">${escapeHtml(tac.name)}</span>
-                            <span style="font-size: 11px; color: var(--text-muted);">(${tac.covered_techniques}/${tac.total_techniques} covered)</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="badge ${tac.covered_techniques > 0 ? 'badge-success' : 'badge-outline'}" style="font-size: 10.5px;">${covPct}% Coverage</span>
-                            <a href="${escapeHtml(tac.url || '#')}" target="_blank" style="font-size: 11px; color: var(--primary); text-decoration: none;" title="Open in MITRE ATT&CK Knowledgebase">MITRE ↗</a>
-                        </div>
+        renderSIEMMitreAutoSync(report.auto_sync);
+        renderSIEMMitreMatrix();
+    } catch (e) {
+        container.innerHTML = `<div class="text-center text-red" style="padding: 20px;">Hata: ${escapeHtml(e.message)}</div>`;
+    }
+}
+
+function mitreTechMatches(tech) {
+    const st = mitreUIState;
+    if (!st.showSub && tech.sub_technique_of) return false;
+    switch (st.filter) {
+        case 'covered': if (!tech.covered) return false; break;
+        case 'uncovered': if (tech.covered) return false; break;
+        case 'alerts': if (!(tech.alert_count > 0)) return false; break;
+        case 'new': if (!tech.is_new) return false; break;
+    }
+    if (st.search) {
+        const hay = `${tech.id} ${tech.name} ${(tech.rule_ids || []).join(' ')} ${(tech.rule_names || []).join(' ')}`.toLowerCase();
+        if (!hay.includes(st.search)) return false;
+    }
+    return true;
+}
+
+function renderSIEMMitreMatrix() {
+    const container = document.getElementById('mitre-matrix-container');
+    const report = mitreUIState.report;
+    if (!container || !report) return;
+
+    const tactics = report.tactics || [];
+    if (tactics.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted" style="padding: 20px;">No tactics found.</div>';
+        return;
+    }
+
+    const narrowing = mitreUIState.filter !== 'all' || !!mitreUIState.search;
+    let shown = 0;
+
+    const html = tactics.map(tac => {
+        const techs = (tac.techniques || []).filter(mitreTechMatches);
+        if (narrowing && techs.length === 0) return '';
+        shown += techs.length;
+
+        const covPct = (tac.coverage_percent || 0).toFixed(0);
+        const newCount = (tac.techniques || []).filter(t => t.is_new).length;
+        const alertCount = (tac.techniques || []).reduce((s, t) => s + (t.alert_count || 0), 0);
+        const open = narrowing || tac.covered_techniques > 0 || newCount > 0;
+
+        return `
+            <details class="panel" ${open ? 'open' : ''} style="margin-bottom: 0; background: var(--bg-card); border: 1px solid ${tac.covered_techniques > 0 ? 'rgba(16, 185, 129, 0.35)' : 'var(--border-color)'}; border-radius: 8px; overflow: hidden;">
+                <summary style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px; background: rgba(255,255,255,0.02); cursor: pointer; list-style: none;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span class="mono-code" style="font-weight: 700; color: var(--primary); font-size: 11px;">${escapeHtml(tac.id)}</span>
+                        <span style="font-weight: 600; font-size: 13.5px; color: var(--text-main);">${escapeHtml(tac.name)}</span>
+                        <span style="font-size: 11px; color: var(--text-muted);">(${tac.covered_techniques}/${tac.total_techniques} covered${narrowing ? ` • ${techs.length} shown` : ''})</span>
+                        ${newCount > 0 ? `<span class="badge" style="font-size: 9.5px; background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.5);">${newCount} NEW</span>` : ''}
+                        ${alertCount > 0 ? `<span class="badge badge-danger" style="font-size: 9.5px;">${alertCount.toLocaleString()} alerts</span>` : ''}
                     </div>
-                    <div class="panel-body" style="padding: 12px 14px;">
-                        <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px;">${escapeHtml(tac.description || '')}</div>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px;">
-                            ${(tac.techniques || []).map(tech => {
-                                const isCovered = tech.covered;
-                                const ruleBadges = (tech.rule_ids || []).map(r => `<span class="badge badge-secondary" style="font-size: 9.5px; padding: 2px 4px;">${escapeHtml(r)}</span>`).join(' ');
-                                return `
-                                    <div style="padding: 8px 10px; background: ${isCovered ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-main)'}; border: 1px solid ${isCovered ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)'}; border-radius: 6px; display: flex; flex-direction: column; gap: 4px;">
-                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
-                                            <a href="${escapeHtml(tech.url || '#')}" target="_blank" style="font-size: 12px; font-weight: 600; color: ${isCovered ? 'var(--text-main)' : 'var(--text-muted)'}; text-decoration: none;" title="${escapeHtml(tech.description || '')}">
-                                                ${escapeHtml(tech.id)}: ${escapeHtml(tech.name)}
-                                            </a>
-                                            ${isCovered ? '<span class="badge badge-success" style="font-size: 9.5px;">Covered</span>' : '<span class="badge badge-outline" style="font-size: 9.5px; opacity: 0.6;">Uncovered</span>'}
-                                        </div>
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-                                            <div style="display: flex; gap: 4px; flex-wrap: wrap;">${ruleBadges || '<span style="font-size: 10px; color: var(--text-muted);">No active rules</span>'}</div>
-                                            ${tech.alert_count > 0 ? `<span class="badge badge-danger" style="font-size: 9.5px;">${tech.alert_count} alerts</span>` : ''}
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge ${tac.covered_techniques > 0 ? 'badge-success' : 'badge-outline'}" style="font-size: 10.5px;">${covPct}% Coverage</span>
+                        <a href="${escapeHtml(tac.url || '#')}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size: 11px; color: var(--primary); text-decoration: none;" title="Open in MITRE ATT&CK Knowledgebase">MITRE ↗</a>
+                    </div>
+                </summary>
+                <div class="panel-body" style="padding: 12px 14px; border-top: 1px solid var(--border-color);">
+                    <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px;">${escapeHtml(tac.description || '')}</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px;">
+                        ${techs.map(renderSIEMMitreTechnique).join('') || '<div class="text-muted" style="font-size: 11.5px;">No techniques match.</div>'}
                     </div>
                 </div>
-            `;
-        }).join('');
+            </details>
+        `;
+    }).join('');
 
-    } catch (e) {
-        container.innerHTML = `<div class="text-center text-red" style="padding: 20px;">Hata: ${e.message}</div>`;
+    container.innerHTML = html || `<div class="text-center text-muted" style="padding: 20px;">No techniques match the current filter.</div>`;
+    if (narrowing) {
+        container.insertAdjacentHTML('afterbegin', `<div style="font-size: 11.5px; color: var(--text-muted);">${shown.toLocaleString()} technique placement(s) match.</div>`);
     }
+}
+
+function renderSIEMMitreTechnique(tech) {
+    const isCovered = tech.covered;
+    const isSub = !!tech.sub_technique_of;
+    const ruleBadges = (tech.rule_ids || []).map((r, i) =>
+        `<span class="badge badge-secondary" style="font-size: 9.5px; padding: 2px 4px;" title="${escapeHtml((tech.rule_names || [])[i] || '')}">${escapeHtml(r)}</span>`
+    ).join(' ');
+    const bg = isCovered ? 'rgba(16, 185, 129, 0.08)' : (tech.is_new ? 'rgba(139, 92, 246, 0.07)' : 'var(--bg-main)');
+    const border = isCovered ? 'rgba(16, 185, 129, 0.3)' : (tech.is_new ? 'rgba(139, 92, 246, 0.4)' : 'var(--border-color)');
+    const lastSeen = tech.last_seen_alert ? ` • last ${mitreFmtTime(tech.last_seen_alert)}` : '';
+
+    return `
+        <div style="padding: 8px 10px; ${isSub ? 'margin-left: 10px; border-left-width: 3px;' : ''} background: ${bg}; border: 1px solid ${border}; border-radius: 6px; display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
+                <a href="${escapeHtml(tech.url || '#')}" target="_blank" rel="noopener" style="font-size: ${isSub ? '11.5px' : '12px'}; font-weight: 600; color: ${isCovered ? 'var(--text-main)' : 'var(--text-muted)'}; text-decoration: none;" title="${escapeHtml(tech.description || '')}">
+                    ${escapeHtml(tech.id)}: ${escapeHtml(tech.name)}
+                </a>
+                <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                    ${tech.is_new ? '<span class="badge" style="font-size: 9px; background: rgba(139, 92, 246, 0.25); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.5);">NEW</span>' : ''}
+                    ${tech.inferred ? '<span class="badge badge-outline" style="font-size: 9px;" title="Referenced by a rule but not present in the loaded catalog">rule-only</span>' : ''}
+                    ${isCovered ? '<span class="badge badge-success" style="font-size: 9.5px;">Covered</span>' : '<span class="badge badge-outline" style="font-size: 9.5px; opacity: 0.6;">Uncovered</span>'}
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; gap: 6px;">
+                <div style="display: flex; gap: 4px; flex-wrap: wrap;">${ruleBadges || '<span style="font-size: 10px; color: var(--text-muted);">No active rules</span>'}</div>
+                ${tech.alert_count > 0 ? `<span class="badge badge-danger" style="font-size: 9.5px;" title="${escapeHtml(lastSeen)}">${tech.alert_count.toLocaleString()} alerts</span>` : ''}
+            </div>
+        </div>
+    `;
 }
 
 async function syncSIEMMitreFeed() {
@@ -3296,7 +3487,7 @@ async function syncSIEMMitreFeed() {
     if (alertBox) {
         alertBox.style.display = 'block';
         alertBox.className = 'alert-box alert-info';
-        alertBox.textContent = 'Connecting to official MITRE Enterprise ATT&CK STIX 2.1 feed (GitHub)...';
+        alertBox.textContent = 'Downloading official MITRE Enterprise ATT&CK STIX 2.1 feed (~50 MB, GitHub)… this can take up to a minute.';
     }
 
     try {
@@ -3314,18 +3505,46 @@ async function syncSIEMMitreFeed() {
             alertBox.textContent = `✓ ${data.message || 'MITRE ATT&CK definitions synchronized successfully!'}`;
         }
         showToast('MITRE ATT&CK matrisi güncellendi!', 'success');
-
-        // Reload matrix representation
-        setTimeout(() => {
-            loadSIEMMitreMatrix();
-        }, 500);
-
+        setTimeout(loadSIEMMitreMatrix, 300);
     } catch (e) {
         if (alertBox) {
             alertBox.className = 'alert-box alert-danger';
-            alertBox.textContent = `✗ Synchronization notice: ${e.message}. Using built-in Enterprise baseline.`;
+            alertBox.textContent = `✗ Synchronization notice: ${e.message}. The previously persisted catalog stays active.`;
         }
         showToast(`Senkronizasyon uyarısı: ${e.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function checkSIEMMitreRelease() {
+    const btn = document.getElementById('btn-check-mitre-release');
+    const alertBox = document.getElementById('mitre-sync-alert');
+    if (btn) btn.disabled = true;
+    if (alertBox) {
+        alertBox.style.display = 'block';
+        alertBox.className = 'alert-box alert-info';
+        alertBox.textContent = 'Checking MITRE for a newer ATT&CK release…';
+    }
+    try {
+        const res = await fetch('/api/v1/siem/mitre/autosync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ check_now: true }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Check failed');
+        if (alertBox) {
+            alertBox.className = 'alert-box alert-success';
+            alertBox.textContent = `✓ ${data.message || 'Check complete'}`;
+        }
+        renderSIEMMitreAutoSync(data.status);
+        setTimeout(loadSIEMMitreMatrix, 300);
+    } catch (e) {
+        if (alertBox) {
+            alertBox.className = 'alert-box alert-danger';
+            alertBox.textContent = `✗ ${e.message}`;
+        }
     } finally {
         if (btn) btn.disabled = false;
     }

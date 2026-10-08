@@ -1,12 +1,8 @@
 package mitre
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -18,29 +14,45 @@ import (
 type Tactic struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
+	ShortName   string `json:"short_name,omitempty"`
 	Description string `json:"description"`
 	URL         string `json:"url"`
 }
 
 // Technique represents a MITRE ATT&CK technique or sub-technique (e.g. T1110)
 type Technique struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	TacticID    string   `json:"tactic_id"`
-	TacticName  string   `json:"tactic_name"`
-	Description string   `json:"description"`
-	URL         string   `json:"url"`
-	SubTechniqueOf string `json:"sub_technique_of,omitempty"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	TacticID       string   `json:"tactic_id"`
+	TacticName     string   `json:"tactic_name"`
+	TacticIDs      []string `json:"tactic_ids,omitempty"` // every tactic the technique belongs to (ATT&CK is many-to-many)
+	Description    string   `json:"description"`
+	URL            string   `json:"url"`
+	SubTechniqueOf string   `json:"sub_technique_of,omitempty"`
+	Platforms      []string `json:"platforms,omitempty"`
+}
+
+// tactics returns every tactic ID the technique is mapped to
+func (t Technique) tactics() []string {
+	if len(t.TacticIDs) > 0 {
+		return t.TacticIDs
+	}
+	if t.TacticID != "" {
+		return []string{t.TacticID}
+	}
+	return nil
 }
 
 // CoverageTechnique reports detection capability status for a specific technique
 type CoverageTechnique struct {
 	Technique
-	Covered      bool     `json:"covered"`
-	RuleIDs      []string `json:"rule_ids"`
-	RuleNames    []string `json:"rule_names"`
-	AlertCount   int64    `json:"alert_count"`
+	Covered       bool       `json:"covered"`
+	RuleIDs       []string   `json:"rule_ids"`
+	RuleNames     []string   `json:"rule_names"`
+	AlertCount    int64      `json:"alert_count"`
 	LastSeenAlert *time.Time `json:"last_seen_alert,omitempty"`
+	IsNew         bool       `json:"is_new"`             // introduced by the most recent ATT&CK release
+	Inferred      bool       `json:"inferred,omitempty"` // referenced by a rule but absent from the loaded catalog
 }
 
 // CoverageTactic reports tactical coverage metrics
@@ -52,26 +64,61 @@ type CoverageTactic struct {
 	Techniques        []CoverageTechnique `json:"techniques"`
 }
 
+// AutoSyncStatus exposes the state of the background ATT&CK release watcher
+type AutoSyncStatus struct {
+	Enabled       bool       `json:"enabled"`
+	FeedURL       string     `json:"feed_url"`
+	IntervalHours int        `json:"interval_hours"`
+	LastCheck     *time.Time `json:"last_check,omitempty"`
+	LastSuccess   *time.Time `json:"last_success,omitempty"`
+	LastResult    string     `json:"last_result,omitempty"`
+	LastError     string     `json:"last_error,omitempty"`
+	NextCheck     *time.Time `json:"next_check,omitempty"`
+	Persisted     bool       `json:"persisted"`
+}
+
 // MatrixReport encapsulates the full ATT&CK matrix coverage state
 type MatrixReport struct {
-	Version            string           `json:"version"`
-	LastUpdated        time.Time        `json:"last_updated"`
-	Source             string           `json:"source"`
-	TotalTactics       int              `json:"total_tactics"`
-	TotalTechniques    int              `json:"total_techniques"`
-	CoveredTechniques  int              `json:"covered_techniques"`
-	TotalAlertsMapped  int64            `json:"total_alerts_mapped"`
-	Tactics            []CoverageTactic `json:"tactics"`
+	Version           string           `json:"version"`
+	AttackVersion     string           `json:"attack_version,omitempty"`
+	PreviousVersion   string           `json:"previous_version,omitempty"`
+	LastUpdated       time.Time        `json:"last_updated"`
+	Source            string           `json:"source"`
+	IsBaseline        bool             `json:"is_baseline"`
+	TotalTactics      int              `json:"total_tactics"`
+	TotalTechniques   int              `json:"total_techniques"`
+	TotalParent       int              `json:"total_parent_techniques"`
+	TotalSub          int              `json:"total_sub_techniques"`
+	CoveredTechniques int              `json:"covered_techniques"`
+	TotalAlertsMapped int64            `json:"total_alerts_mapped"`
+	NewTechniques     int              `json:"new_techniques"`
+	NewTechniqueIDs   []string         `json:"new_technique_ids,omitempty"`
+	AutoSync          AutoSyncStatus   `json:"auto_sync"`
+	Tactics           []CoverageTactic `json:"tactics"`
+}
+
+// AlertStat is an aggregated per-technique alert counter
+type AlertStat struct {
+	Count    int64
+	LastSeen time.Time
 }
 
 // Catalog maintains the in-memory registry of MITRE ATT&CK tactics & techniques
 type Catalog struct {
-	mu          sync.RWMutex
-	tactics     []Tactic
-	techniques  map[string]Technique // keyed by Technique ID (e.g. "T1110")
-	version     string
-	lastUpdated time.Time
-	source      string
+	mu              sync.RWMutex
+	tactics         []Tactic
+	techniques      map[string]Technique // keyed by Technique ID (e.g. "T1110")
+	version         string
+	attackVersion   string
+	previousVersion string
+	lastUpdated     time.Time
+	source          string
+	isBaseline      bool
+	etag            string
+	newTechIDs      map[string]bool
+
+	store    Store
+	autoSync AutoSyncStatus
 }
 
 // Official MITRE Enterprise ATT&CK STIX 2.1 JSON endpoint
@@ -81,31 +128,18 @@ const DefaultMITRESTIXURL = "https://raw.githubusercontent.com/mitre-attack/atta
 func NewCatalog() *Catalog {
 	c := &Catalog{
 		techniques:  make(map[string]Technique),
+		newTechIDs:  make(map[string]bool),
 		version:     "v15.1 Enterprise Matrix",
 		lastUpdated: time.Now().UTC(),
 		source:      "Embedded Enterprise ATT&CK Baseline",
+		isBaseline:  true,
 	}
 	c.loadDefaultBaseline()
 	return c
 }
 
 func (c *Catalog) loadDefaultBaseline() {
-	c.tactics = []Tactic{
-		{ID: "TA0043", Name: "Reconnaissance", Description: "Gather information to plan future adversary operations", URL: "https://attack.mitre.org/tactics/TA0043/"},
-		{ID: "TA0042", Name: "Resource Development", Description: "Establish resources to support adversary operations", URL: "https://attack.mitre.org/tactics/TA0042/"},
-		{ID: "TA0001", Name: "Initial Access", Description: "Gain entry to your network", URL: "https://attack.mitre.org/tactics/TA0001/"},
-		{ID: "TA0002", Name: "Execution", Description: "Run malicious code", URL: "https://attack.mitre.org/tactics/TA0002/"},
-		{ID: "TA0003", Name: "Persistence", Description: "Maintain their foothold across restarts", URL: "https://attack.mitre.org/tactics/TA0003/"},
-		{ID: "TA0004", Name: "Privilege Escalation", Description: "Gain higher-level permissions", URL: "https://attack.mitre.org/tactics/TA0004/"},
-		{ID: "TA0005", Name: "Defense Evasion", Description: "Avoid being detected by security tools", URL: "https://attack.mitre.org/tactics/TA0005/"},
-		{ID: "TA0006", Name: "Credential Access", Description: "Steal account names and passwords", URL: "https://attack.mitre.org/tactics/TA0006/"},
-		{ID: "TA0007", Name: "Discovery", Description: "Explore and observe the target environment", URL: "https://attack.mitre.org/tactics/TA0007/"},
-		{ID: "TA0008", Name: "Lateral Movement", Description: "Move through your network to other systems", URL: "https://attack.mitre.org/tactics/TA0008/"},
-		{ID: "TA0009", Name: "Collection", Description: "Gather data of interest to the adversary goal", URL: "https://attack.mitre.org/tactics/TA0009/"},
-		{ID: "TA0011", Name: "Command and Control", Description: "Communicate with compromised systems to control them", URL: "https://attack.mitre.org/tactics/TA0011/"},
-		{ID: "TA0010", Name: "Exfiltration", Description: "Steal and remove sensitive data from your network", URL: "https://attack.mitre.org/tactics/TA0010/"},
-		{ID: "TA0040", Name: "Impact", Description: "Manipulate, interrupt, or destroy systems and data", URL: "https://attack.mitre.org/tactics/TA0040/"},
-	}
+	c.tactics = defaultTactics()
 
 	baselineTechs := []Technique{
 		// Initial Access
@@ -149,6 +183,25 @@ func (c *Catalog) loadDefaultBaseline() {
 	}
 }
 
+func defaultTactics() []Tactic {
+	return []Tactic{
+		{ID: "TA0043", ShortName: "reconnaissance", Name: "Reconnaissance", Description: "Gather information to plan future adversary operations", URL: "https://attack.mitre.org/tactics/TA0043/"},
+		{ID: "TA0042", ShortName: "resource-development", Name: "Resource Development", Description: "Establish resources to support adversary operations", URL: "https://attack.mitre.org/tactics/TA0042/"},
+		{ID: "TA0001", ShortName: "initial-access", Name: "Initial Access", Description: "Gain entry to your network", URL: "https://attack.mitre.org/tactics/TA0001/"},
+		{ID: "TA0002", ShortName: "execution", Name: "Execution", Description: "Run malicious code", URL: "https://attack.mitre.org/tactics/TA0002/"},
+		{ID: "TA0003", ShortName: "persistence", Name: "Persistence", Description: "Maintain their foothold across restarts", URL: "https://attack.mitre.org/tactics/TA0003/"},
+		{ID: "TA0004", ShortName: "privilege-escalation", Name: "Privilege Escalation", Description: "Gain higher-level permissions", URL: "https://attack.mitre.org/tactics/TA0004/"},
+		{ID: "TA0005", ShortName: "defense-evasion", Name: "Defense Evasion", Description: "Avoid being detected by security tools", URL: "https://attack.mitre.org/tactics/TA0005/"},
+		{ID: "TA0006", ShortName: "credential-access", Name: "Credential Access", Description: "Steal account names and passwords", URL: "https://attack.mitre.org/tactics/TA0006/"},
+		{ID: "TA0007", ShortName: "discovery", Name: "Discovery", Description: "Explore and observe the target environment", URL: "https://attack.mitre.org/tactics/TA0007/"},
+		{ID: "TA0008", ShortName: "lateral-movement", Name: "Lateral Movement", Description: "Move through your network to other systems", URL: "https://attack.mitre.org/tactics/TA0008/"},
+		{ID: "TA0009", ShortName: "collection", Name: "Collection", Description: "Gather data of interest to the adversary goal", URL: "https://attack.mitre.org/tactics/TA0009/"},
+		{ID: "TA0011", ShortName: "command-and-control", Name: "Command and Control", Description: "Communicate with compromised systems to control them", URL: "https://attack.mitre.org/tactics/TA0011/"},
+		{ID: "TA0010", ShortName: "exfiltration", Name: "Exfiltration", Description: "Steal and remove sensitive data from your network", URL: "https://attack.mitre.org/tactics/TA0010/"},
+		{ID: "TA0040", ShortName: "impact", Name: "Impact", Description: "Manipulate, interrupt, or destroy systems and data", URL: "https://attack.mitre.org/tactics/TA0040/"},
+	}
+}
+
 // GetTechnique looks up a technique by ID (e.g. "T1110" or "T1110.003")
 func (c *Catalog) GetTechnique(id string) (Technique, bool) {
 	c.mu.RLock()
@@ -157,97 +210,148 @@ func (c *Catalog) GetTechnique(id string) (Technique, bool) {
 	return t, ok
 }
 
+// TechniqueCount returns the number of loaded techniques (incl. sub-techniques)
+func (c *Catalog) TechniqueCount() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.techniques)
+}
+
 // GenerateCoverageReport compares active SIEM rules and alerts against the ATT&CK matrix
 func (c *Catalog) GenerateCoverageReport(rules []models.SIEMRule, alerts []models.SIEMAlert) MatrixReport {
+	stats := make(map[string]AlertStat)
+	for _, a := range alerts {
+		if a.MitreTechnique == "" {
+			continue
+		}
+		s := stats[a.MitreTechnique]
+		s.Count++
+		if a.LastSeen.After(s.LastSeen) {
+			s.LastSeen = a.LastSeen
+		}
+		stats[a.MitreTechnique] = s
+	}
+	return c.GenerateCoverageReportWithStats(rules, stats)
+}
+
+// GenerateCoverageReportWithStats builds the matrix using pre-aggregated per-technique alert counters
+func (c *Catalog) GenerateCoverageReportWithStats(rules []models.SIEMRule, alertStats map[string]AlertStat) MatrixReport {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	// Map rules by MITRE technique
+	// Local working copy: rule-only techniques are added here, never into the shared map (avoids writes under RLock)
+	techs := make(map[string]Technique, len(c.techniques)+8)
+	for id, t := range c.techniques {
+		techs[id] = t
+	}
+	inferred := make(map[string]bool)
+
+	tacticByName := make(map[string]string, len(c.tactics))
+	for _, tac := range c.tactics {
+		tacticByName[strings.ToLower(tac.Name)] = tac.ID
+	}
+
 	rulesByTech := make(map[string][]models.SIEMRule)
 	for _, r := range rules {
-		if r.MitreTechnique != "" && r.IsEnabled {
-			rulesByTech[r.MitreTechnique] = append(rulesByTech[r.MitreTechnique], r)
-			if _, exists := c.techniques[r.MitreTechnique]; !exists {
-				tacticID := "TA0001"
-				for _, tac := range c.tactics {
-					if strings.EqualFold(tac.Name, r.MitreTactic) {
-						tacticID = tac.ID
-						break
-					}
-				}
-				c.techniques[r.MitreTechnique] = Technique{
-					ID:          r.MitreTechnique,
-					Name:        r.Name,
-					TacticID:    tacticID,
-					TacticName:  r.MitreTactic,
-					Description: r.Description,
-					URL:         fmt.Sprintf("https://attack.mitre.org/techniques/%s/", strings.ReplaceAll(r.MitreTechnique, ".", "/")),
-				}
+		if r.MitreTechnique == "" || !r.IsEnabled {
+			continue
+		}
+		rulesByTech[r.MitreTechnique] = append(rulesByTech[r.MitreTechnique], r)
+		if _, exists := techs[r.MitreTechnique]; exists {
+			continue
+		}
+		tacticID := tacticByName[strings.ToLower(r.MitreTactic)]
+		parent := ""
+		if i := strings.Index(r.MitreTechnique, "."); i > 0 {
+			parent = r.MitreTechnique[:i]
+			if p, ok := techs[parent]; ok && tacticID == "" {
+				tacticID = p.TacticID
 			}
 		}
+		if tacticID == "" {
+			tacticID = "TA0001"
+		}
+		techs[r.MitreTechnique] = Technique{
+			ID:             r.MitreTechnique,
+			Name:           r.Name,
+			TacticID:       tacticID,
+			TacticName:     r.MitreTactic,
+			Description:    r.Description,
+			SubTechniqueOf: parent,
+			URL:            fmt.Sprintf("https://attack.mitre.org/techniques/%s/", strings.ReplaceAll(r.MitreTechnique, ".", "/")),
+		}
+		inferred[r.MitreTechnique] = true
 	}
 
-	// Map alerts by MITRE technique
-	alertsByTech := make(map[string]int64)
-	lastSeenByTech := make(map[string]time.Time)
 	var totalAlertsMapped int64
+	for _, s := range alertStats {
+		totalAlertsMapped += s.Count
+	}
 
-	for _, a := range alerts {
-		if a.MitreTechnique != "" {
-			alertsByTech[a.MitreTechnique]++
-			totalAlertsMapped++
-			if last, ok := lastSeenByTech[a.MitreTechnique]; !ok || a.LastSeen.After(last) {
-				lastSeenByTech[a.MitreTechnique] = a.LastSeen
+	// A technique is covered when a rule targets it directly or any of its sub-techniques
+	coverageRules := func(id string) []models.SIEMRule {
+		matching := append([]models.SIEMRule(nil), rulesByTech[id]...)
+		if !strings.Contains(id, ".") {
+			for techID, rList := range rulesByTech {
+				if strings.HasPrefix(techID, id+".") {
+					matching = append(matching, rList...)
+				}
 			}
+		}
+		return matching
+	}
+
+	byTactic := make(map[string][]Technique)
+	for _, t := range techs {
+		for _, tacID := range t.tactics() {
+			byTactic[tacID] = append(byTactic[tacID], t)
 		}
 	}
 
-	var totalCovered int
+	coveredSet := make(map[string]bool)
+	shownSet := make(map[string]bool)
 	tacticsList := make([]CoverageTactic, 0, len(c.tactics))
 
 	for _, tac := range c.tactics {
-		covTac := CoverageTactic{
-			Tactic:     tac,
-			Techniques: make([]CoverageTechnique, 0),
-		}
+		list := byTactic[tac.ID]
+		sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
 
-		for _, tech := range c.techniques {
-			if tech.TacticID != tac.ID {
-				continue
-			}
-
-			matchingRules := rulesByTech[tech.ID]
-			if len(matchingRules) == 0 {
-				for techID, rList := range rulesByTech {
-					if strings.HasPrefix(techID, tech.ID+".") {
-						matchingRules = append(matchingRules, rList...)
-					}
+		covTac := CoverageTactic{Tactic: tac, Techniques: make([]CoverageTechnique, 0, len(list))}
+		for _, tech := range list {
+			matching := coverageRules(tech.ID)
+			ruleIDs := make([]string, 0, len(matching))
+			ruleNames := make([]string, 0, len(matching))
+			seen := make(map[string]bool)
+			for _, r := range matching {
+				if seen[r.ID] {
+					continue
 				}
-			}
-			isCovered := len(matchingRules) > 0
-			if isCovered {
-				covTac.CoveredTechniques++
-				totalCovered++
-			}
-
-			ruleIDs := make([]string, 0, len(matchingRules))
-			ruleNames := make([]string, 0, len(matchingRules))
-			for _, r := range matchingRules {
+				seen[r.ID] = true
 				ruleIDs = append(ruleIDs, r.ID)
 				ruleNames = append(ruleNames, r.Name)
 			}
+			isCovered := len(ruleIDs) > 0
+			if isCovered {
+				covTac.CoveredTechniques++
+				coveredSet[tech.ID] = true
+			}
+			shownSet[tech.ID] = true
 
 			covTech := CoverageTechnique{
-				Technique:  tech,
-				Covered:    isCovered,
-				RuleIDs:    ruleIDs,
-				RuleNames:  ruleNames,
-				AlertCount: alertsByTech[tech.ID],
+				Technique: tech,
+				Covered:   isCovered,
+				RuleIDs:   ruleIDs,
+				RuleNames: ruleNames,
+				IsNew:     c.newTechIDs[tech.ID],
+				Inferred:  inferred[tech.ID],
 			}
-			if ls, ok := lastSeenByTech[tech.ID]; ok {
-				covTech.LastSeenAlert = &ls
+			if s, ok := alertStats[tech.ID]; ok {
+				covTech.AlertCount = s.Count
+				if !s.LastSeen.IsZero() {
+					ls := s.LastSeen
+					covTech.LastSeenAlert = &ls
+				}
 			}
-
 			covTac.Techniques = append(covTac.Techniques, covTech)
 		}
 
@@ -258,181 +362,37 @@ func (c *Catalog) GenerateCoverageReport(rules []models.SIEMRule, alerts []model
 		tacticsList = append(tacticsList, covTac)
 	}
 
+	parents, subs := 0, 0
+	for id := range shownSet {
+		if strings.Contains(id, ".") {
+			subs++
+		} else {
+			parents++
+		}
+	}
+
+	newIDs := make([]string, 0, len(c.newTechIDs))
+	for id := range c.newTechIDs {
+		newIDs = append(newIDs, id)
+	}
+	sort.Strings(newIDs)
+
 	return MatrixReport{
 		Version:           c.version,
+		AttackVersion:     c.attackVersion,
+		PreviousVersion:   c.previousVersion,
 		LastUpdated:       c.lastUpdated,
 		Source:            c.source,
+		IsBaseline:        c.isBaseline,
 		TotalTactics:      len(c.tactics),
-		TotalTechniques:   len(c.techniques),
-		CoveredTechniques: totalCovered,
+		TotalTechniques:   len(shownSet),
+		TotalParent:       parents,
+		TotalSub:          subs,
+		CoveredTechniques: len(coveredSet),
 		TotalAlertsMapped: totalAlertsMapped,
+		NewTechniques:     len(newIDs),
+		NewTechniqueIDs:   newIDs,
+		AutoSync:          c.autoSync,
 		Tactics:           tacticsList,
 	}
-}
-
-// SyncFromURL fetches the latest enterprise ATT&CK STIX bundle or JSON matrix definitions
-func (c *Catalog) SyncFromURL(ctx context.Context, rawURL string) (int, error) {
-	if rawURL == "" {
-		rawURL = DefaultMITRESTIXURL
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return 0, fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("User-Agent", "Valtrivo-LogSeal-SIEM/1.0")
-
-	client := &http.Client{Timeout: 45 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0, fmt.Errorf("fetch MITRE STIX JSON: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("MITRE source returned HTTP status %d", resp.StatusCode)
-	}
-
-	return c.ParseSTIXStream(resp.Body, rawURL)
-}
-
-// SyncFromFile loads updated ATT&CK STIX / JSON from a local filepath (e.g. for air-gapped systems)
-func (c *Catalog) SyncFromFile(filePath string) (int, error) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return 0, fmt.Errorf("open MITRE file: %w", err)
-	}
-	defer f.Close()
-
-	return c.ParseSTIXStream(f, filePath)
-}
-
-// ParseSTIXStream parses STIX 2.1 JSON or lightweight JSON matrix definition
-func (c *Catalog) ParseSTIXStream(r io.Reader, sourceName string) (int, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return 0, fmt.Errorf("read stream: %w", err)
-	}
-
-	// First try lightweight catalog schema
-	type SimpleFormat struct {
-		Version    string      `json:"version"`
-		Techniques []Technique `json:"techniques"`
-	}
-
-	var sf SimpleFormat
-	if jsonErr := json.Unmarshal(data, &sf); jsonErr == nil && len(sf.Techniques) > 0 {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		for _, t := range sf.Techniques {
-			if t.ID != "" {
-				c.techniques[t.ID] = t
-			}
-		}
-		if sf.Version != "" {
-			c.version = sf.Version
-		}
-		c.lastUpdated = time.Now().UTC()
-		c.source = sourceName
-		return len(sf.Techniques), nil
-	}
-
-	// Try STIX 2.1 bundle
-	type STIXExternalRef struct {
-		SourceName string `json:"source_name"`
-		ExternalID string `json:"external_id"`
-		URL        string `json:"url"`
-	}
-	type STIXKillChainPhase struct {
-		KillChainName string `json:"kill_chain_name"`
-		PhaseName     string `json:"phase_name"`
-	}
-	type STIXObject struct {
-		Type             string               `json:"type"`
-		Name             string               `json:"name"`
-		Description      string               `json:"description"`
-		ExternalRefs     []STIXExternalRef    `json:"external_references"`
-		KillChainPhases  []STIXKillChainPhase `json:"kill_chain_phases"`
-		Revoked          bool                 `json:"revoked"`
-		XMitreDeprecated bool                 `json:"x_mitre_deprecated"`
-	}
-	type STIXBundle struct {
-		Objects []STIXObject `json:"objects"`
-	}
-
-	var bundle STIXBundle
-	if err := json.Unmarshal(data, &bundle); err != nil {
-		return 0, fmt.Errorf("unmarshal JSON: %w", err)
-	}
-
-	parsedCount := 0
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// Mapping of kill chain phase names to Tactic IDs
-	phaseToTactic := map[string]struct {
-		id   string
-		name string
-	}{
-		"reconnaissance":        {"TA0043", "Reconnaissance"},
-		"resource-development":  {"TA0042", "Resource Development"},
-		"initial-access":        {"TA0001", "Initial Access"},
-		"execution":             {"TA0002", "Execution"},
-		"persistence":           {"TA0003", "Persistence"},
-		"privilege-escalation":  {"TA0004", "Privilege Escalation"},
-		"defense-evasion":       {"TA0005", "Defense Evasion"},
-		"credential-access":     {"TA0006", "Credential Access"},
-		"discovery":             {"TA0007", "Discovery"},
-		"lateral-movement":      {"TA0008", "Lateral Movement"},
-		"collection":            {"TA0009", "Collection"},
-		"command-and-control":   {"TA0011", "Command and Control"},
-		"exfiltration":          {"TA0010", "Exfiltration"},
-		"impact":                {"TA0040", "Impact"},
-	}
-
-	for _, obj := range bundle.Objects {
-		if obj.Type != "attack-pattern" || obj.Revoked || obj.XMitreDeprecated {
-			continue
-		}
-
-		var techID, techURL string
-		for _, ref := range obj.ExternalRefs {
-			if ref.SourceName == "mitre-attack" && ref.ExternalID != "" {
-				techID = ref.ExternalID
-				techURL = ref.URL
-				break
-			}
-		}
-
-		if techID == "" {
-			continue
-		}
-
-		var tacID, tacName string
-		for _, phase := range obj.KillChainPhases {
-			if phase.KillChainName == "mitre-attack" {
-				if mapping, ok := phaseToTactic[phase.PhaseName]; ok {
-					tacID = mapping.id
-					tacName = mapping.name
-					break
-				}
-			}
-		}
-
-		c.techniques[techID] = Technique{
-			ID:          techID,
-			Name:        obj.Name,
-			TacticID:    tacID,
-			TacticName:  tacName,
-			Description: obj.Description,
-			URL:         techURL,
-		}
-		parsedCount++
-	}
-
-	c.version = fmt.Sprintf("MITRE ATT&CK STIX 2.1 (%d techniques)", len(c.techniques))
-	c.lastUpdated = time.Now().UTC()
-	c.source = sourceName
-
-	return parsedCount, nil
 }

@@ -3,12 +3,14 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/syslog-platform/logger/internal/config"
 	"github.com/syslog-platform/logger/internal/models"
@@ -635,6 +637,13 @@ func (db *DB) EnsureSIEMSchema(ctx context.Context) error {
 
 	ALTER TABLE siem_rules ADD COLUMN IF NOT EXISTS priority VARCHAR(16) DEFAULT 'P1';
 	ALTER TABLE siem_rules ADD COLUMN IF NOT EXISTS source_ref TEXT DEFAULT '';
+
+	CREATE TABLE IF NOT EXISTS mitre_catalog_cache (
+		id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+		payload JSONB NOT NULL,
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_siem_alerts_technique ON siem_alerts(mitre_technique);
 	`
 	if _, err := db.pool.Exec(ctx, schema); err != nil {
 		return err
@@ -676,6 +685,56 @@ func (db *DB) EnsureSIEMSchema(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// LoadMitreCatalog returns the persisted MITRE ATT&CK catalog snapshot (nil when absent)
+func (db *DB) LoadMitreCatalog(ctx context.Context) ([]byte, error) {
+	var payload string
+	err := db.pool.QueryRow(ctx, `SELECT payload::text FROM mitre_catalog_cache WHERE id = 1`).Scan(&payload)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return []byte(payload), nil
+}
+
+// SaveMitreCatalog upserts the MITRE ATT&CK catalog snapshot
+func (db *DB) SaveMitreCatalog(ctx context.Context, payload []byte) error {
+	_, err := db.pool.Exec(ctx, `
+		INSERT INTO mitre_catalog_cache (id, payload, updated_at) VALUES (1, $1::jsonb, NOW())
+		ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`, string(payload))
+	return err
+}
+
+// MitreTechniqueAlertStat aggregates alerts per MITRE technique
+type MitreTechniqueAlertStat struct {
+	Technique string
+	Count     int64
+	LastSeen  time.Time
+}
+
+// ListMitreAlertStats returns alert counters for every technique across all stored alerts
+func (db *DB) ListMitreAlertStats(ctx context.Context) ([]MitreTechniqueAlertStat, error) {
+	rows, err := db.pool.Query(ctx, `
+		SELECT mitre_technique, COUNT(*), MAX(last_seen)
+		FROM siem_alerts
+		WHERE mitre_technique <> ''
+		GROUP BY mitre_technique`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MitreTechniqueAlertStat
+	for rows.Next() {
+		var s MitreTechniqueAlertStat
+		if err := rows.Scan(&s.Technique, &s.Count, &s.LastSeen); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }
 
 // ListSIEMRules returns all defined detection rules

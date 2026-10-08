@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/syslog-platform/logger/internal/models"
+	"github.com/syslog-platform/logger/internal/siem/mitre"
 )
 
 // handleSIEMAlertSubroutes dispatches /api/v1/siem/alerts/{id}[/status|notes]
@@ -402,12 +403,14 @@ func (h *Handler) handleSIEMMitreMatrix(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	alerts, _, err := h.pgDB.ListSIEMAlerts(ctx, "", "", "", 200, 0)
-	if err != nil {
-		alerts = []models.SIEMAlert{}
+	stats := make(map[string]mitre.AlertStat)
+	if rows, err := h.pgDB.ListMitreAlertStats(ctx); err == nil {
+		for _, s := range rows {
+			stats[s.Technique] = mitre.AlertStat{Count: s.Count, LastSeen: s.LastSeen}
+		}
 	}
 
-	report := h.mitreCatalog.GenerateCoverageReport(rules, alerts)
+	report := h.mitreCatalog.GenerateCoverageReportWithStats(rules, stats)
 	writeJSON(w, http.StatusOK, report)
 }
 
@@ -424,7 +427,7 @@ func (h *Handler) handleSIEMMitreSync(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	ctx, cancel := contextWithTimeout(r, 60*time.Second)
+	ctx, cancel := contextWithTimeout(r, 5*time.Minute)
 	defer cancel()
 
 	var count int
@@ -465,10 +468,15 @@ func (h *Handler) handleSIEMMitreSync(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now().UTC(),
 	})
 
+	status := h.mitreCatalog.GenerateCoverageReportWithStats(nil, nil)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"success":           true,
 		"synced_techniques": count,
-		"message":           fmt.Sprintf("Successfully synchronized %d MITRE ATT&CK techniques", count),
+		"attack_version":    status.AttackVersion,
+		"total_techniques":  status.TotalTechniques,
+		"new_techniques":    status.NewTechniques,
+		"message": fmt.Sprintf("%s loaded: %d techniques (%d parent / %d sub-techniques), %d new since previous release. Saved to database.",
+			status.Version, status.TotalTechniques, status.TotalParent, status.TotalSub, status.NewTechniques),
 	})
 }
 
