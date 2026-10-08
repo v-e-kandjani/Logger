@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.3.2</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.3.3</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -559,18 +559,24 @@
             <!-- TAB: Unknown Sources -->
             <section class="tab-pane" id="pane-unregistered">
                 <div class="section-actions">
-                    <h3>Auto-Discovered Syslog Senders (Unregistered)</h3>
-                    <p class="subtitle">Convert discovered network senders into registered assets with one click</p>
+                    <div>
+                        <h3 data-i18n="unregistered_title">Auto-Discovered Syslog Senders & Device Types</h3>
+                        <p class="subtitle" data-i18n="unregistered_subtitle">Fingerprinted network assets with automated vendor & device type detection</p>
+                    </div>
+                    <button class="btn btn-primary" id="btn-onboard-all-unreg" style="display: flex; align-items: center; gap: 6px;">
+                        <span>⚡</span> <span data-i18n="btn_onboard_all">Auto-Onboard All Discovered Assets</span>
+                    </button>
                 </div>
                 <div class="table-container">
                     <table class="data-table" id="unreg-table">
                         <thead>
                             <tr>
                                 <th>Sender IP</th>
-                                <th>Packets Received</th>
-                                <th>Detected Facility</th>
-                                <th>Detected Severity</th>
-                                <th>First Seen</th>
+                                <th>Hostname / Asset</th>
+                                <th>Discovered Type</th>
+                                <th>Detected Vendor</th>
+                                <th>Confidence</th>
+                                <th>Packets</th>
                                 <th>Last Seen</th>
                                 <th>Action</th>
                             </tr>
@@ -906,7 +912,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.3.2</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.3.3</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -1008,17 +1014,31 @@
                     <label>IP Address</label>
                     <input type="text" class="input" id="dev-ip" placeholder="192.168.1.1">
                 </div>
+                <div id="modal-auto-discovery-badge" style="display: none; margin-bottom: 12px; padding: 10px 14px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; font-size: 12px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span id="auto-discovery-badge-text" style="font-weight: 600; color: var(--color-primary);">🎯 Auto-Discovered: Fortinet Firewall</span>
+                        <span id="auto-discovery-confidence-badge" class="badge badge-success">HIGH</span>
+                    </div>
+                </div>
                 <div class="form-group">
                     <label>Vendor</label>
                     <select class="input" id="dev-vendor">
-                        <option value="WatchGuard">WatchGuard (Firebox)</option>
-                        <option value="Fortinet">Fortinet (FortiGate)</option>
-                        <option value="Cisco">Cisco (ASA / IOS / Catalyst)</option>
-                        <option value="Palo Alto">Palo Alto Networks</option>
-                        <option value="HPE Aruba">HPE Aruba Networking</option>
-                        <option value="Sophos">Sophos (XG / UTM)</option>
-                        <option value="Linux">Linux Server</option>
-                        <option value="Generic">Generic Syslog</option>
+                        <option value="Fortinet">Fortinet (FortiGate / FortiSwitch)</option>
+                        <option value="WatchGuard">WatchGuard (Firebox / Fireware)</option>
+                        <option value="Cisco">Cisco (ASA / IOS / Catalyst / Nexus)</option>
+                        <option value="Palo Alto">Palo Alto Networks (PAN-OS)</option>
+                        <option value="MikroTik">MikroTik (RouterOS / SwitchOS)</option>
+                        <option value="pfSense">pfSense</option>
+                        <option value="OPNsense">OPNsense</option>
+                        <option value="HPE Aruba">HPE Aruba Networking (ProCurve / AOS)</option>
+                        <option value="Juniper">Juniper Networks (Junos / SRX / EX)</option>
+                        <option value="Sophos">Sophos (SFOS / XG / UTM)</option>
+                        <option value="Check Point">Check Point (Quantum / Gaia)</option>
+                        <option value="Ubiquiti">Ubiquiti (UniFi / EdgeMAX)</option>
+                        <option value="Linux">Linux Server (Ubuntu / RHEL / Debian)</option>
+                        <option value="Microsoft">Microsoft Windows Server / Active Directory</option>
+                        <option value="VMware">VMware ESXi Hypervisor</option>
+                        <option value="Generic">Generic Syslog Device</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1027,8 +1047,11 @@
                         <option value="Firewall">Firewall</option>
                         <option value="Switch">Switch</option>
                         <option value="Router">Router</option>
-                        <option value="Wireless Controller">Wireless Controller</option>
                         <option value="Server">Server</option>
+                        <option value="Wireless Controller">Wireless Controller</option>
+                        <option value="Access Point">Access Point</option>
+                        <option value="VPN Gateway">VPN Gateway</option>
+                        <option value="Generic Syslog">Generic Syslog</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1529,7 +1552,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.3.2"></script>
-    <script src="/static/js/app.js?v=1.3.2"></script>
+    <script src="/static/js/translations.js?v=1.3.3"></script>
+    <script src="/static/js/app.js?v=1.3.3"></script>
 </body>
 </html>

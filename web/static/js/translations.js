@@ -3,7 +3,7 @@ const translations = {
     tr: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.3.2",
+        app_version: "v1.3.3",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         view_title_dashboard: "Operasyon & Güvenlik Paneli",
@@ -169,10 +169,19 @@ const translations = {
         col_ts_policy: "Zaman Damgası Politikası",
         col_actions: "İşlemler",
 
-        // Unknown Sources
+        // Unknown Sources / Auto-Discovery
         unknown_header: "Ağda Otomatik Tespit Edilen Syslog Göndericileri (Kayıtsız)",
         unknown_desc: "Sisteme yetkisiz veya yeni bağlanan syslog göndericilerini tek tıkla envantere kaydedin.",
+        unregistered_title: "Otomatik Keşfedilen Syslog Kaynakları & Cihaz Türleri",
+        unregistered_subtitle: "Otomatik üretici ve cihaz türü parmak izi tespiti yapılan ağ varlıkları",
+        btn_onboard_all: "Tüm Keşfedilen Varlıkları Otomatik Kaydet",
+        btn_auto_detect: "Otomatik Algıla",
+        badge_auto_discovered: "🎯 Otomatik Keşfedildi",
         col_sender_ip: "Gönderici IP",
+        col_hostname: "Hostname / Varlık",
+        col_discovered_type: "Cihaz Türü",
+        col_detected_vendor: "Algılanan Üretici",
+        col_confidence: "Güven Skoru",
         col_packets_rx: "Alınan Paket",
         col_detected_facility: "Algılanan Tesis",
         col_detected_severity: "Algılanan Önem",
@@ -258,7 +267,7 @@ const translations = {
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.3.2",
+        app_version: "v1.3.3",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         view_title_dashboard: "Operations & Security Dashboard",
@@ -424,10 +433,19 @@ const translations = {
         col_ts_policy: "Timestamp Policy",
         col_actions: "Actions",
 
-        // Unknown Sources
+        // Unknown Sources / Auto-Discovery
         unknown_header: "Auto-Discovered Syslog Senders (Unregistered)",
         unknown_desc: "Convert discovered network senders into registered assets with one click",
+        unregistered_title: "Auto-Discovered Syslog Senders & Device Types",
+        unregistered_subtitle: "Fingerprinted network assets with automated vendor & device type detection",
+        btn_onboard_all: "Auto-Onboard All Discovered Assets",
+        btn_auto_detect: "Auto-Detect",
+        badge_auto_discovered: "🎯 Auto-Discovered",
         col_sender_ip: "Sender IP",
+        col_hostname: "Hostname / Asset",
+        col_discovered_type: "Discovered Type",
+        col_detected_vendor: "Detected Vendor",
+        col_confidence: "Confidence",
         col_packets_rx: "Packets Received",
         col_detected_facility: "Detected Facility",
         col_detected_severity: "Detected Severity",

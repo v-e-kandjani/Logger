@@ -262,6 +262,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.3.3** (Device Type & Vendor Auto-Discovery Engine):
+  - **Automated Deep Asset Fingerprinting**: Real-time inspection engine analyzing incoming syslog event patterns, RFC headers, hostnames, and application signatures to automatically detect both device vendor (Fortinet, WatchGuard, Cisco, Palo Alto, MikroTik, pfSense, OPNsense, HPE Aruba, Juniper, Sophos, Check Point, Ubiquiti, Linux, Windows, VMware) and device type (Firewall, Switch, Router, Server, Wireless Controller, Access Point, VPN Gateway).
+  - **Asset Cataloging & Confidence Rating**: Automatically extracts hostnames, tags confidence ratings (`HIGH`, `MEDIUM`, `LOW`), and saves metadata to PostgreSQL `unregistered_sources` without dropping or delaying in-flight log ingestion.
+  - **1-Click Discovered Asset Onboarding**: Pre-populates vendor, device type, network tier group, and hostname inside `#device-modal` for rapid single-device onboarding.
+  - **Bulk Onboarding Action (`⚡ Auto-Onboard All Discovered Assets`)**: 1-click batch onboarding converting all discovered network senders into registered inventory assets simultaneously with automated naming conventions.
+  - **Retrospective Log Analysis (`🔍 Detect`)**: On-demand device type detection for existing registered devices by querying their latest ClickHouse historical logs via `POST /api/v1/devices/auto-detect`.
 - **v1.3.2** (Automated FIFO Storage Reclaim & Dynamic Listener Management):
   - **Bounded Live Stream (Last 15 Logs)**: Restructured live websocket stream and buffer to strictly retain only the last 15 receiving events, preventing browser memory exhaustion and high-volume clutter while preserving instant visibility of incoming traffic.
   - **Dynamic Syslog Network Listeners & Hot-Reload**: Ability to configure and change UDP, TCP, and TLS bind IP addresses and port numbers directly from the Web UI Settings panel with zero-downtime socket hot-reload without container restarts.

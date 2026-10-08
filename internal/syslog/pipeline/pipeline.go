@@ -13,6 +13,7 @@ import (
 	"github.com/syslog-platform/logger/internal/database/postgres"
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/siem/correlation"
+	"github.com/syslog-platform/logger/internal/syslog/detector"
 	"github.com/syslog-platform/logger/internal/syslog/parser"
 )
 
@@ -155,9 +156,15 @@ func (p *Pipeline) workerLoop() {
 				}
 				if dev.Vendor != "" {
 					event.Vendor = dev.Vendor
+				} else if event.Vendor == "" || event.Vendor == "Generic" {
+					detection := detector.Detect(event.RawMessage, event.Hostname, event.ApplicationName)
+					event.Vendor = detection.Vendor
 				}
 				if dev.DeviceType != "" {
 					event.Product = dev.DeviceType
+				} else if event.Product == "" || event.Product == "Unknown" {
+					detection := detector.Detect(event.RawMessage, event.Hostname, event.ApplicationName)
+					event.Product = detection.DeviceType
 				}
 				// Asynchronously update last_seen_at in postgres
 				go func(ip string) {
@@ -166,35 +173,47 @@ func (p *Pipeline) workerLoop() {
 					_ = p.pgDB.UpdateDeviceLastSeen(ctx, ip, time.Now())
 				}(ipStr)
 			} else {
-				// Permissive mode: auto-discovery
+				// Permissive mode: auto-discovery with deep device type & vendor fingerprinting
 				event.DeviceID = uuid.Nil
-				if event.DeviceName == "" {
+				detection := detector.Detect(event.RawMessage, event.Hostname, event.ApplicationName)
+
+				if detection.Hostname != "" {
+					event.Hostname = detection.Hostname
+					if event.DeviceName == "" || event.DeviceName == "UNKNOWN" {
+						event.DeviceName = detection.Hostname
+					}
+				} else if event.DeviceName == "" {
 					if event.Hostname != "" && event.Hostname != ipStr {
 						event.DeviceName = event.Hostname
 					} else {
 						event.DeviceName = "UNKNOWN"
 					}
 				}
+
 				event.DeviceGroup = "Unregistered"
-				if event.Vendor == "" {
-					event.Vendor = "Generic"
+				if event.Vendor == "" || event.Vendor == "Generic" {
+					event.Vendor = detection.Vendor
 				}
-				if event.Product == "" {
-					event.Product = "Unknown"
+				if event.Product == "" || event.Product == "Unknown" {
+					event.Product = detection.DeviceType
 				}
 
-				// Fire-and-forget record unknown sender
-				go func(ip, sample, fac, sev string) {
+				// Fire-and-forget record unknown sender with auto-discovered metadata
+				go func(ip, host, vendor, devType, conf, sample, fac, sev string) {
 					ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 					defer cancel()
 					_ = p.pgDB.RecordUnregisteredSource(ctx, &models.UnregisteredSource{
 						IPAddress:        ip,
+						Hostname:         host,
+						DetectedVendor:   vendor,
+						DetectedType:     devType,
+						Confidence:       conf,
 						LastSeenAt:       time.Now(),
 						LastRawSample:    sample,
 						DetectedFacility: fac,
 						DetectedSeverity: sev,
 					})
-				}(ipStr, event.RawMessage, event.Facility, event.Severity)
+				}(ipStr, detection.Hostname, detection.Vendor, detection.DeviceType, detection.Confidence, event.RawMessage, event.Facility, event.Severity)
 			}
 
 			p.EventsParsed.Add(1)

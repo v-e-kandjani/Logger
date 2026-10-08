@@ -24,6 +24,7 @@ import (
 	"github.com/syslog-platform/logger/internal/metrics"
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/siem/mitre"
+	"github.com/syslog-platform/logger/internal/syslog/detector"
 	"github.com/syslog-platform/logger/internal/syslog/listener"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 	"github.com/syslog-platform/logger/internal/timestamp"
@@ -123,7 +124,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/logs", h.requireAuth(h.handleSearchLogs))
 	mux.HandleFunc("/api/v1/logs/live", h.requireAuth(h.handleLiveWebSocket))
 	mux.HandleFunc("/api/v1/devices", h.requireAuth(h.handleDevices))
+	mux.HandleFunc("/api/v1/devices/auto-detect", h.requireAuth(h.handleDeviceAutoDetect))
 	mux.HandleFunc("/api/v1/unregistered", h.requireAuth(h.handleUnregisteredSources))
+	mux.HandleFunc("/api/v1/unregistered/onboard-all", h.requireAuth(h.handleAutoOnboardAll))
 	mux.HandleFunc("/api/v1/archives", h.requireAuth(h.handleArchives))
 	mux.HandleFunc("/api/v1/archives/create", h.requireAuth(h.handleCreateArchiveNow))
 	mux.HandleFunc("/api/v1/archives/download", h.requireAuth(h.handleDownloadArchive))
@@ -637,6 +640,149 @@ func (h *Handler) handleUnregisteredSources(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	writeJSON(w, http.StatusOK, sources)
+}
+
+func (h *Handler) handleDeviceAutoDetect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx, cancel := contextWithTimeout(r, 10*time.Second)
+	defer cancel()
+
+	var req struct {
+		DeviceID string `json:"device_id"`
+		IP       string `json:"ip"`
+		Sample   string `json:"sample"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	devID, _ := uuid.Parse(req.DeviceID)
+	var targetDev *models.Device
+	if devID != uuid.Nil {
+		devices, err := h.pgDB.ListDevices(ctx)
+		if err == nil {
+			for i := range devices {
+				if devices[i].ID == devID {
+					targetDev = &devices[i]
+					break
+				}
+			}
+		}
+	}
+
+	sample := req.Sample
+	hostname := ""
+	ipStr := req.IP
+	if targetDev != nil {
+		ipStr = targetDev.IPAddress
+		hostname = targetDev.Hostname
+	}
+
+	// If sample is empty, query ClickHouse for the latest raw syslog message from this IP
+	if sample == "" && ipStr != "" {
+		query := fmt.Sprintf(`
+			SELECT raw_message, hostname, application_name 
+			FROM %s.syslog_events 
+			WHERE source_ip = '%s' 
+			ORDER BY event_timestamp DESC LIMIT 1
+		`, h.chClient.Database(), ipStr)
+
+		rows, err := h.chClient.QueryEvents(ctx, query)
+		if err == nil {
+			defer rows.Close()
+			if rows.Next() {
+				var rawMsg, hName, appName string
+				if err := rows.Scan(&rawMsg, &hName, &appName); err == nil {
+					sample = rawMsg
+					if hostname == "" {
+						hostname = hName
+					}
+				}
+			}
+		}
+	}
+
+	detection := detector.Detect(sample, hostname, "")
+	detection.SuggestedName = detector.GenerateSuggestedName(ipStr, detection)
+
+	// If this corresponds to an existing registered device, update it in PostgreSQL
+	if targetDev != nil && detection.Vendor != "Generic" && detection.DeviceType != "Generic Syslog" {
+		_ = h.pgDB.UpdateDeviceTypeAndVendor(ctx, targetDev.ID, detection.Vendor, detection.DeviceType)
+		_ = h.deviceCache.Refresh(ctx)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":          "detected",
+		"vendor":          detection.Vendor,
+		"device_type":     detection.DeviceType,
+		"confidence":      detection.Confidence,
+		"suggested_group": detection.SuggestedGroup,
+		"suggested_name":  detection.SuggestedName,
+		"hostname":        detection.Hostname,
+		"sample_used":     sample,
+	})
+}
+
+func (h *Handler) handleAutoOnboardAll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx, cancel := contextWithTimeout(r, 15*time.Second)
+	defer cancel()
+
+	sources, err := h.pgDB.ListUnregisteredSources(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	onboardedCount := 0
+	var registeredList []models.Device
+
+	for _, s := range sources {
+		detection := detector.Detect(s.LastRawSample, s.Hostname, "")
+		vendor := s.DetectedVendor
+		if vendor == "" || vendor == "Generic" {
+			vendor = detection.Vendor
+		}
+		devType := s.DetectedType
+		if devType == "" || devType == "Generic Syslog" {
+			devType = detection.DeviceType
+		}
+
+		devName := detector.GenerateSuggestedName(s.IPAddress, detection)
+		group := detection.SuggestedGroup
+
+		d := models.Device{
+			Name:             devName,
+			IPAddress:        s.IPAddress,
+			Hostname:         s.Hostname,
+			Description:      fmt.Sprintf("Auto-discovered %s %s", vendor, devType),
+			Vendor:           vendor,
+			DeviceType:       devType,
+			GroupName:        group,
+			ExpectedProtocol: "ANY",
+			ExpectedPort:     514,
+			IsEnabled:        true,
+			RetentionDays:    365,
+			TimestampPolicy:  "HOURLY",
+		}
+
+		if err := h.pgDB.CreateDevice(ctx, &d); err == nil {
+			_ = h.pgDB.DeleteUnregisteredSource(ctx, s.IPAddress)
+			onboardedCount++
+			registeredList = append(registeredList, d)
+		}
+	}
+
+	_ = h.deviceCache.Refresh(ctx)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":    "success",
+		"onboarded": onboardedCount,
+		"devices":   registeredList,
+	})
 }
 
 func (h *Handler) handleArchives(w http.ResponseWriter, r *http.Request) {

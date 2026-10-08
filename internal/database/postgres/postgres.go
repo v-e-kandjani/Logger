@@ -48,6 +48,14 @@ func NewDB(cfg config.PostgresConfig) (*DB, error) {
 		return nil, fmt.Errorf("pinging postgres: %w", err)
 	}
 
+	// Ensure auto-discovery schema columns exist
+	_, _ = pool.Exec(ctx, `
+		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS hostname VARCHAR(128) DEFAULT '';
+		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS detected_vendor VARCHAR(64) DEFAULT '';
+		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS detected_type VARCHAR(64) DEFAULT '';
+		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS confidence VARCHAR(16) DEFAULT 'MEDIUM';
+	`)
+
 	return &DB{pool: pool}, nil
 }
 
@@ -216,16 +224,27 @@ func (db *DB) UpdateDeviceLastSeen(ctx context.Context, ipStr string, seenTime t
 // RecordUnregisteredSource upserts an auto-discovered sender
 func (db *DB) RecordUnregisteredSource(ctx context.Context, u *models.UnregisteredSource) error {
 	query := `
-		INSERT INTO unregistered_sources (ip_address, first_seen_at, last_seen_at, packet_count, last_raw_sample, detected_facility, detected_severity)
-		VALUES ($1::inet, $2, $2, 1, $3, $4, $5)
+		INSERT INTO unregistered_sources (
+			ip_address, first_seen_at, last_seen_at, packet_count, 
+			last_raw_sample, detected_facility, detected_severity,
+			hostname, detected_vendor, detected_type, confidence
+		)
+		VALUES ($1::inet, $2, $2, 1, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (ip_address) DO UPDATE
 		SET last_seen_at = EXCLUDED.last_seen_at,
 		    packet_count = unregistered_sources.packet_count + 1,
 		    last_raw_sample = EXCLUDED.last_raw_sample,
 		    detected_facility = EXCLUDED.detected_facility,
-		    detected_severity = EXCLUDED.detected_severity`
+		    detected_severity = EXCLUDED.detected_severity,
+		    hostname = CASE WHEN EXCLUDED.hostname <> '' THEN EXCLUDED.hostname ELSE unregistered_sources.hostname END,
+		    detected_vendor = CASE WHEN EXCLUDED.detected_vendor <> '' AND EXCLUDED.detected_vendor <> 'Generic' THEN EXCLUDED.detected_vendor ELSE unregistered_sources.detected_vendor END,
+		    detected_type = CASE WHEN EXCLUDED.detected_type <> '' AND EXCLUDED.detected_type <> 'Generic Syslog' THEN EXCLUDED.detected_type ELSE unregistered_sources.detected_type END,
+		    confidence = CASE WHEN EXCLUDED.confidence = 'HIGH' THEN 'HIGH' ELSE unregistered_sources.confidence END`
 
-	_, err := db.pool.Exec(ctx, query, u.IPAddress, u.LastSeenAt, u.LastRawSample, u.DetectedFacility, u.DetectedSeverity)
+	_, err := db.pool.Exec(ctx, query,
+		u.IPAddress, u.LastSeenAt, u.LastRawSample, u.DetectedFacility, u.DetectedSeverity,
+		u.Hostname, u.DetectedVendor, u.DetectedType, u.Confidence,
+	)
 	return err
 }
 
@@ -239,7 +258,10 @@ func (db *DB) DeleteUnregisteredSource(ctx context.Context, ipStr string) error 
 func (db *DB) ListUnregisteredSources(ctx context.Context) ([]models.UnregisteredSource, error) {
 	// Exclude any IP that has already been registered in the devices table
 	query := `
-		SELECT host(u.ip_address), u.first_seen_at, u.last_seen_at, u.packet_count, u.last_raw_sample, u.detected_facility, u.detected_severity
+		SELECT host(u.ip_address), u.first_seen_at, u.last_seen_at, u.packet_count, 
+		       u.last_raw_sample, u.detected_facility, u.detected_severity,
+		       coalesce(u.hostname, ''), coalesce(u.detected_vendor, 'Generic'), 
+		       coalesce(u.detected_type, 'Generic Syslog'), coalesce(u.confidence, 'LOW')
 		FROM unregistered_sources u
 		LEFT JOIN devices d ON u.ip_address = d.ip_address
 		WHERE d.id IS NULL
@@ -254,12 +276,23 @@ func (db *DB) ListUnregisteredSources(ctx context.Context) ([]models.Unregistere
 	var list []models.UnregisteredSource
 	for rows.Next() {
 		var u models.UnregisteredSource
-		if err := rows.Scan(&u.IPAddress, &u.FirstSeenAt, &u.LastSeenAt, &u.PacketCount, &u.LastRawSample, &u.DetectedFacility, &u.DetectedSeverity); err != nil {
+		if err := rows.Scan(
+			&u.IPAddress, &u.FirstSeenAt, &u.LastSeenAt, &u.PacketCount, 
+			&u.LastRawSample, &u.DetectedFacility, &u.DetectedSeverity,
+			&u.Hostname, &u.DetectedVendor, &u.DetectedType, &u.Confidence,
+		); err != nil {
 			return nil, err
 		}
 		list = append(list, u)
 	}
 	return list, nil
+}
+
+// UpdateDeviceTypeAndVendor updates vendor and device_type for an asset
+func (db *DB) UpdateDeviceTypeAndVendor(ctx context.Context, id uuid.UUID, vendor, deviceType string) error {
+	query := `UPDATE devices SET vendor = $1, device_type = $2, updated_at = NOW() WHERE id = $3`
+	_, err := db.pool.Exec(ctx, query, vendor, deviceType, id)
+	return err
 }
 
 // LogArchive methods

@@ -96,7 +96,30 @@
 
 ---
 
-### 3.2 Tier 2: Parser & Multi-Vendor Normalization
+### 3.2 Automated Device Type & Vendor Fingerprinting Engine
+Operating seamlessly within the ingestion pipeline, the deep asset detector (`internal/syslog/detector`) fingerprints network hardware and software from raw incoming syslog packets without adding latency to the high-throughput channel:
+
+* **Multi-Dimensional Signature Heuristics:**
+  * **Fortinet:** Detects `devid=FG`, `type="traffic"`, FortiOS kernel tokens (`Firewall`).
+  * **WatchGuard:** Matches `msg_id=`, `Firebox`, `Fireware` tags (`Firewall`).
+  * **Cisco:** Inspects `%ASA-`, `%FTD-` (`Firewall`), `%SYS-`, `%LINK-`, `%CDP-` (`Switch`), `%ROUTER-`, `%BGP-` (`Router`), `%WLC-`, `aironet` (`Wireless Controller`).
+  * **Palo Alto Networks:** Identifies `PAN-OS`, `,TRAFFIC,`, `,THREAT,` CSV structures (`Firewall`).
+  * **MikroTik:** Recognizes RouterOS tags `system,info`, `firewall,info`, `caps,info` (`Router` / `Wireless`).
+  * **pfSense / OPNsense:** Matches `filterlog`, `openvpn`, `suricata` (`Firewall`).
+  * **HPE Aruba:** Identifies ProCurve and ArubaOS markers `WLC`, `AP-`, `%WLAN` (`Switch` / `Wireless Controller`).
+  * **Juniper:** Matches `RT_FLOW`, Junos `ESWD`, `BGP` (`Firewall` / `Switch`).
+  * **Sophos & Check Point:** Matches `SFOS`, `device_name="XG"`, and `fw_action`, `Quantum` (`Firewall`).
+  * **Ubiquiti:** Recognizes `UniFi`, `UAP-`, `EdgeSwitch` (`Wireless Controller` / `Switch`).
+  * **Operating Systems & Hypervisors:** Recognizes Linux PAM (`sshd`, `sudo`, `cron`), Windows Active Directory / EventLog (`Microsoft-Windows-Security-Auditing`), and VMware ESXi (`vmkernel`, `vobd`).
+* **Confidence Rating:** Assigns `HIGH` (definitive vendor signature/ID match), `MEDIUM` (heuristic substring/app match), or `LOW` (generic heuristic fallback).
+* **Dual Execution Modes:**
+  1. **Real-Time Stream Discovery:** Asynchronously registers new network senders with detected hostname, vendor, type, and confidence in PostgreSQL `unregistered_sources`.
+  2. **Retrospective Log Analysis:** On-demand inspection endpoint (`POST /api/v1/devices/auto-detect`) querying historical ClickHouse logs to fingerprint previously registered assets.
+  3. **Automated Onboarding:** Supports both single-click pre-filled modal onboarding and bulk automated onboarding (`POST /api/v1/unregistered/onboard-all`).
+
+---
+
+### 3.3 Tier 2: Parser & Multi-Vendor Normalization
 The normalization subsystem decodes raw vendor-specific syslog messages into a standardized `NormalizedEvent` struct:
 
 ```go
@@ -128,7 +151,7 @@ type NormalizedEvent struct {
 
 ---
 
-### 3.3 Tier 3: Real-Time Sliding-Window Correlation Engine
+### 3.4 Tier 3: Real-Time Sliding-Window Correlation Engine
 The correlation engine evaluates normalized events against active detection rules using in-memory sliding time windows:
 
 * **Sliding Window State:** Each rule maintains dynamic buckets partitioned by `GroupBy` keys (e.g. `AUTH-001::source_ip` or `SYS-001::username`).
@@ -138,7 +161,7 @@ The correlation engine evaluates normalized events against active detection rule
 
 ---
 
-### 3.4 Tier 4: Storage Architecture
+### 3.5 Tier 4: Storage Architecture
 
 #### 1. ClickHouse (High-Performance Analytical Log Store)
 * **Table:** `syslog.syslog_events`
@@ -165,7 +188,7 @@ The correlation engine evaluates normalized events against active detection rule
 
 ---
 
-### 3.5 Tier 5: Law No. 5651 & TÜBİTAK KamuSM Timestamping
+### 3.6 Tier 5: Law No. 5651 & TÜBİTAK KamuSM Timestamping
 To fulfill the legal requirements of Turkish Law No. 5651:
 1. Logs are batched into deterministic time windows (hourly or daily).
 2. The batch is compressed (`.jsonl.gz`) and hashed via **SHA-256**.

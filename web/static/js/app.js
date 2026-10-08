@@ -308,12 +308,12 @@ function initSearch() {
 // Devices Management
 async function loadDevices() {
     const tbody = document.getElementById('devices-body');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Loading registered devices...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center">Loading registered devices...</td></tr>';
     try {
         const res = await fetch('/api/v1/devices');
         const devices = await res.json();
         if (!devices || devices.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No registered devices yet. Add one or convert from unknown sources.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No registered devices yet. Add one or convert from unknown sources.</td></tr>';
             return;
         }
 
@@ -321,8 +321,8 @@ async function loadDevices() {
             <tr>
                 <td><strong>${escapeHtml(d.name)}</strong></td>
                 <td class="mono-code">${d.ip_address}</td>
-                <td>${d.vendor}</td>
-                <td>${d.device_type}</td>
+                <td>${escapeHtml(d.vendor)}</td>
+                <td>${escapeHtml(d.device_type)}</td>
                 <td>
                     <span class="badge ${d.syslog_status === 'HEALTHY' ? 'badge-success' : d.syslog_status === 'WARNING' ? 'badge-warning' : 'badge-secondary'}">
                         ${d.syslog_status}
@@ -331,6 +331,7 @@ async function loadDevices() {
                 <td>${d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : 'Never'}</td>
                 <td><span class="badge badge-primary">${d.timestamp_policy}</span></td>
                 <td>
+                    <button class="btn btn-outline" style="padding: 4px 8px; margin-right: 4px;" onclick="autoDetectDevice('${d.id}', '${d.ip_address}')" title="Auto-Detect Vendor & Type from Log Stream">🔍 Detect</button>
                     <button class="btn btn-outline text-red" style="padding: 4px 8px;" onclick="deleteDevice('${d.id}')">Delete</button>
                 </td>
             </tr>
@@ -351,15 +352,64 @@ window.deleteDevice = async (id) => {
     }
 };
 
-// Unknown Sources
+window.autoDetectDevice = async (id, ip) => {
+    try {
+        const res = await fetch('/api/v1/devices/auto-detect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, ip_address: ip }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Auto-detect failed');
+        alert(`Auto-detection result for ${ip}:\nVendor: ${data.vendor}\nDevice Type: ${data.device_type}\nConfidence: ${data.confidence}\nHostname: ${data.hostname || 'N/A'}`);
+        loadDevices();
+    } catch (e) {
+        alert('Auto-detection error: ' + e.message);
+    }
+};
+
+function getDeviceTypeBadge(type) {
+    if (!type || type === 'Generic Syslog' || type === 'Unknown') {
+        return `<span class="badge badge-secondary">Generic Syslog</span>`;
+    }
+    const t = type.toLowerCase();
+    if (t.includes('firewall')) {
+        return `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">🛡️ Firewall</span>`;
+    }
+    if (t.includes('switch')) {
+        return `<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">🔀 Switch</span>`;
+    }
+    if (t.includes('router')) {
+        return `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);">🌐 Router</span>`;
+    }
+    if (t.includes('server')) {
+        return `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">🖥️ Server</span>`;
+    }
+    if (t.includes('wireless') || t.includes('access point')) {
+        return `<span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">📶 Wireless</span>`;
+    }
+    if (t.includes('vpn')) {
+        return `<span class="badge" style="background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3);">🔒 VPN Gateway</span>`;
+    }
+    return `<span class="badge badge-secondary">${escapeHtml(type)}</span>`;
+}
+
+function getConfidenceBadge(conf) {
+    const c = (conf || 'LOW').toUpperCase();
+    if (c === 'HIGH') return `<span class="badge badge-success">HIGH</span>`;
+    if (c === 'MEDIUM') return `<span class="badge badge-warning">MED</span>`;
+    return `<span class="badge badge-secondary">LOW</span>`;
+}
+
+// Auto-Discovered Sources
 async function loadUnregisteredSources() {
     const tbody = document.getElementById('unreg-body');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Loading detected sources...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center">Loading detected sources...</td></tr>';
     try {
         const res = await fetch('/api/v1/unregistered');
         const sources = await res.json();
         if (!sources || sources.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No unregistered syslog traffic detected.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No unregistered syslog traffic detected.</td></tr>';
             return;
         }
 
@@ -367,13 +417,14 @@ async function loadUnregisteredSources() {
         tbody.innerHTML = sources.map((s, idx) => `
             <tr>
                 <td class="mono-code text-yellow">${escapeHtml(s.ip_address)}</td>
+                <td><strong>${escapeHtml(s.hostname && s.hostname !== '-' ? s.hostname : (s.detected_vendor ? s.detected_vendor + '-Asset' : 'Unknown'))}</strong></td>
+                <td>${getDeviceTypeBadge(s.detected_type)}</td>
+                <td><span class="badge badge-outline">${escapeHtml(s.detected_vendor || 'Generic')}</span></td>
+                <td>${getConfidenceBadge(s.confidence)}</td>
                 <td>${Number(s.packet_count).toLocaleString()}</td>
-                <td>${escapeHtml(s.detected_facility || '-')}</td>
-                <td>${escapeHtml(s.detected_severity || '-')}</td>
-                <td>${new Date(s.first_seen_at).toLocaleString()}</td>
                 <td>${new Date(s.last_seen_at).toLocaleString()}</td>
                 <td>
-                    <button class="btn btn-outline btn-register-unreg" data-idx="${idx}">+ Register</button>
+                    <button class="btn btn-primary btn-register-unreg" data-idx="${idx}" style="padding: 4px 10px; font-size: 12px;">+ Onboard</button>
                 </td>
             </tr>
         `).join('');
@@ -384,37 +435,90 @@ async function loadUnregisteredSources() {
                 const idx = parseInt(btn.getAttribute('data-idx'), 10);
                 const s = window._unregisteredSources[idx];
                 if (s) {
-                    onboardDevice(s.ip_address, s.last_raw_sample || '');
+                    onboardDevice(s.ip_address, s.last_raw_sample || '', s);
                 }
             });
         });
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-red">Failed: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-red">Failed: ${e.message}</td></tr>`;
     }
 }
 
-window.onboardDevice = (ip, sample = '') => {
+window.onboardDevice = (ip, sample = '', sourceObj = null) => {
     const ipInput = document.getElementById('dev-ip');
     const nameInput = document.getElementById('dev-name');
-    if (ipInput) ipInput.value = ip;
-    if (nameInput) nameInput.value = `Device-${ip.replace(/\./g, '-')}`;
-
     const vendorSelect = document.getElementById('dev-vendor');
     const typeSelect = document.getElementById('dev-type');
     const groupSelect = document.getElementById('dev-group');
+    const modalBadge = document.getElementById('modal-auto-discovery-badge');
+    const badgeText = document.getElementById('auto-discovery-badge-text');
+    const confBadge = document.getElementById('auto-discovery-confidence-badge');
 
-    if (sample && (sample.toLowerCase().includes('watchguard') || sample.toLowerCase().includes('firebox') || sample.includes('msg_id='))) {
-        if (vendorSelect) vendorSelect.value = 'WatchGuard';
-        if (typeSelect) typeSelect.value = 'Firewall';
-        if (nameInput) nameInput.value = `WatchGuard-FW-${ip.replace(/\./g, '-')}`;
-        if (groupSelect) groupSelect.value = 'Perimeter Firewalls';
-    } else if (sample && (sample.toLowerCase().includes('cisco') || sample.includes('%SYS-') || sample.includes('%LINK-'))) {
-        if (vendorSelect) vendorSelect.value = 'Cisco';
-        if (typeSelect) typeSelect.value = 'Switch';
-        if (nameInput) nameInput.value = `Cisco-SW-${ip.replace(/\./g, '-')}`;
-        if (groupSelect) groupSelect.value = 'Core Switches & Routers';
+    if (ipInput) ipInput.value = ip;
+
+    let detectedVendor = (sourceObj && sourceObj.detected_vendor) || '';
+    let detectedType = (sourceObj && sourceObj.detected_type) || '';
+    let hostname = (sourceObj && sourceObj.hostname) || '';
+    let confidence = (sourceObj && sourceObj.confidence) || '';
+
+    if (!detectedVendor && sample) {
+        const sLower = sample.toLowerCase();
+        if (sLower.includes('fortinet') || sLower.includes('fortigate') || sLower.includes('devid=fg') || sLower.includes('type="traffic"')) {
+            detectedVendor = 'Fortinet';
+            detectedType = 'Firewall';
+            confidence = 'HIGH';
+        } else if (sLower.includes('watchguard') || sLower.includes('firebox') || sample.includes('msg_id=')) {
+            detectedVendor = 'WatchGuard';
+            detectedType = 'Firewall';
+            confidence = 'HIGH';
+        } else if (sLower.includes('cisco') || sample.includes('%SYS-') || sample.includes('%LINK-') || sample.includes('%ASA-')) {
+            detectedVendor = 'Cisco';
+            detectedType = sample.includes('%ASA-') ? 'Firewall' : 'Switch';
+            confidence = 'HIGH';
+        } else if (sLower.includes('palo alto') || sample.includes('TRAFFIC,') || sample.includes('THREAT,')) {
+            detectedVendor = 'Palo Alto';
+            detectedType = 'Firewall';
+            confidence = 'HIGH';
+        } else if (sLower.includes('mikrotik') || sample.includes('system,info') || sample.includes('firewall,info')) {
+            detectedVendor = 'MikroTik';
+            detectedType = 'Router';
+            confidence = 'HIGH';
+        }
+    }
+
+    if (hostname && hostname !== '-' && hostname !== 'unknown') {
+        if (nameInput) nameInput.value = hostname;
+    } else if (detectedVendor && detectedType) {
+        if (nameInput) nameInput.value = `${detectedVendor}-${detectedType.replace(/\s+/g, '')}-${ip.replace(/\./g, '-')}`;
     } else {
-        if (groupSelect) groupSelect.value = 'Default';
+        if (nameInput) nameInput.value = `Device-${ip.replace(/\./g, '-')}`;
+    }
+
+    if (detectedVendor && vendorSelect) {
+        vendorSelect.value = detectedVendor;
+    }
+    if (detectedType && typeSelect) {
+        typeSelect.value = detectedType;
+    }
+
+    if (groupSelect) {
+        if (detectedType === 'Firewall') groupSelect.value = 'Perimeter Firewalls';
+        else if (detectedType === 'Switch' || detectedType === 'Router') groupSelect.value = 'Core Switches & Routers';
+        else if (detectedType === 'Server') groupSelect.value = 'Identity & Auth Servers';
+        else groupSelect.value = 'Default';
+    }
+
+    if (modalBadge) {
+        if (detectedVendor || detectedType) {
+            modalBadge.style.display = 'block';
+            if (badgeText) badgeText.textContent = `🎯 Auto-Discovered: ${detectedVendor || 'Generic'} ${detectedType || 'Device'}${hostname && hostname !== '-' ? ' (' + hostname + ')' : ''}`;
+            if (confBadge) {
+                confBadge.textContent = confidence || 'HIGH';
+                confBadge.className = 'badge ' + (confidence === 'HIGH' ? 'badge-success' : confidence === 'MEDIUM' ? 'badge-warning' : 'badge-secondary');
+            }
+        } else {
+            modalBadge.style.display = 'none';
+        }
     }
 
     const modal = document.getElementById('device-modal');
@@ -526,15 +630,44 @@ function initArchiveTrigger() {
 
 function initDeviceModal() {
     const modal = document.getElementById('device-modal');
-    document.getElementById('btn-add-device-modal').addEventListener('click', () => {
-        modal.style.display = 'flex';
-    });
-    document.getElementById('btn-close-modal').addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
-    document.getElementById('btn-cancel-modal').addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
+    const addBtn = document.getElementById('btn-add-device-modal');
+    if (addBtn) {
+        addBtn.addEventListener('click', () => {
+            const badge = document.getElementById('modal-auto-discovery-badge');
+            if (badge) badge.style.display = 'none';
+            const nameInp = document.getElementById('dev-name');
+            const ipInp = document.getElementById('dev-ip');
+            if (nameInp) nameInp.value = '';
+            if (ipInp) ipInp.value = '';
+            modal.style.display = 'flex';
+        });
+    }
+    const closeBtn = document.getElementById('btn-close-modal');
+    if (closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+    const cancelBtn = document.getElementById('btn-cancel-modal');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+
+    const btnOnboardAll = document.getElementById('btn-onboard-all-unreg');
+    if (btnOnboardAll) {
+        btnOnboardAll.addEventListener('click', async () => {
+            if (!confirm('Automatically onboard and register all auto-discovered network assets?')) return;
+            btnOnboardAll.disabled = true;
+            btnOnboardAll.innerHTML = '<span>⏳</span> Onboarding Assets...';
+            try {
+                const res = await fetch('/api/v1/unregistered/onboard-all', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed onboarding assets');
+                showToast(`✓ Successfully auto-onboarded ${data.onboarded_count || 0} discovered device(s)!`, 'success');
+                loadUnregisteredSources();
+                loadDevices();
+            } catch (e) {
+                showToast('Failed onboarding: ' + e.message, 'error');
+            } finally {
+                btnOnboardAll.disabled = false;
+                btnOnboardAll.innerHTML = '<span>⚡</span> <span data-i18n="btn_onboard_all">Auto-Onboard All Discovered Assets</span>';
+            }
+        });
+    }
 
     document.getElementById('btn-save-device').addEventListener('click', async () => {
         const payload = {
@@ -552,10 +685,11 @@ function initDeviceModal() {
             });
             if (!res.ok) throw new Error(await res.text());
             modal.style.display = 'none';
+            showToast('✓ Device asset registered successfully', 'success');
             loadDevices();
             loadUnregisteredSources();
         } catch (e) {
-            alert('Failed saving asset: ' + e.message);
+            showToast('Failed saving asset: ' + e.message, 'error');
         }
     });
 }

@@ -72,6 +72,10 @@ type DeviceGroup struct {
 // UnregisteredSource records an unknown host transmitting syslog messages
 type UnregisteredSource struct {
 	IPAddress        string    `json:"ip_address"`
+	Hostname         string    `json:"hostname,omitempty"`
+	DetectedVendor   string    `json:"detected_vendor,omitempty"`
+	DetectedType     string    `json:"detected_type,omitempty"`
+	Confidence       string    `json:"confidence,omitempty"`
 	FirstSeenAt      time.Time `json:"first_seen_at"`
 	LastSeenAt       time.Time `json:"last_seen_at"`
 	PacketCount      int64     `json:"packet_count"`

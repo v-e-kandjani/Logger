@@ -251,6 +251,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ## Sürüm Geçmişi (Release History)
 
+- **v1.3.3** (Cihaz Türü & Üretici Otomatik Keşif Motoru):
+  - **Derin Otomatik Varlık Parmak İzi Tespiti**: Gelen syslog olay kalıplarını, RFC başlıklarını, hostname değerlerini ve uygulama imzalarını analiz ederek ağdaki varlıkların üreticisini (Fortinet, WatchGuard, Cisco, Palo Alto, MikroTik, pfSense, OPNsense, HPE Aruba, Juniper, Sophos, Check Point, Ubiquiti, Linux, Windows, VMware) ve cihaz türünü (Firewall, Switch, Router, Server, Wireless Controller, Access Point, VPN Gateway) gerçek zamanlı otomatik olarak algılayan motor geliştirildi.
+  - **Varlık Kataloglama & Güven Skoru**: Hostname ayrıştırma, güven derecelendirmesi (`HIGH`, `MEDIUM`, `LOW`) ve tespit edilen metaverilerin log akışını yavaşlatmadan asenkron olarak PostgreSQL `unregistered_sources` tablosuna kaydedilmesi sağlandı.
+  - **Tek Tıkla Keşfedilen Cihaz Kaydı**: Algılanan üretici, cihaz türü, ağ grubu ve hostname bilgilerini `#device-modal` içine otomatik doldurarak saniyeler içinde varlık kaydı yapma imkanı getirildi.
+  - **Toplu Otomatik Envanter Kaydı (`⚡ Tüm Keşfedilen Varlıkları Otomatik Kaydet`)**: Ağda tespit edilen tüm bilinmeyen syslog kaynaklarını tek tıkla standart adlandırma kuralı ve tespit edilen cihaz türleriyle kayıtlı cihazlar envanterine dönüştürme özelliği eklendi.
+  - **Geriye Dönük Log Analizi (`🔍 Detect`)**: Daha önceden kaydedilmiş cihazların en son ClickHouse loglarını geriye dönük analiz ederek cihaz türü ve üretici tespitini tetikleyen `POST /api/v1/devices/auto-detect` uç noktası ve arayüz butonu entegre edildi.
 - **v1.3.2** (Otomatik FIFO Disk Ezme & Dinamik Syslog Dinleyici Yönetimi):
   - **Sınırlandırılmış Canlı Akış (Son 15 Kayıt)**: Canlı websocket akışı ve tamponu kesin olarak sadece son 15 gelen olay kaydını tutacak şekilde yeniden yapılandırıldı; tarayıcı bellek şişmesi ve aşırı akış kalabalığı engellendi.
   - **Dinamik Syslog Ağ Dinleyicileri & Sıcak Yeniden Yükleme (Hot-Reload)**: UDP, TCP ve TLS dinleme IP adresleri ile port numaralarının doğrudan Web Arayüzü Ayarlar sekmesinden yapılandırılması ve konteynerleri yeniden başlatmadan sıfır kesintiyle anında devreye alınması sağlandı.
