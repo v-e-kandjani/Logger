@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	Version   = "v1.3.0"
+	Version   = "v1.3.1"
 	BuildDate = "2026-10-08"
-	CommitSHA = "0a5ea80"
+	CommitSHA = "735a1cc"
 	Platform  = "Valtrivo LogSeal"
 	Company   = "Valtrivo"
 	Tagline   = "Her kayıt, zamanıyla kanıt."

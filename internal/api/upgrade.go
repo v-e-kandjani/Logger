@@ -367,6 +367,12 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 		"UPGRADE.md",
 		"README.md",
 		"README.tr.md",
+		"docs/ARCHITECTURE.md",
+		"docs/MITRE_ATTACK_GUIDE.md",
+		"migrations/postgres/001_initial_schema.sql",
+		"migrations/postgres/002_siem_tables.sql",
+		"migrations/clickhouse/001_initial_events.sql",
+		"docker-compose.yml",
 	}
 
 	var updatedFiles []string

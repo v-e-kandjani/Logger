@@ -241,10 +241,22 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 > Ayrıntılı adımlar, geri alma (rollback) prosedürleri ve SSS için **[UPGRADE.md](UPGRADE.md)** belgesine bakınız.
 
+## Mimari ve Teknik Dokümantasyon
+
+- 📘 [**Kapsamlı Sistem Mimarisi Belgesi**](docs/ARCHITECTURE.md) — Çok katmanlı log toplama, çift veritabanlı depolama (ClickHouse + PostgreSQL), bellek içi korelasyon ve 5651 zaman damgası mimarisi.
+- 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
+- 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
+
 ---
 
 ## Sürüm Geçmişi (Release History)
 
+- **v1.3.1** (Sıfır Veri Kaybı Optimizasyonu & MITRE ATT&CK Senkronizasyonu):
+  - **Sıfır Veri Kaybı Kalıcılığı ve Performans Optimizasyonu**: Konteyner yeniden başlatmalarında ClickHouse kuyruklarının ve PostgreSQL WAL kontrol noktalarının temiz diske yazılması için `stop_grace_period: 30s` tanımlandı. PostgreSQL sunucu parametreleri (`shared_buffers=256MB`, `work_mem=16MB`, `wal_buffers=16MB`, `max_connections=200`) optimize edildi.
+  - **Otomatik Yükseltme Öncesi Yedekleme**: `upgrade.sh` betiği, kod çekilmeden veya konteyner derlenmeden önce `./backups/postgres_backup_YYYYMMDD_HHMMSS.sql.gz` konumuna otomatik sıkıştırılmış PostgreSQL yedeği alır (son 5 yedek rotasyonu ile).
+  - **MITRE ATT&CK® Kataloğu & Senkronizasyon Motoru**: Yerleşik Kurumsal ATT&CK v15.1 kataloğu, resmi GitHub STIX 2.1 besleme ayrıştırıcısı (`POST /api/v1/siem/mitre/sync`) ve kapalı ağlar için yerel dosya senkronizasyonu.
+  - **SOC ATT&CK Matris Görüntüleyici**: 14 taktik hedefi, izlenen teknik ID'lerini, aktif kuralları ve tespit edilen vaka istatistiklerini gösteren etkileşimli web modalı.
+  - **Kapsamlı Teknik Mimari Dokümantasyonu**: Detaylı `docs/ARCHITECTURE.md` ve `docs/MITRE_ATTACK_GUIDE.md` yayımlandı.
 - **v1.3.0** (Faz 5 - Kurumsal SIEM Dönüşümü):
   - **SIEM Normalizasyon Motoru**: Fortinet FortiGate, WatchGuard Firebox, Cisco ASA/IOS, Linux Auth/SSH/Sudo ve Windows Syslog loglarını Ortak Olay Modeline (`event.category`, `event.action`, `source.ip`, `destination.ip`, `user.name`, `severity`, `risk_score`, MITRE ATT&CK) dönüştüren evrensel standartlaştırıcı.
   - **Gerçek Zamanlı Korelasyon & Tespit Motoru**: Kayan zaman pencerelerinde çalışan ve ön tanımlı tespit kuralları (Kaba Kuvvet Parola Saldırısı `AUTH-001`, Parola Püskürtme `AUTH-002`, Ağ Port Taraması `NET-001`, Güvenlik Duvarı Paket Boğma `NET-002`, Yetki Yükseltme Girişimi `SYS-001`, Kalıcılık/Kullanıcı Oluşturma `SYS-002`, Tehdit/İstismar Engellendi `THREAT-001`) barındıran tespit çekirdeği.

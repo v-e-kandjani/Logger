@@ -252,8 +252,22 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+## Architecture & Technical Documentation
+
+- 📘 [**Comprehensive System Architecture Specification**](docs/ARCHITECTURE.md) — Multi-tier ingestion, dual-engine storage (ClickHouse + PostgreSQL), in-memory correlation, and 5651 timestamping architecture.
+- 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
+- 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
+
+---
+
 ## Release History
 
+- **v1.3.1** (Zero Data Loss Optimization & MITRE ATT&CK Sync):
+  - **Zero Data Loss Database Persistence & Optimization**: Configured `stop_grace_period: 30s` across all containers ensuring in-flight ClickHouse batch queues and PostgreSQL WAL checkpoints flush cleanly before restart. Tuned PostgreSQL server parameters (`shared_buffers=256MB`, `work_mem=16MB`, `wal_buffers=16MB`, `max_connections=200`).
+  - **Automated Pre-Upgrade Snapshots**: `upgrade.sh` automatically creates compressed PostgreSQL database backups (`./backups/postgres_backup_YYYYMMDD_HHMMSS.sql.gz`) with 5-snapshot retention prior to code pull or container rebuild.
+  - **MITRE ATT&CK® Catalog & Synchronization Engine**: Built-in Enterprise ATT&CK v15.1 catalog with online STIX 2.1 JSON parser (`POST /api/v1/siem/mitre/sync`) and air-gapped offline file sync capability.
+  - **SOC ATT&CK Matrix Visualizer Modal**: Interactive Web UI viewer displaying real-time defensive coverage across all 14 tactics, monitored technique IDs, rule mappings, and live incident attribution.
+  - **Complete Technical Architecture Documentation**: Published detailed `docs/ARCHITECTURE.md` and `docs/MITRE_ATTACK_GUIDE.md`.
 - **v1.3.0** (Phase 5 - Enterprise SIEM Evolution):
   - **SIEM Normalization Engine**: Universal standardizer normalizing Fortinet FortiGate, WatchGuard Firebox, Cisco ASA/IOS, Linux Auth/SSH/Sudo, and Windows Syslog into Common Event Model (`event.category`, `event.action`, `source.ip`, `destination.ip`, `user.name`, `severity`, `risk_score`, MITRE ATT&CK mapping).
   - **Real-Time Correlation & Detection Engine**: Sliding window bucket evaluator with out-of-the-box detection rules (Brute Force `AUTH-001`, Password Spraying `AUTH-002`, Port Scan `NET-001`, Firewall Denial Flood `NET-002`, Privilege Escalation `SYS-001`, Persistence Account Creation `SYS-002`, Threat/Malware Exploit Blocked `THREAT-001`).

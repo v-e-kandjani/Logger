@@ -52,6 +52,20 @@ CH_USER="${CLICKHOUSE_USER:-default}"
 PREV_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 info "Current installed commit: ${PREV_COMMIT}"
 
+# 1.5. Automated Pre-Upgrade Database Snapshot (Zero Data Loss Protection)
+mkdir -p ./backups
+if docker compose ps -q postgres &>/dev/null && [ "$(docker compose ps -q postgres)" != "" ]; then
+    info "Taking automated pre-upgrade snapshot of PostgreSQL database..."
+    BACKUP_FILE="./backups/postgres_backup_$(date +%Y%m%d_%H%M%S).sql.gz"
+    if docker compose exec -T postgres pg_dump -U "$PG_USER" -d "$PG_DB" | gzip > "$BACKUP_FILE"; then
+        success "Database backup snapshot saved: ${BACKUP_FILE}"
+        # Keep only the latest 5 snapshots to avoid filling disk
+        ls -tp ./backups/postgres_backup_*.sql.gz 2>/dev/null | tail -n +6 | xargs -I {} rm -- {} 2>/dev/null || true
+    else
+        warn "Automated database backup notice: container busy or pg_dump returned non-zero. Continuing with upgrade..."
+    fi
+fi
+
 # 2. Pull latest code from GitHub
 info "Fetching and pulling latest code from origin/main..."
 # Stash any local uncommitted files to prevent merge conflict

@@ -3,7 +3,7 @@ const translations = {
     tr: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.3.0",
+        app_version: "v1.3.1",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         view_title_dashboard: "Operasyon & Güvenlik Paneli",
@@ -32,6 +32,16 @@ const translations = {
         // SIEM SOC
         siem_soc_title: "Güvenlik Operasyon Merkezi (SIEM)",
         siem_soc_subtitle: "Gerçek zamanlı korelasyon kuralları, tehdit istihbaratı, MITRE ATT&CK ve vaka yönetimi",
+        btn_mitre_matrix: "MITRE ATT&CK Matrisi",
+        btn_sync_mitre: "Resmi Beslemeyi Güncelle",
+        mitre_modal_title: "MITRE ATT&CK® Matrisi ve Kapsama Durumu",
+        mitre_stat_tactics: "Taktik Hedefler",
+        mitre_stat_tactics_sub: "14 Saldırgan Amacı",
+        mitre_stat_techniques: "Katalog Teknikleri",
+        mitre_stat_techniques_sub: "İzlenen Teknik ID'leri",
+        mitre_stat_covered: "Kural Koruması",
+        mitre_stat_alerts: "Eşleşen Vakalar",
+        mitre_stat_alerts_sub: "Canlı Alarmlarda Tespit Edilen",
         btn_siem_rules: "Tespit Kuralları",
         btn_simulate_threat: "Saldırı Simülasyonu",
         stat_active_incidents: "Aktif Vakalar",
@@ -237,7 +247,7 @@ const translations = {
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.3.0",
+        app_version: "v1.3.1",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         view_title_dashboard: "Operations & Security Dashboard",
@@ -266,6 +276,16 @@ const translations = {
         // SIEM SOC
         siem_soc_title: "Security Operations Center (SIEM)",
         siem_soc_subtitle: "Real-time correlation rules, threat intelligence, MITRE ATT&CK mapping & incident triage",
+        btn_mitre_matrix: "MITRE ATT&CK Matrix",
+        btn_sync_mitre: "Sync Official Feed",
+        mitre_modal_title: "MITRE ATT&CK® Enterprise Matrix & Coverage",
+        mitre_stat_tactics: "Enterprise Tactics",
+        mitre_stat_tactics_sub: "14 Adversary Objectives",
+        mitre_stat_techniques: "Monitored Techniques",
+        mitre_stat_techniques_sub: "Catalog Technique IDs",
+        mitre_stat_covered: "Covered by SIEM Rules",
+        mitre_stat_alerts: "Attributed Incidents",
+        mitre_stat_alerts_sub: "Mapped in Live Alerts",
         btn_siem_rules: "Detection Rules",
         btn_simulate_threat: "Simulate Threat",
         stat_active_incidents: "Active Incidents",

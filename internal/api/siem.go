@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -384,3 +385,90 @@ func (h *Handler) handleSIEMLiveStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+// handleSIEMMitreMatrix returns ATT&CK matrix tactics, techniques, and SOC coverage
+func (h *Handler) handleSIEMMitreMatrix(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r, 5*time.Second)
+	defer cancel()
+
+	rules, err := h.pgDB.ListSIEMRules(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	alerts, _, err := h.pgDB.ListSIEMAlerts(ctx, "", "", "", 200, 0)
+	if err != nil {
+		alerts = []models.SIEMAlert{}
+	}
+
+	report := h.mitreCatalog.GenerateCoverageReport(rules, alerts)
+	writeJSON(w, http.StatusOK, report)
+}
+
+// handleSIEMMitreSync updates MITRE ATT&CK definitions from online feed or local air-gapped file
+func (h *Handler) handleSIEMMitreSync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		URL      string `json:"url"`
+		FilePath string `json:"file_path"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	ctx, cancel := contextWithTimeout(r, 60*time.Second)
+	defer cancel()
+
+	var count int
+	var err error
+
+	if req.FilePath != "" {
+		count, err = h.mitreCatalog.SyncFromFile(req.FilePath)
+	} else {
+		count, err = h.mitreCatalog.SyncFromURL(ctx, req.URL)
+	}
+
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("Failed to sync MITRE ATT&CK definitions: %v", err),
+		})
+		return
+	}
+
+	cookie, _ := r.Cookie(SessionCookieName)
+	username := "Administrator"
+	if cookie != nil {
+		if session, ok := h.sessions.Get(cookie.Value); ok {
+			username = session.Username
+		}
+	}
+
+	_ = h.pgDB.InsertAuditLog(ctx, &models.AuditLog{
+		Username: username,
+		SourceIP: r.RemoteAddr,
+		Action:   "SIEM_MITRE_SYNC",
+		Resource: "MITRE_ATTACK",
+		Result:   "SUCCESS",
+		Details: map[string]interface{}{
+			"synced_techniques": count,
+			"source":            req.URL,
+			"file_path":         req.FilePath,
+		},
+		CreatedAt: time.Now().UTC(),
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success":           true,
+		"synced_techniques": count,
+		"message":           fmt.Sprintf("Successfully synchronized %d MITRE ATT&CK techniques", count),
+	})
+}
+

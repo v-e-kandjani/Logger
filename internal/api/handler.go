@@ -22,6 +22,7 @@ import (
 	"github.com/syslog-platform/logger/internal/database/postgres"
 	"github.com/syslog-platform/logger/internal/metrics"
 	"github.com/syslog-platform/logger/internal/models"
+	"github.com/syslog-platform/logger/internal/siem/mitre"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 	"github.com/syslog-platform/logger/internal/timestamp"
 	"github.com/syslog-platform/logger/internal/version"
@@ -39,6 +40,7 @@ type Handler struct {
 	archEngine       *archive.Engine
 	tsProvider       timestamp.TimestampProvider
 	metricsCollector *metrics.Collector
+	mitreCatalog     *mitre.Catalog
 	nodeName         string
 	sessions         *SessionManager
 
@@ -65,6 +67,7 @@ func NewHandler(
 		archEngine:       ae,
 		tsProvider:       ts,
 		metricsCollector: mc,
+		mitreCatalog:     mitre.NewCatalog(),
 		nodeName:         node,
 		sessions:         NewSessionManager(),
 	}
@@ -140,6 +143,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/siem/rules/", h.requireAuth(h.handleSIEMRuleSubroutes))
 	mux.HandleFunc("/api/v1/siem/simulate", h.requireAuth(h.handleSIEMSimulate))
 	mux.HandleFunc("/api/v1/siem/live", h.requireAuth(h.handleSIEMLiveStream))
+	mux.HandleFunc("/api/v1/siem/mitre", h.requireAuth(h.handleSIEMMitreMatrix))
+	mux.HandleFunc("/api/v1/siem/mitre/sync", h.requireAuth(h.handleSIEMMitreSync))
 
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))

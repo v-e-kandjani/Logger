@@ -19,6 +19,7 @@ services:
         soft: 262144
         hard: 262144
     restart: unless-stopped
+    stop_grace_period: 30s
     healthcheck:
       test: ["CMD", "clickhouse-client", "--user", "${CLICKHOUSE_USER:-default}", "--password", "${CLICKHOUSE_PASSWORD:-}", "--query", "SELECT 1"]
       interval: 5s
@@ -38,7 +39,24 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations/postgres:/docker-entrypoint-initdb.d
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=64MB"
+      - "-c"
+      - "effective_cache_size=768MB"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "max_connections=200"
     restart: unless-stopped
+    stop_grace_period: 30s
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-syslog_admin} -d ${POSTGRES_DB:-syslog_manager}"]
       interval: 5s
@@ -80,6 +98,7 @@ services:
       - syslog_archives:/opt/syslog-platform/archive
       - ./timestamp-client:/opt/syslog-platform/timestamp-client
     restart: unless-stopped
+    stop_grace_period: 30s
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/api/v1/system/health"]
       interval: 10s

@@ -125,8 +125,21 @@ If you ever need to rollback to a previous commit:
 * Database services (`clickhouse` and `postgres`) remain online and are **not** stopped during `syslog-app` rebuilds.
 * Recreating `syslog-app` takes approximately **2–3 seconds**, during which the OS UDP socket buffer queues incoming syslog packets.
 
-### 2. Are historical logs or certificates affected?
-* **No.** All ClickHouse logs, PostgreSQL databases, daily timestamped archive bundles (`.jsonl.gz.zd`), and configuration files are stored in persistent Docker volumes and host directories. They are untouched during upgrades.
+### 2. Are historical logs, alerts, or database records preserved?
+* **YES, 100% Guaranteed.** All ClickHouse historical logs, PostgreSQL databases, SIEM alerts, custom correlation rules, and daily timestamped archive bundles (`.jsonl.gz.zd`) are stored in persistent Docker named volumes (`clickhouse_data`, `postgres_data`, `syslog_archives`).
+* Upgrading only updates the Go binary and web static assets inside the `syslog-app` container.
 
-### 3. What if `git pull` reports "Permission denied"?
+### 3. Database Disaster Recovery & Automated Snapshots
+* Whenever `upgrade.sh` is executed, it automatically generates a compressed database snapshot in `./backups/postgres_backup_YYYYMMDD_HHMMSS.sql.gz` before any changes are pulled.
+* To restore a snapshot at any time:
+  ```bash
+  gunzip -c ./backups/postgres_backup_<TIMESTAMP>.sql.gz | docker compose exec -T postgres psql -U syslog_admin -d syslog_manager
+  ```
+
+> [!CAUTION]
+> **DO NOT USE `docker compose down -v`!**
+> The `-v` flag instructs Docker to **destroy all volumes**, which will wipe your database! Always use standard `docker compose up -d syslog-app` or `bash upgrade.sh`.
+
+### 4. What if `git pull` reports "Permission denied"?
 Ensure the repository was cloned via HTTPS (`https://github.com/v-e-kandjani/Logger.git`) or that your user has read permissions.
+

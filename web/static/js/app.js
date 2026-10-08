@@ -2216,6 +2216,11 @@ function initSIEMManagement() {
         });
     }
 
+    const btnOpenMitre = document.getElementById('btn-open-mitre-matrix');
+    if (btnOpenMitre) {
+        btnOpenMitre.addEventListener('click', openSIEMMitreModal);
+    }
+
     const btnOpenRules = document.getElementById('btn-open-siem-rules');
     if (btnOpenRules) {
         btnOpenRules.addEventListener('click', openSIEMRulesModal);
@@ -2251,8 +2256,20 @@ function initSIEMManagement() {
         });
     }
 
+    const btnCloseMitre = document.getElementById('btn-close-siem-mitre');
+    if (btnCloseMitre) {
+        btnCloseMitre.addEventListener('click', () => {
+            document.getElementById('siem-mitre-modal').style.display = 'none';
+        });
+    }
+
+    const btnSyncMitre = document.getElementById('btn-sync-mitre-feed');
+    if (btnSyncMitre) {
+        btnSyncMitre.addEventListener('click', syncSIEMMitreFeed);
+    }
+
     // Backdrop dismissal
-    ['siem-investigate-modal', 'siem-rules-modal', 'siem-simulate-modal'].forEach(id => {
+    ['siem-investigate-modal', 'siem-rules-modal', 'siem-simulate-modal', 'siem-mitre-modal'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener('click', (e) => {
@@ -2694,3 +2711,142 @@ function handleLiveIncomingAlert(alert) {
         loadSIEMAlerts();
     }
 }
+
+async function openSIEMMitreModal() {
+    const modal = document.getElementById('siem-mitre-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    loadSIEMMitreMatrix();
+}
+
+async function loadSIEMMitreMatrix() {
+    const container = document.getElementById('mitre-matrix-container');
+    const versionLabel = document.getElementById('mitre-matrix-version-label');
+    if (!container) return;
+
+    try {
+        const res = await fetch('/api/v1/siem/mitre');
+        if (!res.ok) throw new Error('Failed loading MITRE ATT&CK report');
+        const report = await res.json();
+
+        // Update stats
+        const elTactics = document.getElementById('mitre-stat-tactics');
+        if (elTactics) elTactics.textContent = report.total_tactics || 14;
+
+        const elTechs = document.getElementById('mitre-stat-techniques');
+        if (elTechs) elTechs.textContent = (report.total_techniques || 0).toLocaleString();
+
+        const elCovered = document.getElementById('mitre-stat-covered');
+        if (elCovered) elCovered.textContent = (report.covered_techniques || 0).toLocaleString();
+
+        const elCovPct = document.getElementById('mitre-stat-coverage-pct');
+        if (elCovPct && report.total_techniques > 0) {
+            const pct = ((report.covered_techniques / report.total_techniques) * 100).toFixed(1);
+            elCovPct.textContent = `${pct}% Active Detection Coverage`;
+        }
+
+        const elAlerts = document.getElementById('mitre-stat-alerts');
+        if (elAlerts) elAlerts.textContent = (report.total_alerts_mapped || 0).toLocaleString();
+
+        if (versionLabel && report.version) {
+            versionLabel.textContent = `${report.version} • Source: ${report.source || 'Official Feed'}`;
+        }
+
+        // Render Tactics and Techniques
+        const tactics = report.tactics || [];
+        if (tactics.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted" style="padding: 20px;">No tactics found.</div>';
+            return;
+        }
+
+        container.innerHTML = tactics.map(tac => {
+            const covPct = (tac.coverage_percent || 0).toFixed(0);
+            const covClass = tac.covered_techniques > 0 ? 'border-accent' : '';
+            return `
+                <div class="panel ${covClass}" style="margin-bottom: 0; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-color);">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="mono-code" style="font-weight: 700; color: var(--primary); font-size: 11px;">${escapeHtml(tac.id)}</span>
+                            <span style="font-weight: 600; font-size: 13.5px; color: var(--text-main);">${escapeHtml(tac.name)}</span>
+                            <span style="font-size: 11px; color: var(--text-muted);">(${tac.covered_techniques}/${tac.total_techniques} covered)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="badge ${tac.covered_techniques > 0 ? 'badge-success' : 'badge-outline'}" style="font-size: 10.5px;">${covPct}% Coverage</span>
+                            <a href="${escapeHtml(tac.url || '#')}" target="_blank" style="font-size: 11px; color: var(--primary); text-decoration: none;" title="Open in MITRE ATT&CK Knowledgebase">MITRE ↗</a>
+                        </div>
+                    </div>
+                    <div class="panel-body" style="padding: 12px 14px;">
+                        <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px;">${escapeHtml(tac.description || '')}</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px;">
+                            ${(tac.techniques || []).map(tech => {
+                                const isCovered = tech.covered;
+                                const ruleBadges = (tech.rule_ids || []).map(r => `<span class="badge badge-secondary" style="font-size: 9.5px; padding: 2px 4px;">${escapeHtml(r)}</span>`).join(' ');
+                                return `
+                                    <div style="padding: 8px 10px; background: ${isCovered ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-main)'}; border: 1px solid ${isCovered ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)'}; border-radius: 6px; display: flex; flex-direction: column; gap: 4px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
+                                            <a href="${escapeHtml(tech.url || '#')}" target="_blank" style="font-size: 12px; font-weight: 600; color: ${isCovered ? 'var(--text-main)' : 'var(--text-muted)'}; text-decoration: none;" title="${escapeHtml(tech.description || '')}">
+                                                ${escapeHtml(tech.id)}: ${escapeHtml(tech.name)}
+                                            </a>
+                                            ${isCovered ? '<span class="badge badge-success" style="font-size: 9.5px;">Covered</span>' : '<span class="badge badge-outline" style="font-size: 9.5px; opacity: 0.6;">Uncovered</span>'}
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                            <div style="display: flex; gap: 4px; flex-wrap: wrap;">${ruleBadges || '<span style="font-size: 10px; color: var(--text-muted);">No active rules</span>'}</div>
+                                            ${tech.alert_count > 0 ? `<span class="badge badge-danger" style="font-size: 9.5px;">${tech.alert_count} alerts</span>` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (e) {
+        container.innerHTML = `<div class="text-center text-red" style="padding: 20px;">Hata: ${e.message}</div>`;
+    }
+}
+
+async function syncSIEMMitreFeed() {
+    const btn = document.getElementById('btn-sync-mitre-feed');
+    const alertBox = document.getElementById('mitre-sync-alert');
+
+    if (btn) btn.disabled = true;
+    if (alertBox) {
+        alertBox.style.display = 'block';
+        alertBox.className = 'alert-box alert-info';
+        alertBox.textContent = 'Connecting to official MITRE Enterprise ATT&CK STIX 2.1 feed (GitHub)...';
+    }
+
+    try {
+        const res = await fetch('/api/v1/siem/mitre/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Sync failed');
+
+        if (alertBox) {
+            alertBox.className = 'alert-box alert-success';
+            alertBox.textContent = `✓ ${data.message || 'MITRE ATT&CK definitions synchronized successfully!'}`;
+        }
+        showToast('MITRE ATT&CK matrisi güncellendi!', 'success');
+
+        // Reload matrix representation
+        setTimeout(() => {
+            loadSIEMMitreMatrix();
+        }, 500);
+
+    } catch (e) {
+        if (alertBox) {
+            alertBox.className = 'alert-box alert-danger';
+            alertBox.textContent = `✗ Synchronization notice: ${e.message}. Using built-in Enterprise baseline.`;
+        }
+        showToast(`Senkronizasyon uyarısı: ${e.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+

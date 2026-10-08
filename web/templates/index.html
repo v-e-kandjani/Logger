@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.3.0</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.3.1</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -383,7 +383,10 @@
                         <h3 data-i18n="siem_soc_title">Security Operations Center (SIEM)</h3>
                         <p class="subtitle" data-i18n="siem_soc_subtitle">Real-time correlation rules, threat intelligence, MITRE ATT&CK mapping & incident triage</p>
                     </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <button class="btn btn-outline" id="btn-open-mitre-matrix">
+                            <span>🛡️</span> <span data-i18n="btn_mitre_matrix">MITRE ATT&CK Matrix</span>
+                        </button>
                         <button class="btn btn-outline" id="btn-open-siem-rules">
                             <span>⚙️</span> <span data-i18n="btn_siem_rules">Detection Rules</span>
                         </button>
@@ -834,7 +837,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.3.0</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.3.1</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -1403,7 +1406,61 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=3.0"></script>
-    <script src="/static/js/app.js?v=3.0"></script>
+    <!-- MODAL: MITRE ATT&CK Matrix & Coverage -->
+    <div class="modal-backdrop" id="siem-mitre-modal" style="display: none;">
+        <div class="modal modal-wide" style="max-width: 1050px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px;">🛡️</span>
+                    <div>
+                        <h3 style="margin: 0;" data-i18n="mitre_modal_title">MITRE ATT&CK® Enterprise Matrix & Coverage</h3>
+                        <span style="font-size: 11px; color: var(--text-muted);" id="mitre-matrix-version-label">Enterprise Matrix v15.1 Baseline</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn btn-primary" id="btn-sync-mitre-feed" style="font-size: 12px; padding: 6px 12px;">
+                        <span>🔄</span> <span data-i18n="btn_sync_mitre">Sync Official Feed</span>
+                    </button>
+                    <button class="close-btn" id="btn-close-siem-mitre">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding: 16px; max-height: 78vh; overflow-y: auto;">
+                <!-- Matrix Metrics -->
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px;">
+                    <div class="stat-card" style="padding: 12px;">
+                        <div class="stat-header" data-i18n="mitre_stat_tactics">Enterprise Tactics</div>
+                        <div class="stat-value text-blue" id="mitre-stat-tactics">14</div>
+                        <div class="stat-sub" data-i18n="mitre_stat_tactics_sub">Adversary Objectives</div>
+                    </div>
+                    <div class="stat-card" style="padding: 12px;">
+                        <div class="stat-header" data-i18n="mitre_stat_techniques">Monitored Techniques</div>
+                        <div class="stat-value text-yellow" id="mitre-stat-techniques">0</div>
+                        <div class="stat-sub" data-i18n="mitre_stat_techniques_sub">Catalog Techniques</div>
+                    </div>
+                    <div class="stat-card" style="padding: 12px;">
+                        <div class="stat-header" data-i18n="mitre_stat_covered">Covered by SIEM Rules</div>
+                        <div class="stat-value text-green" id="mitre-stat-covered">0</div>
+                        <div class="stat-sub" id="mitre-stat-coverage-pct">0% Active Detection</div>
+                    </div>
+                    <div class="stat-card" style="padding: 12px;">
+                        <div class="stat-header" data-i18n="mitre_stat_alerts">Attributed Incidents</div>
+                        <div class="stat-value text-red" id="mitre-stat-alerts">0</div>
+                        <div class="stat-sub" data-i18n="mitre_stat_alerts_sub">Mapped in Live Alerts</div>
+                    </div>
+                </div>
+
+                <!-- Sync Notification Banner -->
+                <div id="mitre-sync-alert" class="alert-box" style="display: none; margin-bottom: 14px; padding: 10px 14px; font-size: 12px; border-radius: 6px;"></div>
+
+                <!-- Matrix Tactics Breakdown -->
+                <div id="mitre-matrix-container" style="display: flex; flex-direction: column; gap: 14px;">
+                    <div class="text-center text-muted" style="padding: 30px;">Loading MITRE ATT&CK Matrix coverage...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/translations.js?v=1.3.1"></script>
+    <script src="/static/js/app.js?v=1.3.1"></script>
 </body>
 </html>
