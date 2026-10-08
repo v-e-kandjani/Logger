@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.3.1</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.3.2</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -299,11 +299,12 @@
                             <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                                 <div style="max-width: 700px;">
                                     <span style="font-size: 13px; font-weight: 600; color: var(--text-main); display: block;" data-i18n="storage_fifo_desc">Depolama alanı dolduğunda veri kaybını önlemek için en eski aylık log bölümünü ClickHouse seviyesinde anında temizler.</span>
-                                    <span style="font-size: 11px; color: var(--text-muted);" data-i18n="storage_auto_policy">Disk doluluk oranı kritik seviyeye ulaştığında en eski arşivlenmiş log bloklarını otomatik olarak ez.</span>
+                                    <span style="font-size: 11px; color: var(--text-muted);" data-i18n="storage_auto_policy">Disk doluluk oranı yapılandırılan eşiğe ulaştığında en eski log blokları FIFO yöntemiyle otomatik temizlenir.</span>
                                 </div>
-                                <button class="btn btn-outline text-red" id="btn-prune-storage" data-i18n="btn_prune_oldest" style="border-color: rgba(239, 68, 68, 0.4); padding: 8px 16px; font-weight: 600;">
-                                    🗑️ En Eski Bölümü Ez (FIFO Overwrite)
-                                </button>
+                                <div style="display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 8px 14px; border-radius: 8px;">
+                                    <span class="status-dot online"></span>
+                                    <span style="font-size: 12px; font-weight: 600; color: var(--color-success);" id="fifo-status-indicator" data-i18n="storage_fifo_automated_badge">⚡ Otomatik FIFO Temizleme Devrede (<span id="fifo-threshold-display">85</span>% Eşik)</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -315,7 +316,7 @@
                 <div class="live-toolbar">
                     <button class="btn btn-primary" id="btn-toggle-live">Pause Stream</button>
                     <input type="text" class="input" id="live-filter" placeholder="Filter incoming live events (regex or text)...">
-                    <span class="badge badge-secondary" id="live-buffer-count">0 in view (Max 500)</span>
+                    <span class="badge badge-secondary" id="live-buffer-count">0 in view (Max 15)</span>
                 </div>
                 <div class="console-box" id="live-log-container">
                     <!-- Stream rows injected here -->
@@ -728,6 +729,16 @@
                                 <label>Default ClickHouse Retention (Days)</label>
                                 <input type="number" class="input" id="setting-retention-days" value="365">
                             </div>
+                            <div class="form-group" style="margin-top: 14px;">
+                                <label style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: 600;" data-i18n="lbl_fifo_threshold">Automated FIFO Reclaim Threshold (%)</span>
+                                    <span id="fifo-threshold-val-badge" class="badge badge-warning" style="font-size: 0.85rem; font-weight: 700;">85%</span>
+                                </label>
+                                <input type="range" class="input" id="setting-fifo-threshold" min="30" max="95" step="1" value="85" style="padding: 4px; cursor: pointer;">
+                                <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 4px;" data-i18n="desc_fifo_threshold">
+                                    When database host disk utilization exceeds this percentage, the automated background cleaner immediately discards the oldest partition or logs via FIFO to prevent disk exhaustion and ensure zero log drop.
+                                </small>
+                            </div>
                             <div class="status-row" style="margin-top: 16px;">
                                 <span>Java Runtime</span>
                                 <span class="mono-code">/usr/bin/java (OpenJDK 17)</span>
@@ -739,6 +750,64 @@
                             <div class="status-row">
                                 <span>Archive Destination</span>
                                 <span class="mono-code">/opt/syslog-platform/archive/YYYY/MM/DD/</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Network Listeners & Port Configuration -->
+                    <div class="panel" style="grid-column: 1 / -1;">
+                        <div class="panel-header">
+                            <h3 data-i18n="panel_listeners_title">Syslog Network Listeners & Port Configuration</h3>
+                            <span class="badge badge-primary" data-i18n="badge_dynamic_reload">Dynamic Hot-Reload</span>
+                        </div>
+                        <div class="panel-body">
+                            <p class="subtitle" style="margin-bottom: 14px;" data-i18n="desc_listeners_subtitle">
+                                Configure network bind addresses and port numbers for syslog protocols. Changes take effect immediately via zero-downtime socket hot-reload without restarting containers.
+                            </p>
+
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                                <!-- UDP Listener -->
+                                <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <strong style="color: var(--color-primary); font-size: 0.9rem;">UDP Socket Listener</strong>
+                                        <span class="badge badge-success">RFC 5426</span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="lbl_udp_listen_addr">Bind Address & Port (e.g. :514 or 0.0.0.0:514)</label>
+                                        <input type="text" class="input mono-code" id="setting-udp-listen-addr" placeholder=":514">
+                                        <small style="color: var(--text-muted); font-size: 0.75rem;">Supports multiple ports separated by commas</small>
+                                    </div>
+                                </div>
+
+                                <!-- TCP Listener -->
+                                <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <strong style="color: var(--color-cyan, #06b6d4); font-size: 0.9rem;">TCP Stream Listener</strong>
+                                        <span class="badge badge-success">RFC 6587</span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="lbl_tcp_listen_addr">Bind Address & Port (e.g. :514 or 0.0.0.0:514)</label>
+                                        <input type="text" class="input mono-code" id="setting-tcp-listen-addr" placeholder=":514">
+                                        <small style="color: var(--text-muted); font-size: 0.75rem;">Octet-counting and newline-delimited framing</small>
+                                    </div>
+                                </div>
+
+                                <!-- TLS Listener -->
+                                <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <strong style="color: #a855f7; font-size: 0.9rem;">TLS Encrypted Listener</strong>
+                                        <span class="badge badge-secondary">RFC 5425</span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="lbl_tls_listen_addr">Bind Address & Port (e.g. :6514 or 0.0.0.0:6514)</label>
+                                        <input type="text" class="input mono-code" id="setting-tls-listen-addr" placeholder=":6514">
+                                        <small style="color: var(--text-muted); font-size: 0.75rem;">TLS 1.2+ mutual/server authentication</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 10px; margin-top: 16px;">
+                                <button class="btn btn-primary" id="btn-save-listeners" data-i18n="btn_save_listeners">Apply & Hot-Reload Listeners</button>
                             </div>
                         </div>
                     </div>
@@ -837,7 +906,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.3.1</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.3.2</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -1460,7 +1529,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.3.1"></script>
-    <script src="/static/js/app.js?v=1.3.1"></script>
+    <script src="/static/js/translations.js?v=1.3.2"></script>
+    <script src="/static/js/app.js?v=1.3.2"></script>
 </body>
 </html>

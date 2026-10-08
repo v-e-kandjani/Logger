@@ -2,7 +2,7 @@
 let liveSocket = null;
 let isLivePaused = false;
 let liveLogCount = 0;
-const MAX_LIVE_ROWS = 500;
+const MAX_LIVE_ROWS = 15;
 let lastPacketCount = 0;
 let lastSampleTime = Date.now();
 
@@ -169,14 +169,14 @@ function initLiveStream() {
         toggleBtn.className = isLivePaused ? 'btn btn-outline' : 'btn btn-primary';
     });
 
-    // Pre-populate with recent logs from ClickHouse so stream is not blank on page load
+    // Pre-populate with recent logs from ClickHouse so stream is not blank on page load (Max 15)
     const preloadRecentLogs = async () => {
         try {
-            const res = await fetch('/api/v1/logs?limit=50&range=all');
+            const res = await fetch('/api/v1/logs?limit=15&range=all');
             if (!res.ok) return;
             const data = await res.json();
             if (data.logs && data.logs.length > 0 && liveLogCount === 0) {
-                const recent = [...data.logs].reverse();
+                const recent = [...data.logs].reverse().slice(-MAX_LIVE_ROWS);
                 recent.forEach(log => {
                     const row = document.createElement('div');
                     row.className = 'log-row';
@@ -229,9 +229,11 @@ function initLiveStream() {
                 container.appendChild(row);
                 liveLogCount++;
 
-                // Enforce Bounded Buffer (prevent memory leakage in browser)
-                if (liveLogCount > MAX_LIVE_ROWS) {
-                    container.removeChild(container.firstChild);
+                // Enforce Bounded Buffer (Strictly 15 items in view)
+                while (liveLogCount > MAX_LIVE_ROWS) {
+                    if (container.firstChild) {
+                        container.removeChild(container.firstChild);
+                    }
                     liveLogCount--;
                 }
                 container.scrollTop = container.scrollHeight;
@@ -722,6 +724,22 @@ async function loadSettings() {
         if (s.retention_days && document.getElementById('setting-retention-days')) {
             document.getElementById('setting-retention-days').value = s.retention_days;
         }
+        if (s.storage_fifo_threshold_pct && document.getElementById('setting-fifo-threshold')) {
+            document.getElementById('setting-fifo-threshold').value = s.storage_fifo_threshold_pct;
+            const badge = document.getElementById('fifo-threshold-val-badge');
+            if (badge) badge.textContent = s.storage_fifo_threshold_pct + '%';
+            const display = document.getElementById('fifo-threshold-display');
+            if (display) display.textContent = s.storage_fifo_threshold_pct;
+        }
+        if (s.syslog_udp_listen_addr && document.getElementById('setting-udp-listen-addr')) {
+            document.getElementById('setting-udp-listen-addr').value = s.syslog_udp_listen_addr;
+        }
+        if (s.syslog_tcp_listen_addr && document.getElementById('setting-tcp-listen-addr')) {
+            document.getElementById('setting-tcp-listen-addr').value = s.syslog_tcp_listen_addr;
+        }
+        if (s.syslog_tls_listen_addr && document.getElementById('setting-tls-listen-addr')) {
+            document.getElementById('setting-tls-listen-addr').value = s.syslog_tls_listen_addr;
+        }
 
         const isStrict = s.strict_device_filtering === 'true' || s.strict_device_filtering === true;
         updateIngestionSecurityUI(isStrict);
@@ -808,6 +826,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 kamusm_digest_type: document.getElementById('setting-digest') ? document.getElementById('setting-digest').value : 'sha-256',
                 archive_interval: document.getElementById('setting-archive-interval') ? document.getElementById('setting-archive-interval').value : 'hourly',
                 retention_days: document.getElementById('setting-retention-days') ? document.getElementById('setting-retention-days').value : '365',
+                storage_fifo_threshold_pct: document.getElementById('setting-fifo-threshold') ? document.getElementById('setting-fifo-threshold').value : '85',
             };
 
             const passInput = document.getElementById('setting-customer-pass');
@@ -833,6 +852,46 @@ document.addEventListener('DOMContentLoaded', () => {
             } finally {
                 btnSave.disabled = false;
                 btnSave.textContent = 'Save Stamping Settings';
+            }
+        });
+    }
+
+    const fifoSlider = document.getElementById('setting-fifo-threshold');
+    if (fifoSlider) {
+        fifoSlider.addEventListener('input', () => {
+            const badge = document.getElementById('fifo-threshold-val-badge');
+            if (badge) badge.textContent = fifoSlider.value + '%';
+            const display = document.getElementById('fifo-threshold-display');
+            if (display) display.textContent = fifoSlider.value;
+        });
+    }
+
+    const btnSaveListeners = document.getElementById('btn-save-listeners');
+    if (btnSaveListeners) {
+        btnSaveListeners.addEventListener('click', async () => {
+            btnSaveListeners.disabled = true;
+            btnSaveListeners.textContent = 'Reloading Listeners...';
+            const udpAddr = document.getElementById('setting-udp-listen-addr') ? document.getElementById('setting-udp-listen-addr').value.trim() : ':514';
+            const tcpAddr = document.getElementById('setting-tcp-listen-addr') ? document.getElementById('setting-tcp-listen-addr').value.trim() : ':514';
+            const tlsAddr = document.getElementById('setting-tls-listen-addr') ? document.getElementById('setting-tls-listen-addr').value.trim() : ':6514';
+
+            try {
+                const res = await fetch('/api/v1/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        syslog_udp_listen_addr: udpAddr,
+                        syslog_tcp_listen_addr: tcpAddr,
+                        syslog_tls_listen_addr: tlsAddr
+                    })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                alert(`Syslog Network Listeners updated & hot-reloaded successfully!\nUDP: ${udpAddr}\nTCP: ${tcpAddr}\nTLS: ${tlsAddr}`);
+            } catch (e) {
+                alert('Failed saving/reloading listeners: ' + e.message);
+            } finally {
+                btnSaveListeners.disabled = false;
+                btnSaveListeners.textContent = 'Apply & Hot-Reload Listeners';
             }
         });
     }
@@ -1244,6 +1303,11 @@ function updateStorageUI(storage) {
         } else {
             progressBar.style.background = 'linear-gradient(90deg, #10B981 0%, #3B82F6 70%, #F59E0B 90%, #EF4444 100%)';
         }
+    }
+
+    if (storage.fifo_threshold_percent) {
+        const fifoDisp = document.getElementById('fifo-threshold-display');
+        if (fifoDisp) fifoDisp.textContent = storage.fifo_threshold_percent;
     }
 }
 

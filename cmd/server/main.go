@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -162,20 +163,49 @@ func main() {
 	log.Printf("[Pipeline] Ingestion ring buffer started with %d workers", cfg.Syslog.Workers)
 
 	// 7. Initialize Syslog Socket Listeners (UDP/TCP/TLS)
+	if val, ok := dbSettings["syslog_udp_listen_addr"]; ok && val != "" {
+		cfg.Syslog.UDP.ListenAddr = val
+	}
+	if val, ok := dbSettings["syslog_tcp_listen_addr"]; ok && val != "" {
+		cfg.Syslog.TCP.ListenAddr = val
+	}
+	if val, ok := dbSettings["syslog_tls_listen_addr"]; ok && val != "" {
+		cfg.Syslog.TLS.ListenAddr = val
+	}
 	syslogServer := listener.NewServer(cfg.Syslog, pipe)
 	if err := syslogServer.Start(); err != nil {
 		log.Fatalf("Syslog listener startup error: %v", err)
 	}
 	defer syslogServer.Stop()
 
-	// 8. Initialize System Telemetry & Performance Metrics Engine
+	// 8. Initialize Automated FIFO Storage Reclaim Cleaner
+	fifoThresholdFunc := func() float64 {
+		s, err := pgDB.GetSettings(context.Background())
+		if err == nil {
+			if tStr, ok := s["storage_fifo_threshold_pct"]; ok {
+				if tVal, err := strconv.ParseFloat(tStr, 64); err == nil && tVal > 10 && tVal <= 99 {
+					return tVal
+				}
+			}
+		}
+		return 85.0
+	}
+	autoCleaner := clickhouse.NewAutoCleaner(chClient, fifoThresholdFunc, func(target string, before, after, thresh float64) {
+		log.Printf("[Auto-Cleaner] Automated FIFO Reclaim completed: %s purged (Usage: %.1f%% -> %.1f%%, threshold: %.1f%%)",
+			target, before, after, thresh)
+	}, 30*time.Second)
+	autoCleaner.Start(appCtx)
+	defer autoCleaner.Stop()
+
+	// 9. Initialize System Telemetry & Performance Metrics Engine
 	metricsCollector := metrics.NewCollector(pipe)
 	metricsCollector.Start(context.Background())
 	defer metricsCollector.Stop()
 	log.Println("[Telemetry] Real-time CPU, RAM, EPS & Network I/O metrics collector running")
 
-	// 9. Initialize REST & WebSocket HTTP Server
+	// 10. Initialize REST & WebSocket HTTP Server
 	apiHandler := api.NewHandler(pipe, chClient, pgDB, deviceCache, archEngine, tsProvider, metricsCollector, cfg.Server.CollectorNode)
+	apiHandler.SetSyslogServer(syslogServer)
 	mux := http.NewServeMux()
 	apiHandler.RegisterRoutes(mux)
 

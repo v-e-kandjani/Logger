@@ -3,7 +3,7 @@ const translations = {
     tr: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.3.1",
+        app_version: "v1.3.2",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         view_title_dashboard: "Operasyon & Güvenlik Paneli",
@@ -130,6 +130,17 @@ const translations = {
         storage_disk_free: "Kalan Boş Alan",
         btn_prune_oldest: "En Eski Bölümü Ez (FIFO Overwrite)",
         storage_fifo_desc: "Depolama alanı dolduğunda veri kaybını önlemek için en eski aylık log bölümünü ClickHouse seviyesinde anında temizler.",
+        storage_auto_policy: "Disk doluluk oranı yapılandırılan eşiğe ulaştığında en eski log blokları FIFO yöntemiyle otomatik temizlenir.",
+        storage_fifo_automated_badge: "⚡ Otomatik FIFO Temizleme Devrede (%s Eşik)",
+        lbl_fifo_threshold: "Otomatik FIFO Disk Ezme Eşiği (%)",
+        desc_fifo_threshold: "Veritabanı disk doluluk oranı bu yüzdeyi aştığında, arka plan temizleyici disk taşmasını önlemek ve yeni logların asla kaçırılmamasını garanti etmek için en eski verileri FIFO yöntemiyle otomatik olarak temizler.",
+        panel_listeners_title: "Syslog Ağ Dinleyicileri & Port Yapılandırması",
+        desc_listeners_subtitle: "Syslog protokolleri için ağ dinleme IP adreslerini ve port numaralarını yapılandırın. Değişiklikler konteynerleri yeniden başlatmadan sıfır kesintiyle anında devreye alınır.",
+        badge_dynamic_reload: "Dinamik Yeniden Yükleme",
+        lbl_udp_listen_addr: "UDP Dinleme Adresi & Portu (Örn: :514 veya 0.0.0.0:514)",
+        lbl_tcp_listen_addr: "TCP Dinleme Adresi & Portu (Örn: :514 veya 0.0.0.0:514)",
+        lbl_tls_listen_addr: "TLS Dinleme Adresi & Portu (Örn: :6514 veya 0.0.0.0:6514)",
+        btn_save_listeners: "Dinleyicileri Uygula & Sıcak Yeniden Yükle",
 
         // Log Search
         search_placeholder: "Mesaj, host, cihaz veya serbest metin ara (örn: WatchGuard, Deny, HTTPS, admin)...",
@@ -247,7 +258,7 @@ const translations = {
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.3.1",
+        app_version: "v1.3.2",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         view_title_dashboard: "Operations & Security Dashboard",
@@ -374,6 +385,17 @@ const translations = {
         storage_disk_free: "Free Disk Space",
         btn_prune_oldest: "Reclaim Oldest Partition (FIFO Overwrite)",
         storage_fifo_desc: "Instantly drops the chronologically oldest partition to guarantee storage availability during disk pressure.",
+        storage_auto_policy: "When host disk usage reaches the threshold, the oldest log blocks are automatically purged via FIFO.",
+        storage_fifo_automated_badge: "⚡ Automated FIFO Reclaim Active (%s Threshold)",
+        lbl_fifo_threshold: "Automated FIFO Disk Reclaim Threshold (%)",
+        desc_fifo_threshold: "When database host disk utilization exceeds this percentage, the automated background cleaner immediately discards the oldest partition or logs via FIFO to prevent disk exhaustion and ensure zero log drop.",
+        panel_listeners_title: "Syslog Network Listeners & Port Configuration",
+        desc_listeners_subtitle: "Configure network bind addresses and port numbers for syslog protocols. Changes take effect immediately via zero-downtime socket hot-reload without restarting containers.",
+        badge_dynamic_reload: "Dynamic Hot-Reload",
+        lbl_udp_listen_addr: "UDP Bind Address & Port (e.g. :514 or 0.0.0.0:514)",
+        lbl_tcp_listen_addr: "TCP Bind Address & Port (e.g. :514 or 0.0.0.0:514)",
+        lbl_tls_listen_addr: "TLS Bind Address & Port (e.g. :6514 or 0.0.0.0:6514)",
+        btn_save_listeners: "Apply & Hot-Reload Listeners",
 
         // Log Search
         search_placeholder: "Full-text token search (e.g. WatchGuard, Deny, HTTPS, admin)...",

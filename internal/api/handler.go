@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/syslog-platform/logger/internal/metrics"
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/siem/mitre"
+	"github.com/syslog-platform/logger/internal/syslog/listener"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 	"github.com/syslog-platform/logger/internal/timestamp"
 	"github.com/syslog-platform/logger/internal/version"
@@ -41,12 +43,17 @@ type Handler struct {
 	tsProvider       timestamp.TimestampProvider
 	metricsCollector *metrics.Collector
 	mitreCatalog     *mitre.Catalog
+	syslogServer     *listener.Server
 	nodeName         string
 	sessions         *SessionManager
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
 	lastManualArchive time.Time
+}
+
+func (h *Handler) SetSyslogServer(s *listener.Server) {
+	h.syslogServer = s
 }
 
 func NewHandler(
@@ -527,6 +534,28 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 			h.pipeline.SetStrictFiltering(sdf == "true" || sdf == "1")
 		}
 
+		// Reload network syslog listeners if addresses/ports were modified
+		if h.syslogServer != nil {
+			udpAddr, hasUDP := req["syslog_udp_listen_addr"]
+			tcpAddr, hasTCP := req["syslog_tcp_listen_addr"]
+			tlsAddr, hasTLS := req["syslog_tls_listen_addr"]
+			if hasUDP || hasTCP || hasTLS {
+				currentUDP, currentTCP, currentTLS := h.syslogServer.GetListenAddresses()
+				if !hasUDP {
+					udpAddr = currentUDP
+				}
+				if !hasTCP {
+					tcpAddr = currentTCP
+				}
+				if !hasTLS {
+					tlsAddr = currentTLS
+				}
+				if err := h.syslogServer.Reload(udpAddr, tcpAddr, tlsAddr); err != nil {
+					log.Printf("[Handler] Syslog listener reload warning: %v", err)
+				}
+			}
+		}
+
 		writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
 		return
 	}
@@ -562,6 +591,32 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, ok := settings["archive_interval"]; !ok {
 		settings["archive_interval"] = "hourly"
+	}
+	if _, ok := settings["storage_fifo_threshold_pct"]; !ok {
+		settings["storage_fifo_threshold_pct"] = "85"
+	}
+
+	// Syslog listener address defaults from active server if not saved
+	if h.syslogServer != nil {
+		activeUDP, activeTCP, activeTLS := h.syslogServer.GetListenAddresses()
+		if _, ok := settings["syslog_udp_listen_addr"]; !ok && activeUDP != "" {
+			settings["syslog_udp_listen_addr"] = activeUDP
+		}
+		if _, ok := settings["syslog_tcp_listen_addr"]; !ok && activeTCP != "" {
+			settings["syslog_tcp_listen_addr"] = activeTCP
+		}
+		if _, ok := settings["syslog_tls_listen_addr"]; !ok && activeTLS != "" {
+			settings["syslog_tls_listen_addr"] = activeTLS
+		}
+	}
+	if _, ok := settings["syslog_udp_listen_addr"]; !ok {
+		settings["syslog_udp_listen_addr"] = ":514"
+	}
+	if _, ok := settings["syslog_tcp_listen_addr"]; !ok {
+		settings["syslog_tcp_listen_addr"] = ":514"
+	}
+	if _, ok := settings["syslog_tls_listen_addr"]; !ok {
+		settings["syslog_tls_listen_addr"] = ":6514"
 	}
 
 	// Mask password before returning
@@ -747,7 +802,28 @@ func (h *Handler) handleStorageStats(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, stats)
+
+	settings, _ := h.pgDB.GetSettings(ctx)
+	fifoThreshold := 85.0
+	if tStr, ok := settings["storage_fifo_threshold_pct"]; ok {
+		if tVal, err := strconv.ParseFloat(tStr, 64); err == nil && tVal > 10 && tVal <= 99 {
+			fifoThreshold = tVal
+		}
+	}
+
+	resp := map[string]any{
+		"total_bytes_on_disk":     stats.TotalBytesOnDisk,
+		"uncompressed_data_bytes": stats.UncompressedDataBytes,
+		"total_rows":              stats.TotalRows,
+		"compression_ratio":       stats.CompressionRatio,
+		"free_disk_bytes":         stats.FreeDiskBytes,
+		"total_disk_bytes":        stats.TotalDiskBytes,
+		"disk_usage_percent":      stats.DiskUsagePercent,
+		"active_partitions":       stats.ActivePartitions,
+		"fifo_threshold_percent":  fifoThreshold,
+		"auto_fifo_active":        true,
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) handleStoragePrune(w http.ResponseWriter, r *http.Request) {

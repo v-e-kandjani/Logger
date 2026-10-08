@@ -262,6 +262,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.3.2** (Automated FIFO Storage Reclaim & Dynamic Listener Management):
+  - **Bounded Live Stream (Last 15 Logs)**: Restructured live websocket stream and buffer to strictly retain only the last 15 receiving events, preventing browser memory exhaustion and high-volume clutter while preserving instant visibility of incoming traffic.
+  - **Dynamic Syslog Network Listeners & Hot-Reload**: Ability to configure and change UDP, TCP, and TLS bind IP addresses and port numbers directly from the Web UI Settings panel with zero-downtime socket hot-reload without container restarts.
+  - **Automated FIFO Storage Reclaim Cleaner**: Configurable disk usage threshold percentage (e.g. 85%) with background continuous monitoring every 30 seconds. When disk utilization reaches or exceeds the threshold, the system automatically purges the chronologically oldest ClickHouse partition or oldest 24h log batch via FIFO, ensuring zero missed or dropped incoming logs due to storage exhaustion.
+  - **Dashboard Automation**: Removed manual prune button from dashboard and replaced with real-time automated FIFO status indicator and threshold telemetry.
 - **v1.3.1** (Zero Data Loss Optimization & MITRE ATT&CK Sync):
   - **Zero Data Loss Database Persistence & Optimization**: Configured `stop_grace_period: 30s` across all containers ensuring in-flight ClickHouse batch queues and PostgreSQL WAL checkpoints flush cleanly before restart. Tuned PostgreSQL server parameters (`shared_buffers=256MB`, `work_mem=16MB`, `wal_buffers=16MB`, `max_connections=200`).
   - **Automated Pre-Upgrade Snapshots**: `upgrade.sh` automatically creates compressed PostgreSQL database backups (`./backups/postgres_backup_YYYYMMDD_HHMMSS.sql.gz`) with 5-snapshot retention prior to code pull or container rebuild.

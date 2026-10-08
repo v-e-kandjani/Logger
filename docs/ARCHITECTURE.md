@@ -148,6 +148,9 @@ The correlation engine evaluates normalized events against active detection rule
 * **Compression:** `DoubleDelta` on timestamps, `ZSTD(1)` on metadata, `ZSTD(6)` on raw log bodies.
 * **Indices:** `tokenbf_v1(30720, 2, 0)` Bloom filter indices on `message` and `raw_message` for sub-second full-text token searches across billions of records.
 * **Materialized View:** `syslog.mv_events_per_minute` feeding `SummingMergeTree` for instant EPS and log-rate telemetry.
+* **Automated FIFO Storage Reclaim (Zero Log Miss Policy):** Background cleaner monitors host storage utilization every 30 seconds against a user-configured threshold percentage (default 85%). When the threshold is exceeded, the oldest monthly partition is dropped instantly via `ALTER TABLE DROP PARTITION` (or oldest 24h batch if 1 partition), guaranteeing continuous disk headroom so incoming logs are never dropped due to disk pressure.
+* **Bounded Live Stream Ring Buffer:** Live WebSocket feed strictly displays the last 15 receiving logs, eliminating browser DOM thrashing while preserving instantaneous verification of active network traffic.
+* **Dynamic Listener Hot-Reload:** Network addresses and ports for UDP (RFC 5426), TCP (RFC 6587), and TLS (RFC 5425) are hot-reloaded with zero container downtime directly from the Web UI Settings console.
 
 #### 2. PostgreSQL (ACID Relational Metadata & SOC State)
 * **Tables:**
@@ -158,6 +161,7 @@ The correlation engine evaluates normalized events against active detection rule
   * `siem_incident_notes`: Timestamped analyst case notes and investigation rationale.
   * `users` & `audit_logs`: Session authentication, RBAC, and tamper-evident administrative action logs.
   * `log_archives`: Daily 5651 archive manifests, SHA-256 hashes, and timestamping receipts.
+  * `settings`: System configurations including `storage_fifo_threshold_pct`, `syslog_udp_listen_addr`, `syslog_tcp_listen_addr`, and `syslog_tls_listen_addr`.
 
 ---
 

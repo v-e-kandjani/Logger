@@ -17,6 +17,7 @@ import (
 
 // Server encapsulates UDP, TCP, and TLS listeners
 type Server struct {
+	mu       sync.Mutex
 	cfg      config.SyslogConfig
 	pipeline *pipeline.Pipeline
 	udpConns []*net.UDPConn
@@ -36,6 +37,9 @@ func NewServer(cfg config.SyslogConfig, pipe *pipeline.Pipeline) *Server {
 
 // Start initiates all enabled listeners
 func (s *Server) Start() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.cfg.UDP.Enabled {
 		if err := s.startUDP(); err != nil {
 			return fmt.Errorf("starting UDP listener: %w", err)
@@ -55,6 +59,76 @@ func (s *Server) Start() error {
 	}
 
 	return nil
+}
+
+// Reload safely restarts listeners with new addresses and ports
+func (s *Server) Reload(udpAddr, tcpAddr, tlsAddr string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 1. Close current UDP listeners
+	for _, conn := range s.udpConns {
+		if conn != nil {
+			_ = conn.Close()
+		}
+	}
+	s.udpConns = nil
+
+	// 2. Close current TCP listeners
+	for _, ln := range s.tcpLns {
+		if ln != nil {
+			_ = ln.Close()
+		}
+	}
+	s.tcpLns = nil
+
+	// 3. Close current TLS listener
+	if s.tlsLn != nil {
+		_ = s.tlsLn.Close()
+		s.tlsLn = nil
+	}
+
+	// 4. Update configuration
+	if udpAddr != "" {
+		s.cfg.UDP.ListenAddr = udpAddr
+	}
+	if tcpAddr != "" {
+		s.cfg.TCP.ListenAddr = tcpAddr
+	}
+	if tlsAddr != "" {
+		s.cfg.TLS.ListenAddr = tlsAddr
+	}
+
+	// 5. Restart enabled listeners
+	var errs []string
+	if s.cfg.UDP.Enabled {
+		if err := s.startUDP(); err != nil {
+			errs = append(errs, fmt.Sprintf("UDP: %v", err))
+		}
+	}
+	if s.cfg.TCP.Enabled {
+		if err := s.startTCP(); err != nil {
+			errs = append(errs, fmt.Sprintf("TCP: %v", err))
+		}
+	}
+	if s.cfg.TLS.Enabled && s.cfg.TLS.CertFile != "" && s.cfg.TLS.KeyFile != "" {
+		if err := s.startTLS(); err != nil {
+			errs = append(errs, fmt.Sprintf("TLS: %v", err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("reload listener errors: %s", strings.Join(errs, "; "))
+	}
+	log.Printf("[Syslog] Listeners reloaded successfully (UDP: %s, TCP: %s)", s.cfg.UDP.ListenAddr, s.cfg.TCP.ListenAddr)
+	return nil
+}
+
+// GetListenAddresses returns the active listener address configurations
+func (s *Server) GetListenAddresses() (udp, tcp, tls string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cfg.UDP.ListenAddr, s.cfg.TCP.ListenAddr, s.cfg.TLS.ListenAddr
 }
 
 func (s *Server) startUDP() error {
@@ -109,6 +183,9 @@ func (s *Server) udpReaderLoop(conn *net.UDPConn) {
 		default:
 			n, raddr, err := conn.ReadFromUDP(buf)
 			if err != nil {
+				if strings.Contains(err.Error(), "closed") {
+					return
+				}
 				select {
 				case <-s.stopCh:
 					return
@@ -189,6 +266,9 @@ func (s *Server) acceptLoop(ln net.Listener, proto string) {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			if strings.Contains(err.Error(), "closed") {
+				return
+			}
 			select {
 			case <-s.stopCh:
 				return
@@ -244,6 +324,7 @@ func (s *Server) handleTCPConnection(conn net.Conn, proto string) {
 
 func (s *Server) Stop() {
 	close(s.stopCh)
+	s.mu.Lock()
 	for _, conn := range s.udpConns {
 		if conn != nil {
 			_ = conn.Close()
@@ -257,6 +338,7 @@ func (s *Server) Stop() {
 	if s.tlsLn != nil {
 		_ = s.tlsLn.Close()
 	}
+	s.mu.Unlock()
 	s.wg.Wait()
 	log.Println("[Syslog] Listeners stopped")
 }

@@ -251,6 +251,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ## Sürüm Geçmişi (Release History)
 
+- **v1.3.2** (Otomatik FIFO Disk Ezme & Dinamik Syslog Dinleyici Yönetimi):
+  - **Sınırlandırılmış Canlı Akış (Son 15 Kayıt)**: Canlı websocket akışı ve tamponu kesin olarak sadece son 15 gelen olay kaydını tutacak şekilde yeniden yapılandırıldı; tarayıcı bellek şişmesi ve aşırı akış kalabalığı engellendi.
+  - **Dinamik Syslog Ağ Dinleyicileri & Sıcak Yeniden Yükleme (Hot-Reload)**: UDP, TCP ve TLS dinleme IP adresleri ile port numaralarının doğrudan Web Arayüzü Ayarlar sekmesinden yapılandırılması ve konteynerleri yeniden başlatmadan sıfır kesintiyle anında devreye alınması sağlandı.
+  - **Otomatik FIFO Depolama Temizleyici**: Yapılandırılabilir disk doluluk eşiği yüzdesi (örn. %85) ile 30 saniyede bir arka planda kesintisiz izleme. Disk doluluğu eşiğe ulaştığında, sistem en eski ClickHouse bölümünü veya en eski 24 saatlik log bloğunu FIFO yöntemiyle otomatik olarak temizler; böylece disk dolması kaynaklı log kaybı kesin olarak engellenir.
+  - **Panel Otomasyonu**: Kontrol panelindeki manuel temizleme butonu kaldırılarak yerine canlı otomatik FIFO durum göstergesi ve eşik telemetrisi eklendi.
 - **v1.3.1** (Sıfır Veri Kaybı Optimizasyonu & MITRE ATT&CK Senkronizasyonu):
   - **Sıfır Veri Kaybı Kalıcılığı ve Performans Optimizasyonu**: Konteyner yeniden başlatmalarında ClickHouse kuyruklarının ve PostgreSQL WAL kontrol noktalarının temiz diske yazılması için `stop_grace_period: 30s` tanımlandı. PostgreSQL sunucu parametreleri (`shared_buffers=256MB`, `work_mem=16MB`, `wal_buffers=16MB`, `max_connections=200`) optimize edildi.
   - **Otomatik Yükseltme Öncesi Yedekleme**: `upgrade.sh` betiği, kod çekilmeden veya konteyner derlenmeden önce `./backups/postgres_backup_YYYYMMDD_HHMMSS.sql.gz` konumuna otomatik sıkıştırılmış PostgreSQL yedeği alır (son 5 yedek rotasyonu ile).
