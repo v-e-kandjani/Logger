@@ -85,6 +85,14 @@ func TestDetect(t *testing.T) {
 			wantVendor: "pfSense",
 			wantType:   "Firewall",
 		},
+		{
+			name:       "Fortinet FG200E MARS-DC traffic log",
+			raw:        `date=2026-10-08 time=22:22:13 devname="FGT-1" devid="FG200ETK20907839" eventtime=1791487333663103688 tz="+0300" logid="0000000013" type="traffic" subtype="forward" level="notice" vd="1WARE" srcip=10.34.25.30 srcport=17898 dstip=172.16.65.10 dstport=443 action="client-rst"`,
+			hostname:   "MARS-DC-FG200E",
+			app:        "Fortinet",
+			wantVendor: "Fortinet",
+			wantType:   "Firewall",
+		},
 	}
 
 	for _, tc := range tests {

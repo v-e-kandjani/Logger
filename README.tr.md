@@ -251,6 +251,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ## Sürüm Geçmişi (Release History)
 
+- **v1.3.5** (Fortinet Trafik Olayları Normalizasyonu & Temiz API 401 Oturum Yönetimi):
+  - **Fortinet Oturum Kapanış & Reset Normalizasyonu**: `normalizeFortinet` fonksiyonuna FortiOS trafik aksiyonları `client-rst`, `server-rst`, `close`, `timeout` ve `ip-conn` durumları eklenerek `network / connection-allowed` sınıfına doğru şekilde normalize edilmesi sağlandı.
+  - **Gömülü Cihaz Adı Ayrıştırma**: Fortinet loglarındaki `devname` anahtarı (örn. `devname="FGT-1"`) doğrudan `NormalizedEvent.DeviceName` alanına aktarılarak varlık kimliği netleştirildi.
+  - **Tırnak ve Boşluk Duyarlı Anahtar-Değer Ayrıştırıcı**: `parseKeyValuePairs` tarayıcısı tırnak içindeki boşluklu değerleri (kural isimleri, saldırı metinleri) eksiksiz ayrıştıracak şekilde yenilendi.
+  - **API 401 JSON Koruması**: `/api/` rotalarının oturum zaman aşımında HTML login sayfasına HTTP 303 ile yönlendirilmesi engellenerek her zaman JSON 401 dönmesi sağlandı; böylece tarayıcıdaki `JSON.parse` sözdizimi hataları tamamen giderildi.
+  - **Akıcı Oturum Yenileme**: Arayüzdeki tüm asenkron fetch çağrılarına 401 yakalama mantığı eklenerek oturum düştüğünde kullanıcının temiz bir şekilde `/login` ekranına yönlendirilmesi sağlandı.
 - **v1.3.4** (12 Kategoride 72 Kurallı Kapsamlı SIEM Tespit Kataloğu):
   - **72 Kurallı Kategorize SIEM Tespit Kataloğu**: 12 farklı operasyonel ve siber tehdit alanını kapsayan kurumsal tespit kataloğu: Kimlik Doğrulama & Hesap Erişimi (`AUTH-001`–`006`), Yetki Yükseltme & Active Directory (`PRIV-001`–`006`), Anahtar & Yönlendirici Yönetimi (`NETADM-001`–`006`), Güvenlik Duvarı & Çevre Güvenliği (`PERIM-001`–`006`), Ağ Keşfi & Şüpheli Trafik (`NET-001`–`006`), Windows Yürütme & Kalıcılık (`WIN-001`–`006`), Linux Yetki & Kalıcılık (`LIN-001`–`006`), Bulut Kimlik & Denetim Düzlemi (`CLOUD-001`–`006`), E-Posta & Web Uygulamaları (`MAILWEB-001`–`006`), Veri Hırsızlığı & Fidye Yazılımı (`DATA-001`–`006`), Savunma Atlatma & Göstergeler (`DEF-001`–`006`) ve Logger Sistem Sağlığı & Bütünlüğü (`HEALTH-001`–`006`).
   - **Öncelik Seviyesi ve Kaynak Referansları**: Her kural için uygulama önceliği (`P1` temel/anlık vs `P2` zenginleştirilmiş/geçmiş bazlı) ve endüstri standardı kaynak referansları (Splunk Security Content, Microsoft Sentinel, Google Cloud Operations / YARA-L ve Özgün Logger Kontrolleri).

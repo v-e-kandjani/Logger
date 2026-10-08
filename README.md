@@ -262,6 +262,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.3.5** (Fortinet Traffic Actions Normalization & Clean API 401 Session Handling):
+  - **Fortinet Session Teardown & Close Normalization**: Expanded `normalizeFortinet` to natively recognize FortiOS traffic session outcomes `client-rst`, `server-rst`, `close`, `timeout`, and `ip-conn`, accurately normalizing them to `network / connection-allowed` and preventing unclassified network events.
+  - **Embedded Device Name Attribution**: Extracts `devname` from Fortinet syslog payloads (e.g. `devname="FGT-1"`) into `NormalizedEvent.DeviceName`.
+  - **Quote-Aware Key-Value Scanner**: Rewrote `parseKeyValuePairs` tokenizer to properly handle quoted values with spaces (e.g. complex policy names, attack descriptions).
+  - **API 401 Unauthorized Guard**: Guaranteed that all `/api/` endpoints strictly return JSON 401 (`{"error":"unauthorized"}`) rather than HTTP 303 redirects to HTML `/login`, eliminating `JSON.parse` syntax errors when sessions expire.
+  - **Seamless Client Session Re-Authentication**: Added proactive 401 interception across all SOC dashboard async fetch handlers to cleanly redirect expired sessions to `/login`.
 - **v1.3.4** (Categorized 72-Rule SIEM Detection Catalog & Multi-Domain Correlation):
   - **Categorized 72-Rule SIEM Detection Catalog**: Implemented complete enterprise detection catalog across 12 distinct operational and threat domains: Authentication (`AUTH-001`–`006`), Privilege & AD (`PRIV-001`–`006`), Switch & Router Administration (`NETADM-001`–`006`), Firewall & Perimeter (`PERIM-001`–`006`), Network Reconnaissance (`NET-001`–`006`), Windows Execution (`WIN-001`–`006`), Linux Privilege (`LIN-001`–`006`), Cloud Identity (`CLOUD-001`–`006`), Email & Web Apps (`MAILWEB-001`–`006`), Data Theft & Ransomware (`DATA-001`–`006`), Defense Evasion (`DEF-001`–`006`), and Logger Health & Integrity (`HEALTH-001`–`006`).
   - **Priority & Upstream Source Attribution**: Every rule enriched with implementation urgency priority (`P1` baseline vs `P2` historical/enriched) and upstream reference citations (Splunk Security Content, Microsoft Sentinel, Google Cloud Operations / YARA-L, and Original Logger Controls).

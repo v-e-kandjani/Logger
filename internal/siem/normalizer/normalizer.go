@@ -97,6 +97,9 @@ func (n *Normalizer) normalizeFortinet(event *models.LogEvent, norm *models.Norm
 	if u := kv["user"]; u != "" {
 		norm.Username = strings.Trim(u, "\"")
 	}
+	if devname := kv["devname"]; devname != "" && norm.DeviceName == "" {
+		norm.DeviceName = strings.Trim(devname, "\"")
+	}
 
 	action := strings.ToLower(kv["action"])
 	logType := strings.ToLower(kv["type"])
@@ -111,7 +114,7 @@ func (n *Normalizer) normalizeFortinet(event *models.LogEvent, norm *models.Norm
 		norm.RiskScore = 85
 		norm.MitreTactic = "Initial Access"
 		norm.MitreTechnique = "T1190"
-	case action == "deny" || action == "block" || action == "drop":
+	case action == "deny" || action == "block" || action == "drop" || action == "reset":
 		norm.EventCategory = "network"
 		norm.EventAction = "connection-denied"
 		norm.EventOutcome = "blocked"
@@ -119,7 +122,8 @@ func (n *Normalizer) normalizeFortinet(event *models.LogEvent, norm *models.Norm
 		norm.RiskScore = 30
 		norm.MitreTactic = "Discovery"
 		norm.MitreTechnique = "T1046"
-	case action == "accept" || action == "allow" || action == "permit":
+	case action == "accept" || action == "allow" || action == "permit" ||
+		action == "client-rst" || action == "server-rst" || action == "close" || action == "timeout" || action == "ip-conn":
 		norm.EventCategory = "network"
 		norm.EventAction = "connection-allowed"
 		norm.EventOutcome = "allowed"
@@ -139,6 +143,14 @@ func (n *Normalizer) normalizeFortinet(event *models.LogEvent, norm *models.Norm
 			norm.EventOutcome = "success"
 			norm.Severity = "INFORMATIONAL"
 			norm.RiskScore = 10
+		}
+	default:
+		if norm.EventCategory == "" {
+			norm.EventCategory = "network"
+			norm.EventAction = "connection-allowed"
+			norm.EventOutcome = "allowed"
+			norm.Severity = "INFORMATIONAL"
+			norm.RiskScore = 5
 		}
 	}
 }
@@ -419,15 +431,47 @@ func (n *Normalizer) normalizeGeneric(event *models.LogEvent, norm *models.Norma
 	}
 }
 
-// parseKeyValuePairs splits key=value or key="value" strings into map
+// parseKeyValuePairs splits key=value or key="value with spaces" strings into a map
 func parseKeyValuePairs(s string) map[string]string {
 	result := make(map[string]string)
-	pairs := strings.Fields(s)
-	for _, pair := range pairs {
-		if idx := strings.IndexByte(pair, '='); idx > 0 {
-			k := strings.ToLower(pair[:idx])
-			v := strings.Trim(pair[idx+1:], "\"")
-			result[k] = v
+	inQuotes := false
+	var key, val strings.Builder
+	isParsingVal := false
+
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if ch == '"' {
+			inQuotes = !inQuotes
+			continue
+		}
+		if !inQuotes && ch == '=' && !isParsingVal {
+			isParsingVal = true
+			continue
+		}
+		if !inQuotes && (ch == ' ' || ch == '\t') {
+			if isParsingVal {
+				k := strings.ToLower(strings.TrimSpace(key.String()))
+				if k != "" {
+					result[k] = strings.Trim(val.String(), "\"")
+				}
+				key.Reset()
+				val.Reset()
+				isParsingVal = false
+			} else {
+				key.Reset()
+			}
+			continue
+		}
+		if isParsingVal {
+			val.WriteByte(ch)
+		} else {
+			key.WriteByte(ch)
+		}
+	}
+	if isParsingVal {
+		k := strings.ToLower(strings.TrimSpace(key.String()))
+		if k != "" {
+			result[k] = strings.Trim(val.String(), "\"")
 		}
 	}
 	return result

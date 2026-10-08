@@ -2504,6 +2504,10 @@ function loadSIEMData() {
 async function loadSIEMOverview() {
     try {
         const res = await fetch('/api/v1/siem/overview');
+        if (res.status === 401 || (res.redirected && res.url.includes('/login'))) {
+            window.location.href = '/login';
+            return;
+        }
         if (!res.ok) return;
         const data = await res.json();
 
@@ -2589,7 +2593,14 @@ async function loadSIEMAlerts() {
         if (siemSearchQuery) params.append('search', siemSearchQuery);
 
         const res = await fetch(`/api/v1/siem/alerts?${params.toString()}`);
-        if (!res.ok) throw new Error('API error');
+        if (res.status === 401 || (res.redirected && res.url.includes('/login'))) {
+            window.location.href = '/login';
+            return;
+        }
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${res.status}`);
+        }
         const data = await res.json();
         const alerts = data.alerts || [];
 
@@ -2888,6 +2899,10 @@ async function openSIEMRulesModal() {
 
     try {
         const res = await fetch('/api/v1/siem/rules');
+        if (res.status === 401 || (res.redirected && res.url.includes('/login'))) {
+            window.location.href = '/login';
+            return;
+        }
         if (!res.ok) throw new Error('API error');
         const data = await res.json();
         allSIEMRules = data.rules || [];
@@ -2991,6 +3006,10 @@ async function loadSIEMMitreMatrix() {
 
     try {
         const res = await fetch('/api/v1/siem/mitre');
+        if (res.status === 401 || (res.redirected && res.url.includes('/login'))) {
+            window.location.href = '/login';
+            return;
+        }
         if (!res.ok) throw new Error('Failed loading MITRE ATT&CK report');
         const report = await res.json();
 

@@ -101,6 +101,14 @@ func (h *Handler) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (h *Handler) unauthorized(w http.ResponseWriter, r *http.Request) {
+	// API endpoints must ALWAYS return JSON 401 Unauthorized, never redirect to HTML login page
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{
+			"error":     "unauthorized",
+			"login_url": "/login",
+		})
+		return
+	}
 	if r.URL.Path == "/" || strings.Contains(r.Header.Get("Accept"), "text/html") {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
