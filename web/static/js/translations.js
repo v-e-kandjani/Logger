@@ -3,7 +3,7 @@ const translations = {
     tr: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.3.3",
+        app_version: "v1.3.4",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         view_title_dashboard: "Operasyon & Güvenlik Paneli",
@@ -66,8 +66,8 @@ const translations = {
         th_events: "Olay Sayısı",
         th_assigned: "Atanan",
         loading_alerts: "Güvenlik alarmları yükleniyor...",
-        siem_rules_title: "SIEM Korelasyon & Tespit Kuralları",
-        siem_rules_desc: "Gelen normalize loglar, kayan zaman pencerelerinde otomatik olarak kurallarla eşleştirilir.",
+        siem_rules_title: "SIEM Korelasyon & Tespit Kataloğu (72 Kural)",
+        siem_rules_desc: "12 kategoride 72 tespit kuralı, gelen normalize logları kayan pencerelerde sürekli değerlendirir.",
         sim_modal_title: "Güvenlik Saldırı Senaryoları Simülasyonu",
         sim_modal_desc: "Korelasyon motoruna anında saldırı telemetrisi enjekte ederek kuralları ve alarmları test edin.",
         filter_all: "Tümü",
@@ -267,7 +267,7 @@ const translations = {
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.3.3",
+        app_version: "v1.3.4",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         view_title_dashboard: "Operations & Security Dashboard",
@@ -330,8 +330,8 @@ const translations = {
         th_events: "Events",
         th_assigned: "Assigned",
         loading_alerts: "Loading security alerts...",
-        siem_rules_title: "SIEM Correlation & Detection Rules",
-        siem_rules_desc: "Out-of-the-box detection rules continuously evaluate incoming normalized events across sliding windows.",
+        siem_rules_title: "SIEM Correlation & Detection Catalog (72 Rules)",
+        siem_rules_desc: "Categorized 72-rule detection catalog across 12 operational and threat domains continuously evaluating sliding windows.",
         sim_modal_title: "Simulate Security Attack Scenarios",
         sim_modal_desc: "Instantly inject normalized attack telemetry into the correlation engine to verify detection rules, alert generation, and SOC response.",
         filter_all: "All",

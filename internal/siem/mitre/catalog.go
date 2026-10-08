@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -166,6 +167,23 @@ func (c *Catalog) GenerateCoverageReport(rules []models.SIEMRule, alerts []model
 	for _, r := range rules {
 		if r.MitreTechnique != "" && r.IsEnabled {
 			rulesByTech[r.MitreTechnique] = append(rulesByTech[r.MitreTechnique], r)
+			if _, exists := c.techniques[r.MitreTechnique]; !exists {
+				tacticID := "TA0001"
+				for _, tac := range c.tactics {
+					if strings.EqualFold(tac.Name, r.MitreTactic) {
+						tacticID = tac.ID
+						break
+					}
+				}
+				c.techniques[r.MitreTechnique] = Technique{
+					ID:          r.MitreTechnique,
+					Name:        r.Name,
+					TacticID:    tacticID,
+					TacticName:  r.MitreTactic,
+					Description: r.Description,
+					URL:         fmt.Sprintf("https://attack.mitre.org/techniques/%s/", strings.ReplaceAll(r.MitreTechnique, ".", "/")),
+				}
+			}
 		}
 	}
 
@@ -199,6 +217,13 @@ func (c *Catalog) GenerateCoverageReport(rules []models.SIEMRule, alerts []model
 			}
 
 			matchingRules := rulesByTech[tech.ID]
+			if len(matchingRules) == 0 {
+				for techID, rList := range rulesByTech {
+					if strings.HasPrefix(techID, tech.ID+".") {
+						matchingRules = append(matchingRules, rList...)
+					}
+				}
+			}
 			isCovered := len(matchingRules) > 0
 			if isCovered {
 				covTac.CoveredTechniques++

@@ -262,6 +262,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ## Release History
 
+- **v1.3.4** (Categorized 72-Rule SIEM Detection Catalog & Multi-Domain Correlation):
+  - **Categorized 72-Rule SIEM Detection Catalog**: Implemented complete enterprise detection catalog across 12 distinct operational and threat domains: Authentication (`AUTH-001`–`006`), Privilege & AD (`PRIV-001`–`006`), Switch & Router Administration (`NETADM-001`–`006`), Firewall & Perimeter (`PERIM-001`–`006`), Network Reconnaissance (`NET-001`–`006`), Windows Execution (`WIN-001`–`006`), Linux Privilege (`LIN-001`–`006`), Cloud Identity (`CLOUD-001`–`006`), Email & Web Apps (`MAILWEB-001`–`006`), Data Theft & Ransomware (`DATA-001`–`006`), Defense Evasion (`DEF-001`–`006`), and Logger Health & Integrity (`HEALTH-001`–`006`).
+  - **Priority & Upstream Source Attribution**: Every rule enriched with implementation urgency priority (`P1` baseline vs `P2` historical/enriched) and upstream reference citations (Splunk Security Content, Microsoft Sentinel, Google Cloud Operations / YARA-L, and Original Logger Controls).
+  - **Dynamic MITRE ATT&CK® Hierarchy Mapping**: Comprehensive defensive linkage across all 14 tactics with recursive sub-technique prefix matching (e.g. `T1110.003` -> `T1110`) and automatic dynamic technique discovery.
+  - **Interactive SOC Rules Catalog Modal**: Upgraded rules viewer with live multi-field search, 12-category dropdown filter, priority filter (`P1`/`P2`), priority badge styling, and one-click rule activation toggles.
+  - **Schema & Persistence Migrations**: Idempotent PostgreSQL schema expansion with `priority` and `source_ref` columns, and automatic 72-rule catalog synchronization on startup.
 - **v1.3.3** (Device Type & Vendor Auto-Discovery Engine):
   - **Automated Deep Asset Fingerprinting**: Real-time inspection engine analyzing incoming syslog event patterns, RFC headers, hostnames, and application signatures to automatically detect both device vendor (Fortinet, WatchGuard, Cisco, Palo Alto, MikroTik, pfSense, OPNsense, HPE Aruba, Juniper, Sophos, Check Point, Ubiquiti, Linux, Windows, VMware) and device type (Firewall, Switch, Router, Server, Wireless Controller, Access Point, VPN Gateway).
   - **Asset Cataloging & Confidence Rating**: Automatically extracts hostnames, tags confidence ratings (`HIGH`, `MEDIUM`, `LOW`), and saves metadata to PostgreSQL `unregistered_sources` without dropping or delaying in-flight log ingestion.

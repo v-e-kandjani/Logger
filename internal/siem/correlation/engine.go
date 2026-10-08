@@ -47,144 +47,9 @@ type Engine struct {
 	stopCh       chan struct{}
 }
 
-// DefaultRules returns the initial security detection rules
+// DefaultRules returns the complete 72-rule detection catalog
 func DefaultRules() []models.SIEMRule {
-	now := time.Now().UTC()
-	return []models.SIEMRule{
-		{
-			ID:               "AUTH-001",
-			Name:             "Multiple Failed Logins (Brute Force)",
-			Description:      "Detects multiple failed login attempts from a single source within a short time window",
-			Severity:         "HIGH",
-			RiskScore:        75,
-			Category:         "authentication",
-			Threshold:        5,
-			TimeframeSeconds: 180, // 3 minutes
-			GroupBy:          []string{"source_ip"},
-			MitreTactic:      "Credential Access",
-			MitreTechnique:   "T1110",
-			IsEnabled:        true,
-			MatchCategory:    "authentication",
-			MatchAction:      "login-failed",
-			MatchOutcome:     "failure",
-			CreatedAt:        now,
-			UpdatedAt:        now,
-		},
-		{
-			ID:               "AUTH-002",
-			Name:             "Multi-Account Password Spraying",
-			Description:      "Detects failed authentication against multiple different user accounts from the same source IP",
-			Severity:         "HIGH",
-			RiskScore:        80,
-			Category:         "authentication",
-			Threshold:        3,
-			TimeframeSeconds: 300, // 5 minutes
-			GroupBy:          []string{"source_ip"},
-			MitreTactic:      "Credential Access",
-			MitreTechnique:   "T1110.003",
-			IsEnabled:        true,
-			MatchCategory:    "authentication",
-			MatchAction:      "login-failed",
-			MatchOutcome:     "failure",
-			CreatedAt:        now,
-			UpdatedAt:        now,
-		},
-		{
-			ID:               "NET-001",
-			Name:             "Horizontal Port Scan / Reconnaissance",
-			Description:      "Detects a single source IP probing or getting dropped across multiple connection attempts",
-			Severity:         "MEDIUM",
-			RiskScore:        55,
-			Category:         "network",
-			Threshold:        10,
-			TimeframeSeconds: 60, // 1 minute
-			GroupBy:          []string{"source_ip"},
-			MitreTactic:      "Discovery",
-			MitreTechnique:   "T1046",
-			IsEnabled:        true,
-			MatchCategory:    "network",
-			MatchAction:      "connection-denied",
-			MatchOutcome:     "blocked",
-			CreatedAt:        now,
-			UpdatedAt:        now,
-		},
-		{
-			ID:               "NET-002",
-			Name:             "Perimeter Firewall Denial Flood",
-			Description:      "High volume of blocked packets detected across a firewall perimeter device",
-			Severity:         "HIGH",
-			RiskScore:        70,
-			Category:         "network",
-			Threshold:        25,
-			TimeframeSeconds: 60, // 1 minute
-			GroupBy:          []string{"device_name"},
-			MitreTactic:      "Impact",
-			MitreTechnique:   "T1499",
-			IsEnabled:        true,
-			MatchCategory:    "network",
-			MatchAction:      "connection-denied",
-			MatchOutcome:     "blocked",
-			CreatedAt:        now,
-			UpdatedAt:        now,
-		},
-		{
-			ID:               "SYS-001",
-			Name:             "Privilege Escalation Failure (Sudo / Su)",
-			Description:      "Multiple failed administrative privilege escalation attempts by a user",
-			Severity:         "HIGH",
-			RiskScore:        85,
-			Category:         "system",
-			Threshold:        3,
-			TimeframeSeconds: 300, // 5 minutes
-			GroupBy:          []string{"username"},
-			MitreTactic:      "Privilege Escalation",
-			MitreTechnique:   "T1548.003",
-			IsEnabled:        true,
-			MatchCategory:    "system",
-			MatchAction:      "privilege-escalation",
-			MatchOutcome:     "failure",
-			CreatedAt:        now,
-			UpdatedAt:        now,
-		},
-		{
-			ID:               "SYS-002",
-			Name:             "Local Account Creation / Persistence",
-			Description:      "Detects creation of a new local user account",
-			Severity:         "MEDIUM",
-			RiskScore:        60,
-			Category:         "configuration",
-			Threshold:        1,
-			TimeframeSeconds: 60,
-			GroupBy:          []string{"device_name"},
-			MitreTactic:      "Persistence",
-			MitreTechnique:   "T1136.001",
-			IsEnabled:        true,
-			MatchCategory:    "configuration",
-			MatchAction:      "account-created",
-			MatchOutcome:     "success",
-			CreatedAt:        now,
-			UpdatedAt:        now,
-		},
-		{
-			ID:               "THREAT-001",
-			Name:             "Perimeter Threat / Exploit Blocked",
-			Description:      "Intrusion prevention or antivirus subsystem blocked a known exploit or malware delivery attempt",
-			Severity:         "CRITICAL",
-			RiskScore:        95,
-			Category:         "threat",
-			Threshold:        1,
-			TimeframeSeconds: 60,
-			GroupBy:          []string{"source_ip"},
-			MitreTactic:      "Initial Access",
-			MitreTechnique:   "T1190",
-			IsEnabled:        true,
-			MatchCategory:    "threat",
-			MatchAction:      "malware-blocked",
-			MatchOutcome:     "blocked",
-			CreatedAt:        now,
-			UpdatedAt:        now,
-		},
-	}
+	return CatalogRules()
 }
 
 // NewEngine creates and initializes the SIEM correlation engine
@@ -294,8 +159,8 @@ func (e *Engine) Evaluate(event *models.NormalizedEvent) {
 
 		// Check trigger condition
 		shouldTrigger := false
-		if rule.ID == "AUTH-002" {
-			// Password spraying: threshold distinct usernames
+		if rule.ID == "AUTH-004" {
+			// Distributed password spraying: threshold distinct usernames
 			users := make(map[string]struct{})
 			for _, ev := range bucket.Events {
 				if ev.Username != "" {
@@ -337,7 +202,11 @@ func (e *Engine) matchesRule(rule *models.SIEMRule, event *models.NormalizedEven
 		return false
 	}
 	if rule.MatchAction != "" && rule.MatchAction != event.EventAction {
-		return false
+		if rule.ID == "PERIM-004" && (event.EventAction == "intrusion-high-priority" || event.EventAction == "malware-blocked") {
+			// matches either action name
+		} else {
+			return false
+		}
 	}
 	if rule.MatchOutcome != "" && rule.MatchOutcome != event.EventOutcome {
 		return false
@@ -552,7 +421,7 @@ func (e *Engine) SimulateScenario(scenario string) (*models.SIEMAlert, error) {
 		}
 	case "port-scan":
 		attackerIP := "45.33.32.156"
-		for port := 80; port < 92; port++ {
+		for port := 80; port < 132; port++ {
 			rawMsg := fmt.Sprintf("firewall: disp=\"Deny\" src=\"%s\" dst=\"10.0.0.1\" src_port=\"52100\" dst_port=\"%d\"", attackerIP, port)
 			event := &models.NormalizedEvent{
 				EventID:         uuid.New(),
@@ -579,29 +448,27 @@ func (e *Engine) SimulateScenario(scenario string) (*models.SIEMAlert, error) {
 		}
 	case "priv-esc":
 		targetUser := "app-deployer"
-		for i := 0; i < 4; i++ {
-			rawMsg := fmt.Sprintf("sudo: pam_unix(sudo:auth): authentication failure; logname= user=%s", targetUser)
-			event := &models.NormalizedEvent{
-				EventID:        uuid.New(),
-				Timestamp:      now.Add(time.Duration(i) * time.Second),
-				ReceivedAt:     now,
-				SourceIP:       "127.0.0.1",
-				DeviceName:     "app-srv-01",
-				Vendor:         "Linux",
-				Product:        "OS/Auth",
-				EventCategory:  "system",
-				EventAction:    "privilege-escalation",
-				EventOutcome:   "failure",
-				Username:       targetUser,
-				Severity:       "HIGH",
-				RiskScore:      85,
-				MitreTactic:    "Privilege Escalation",
-				MitreTechnique: "T1548.003",
-				Message:        rawMsg,
-				RawMessage:     rawMsg,
-			}
-			e.Evaluate(event)
+		rawMsg := fmt.Sprintf("sudo: pam_unix(sudo:auth): %s added ALL=(ALL) NOPASSWD: ALL in /etc/sudoers", targetUser)
+		event := &models.NormalizedEvent{
+			EventID:        uuid.New(),
+			Timestamp:      now,
+			ReceivedAt:     now,
+			SourceIP:       "127.0.0.1",
+			DeviceName:     "app-srv-01",
+			Vendor:         "Linux",
+			Product:        "OS/Auth",
+			EventCategory:  "linux",
+			EventAction:    "sudoers-nopasswd-added",
+			EventOutcome:   "success",
+			Username:       targetUser,
+			Severity:       "HIGH",
+			RiskScore:      85,
+			MitreTactic:    "Privilege Escalation",
+			MitreTechnique: "T1548.003",
+			Message:        rawMsg,
+			RawMessage:     rawMsg,
 		}
+		e.Evaluate(event)
 	case "threat", "malware":
 		attackerIP := "194.26.29.112"
 		rawMsg := fmt.Sprintf("date=2026-10-08 time=20:15:00 devname=\"FGT100F\" type=utm subtype=ips action=blocked srcip=%s dstip=10.0.0.50 attack=\"CVE-2024-21762 FortiOS SSL-VPN RCE\"", attackerIP)

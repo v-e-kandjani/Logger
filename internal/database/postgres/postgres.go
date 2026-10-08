@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/syslog-platform/logger/internal/config"
 	"github.com/syslog-platform/logger/internal/models"
+	"github.com/syslog-platform/logger/internal/siem/catalog"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -632,26 +633,56 @@ func (db *DB) EnsureSIEMSchema(ctx context.Context) error {
 
 	CREATE INDEX IF NOT EXISTS idx_siem_notes_alert ON siem_incident_notes(alert_id);
 
-	INSERT INTO siem_rules (id, name, description, severity, risk_score, category, threshold, timeframe_seconds, group_by, mitre_tactic, mitre_technique, is_enabled, match_category, match_action, match_outcome)
-	VALUES
-	('AUTH-001', 'Multiple Failed Logins (Brute Force)', 'Detects multiple failed login attempts from a single source within a short time window', 'HIGH', 75, 'authentication', 5, 180, ARRAY['source_ip'], 'Credential Access', 'T1110', TRUE, 'authentication', 'login-failed', 'failure'),
-	('AUTH-002', 'Multi-Account Password Spraying', 'Detects failed authentication against multiple different user accounts from the same source IP', 'HIGH', 80, 'authentication', 3, 300, ARRAY['source_ip'], 'Credential Access', 'T1110.003', TRUE, 'authentication', 'login-failed', 'failure'),
-	('NET-001', 'Horizontal Port Scan / Reconnaissance', 'Detects a single source IP probing or getting dropped across multiple connection attempts', 'MEDIUM', 55, 'network', 10, 60, ARRAY['source_ip'], 'Discovery', 'T1046', TRUE, 'network', 'connection-denied', 'blocked'),
-	('NET-002', 'Perimeter Firewall Denial Flood', 'High volume of blocked packets detected across a firewall perimeter device', 'HIGH', 70, 'network', 25, 60, ARRAY['device_name'], 'Impact', 'T1499', TRUE, 'network', 'connection-denied', 'blocked'),
-	('SYS-001', 'Privilege Escalation Failure (Sudo / Su)', 'Multiple failed administrative privilege escalation attempts by a user', 'HIGH', 85, 'system', 3, 300, ARRAY['username'], 'Privilege Escalation', 'T1548.003', TRUE, 'system', 'privilege-escalation', 'failure'),
-	('SYS-002', 'Local Account Creation / Persistence', 'Detects creation of a new local user account', 'MEDIUM', 60, 'configuration', 1, 60, ARRAY['device_name'], 'Persistence', 'T1136.001', TRUE, 'configuration', 'account-created', 'success'),
-	('THREAT-001', 'Perimeter Threat / Exploit Blocked', 'Intrusion prevention or antivirus subsystem blocked a known exploit or malware delivery attempt', 'CRITICAL', 95, 'threat', 1, 60, ARRAY['source_ip'], 'Initial Access', 'T1190', TRUE, 'threat', 'malware-blocked', 'blocked')
-	ON CONFLICT (id) DO NOTHING;
+	ALTER TABLE siem_rules ADD COLUMN IF NOT EXISTS priority VARCHAR(16) DEFAULT 'P1';
+	ALTER TABLE siem_rules ADD COLUMN IF NOT EXISTS source_ref TEXT DEFAULT '';
 	`
-	_, err := db.pool.Exec(ctx, schema)
-	return err
+	if _, err := db.pool.Exec(ctx, schema); err != nil {
+		return err
+	}
+
+	// Upsert complete 72-rule detection catalog
+	for _, r := range catalog.Rules() {
+		upsertRule := `
+			INSERT INTO siem_rules (
+				id, name, description, severity, risk_score, category, priority, source_ref,
+				threshold, timeframe_seconds, group_by, mitre_tactic, mitre_technique,
+				is_enabled, match_category, match_action, match_outcome
+			) VALUES (
+				$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+			) ON CONFLICT (id) DO UPDATE SET
+				name = EXCLUDED.name,
+				description = EXCLUDED.description,
+				severity = EXCLUDED.severity,
+				risk_score = EXCLUDED.risk_score,
+				category = EXCLUDED.category,
+				priority = EXCLUDED.priority,
+				source_ref = EXCLUDED.source_ref,
+				threshold = EXCLUDED.threshold,
+				timeframe_seconds = EXCLUDED.timeframe_seconds,
+				group_by = EXCLUDED.group_by,
+				mitre_tactic = EXCLUDED.mitre_tactic,
+				mitre_technique = EXCLUDED.mitre_technique,
+				match_category = EXCLUDED.match_category,
+				match_action = EXCLUDED.match_action,
+				match_outcome = EXCLUDED.match_outcome,
+				updated_at = NOW();`
+		if _, err := db.pool.Exec(ctx, upsertRule,
+			r.ID, r.Name, r.Description, r.Severity, r.RiskScore, r.Category, r.Priority, r.SourceRef,
+			r.Threshold, r.TimeframeSeconds, r.GroupBy, r.MitreTactic, r.MitreTechnique,
+			r.IsEnabled, r.MatchCategory, r.MatchAction, r.MatchOutcome,
+		); err != nil {
+			log.Printf("[PostgreSQL] Error seeding SIEM rule %s: %v", r.ID, err)
+		}
+	}
+
+	return nil
 }
 
 // ListSIEMRules returns all defined detection rules
 func (db *DB) ListSIEMRules(ctx context.Context) ([]models.SIEMRule, error) {
 	query := `
-		SELECT id, name, description, severity, risk_score, category, threshold,
-		       timeframe_seconds, group_by, mitre_tactic, mitre_technique,
+		SELECT id, name, description, severity, risk_score, category, COALESCE(priority, 'P1'), COALESCE(source_ref, ''),
+		       threshold, timeframe_seconds, group_by, mitre_tactic, mitre_technique,
 		       is_enabled, match_category, match_action, match_outcome, created_at, updated_at
 		FROM siem_rules
 		ORDER BY id ASC`
@@ -667,6 +698,7 @@ func (db *DB) ListSIEMRules(ctx context.Context) ([]models.SIEMRule, error) {
 		var r models.SIEMRule
 		if err := rows.Scan(
 			&r.ID, &r.Name, &r.Description, &r.Severity, &r.RiskScore, &r.Category,
+			&r.Priority, &r.SourceRef,
 			&r.Threshold, &r.TimeframeSeconds, &r.GroupBy, &r.MitreTactic, &r.MitreTechnique,
 			&r.IsEnabled, &r.MatchCategory, &r.MatchAction, &r.MatchOutcome, &r.CreatedAt, &r.UpdatedAt,
 		); err != nil {

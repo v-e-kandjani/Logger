@@ -39,7 +39,9 @@ type SIEMRule struct {
 	Description      string    `json:"description"`
 	Severity         string    `json:"severity"` // CRITICAL, HIGH, MEDIUM, LOW
 	RiskScore        int       `json:"risk_score"`
-	Category         string    `json:"category"` // authentication, network, threat, system
+	Category         string    `json:"category"` // authentication, privilege, network_admin, perimeter, network, windows, linux, cloud, mail_web, data, defense_evasion, health
+	Priority         string    `json:"priority,omitempty"` // P1, P2
+	SourceRef        string    `json:"source_ref,omitempty"`
 	Threshold        int       `json:"threshold"`
 	TimeframeSeconds int       `json:"timeframe_seconds"`
 	GroupBy          []string  `json:"group_by"` // source_ip, username, device_name

@@ -151,13 +151,31 @@ type NormalizedEvent struct {
 
 ---
 
-### 3.4 Tier 3: Real-Time Sliding-Window Correlation Engine
-The correlation engine evaluates normalized events against active detection rules using in-memory sliding time windows:
+### 3.4 Tier 3: Real-Time Sliding-Window Correlation Engine & 72-Rule Detection Catalog
+The correlation engine evaluates normalized events against active detection rules using in-memory sliding time windows and a structured 72-rule detection catalog:
 
+* **Categorized SIEM Detection Catalog (72 Rules across 12 Domains):**
+  1. **Authentication and account access (`AUTH-001`–`006`):** Password spraying, SSH password guessing, successful login after failures, distributed spraying, repeated denied MFA, and cloud console logins from new countries.
+  2. **Privilege escalation and Active Directory (`PRIV-001`–`006`):** New local admin accounts, privileged AD group additions, rogue directory replication (DCSync), suspicious Kerberoasting RC4 SPN requests, privileged SID additions to SID history, and dangerous group ACL permissions.
+  3. **Switch and router administration (`NETADM-001`–`006`):** New admin-to-device login pairs, traffic mirroring/SPAN capture activation, unexpected firmware/software downloads, rogue DHCP responses on untrusted ports, Dynamic ARP Inspection (DAI) violations, and port-security violations.
+  4. **Firewall, VPN and perimeter control (`PERIM-001`–`006`):** AAA administrative tampering, configuration/file exfiltration off-device, unapproved remote-administration tool traffic, high-priority IPS/IDS intrusion exploits, overly permissive any-any firewall policies, and risky identity network correlations.
+  5. **Network reconnaissance and suspicious traffic (`NET-001`–`006`):** Horizontal scanning across hosts, vertical scanning across ports, outbound SMB traffic to public IPs, outbound external LDAP/LDAPS queries, high-entropy/long DNS queries, and large outbound transfers exceeding baseline.
+  6. **Windows execution and persistence (`WIN-001`–`006`):** LSASS memory access, Office applications spawning uncommon shells, suspicious PowerShell script blocks, user-writable scheduled tasks, unusual service executable paths, and permanent WMI event subscriptions.
+  7. **Linux privilege and persistence (`LIN-001`–`006`):** Passwordless sudo (`NOPASSWD`) additions, SSH `authorized_keys` tampering, unauthorized cron jobs, rogue systemd service units, shadow/credential file access, and non-root UID 0 escalations.
+  8. **Cloud identity and control-plane changes (`CLOUD-001`–`006`):** CloudTrail audit logging stopped, access keys created for third-party identities, public S3 bucket policies/ACLs, overly broad wildcard IAM policies, new service principal credentials, and risky OAuth app consents.
+  9. **Email, collaboration and web applications (`MAILWEB-001`–`006`):** External mailbox forwarding, inbox rules concealing security/finance mail, excessive external email attachment volume, web servers spawning unexpected shells, SQL injection URL patterns, and SharePoint/OneDrive malware detections.
+  10. **Data theft, ransomware and recovery interference (`DATA-001`–`006`):** Volume shadow copy deletions (`vssadmin`/`wmic`), system backup/catalog deletions (`wbadmin`), bursts of suspicious ransomware extensions, security/backup services stopped together, unapproved rclone transfers, and collaboration storage bulk downloads.
+  11. **Defense evasion and threat-indicator matches (`DEF-001`–`006`):** Windows event logs cleared (`wevtutil`/EventID 1102), auditing policies disabled, broad Windows Defender exclusions, Linux auditd/monitoring services stopped, malicious file hash indicators, and DNS threat intelligence matches.
+  12. **Logger health, integrity and administrative controls (`HEALTH-001`–`006`):** Critical log sources becoming silent, parser normalization failure surges, ingestion pipeline backlogs/drops, rule execution failures/missed schedules, unauthorized rule/exception tampering, and evidence hash/manifest integrity verification failures.
+
+* **Priority Tiers & Upstream Lineage:**
+  * **P1 (Immediate Baseline):** Core detections ready for activation on initial telemetry arrival.
+  * **P2 (Enriched/Historical):** Detections requiring history baselining, threat intelligence feeds, or advanced host behavioral enrichment.
+  * **Source Citations:** Catalog maps upstream lineage to Splunk Security Content, Microsoft Sentinel Analytic Rules, Google Cloud Operations (YARA-L), and Original Logger Controls.
 * **Sliding Window State:** Each rule maintains dynamic buckets partitioned by `GroupBy` keys (e.g. `AUTH-001::source_ip` or `SYS-001::username`).
 * **Multi-Event Threshold Evaluation:** Events outside the rule's `TimeframeSeconds` window are pruned dynamically.
-* **Alert Deduplication & Throttling:** When an attack threshold is crossed (e.g. 10 failed logins within 3 minutes), the engine fires an alert, captures up to 10 raw syslog evidence logs, and throttles identical alerts for 30 seconds to prevent alert floods.
-* **Live Broadcast:** New alerts are broadcast over WebSockets to all open SOC analyst dashboards in real time.
+* **Alert Deduplication & Throttling:** When an attack threshold is crossed, the engine generates a typed alert, links raw forensic evidence, and throttles duplicate alerts for 30 seconds to prevent SOC alert storms.
+* **Live Broadcast:** New alerts are broadcast over WebSockets to all connected SOC analyst dashboards in real time.
 
 ---
 

@@ -2789,31 +2789,62 @@ async function addSIEMAlertNote() {
     }
 }
 
-async function openSIEMRulesModal() {
-    const modal = document.getElementById('siem-rules-modal');
+let allSIEMRules = [];
+
+function renderFilteredSIEMRules() {
     const tbody = document.getElementById('siem-rules-body');
-    if (!modal || !tbody) return;
+    const badge = document.getElementById('siem-rules-count-badge');
+    const searchVal = (document.getElementById('siem-rules-search')?.value || '').toLowerCase().trim();
+    const catVal = (document.getElementById('siem-rules-cat-filter')?.value || '').toLowerCase().trim();
+    const priorityVal = (document.getElementById('siem-rules-priority-filter')?.value || '').trim();
 
-    modal.style.display = 'flex';
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Kurallar yükleniyor...</td></tr>';
+    if (!tbody) return;
 
-    try {
-        const res = await fetch('/api/v1/siem/rules');
-        if (!res.ok) throw new Error('API error');
-        const data = await res.json();
-        const rules = data.rules || [];
-
-        if (rules.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center">Kayıtlı kural bulunamadı.</td></tr>';
-            return;
+    let filtered = allSIEMRules.filter(rule => {
+        if (catVal && (rule.category || '').toLowerCase() !== catVal) return false;
+        if (priorityVal && (rule.priority || 'P1') !== priorityVal) return false;
+        if (searchVal) {
+            const matchId = (rule.id || '').toLowerCase().includes(searchVal);
+            const matchName = (rule.name || '').toLowerCase().includes(searchVal);
+            const matchDesc = (rule.description || '').toLowerCase().includes(searchVal);
+            const matchTech = (rule.mitre_technique || '').toLowerCase().includes(searchVal);
+            const matchTactic = (rule.mitre_tactic || '').toLowerCase().includes(searchVal);
+            const matchSrc = (rule.source_ref || '').toLowerCase().includes(searchVal);
+            if (!matchId && !matchName && !matchDesc && !matchTech && !matchTactic && !matchSrc) return false;
         }
+        return true;
+    });
 
-        tbody.innerHTML = rules.map(rule => `
+    if (badge) {
+        badge.textContent = `${filtered.length} / ${allSIEMRules.length} Rules`;
+    }
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 24px; color: var(--text-muted);">Arama kriterlerine uygun kural bulunamadı.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(rule => {
+        const prio = rule.priority || 'P1';
+        const prioClass = prio === 'P1' ? 'badge-priority-p1' : 'badge-priority-p2';
+        const sourceHtml = rule.source_ref 
+            ? `<div style="margin-top: 4px;"><span class="badge-source-ref" title="${escapeHtml(rule.source_ref)}">📖 ${escapeHtml(rule.source_ref)}</span></div>` 
+            : '';
+        const catBadge = rule.category 
+            ? `<span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; margin-left: 6px;">[${escapeHtml(rule.category)}]</span>` 
+            : '';
+
+        return `
             <tr>
                 <td><span class="mono-code" style="font-weight: 700; color: var(--primary);">${escapeHtml(rule.id)}</span></td>
+                <td><span class="${prioClass}">${escapeHtml(prio)}</span></td>
                 <td>
-                    <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(rule.name)}</div>
-                    <div style="font-size: 11.5px; color: var(--text-muted);">${escapeHtml(rule.description || '')}</div>
+                    <div style="font-weight: 600; color: var(--text-main); display: flex; align-items: center;">
+                        ${escapeHtml(rule.name)}
+                        ${catBadge}
+                    </div>
+                    <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(rule.description || '')}</div>
+                    ${sourceHtml}
                 </td>
                 <td>${getSeverityBadgeHTML(rule.severity)}</td>
                 <td style="font-size: 12px;"><span class="badge badge-outline">${rule.threshold} ev / ${rule.timeframe_seconds}s</span></td>
@@ -2825,10 +2856,46 @@ async function openSIEMRulesModal() {
                     </label>
                 </td>
             </tr>
-        `).join('');
+        `;
+    }).join('');
+}
+
+async function openSIEMRulesModal() {
+    const modal = document.getElementById('siem-rules-modal');
+    const tbody = document.getElementById('siem-rules-body');
+    if (!modal || !tbody) return;
+
+    modal.style.display = 'flex';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Kurallar yükleniyor...</td></tr>';
+
+    // Bind filter listeners once
+    const searchInput = document.getElementById('siem-rules-search');
+    const catSelect = document.getElementById('siem-rules-cat-filter');
+    const prioSelect = document.getElementById('siem-rules-priority-filter');
+
+    if (searchInput && !searchInput.dataset.bound) {
+        searchInput.dataset.bound = 'true';
+        searchInput.addEventListener('input', renderFilteredSIEMRules);
+    }
+    if (catSelect && !catSelect.dataset.bound) {
+        catSelect.dataset.bound = 'true';
+        catSelect.addEventListener('change', renderFilteredSIEMRules);
+    }
+    if (prioSelect && !prioSelect.dataset.bound) {
+        prioSelect.dataset.bound = 'true';
+        prioSelect.addEventListener('change', renderFilteredSIEMRules);
+    }
+
+    try {
+        const res = await fetch('/api/v1/siem/rules');
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+        allSIEMRules = data.rules || [];
+
+        renderFilteredSIEMRules();
 
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-red">Hata: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-red">Hata: ${e.message}</td></tr>`;
     }
 }
 
