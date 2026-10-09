@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/syslog-platform/logger/internal/auth/ad"
 	"github.com/syslog-platform/logger/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -127,28 +128,86 @@ func (h *Handler) handleLoginAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := contextWithTimeout(r, 5*time.Second)
+	ctx, cancel := contextWithTimeout(r, 8*time.Second)
 	defer cancel()
 
 	user, err := h.pgDB.GetUserByUsername(ctx, req.Username)
-	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid username or password"})
+	var authenticatedUser *models.User
+
+	if err == nil {
+		if !user.IsEnabled {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "user account is disabled"})
+			return
+		}
+
+		if user.AuthSource == "ad" {
+			// Authenticate against Active Directory domain controller
+			settings, setErr := h.pgDB.GetSettings(ctx)
+			if setErr != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed loading directory settings"})
+				return
+			}
+			adCfg := ad.LoadConfigFromSettings(settings)
+			if !adCfg.Enabled {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Active Directory authentication is currently disabled in system settings"})
+				return
+			}
+			client := ad.NewClient(adCfg)
+			adUser, authErr := client.AuthenticateUser(req.Username, req.Password)
+			if authErr != nil {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid active directory username or password"})
+				return
+			}
+			if adUser.FullName != "" && adUser.FullName != user.FullName {
+				user.FullName = adUser.FullName
+			}
+			authenticatedUser = user
+		} else {
+			// Local password check
+			if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid username or password"})
+				return
+			}
+			authenticatedUser = user
+		}
+	} else {
+		// User does not exist locally; attempt dynamic Active Directory login if enabled
+		settings, setErr := h.pgDB.GetSettings(ctx)
+		if setErr == nil {
+			adCfg := ad.LoadConfigFromSettings(settings)
+			if adCfg.Enabled {
+				client := ad.NewClient(adCfg)
+				adUser, authErr := client.AuthenticateUser(req.Username, req.Password)
+				if authErr == nil {
+					provisioned, provErr := h.pgDB.UpsertADUser(ctx, adUser.Username, adUser.FullName, adUser.Email, adUser.Role)
+					if provErr == nil {
+						authenticatedUser = provisioned
+					}
+				}
+			}
+		}
+		if authenticatedUser == nil {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid username or password"})
+			return
+		}
+	}
+
+	// Multi-Factor Authentication (MFA) Enforcement Check
+	if authenticatedUser.MFAEnabled {
+		ticket := h.mfaTickets.Create(authenticatedUser.ID, authenticatedUser.Username)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":       "mfa_required",
+			"mfa_required": true,
+			"mfa_ticket":   ticket,
+			"username":     authenticatedUser.Username,
+			"mfa_provider": authenticatedUser.MFAProvider,
+		})
 		return
 	}
 
-	if !user.IsEnabled {
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": "user account is disabled"})
-		return
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid username or password"})
-		return
-	}
-
-	// Create session
-	token := h.sessions.Create(user)
-	_ = h.pgDB.UpdateUserLastLogin(ctx, user.ID)
+	// Create authenticated session
+	token := h.sessions.Create(authenticatedUser)
+	_ = h.pgDB.UpdateUserLastLogin(ctx, authenticatedUser.ID)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     SessionCookieName,
@@ -163,9 +222,9 @@ func (h *Handler) handleLoginAPI(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status": "ok",
 		"user": map[string]any{
-			"username":  user.Username,
-			"full_name": user.FullName,
-			"role":      user.Role,
+			"username":  authenticatedUser.Username,
+			"full_name": authenticatedUser.FullName,
+			"role":      authenticatedUser.Role,
 		},
 	})
 }

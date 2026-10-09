@@ -48,6 +48,7 @@ type Handler struct {
 	exportJobMgr     *archive.ExportJobManager
 	nodeName         string
 	sessions         *SessionManager
+	mfaTickets       *MFATicketManager
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
@@ -85,6 +86,7 @@ func NewHandler(
 		exportJobMgr:     archive.NewExportJobManager(ae),
 		nodeName:         node,
 		sessions:         NewSessionManager(),
+		mfaTickets:       NewMFATicketManager(),
 	}
 }
 
@@ -130,11 +132,23 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Public Authentication & Health Routes
 	mux.HandleFunc("/login", h.handleLoginPage)
 	mux.HandleFunc("/api/v1/auth/login", h.handleLoginAPI)
+	mux.HandleFunc("/api/v1/auth/login/mfa", h.handleLoginMFAAPI)
 	mux.HandleFunc("/api/v1/auth/logout", h.handleLogoutAPI)
 	mux.HandleFunc("/api/v1/auth/me", h.handleMeAPI)
 	mux.HandleFunc("/api/v1/system/health", h.handleHealth)
 
 	// Protected API v1 Endpoints (Require valid session)
+	mux.HandleFunc("/api/v1/auth/mfa/setup", h.requireAuth(h.handleMFASetupAPI))
+	mux.HandleFunc("/api/v1/auth/mfa/verify", h.requireAuth(h.handleMFAVerifyAndEnableAPI))
+	mux.HandleFunc("/api/v1/auth/mfa/disable", h.requireAuth(h.handleMFADisableAPI))
+	mux.HandleFunc("/api/v1/auth/mfa/admin-reset", h.requireAuth(h.handleMFAAdminResetAPI))
+
+	mux.HandleFunc("/api/v1/auth/ad/test", h.requireAuth(h.handleADTestAPI))
+	mux.HandleFunc("/api/v1/auth/ad/preview", h.requireAuth(h.handleADPreviewAPI))
+	mux.HandleFunc("/api/v1/auth/ad/sync", h.requireAuth(h.handleADSyncAPI))
+
+	mux.HandleFunc("/api/v1/smtp/test", h.requireAuth(h.handleSMTPTestAPI))
+
 	mux.HandleFunc("/api/v1/dashboard", h.requireAuth(h.handleDashboard))
 	mux.HandleFunc("/api/v1/logs", h.requireAuth(h.handleSearchLogs))
 	mux.HandleFunc("/api/v1/logs/live", h.requireAuth(h.handleLiveWebSocket))
@@ -529,7 +543,7 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for k, v := range req {
-			if k == "kamusm_customer_password" && (v == "********" || v == "") {
+			if (k == "kamusm_customer_password" || k == "ad_bind_password" || k == "smtp_password") && (v == "********" || v == "") {
 				continue // Do not overwrite existing password with mask
 			}
 			_ = h.pgDB.SaveSetting(ctx, k, v)
@@ -660,9 +674,60 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 		settings["syslog_tls_listen_addr"] = ":6514"
 	}
 
-	// Mask password before returning
+	// Active Directory Defaults
+	if _, ok := settings["ad_enabled"]; !ok {
+		settings["ad_enabled"] = "false"
+	}
+	if _, ok := settings["ad_port"]; !ok {
+		settings["ad_port"] = "389"
+	}
+	if _, ok := settings["ad_username_attr"]; !ok {
+		settings["ad_username_attr"] = "sAMAccountName"
+	}
+	if _, ok := settings["ad_name_attr"]; !ok {
+		settings["ad_name_attr"] = "displayName"
+	}
+	if _, ok := settings["ad_email_attr"]; !ok {
+		settings["ad_email_attr"] = "mail"
+	}
+	if _, ok := settings["ad_default_role"]; !ok {
+		settings["ad_default_role"] = "Security Analyst"
+	}
+
+	// MFA Policy Defaults
+	if _, ok := settings["mfa_enforced_policy"]; !ok {
+		settings["mfa_enforced_policy"] = "optional"
+	}
+
+	// SMTP Notification Defaults
+	if _, ok := settings["smtp_enabled"]; !ok {
+		settings["smtp_enabled"] = "false"
+	}
+	if _, ok := settings["smtp_port"]; !ok {
+		settings["smtp_port"] = "587"
+	}
+	if _, ok := settings["smtp_encryption"]; !ok {
+		settings["smtp_encryption"] = "STARTTLS"
+	}
+	if _, ok := settings["smtp_from_name"]; !ok {
+		settings["smtp_from_name"] = "Valtrivo LogSeal SIEM"
+	}
+	if _, ok := settings["smtp_notify_on_assignment"]; !ok {
+		settings["smtp_notify_on_assignment"] = "true"
+	}
+	if _, ok := settings["smtp_notify_on_critical"]; !ok {
+		settings["smtp_notify_on_critical"] = "true"
+	}
+
+	// Mask sensitive passwords before returning
 	if pass, ok := settings["kamusm_customer_password"]; ok && len(pass) > 0 {
 		settings["kamusm_customer_password"] = "********"
+	}
+	if pass, ok := settings["ad_bind_password"]; ok && len(pass) > 0 {
+		settings["ad_bind_password"] = "********"
+	}
+	if pass, ok := settings["smtp_password"]; ok && len(pass) > 0 {
+		settings["smtp_password"] = "********"
 	}
 
 	writeJSON(w, http.StatusOK, settings)

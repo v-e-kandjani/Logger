@@ -119,14 +119,21 @@ type AuditLog struct {
 
 // User represents an administrative or security operator
 type User struct {
-	ID           uuid.UUID `json:"id"`
-	Username     string    `json:"username"`
-	PasswordHash string    `json:"-"`
-	FullName     string    `json:"full_name"`
-	Email        string    `json:"email"`
-	Role         string    `json:"role"` // Super Administrator, Administrator, Security Analyst, Read Only, Auditor
-	IsEnabled    bool      `json:"is_enabled"`
-	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID               uuid.UUID  `json:"id"`
+	Username         string     `json:"username"`
+	PasswordHash     string     `json:"-"`
+	FullName         string     `json:"full_name"`
+	Email            string     `json:"email"`
+	Role             string     `json:"role"` // Super Administrator, Administrator, Security Analyst, Read Only, Auditor
+	IsEnabled        bool       `json:"is_enabled"`
+	AuthSource       string     `json:"auth_source"` // "local" or "ad"
+	MFAEnabled       bool       `json:"mfa_enabled"`
+	MFASecret        string     `json:"-"`
+	MFARecoveryCodes []string   `json:"-"`
+	MFAEnrolledAt    *time.Time `json:"mfa_enrolled_at,omitempty"`
+	MFAProvider      string     `json:"mfa_provider"` // "totp", "ms_authenticator", "google_authenticator", "watchguard_authpoint", "forti_authenticator"
+	LastLoginAt      *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
+

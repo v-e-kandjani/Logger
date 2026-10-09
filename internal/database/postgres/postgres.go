@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -444,20 +445,55 @@ func (db *DB) SeedDefaultDevices(ctx context.Context) error {
 
 func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
 	query := `
-		SELECT id, username, password_hash, full_name, email, role, is_enabled, last_login_at, created_at, updated_at
+		SELECT id, username, password_hash, full_name, email, role, is_enabled,
+		       COALESCE(auth_source, 'local'), COALESCE(mfa_enabled, false),
+		       COALESCE(mfa_secret, ''), COALESCE(mfa_recovery_codes, '{}'),
+		       mfa_enrolled_at, COALESCE(mfa_provider, 'totp'),
+		       last_login_at, created_at, updated_at
 		FROM users
 		WHERE LOWER(username) = LOWER($1)`
 
 	var u models.User
 	var lastLogin *time.Time
+	var enrolledAt *time.Time
 	err := db.pool.QueryRow(ctx, query, username).Scan(
 		&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.Email,
-		&u.Role, &u.IsEnabled, &lastLogin, &u.CreatedAt, &u.UpdatedAt,
+		&u.Role, &u.IsEnabled, &u.AuthSource, &u.MFAEnabled,
+		&u.MFASecret, &u.MFARecoveryCodes, &enrolledAt, &u.MFAProvider,
+		&lastLogin, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 	u.LastLoginAt = lastLogin
+	u.MFAEnrolledAt = enrolledAt
+	return &u, nil
+}
+
+func (db *DB) GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
+	query := `
+		SELECT id, username, password_hash, full_name, email, role, is_enabled,
+		       COALESCE(auth_source, 'local'), COALESCE(mfa_enabled, false),
+		       COALESCE(mfa_secret, ''), COALESCE(mfa_recovery_codes, '{}'),
+		       mfa_enrolled_at, COALESCE(mfa_provider, 'totp'),
+		       last_login_at, created_at, updated_at
+		FROM users
+		WHERE id = $1`
+
+	var u models.User
+	var lastLogin *time.Time
+	var enrolledAt *time.Time
+	err := db.pool.QueryRow(ctx, query, id).Scan(
+		&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.Email,
+		&u.Role, &u.IsEnabled, &u.AuthSource, &u.MFAEnabled,
+		&u.MFASecret, &u.MFARecoveryCodes, &enrolledAt, &u.MFAProvider,
+		&lastLogin, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	u.LastLoginAt = lastLogin
+	u.MFAEnrolledAt = enrolledAt
 	return &u, nil
 }
 
@@ -482,8 +518,8 @@ func (db *DB) SeedDefaultUser(ctx context.Context, username, password string) er
 	}
 
 	query := `
-		INSERT INTO users (username, password_hash, full_name, email, role, is_enabled)
-		VALUES ($1, $2, 'Security Administrator', 'admin@syslog.local', 'Super Administrator', true)
+		INSERT INTO users (username, password_hash, full_name, email, role, is_enabled, auth_source)
+		VALUES ($1, $2, 'Security Administrator', 'admin@syslog.local', 'Super Administrator', true, 'local')
 		ON CONFLICT (username) DO NOTHING`
 	_, err = db.pool.Exec(ctx, query, username, string(hash))
 	return err
@@ -491,7 +527,10 @@ func (db *DB) SeedDefaultUser(ctx context.Context, username, password string) er
 
 func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
 	query := `
-		SELECT id, username, full_name, email, role, is_enabled, last_login_at, created_at, updated_at
+		SELECT id, username, full_name, email, role, is_enabled,
+		       COALESCE(auth_source, 'local'), COALESCE(mfa_enabled, false),
+		       mfa_enrolled_at, COALESCE(mfa_provider, 'totp'),
+		       last_login_at, created_at, updated_at
 		FROM users
 		ORDER BY created_at ASC`
 
@@ -505,14 +544,18 @@ func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
 	for rows.Next() {
 		var u models.User
 		var lastLogin *time.Time
+		var enrolledAt *time.Time
 		err := rows.Scan(
 			&u.ID, &u.Username, &u.FullName, &u.Email,
-			&u.Role, &u.IsEnabled, &lastLogin, &u.CreatedAt, &u.UpdatedAt,
+			&u.Role, &u.IsEnabled, &u.AuthSource, &u.MFAEnabled,
+			&enrolledAt, &u.MFAProvider,
+			&lastLogin, &u.CreatedAt, &u.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
 		u.LastLoginAt = lastLogin
+		u.MFAEnrolledAt = enrolledAt
 		list = append(list, u)
 	}
 	return list, nil
@@ -524,14 +567,117 @@ func (db *DB) CreateUser(ctx context.Context, u *models.User, plainPassword stri
 		return fmt.Errorf("hashing password: %w", err)
 	}
 
+	if u.AuthSource == "" {
+		u.AuthSource = "local"
+	}
+	if u.MFAProvider == "" {
+		u.MFAProvider = "totp"
+	}
+
 	query := `
-		INSERT INTO users (username, password_hash, full_name, email, role, is_enabled)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO users (username, password_hash, full_name, email, role, is_enabled, auth_source, mfa_enabled, mfa_provider)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, updated_at`
 
 	return db.pool.QueryRow(ctx, query,
-		u.Username, string(hash), u.FullName, u.Email, u.Role, u.IsEnabled,
+		u.Username, string(hash), u.FullName, u.Email, u.Role, u.IsEnabled, u.AuthSource, u.MFAEnabled, u.MFAProvider,
 	).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
+}
+
+// UpsertADUser creates or updates a synchronized Active Directory user
+func (db *DB) UpsertADUser(ctx context.Context, username, fullName, email, role string) (*models.User, error) {
+	if role == "" {
+		role = "Security Analyst"
+	}
+	query := `
+		INSERT INTO users (username, password_hash, full_name, email, role, is_enabled, auth_source)
+		VALUES ($1, 'AD_MANAGED_ACCOUNT', $2, $3, $4, true, 'ad')
+		ON CONFLICT (username) DO UPDATE
+		SET full_name = EXCLUDED.full_name,
+		    email = CASE WHEN EXCLUDED.email <> '' THEN EXCLUDED.email ELSE users.email END,
+		    auth_source = 'ad',
+		    updated_at = NOW()
+		RETURNING id, username, full_name, email, role, is_enabled, auth_source, mfa_enabled, last_login_at, created_at, updated_at`
+
+	var u models.User
+	var lastLogin *time.Time
+	err := db.pool.QueryRow(ctx, query, username, fullName, email, role).Scan(
+		&u.ID, &u.Username, &u.FullName, &u.Email, &u.Role, &u.IsEnabled,
+		&u.AuthSource, &u.MFAEnabled, &lastLogin, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	u.LastLoginAt = lastLogin
+	return &u, nil
+}
+
+// UpdateUserMFA activates or updates MFA configuration for a user
+func (db *DB) UpdateUserMFA(ctx context.Context, id uuid.UUID, enabled bool, secret string, recoveryCodes []string, provider string) error {
+	if provider == "" {
+		provider = "totp"
+	}
+	query := `
+		UPDATE users
+		SET mfa_enabled = $1,
+		    mfa_secret = $2,
+		    mfa_recovery_codes = $3,
+		    mfa_provider = $4,
+		    mfa_enrolled_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
+		    updated_at = NOW()
+		WHERE id = $5`
+
+	_, err := db.pool.Exec(ctx, query, enabled, secret, recoveryCodes, provider, id)
+	return err
+}
+
+// DisableUserMFA turns off MFA and clears secrets for a user
+func (db *DB) DisableUserMFA(ctx context.Context, id uuid.UUID) error {
+	query := `
+		UPDATE users
+		SET mfa_enabled = false,
+		    mfa_secret = '',
+		    mfa_recovery_codes = '{}',
+		    mfa_enrolled_at = NULL,
+		    updated_at = NOW()
+		WHERE id = $1`
+
+	_, err := db.pool.Exec(ctx, query, id)
+	return err
+}
+
+// ValidateAndConsumeRecoveryCode validates a one-time recovery code and removes it if valid
+func (db *DB) ValidateAndConsumeRecoveryCode(ctx context.Context, id uuid.UUID, code string) (bool, error) {
+	code = strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(code), "-", ""))
+	if code == "" {
+		return false, nil
+	}
+
+	user, err := db.GetUserByID(ctx, id)
+	if err != nil {
+		return false, err
+	}
+
+	remaining := make([]string, 0, len(user.MFARecoveryCodes))
+	matched := false
+
+	for _, stored := range user.MFARecoveryCodes {
+		cleanStored := strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(stored), "-", ""))
+		if cleanStored == code && !matched {
+			matched = true
+			continue // Consume it
+		}
+		remaining = append(remaining, stored)
+	}
+
+	if !matched {
+		return false, nil
+	}
+
+	// Persist remaining recovery codes
+	query := `UPDATE users SET mfa_recovery_codes = $1, updated_at = NOW() WHERE id = $2`
+	_, err = db.pool.Exec(ctx, query, remaining, id)
+	return true, err
 }
 
 func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) error {
@@ -645,6 +791,14 @@ func (db *DB) EnsureSIEMSchema(ctx context.Context) error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_siem_alerts_technique ON siem_alerts(mitre_technique);
 	CREATE INDEX IF NOT EXISTS idx_siem_alerts_rule_status ON siem_alerts(rule_id, status);
+
+	-- Multi-Factor Authentication (MFA) & Active Directory (AD) Schema Migrations
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_source VARCHAR(32) DEFAULT 'local';
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN DEFAULT FALSE;
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret VARCHAR(128) DEFAULT '';
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_recovery_codes TEXT[] DEFAULT '{}';
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enrolled_at TIMESTAMPTZ;
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_provider VARCHAR(32) DEFAULT 'totp';
 	`
 	if _, err := db.pool.Exec(ctx, schema); err != nil {
 		return err

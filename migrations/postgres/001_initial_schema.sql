@@ -56,6 +56,12 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     role VARCHAR(32) NOT NULL DEFAULT 'Administrator',
     is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    auth_source VARCHAR(32) NOT NULL DEFAULT 'local',
+    mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    mfa_secret VARCHAR(128) DEFAULT '',
+    mfa_recovery_codes TEXT[] DEFAULT '{}',
+    mfa_enrolled_at TIMESTAMPTZ,
+    mfa_provider VARCHAR(32) DEFAULT 'totp',
     last_login_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

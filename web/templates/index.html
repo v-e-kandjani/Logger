@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.4.3</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.0</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -864,6 +864,251 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Active Directory / LDAP Directory Integration Panel -->
+                    <div class="panel" style="grid-column: 1 / -1;">
+                        <div class="panel-header">
+                            <h3 data-i18n="ad_panel_title">Active Directory & LDAP Directory Integration</h3>
+                            <span class="badge badge-primary">Enterprise Identity</span>
+                        </div>
+                        <div class="panel-body">
+                            <p class="subtitle" style="margin-bottom: 14px;" data-i18n="ad_panel_subtitle">
+                                Authenticate and synchronize SIEM security analysts, administrators, and auditors directly from Microsoft Active Directory or OpenLDAP.
+                            </p>
+
+                            <div class="form-group">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="setting-ad-enabled">
+                                    <span><strong data-i18n="lbl_ad_enabled">Enable Active Directory Authentication &amp; User Synchronization</strong></span>
+                                </label>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 12px;">
+                                <div class="form-group">
+                                    <label data-i18n="lbl_ad_server">Domain Controller Host / IP</label>
+                                    <input type="text" class="input mono-code" id="setting-ad-server" placeholder="dc01.corp.local or 10.0.1.10">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="lbl_ad_port">Port</label>
+                                    <input type="number" class="input mono-code" id="setting-ad-port" value="389" placeholder="389 or 636">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="lbl_ad_default_role">Default Role for Synced Users</label>
+                                    <select class="input" id="setting-ad-default-role">
+                                        <option value="Security Analyst">Security Analyst</option>
+                                        <option value="Auditor">Auditor (Compliance)</option>
+                                        <option value="Operator">Network Operator</option>
+                                        <option value="Read Only">Read Only</option>
+                                        <option value="Super Administrator">Super Administrator</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Connection Security Flags -->
+                            <div style="display: flex; gap: 24px; flex-wrap: wrap; margin: 8px 0 14px 0; background: var(--bg-surface-elevated); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="setting-ad-use-ssl">
+                                    <span>LDAPS (SSL/TLS direct on port 636)</span>
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="setting-ad-start-tls">
+                                    <span>StartTLS (port 389)</span>
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="setting-ad-insecure-skip-verify" checked>
+                                    <span>Skip Certificate Verification (InsecureSkipVerify)</span>
+                                </label>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                                <div class="form-group">
+                                    <label data-i18n="lbl_ad_base_dn">Search Base DN</label>
+                                    <input type="text" class="input mono-code" id="setting-ad-base-dn" placeholder="DC=corp,DC=local">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="lbl_ad_bind_dn">Bind Service Account (DN or UPN)</label>
+                                    <input type="text" class="input mono-code" id="setting-ad-bind-dn" placeholder="CN=svc-logger,OU=ServiceAccounts,DC=corp,DC=local">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="lbl_ad_bind_password">Bind Password</label>
+                                    <input type="password" class="input" id="setting-ad-bind-pass" placeholder="••••••••">
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 8px;">
+                                <div class="form-group">
+                                    <label data-i18n="lbl_ad_user_filter">User LDAP Search Filter</label>
+                                    <input type="text" class="input mono-code" id="setting-ad-user-filter" value="(&(objectCategory=person)(objectClass=user))">
+                                </div>
+                                <div class="form-group">
+                                    <label>Username Attribute</label>
+                                    <input type="text" class="input mono-code" id="setting-ad-username-attr" value="sAMAccountName">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email Attribute</label>
+                                    <input type="text" class="input mono-code" id="setting-ad-email-attr" value="mail">
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
+                                <button class="btn btn-primary" id="btn-save-ad-settings" data-i18n="btn_save_ad">Save Active Directory Settings</button>
+                                <button class="btn btn-outline" id="btn-test-ad-conn" data-i18n="btn_test_ad">🔌 Test Connection to Domain Controller</button>
+                                <button class="btn btn-outline" onclick="openADSyncModal()" data-i18n="btn_open_ad_sync">👥 Discover &amp; Sync Users Now</button>
+                            </div>
+                            <div id="ad-test-result" style="margin-top: 12px; display: none;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Factor Authentication (MFA) Policy Panel -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3 data-i18n="mfa_panel_title">Multi-Factor Authentication (MFA) Governance</h3>
+                            <span class="badge badge-success">RFC 6238 TOTP</span>
+                        </div>
+                        <div class="panel-body">
+                            <p class="subtitle" style="margin-bottom: 12px;" data-i18n="mfa_panel_subtitle">
+                                Protect operator logins with high-assurance time-based one-time passwords (TOTP). Fully compatible with leading enterprise authenticators.
+                            </p>
+
+                            <div class="form-group">
+                                <label style="font-weight: 600;" data-i18n="lbl_mfa_policy">System-Wide MFA Enforcement Policy</label>
+                                <select class="input" id="setting-mfa-policy">
+                                    <option value="optional">Optional (Operators can enroll and activate MFA voluntarily)</option>
+                                    <option value="enforced">Mandatory Enforcement (All operators required to verify MFA on login)</option>
+                                </select>
+                            </div>
+
+                            <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 12px;">
+                                <div style="font-size: 0.82rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">
+                                    Verified &amp; Certified Authenticator Apps:
+                                </div>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 0.85rem;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span>🛡️</span> <strong>Microsoft Authenticator</strong>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span>🔑</span> <strong>Google Authenticator</strong>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span>🔴</span> <strong>WatchGuard AuthPoint</strong>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span>⚡</span> <strong>FortiAuthenticator / FortiToken</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 10px; margin-top: 16px;">
+                                <button class="btn btn-primary" id="btn-save-mfa-policy" data-i18n="btn_save_mfa">Save MFA Policy</button>
+                                <button class="btn btn-outline" onclick="openMyMFASetupModal()">🔐 Configure My MFA Token</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SMTP Mail Server & Alert/Task Notification Panel -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3 data-i18n="smtp_panel_title">SMTP Mail Server &amp; Alert Notifications</h3>
+                            <span class="badge badge-warning">Task Dispatcher</span>
+                        </div>
+                        <div class="panel-body">
+                            <p class="subtitle" style="margin-bottom: 12px;" data-i18n="smtp_panel_subtitle">
+                                Configure mail relay to automatically email analysts when SIEM alerts are assigned and broadcast critical detection alarms.
+                            </p>
+
+                            <div class="form-group">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="setting-smtp-enabled">
+                                    <span><strong data-i18n="lbl_smtp_enabled">Enable SMTP Mail Delivery &amp; Alert Dispatch</strong></span>
+                                </label>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-top: 10px;">
+                                <div class="form-group">
+                                    <label data-i18n="lbl_smtp_host">SMTP Hostname / Relay</label>
+                                    <input type="text" class="input mono-code" id="setting-smtp-host" placeholder="smtp.office365.com or mail.corp.local">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="lbl_smtp_port">Port</label>
+                                    <input type="number" class="input mono-code" id="setting-smtp-port" value="587">
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div class="form-group">
+                                    <label data-i18n="lbl_smtp_encryption">Encryption Mode</label>
+                                    <select class="input" id="setting-smtp-encryption">
+                                        <option value="STARTTLS">STARTTLS (Port 587 - Standard)</option>
+                                        <option value="SSL/TLS">SSL/TLS Direct (Port 465)</option>
+                                        <option value="None">None / Plain (Port 25)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+                                    <label class="checkbox-container">
+                                        <input type="checkbox" id="setting-smtp-insecure-skip-verify">
+                                        <span>Skip TLS Verification</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div class="form-group">
+                                    <label data-i18n="lbl_smtp_username">SMTP Username / Email</label>
+                                    <input type="text" class="input mono-code" id="setting-smtp-username" placeholder="alerts@company.com">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="lbl_smtp_password">SMTP Password</label>
+                                    <input type="password" class="input" id="setting-smtp-password" placeholder="••••••••">
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div class="form-group">
+                                    <label data-i18n="lbl_smtp_from_address">From Address</label>
+                                    <input type="text" class="input mono-code" id="setting-smtp-from-address" placeholder="alerts@company.com">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="lbl_smtp_from_name">From Display Name</label>
+                                    <input type="text" class="input" id="setting-smtp-from-name" value="Valtrivo LogSeal SIEM">
+                                </div>
+                            </div>
+
+                            <!-- Notification Triggers -->
+                            <div style="background: var(--bg-surface-elevated); padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 10px;">
+                                <strong style="font-size: 0.82rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 8px;">Notification Rules:</strong>
+                                <div class="form-group" style="margin-bottom: 8px;">
+                                    <label class="checkbox-container">
+                                        <input type="checkbox" id="setting-smtp-notify-on-assignment" checked>
+                                        <span data-i18n="lbl_notify_assignment"><strong>Send Email on SIEM Task &amp; Incident Assignment</strong> to designated analyst</span>
+                                    </label>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 8px;">
+                                    <label class="checkbox-container">
+                                        <input type="checkbox" id="setting-smtp-notify-on-critical" checked>
+                                        <span data-i18n="lbl_notify_critical"><strong>Send Broadcast Alarm on CRITICAL SIEM Detections</strong></span>
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="lbl_smtp_recipients">SOC Broadcast Email List (comma-separated)</label>
+                                    <input type="text" class="input mono-code" id="setting-smtp-recipients" placeholder="soc-team@company.com, alerts@corp.local">
+                                </div>
+                            </div>
+
+                            <!-- Test Email Box -->
+                            <div style="display: flex; gap: 8px; margin-top: 14px; align-items: flex-end;">
+                                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                    <label data-i18n="lbl_test_recipient">Test Recipient Address</label>
+                                    <input type="email" class="input mono-code" id="setting-smtp-test-recipient" placeholder="my-email@company.com">
+                                </div>
+                                <button class="btn btn-outline" id="btn-test-smtp" style="white-space: nowrap;" data-i18n="btn_send_test_email">✉️ Send Test Email</button>
+                            </div>
+                            <div id="smtp-test-result" style="margin-top: 10px; display: none;"></div>
+
+                            <div style="display: flex; gap: 10px; margin-top: 16px;">
+                                <button class="btn btn-primary" id="btn-save-smtp-settings" data-i18n="btn_save_smtp">Save SMTP Settings</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -871,10 +1116,18 @@
             <section class="tab-pane" id="pane-users">
                 <div class="section-actions">
                     <div>
-                        <h3>Operator Accounts & Role Profiles</h3>
-                        <p class="subtitle">Role-Based Access Control (RBAC) with granular security profiles</p>
+                        <h3 data-i18n="users_header">Operator Accounts &amp; Role Profiles</h3>
+                        <p class="subtitle" data-i18n="view_subtitle_users">Role-Based Access Control (RBAC) with Active Directory sync and MFA protection</p>
                     </div>
-                    <button class="btn btn-primary" id="btn-add-user-modal">+ Add Operator</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" id="btn-ad-sync-modal" style="display: inline-flex; align-items: center; gap: 6px;">
+                            <span>🏢</span> <span data-i18n="btn_ad_sync">Active Directory Sync</span>
+                        </button>
+                        <button class="btn btn-outline" id="btn-my-mfa-modal" style="display: inline-flex; align-items: center; gap: 6px;">
+                            <span>🔐</span> <span data-i18n="btn_mfa_setup">MFA Güvenliği (Setup)</span>
+                        </button>
+                        <button class="btn btn-primary" id="btn-add-user-modal">+ Add Operator</button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table class="data-table" id="users-table">
@@ -884,14 +1137,15 @@
                                 <th>Full Name</th>
                                 <th>Email</th>
                                 <th>Profile / Role</th>
-                                <th>Status</th>
+                                <th>Auth Source</th>
+                                <th>MFA Status</th>
+                                <th>Account Status</th>
                                 <th>Last Login</th>
-                                <th>Created</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="users-body">
-                            <tr><td colspan="8" class="text-center">Loading operators...</td></tr>
+                            <tr><td colspan="9" class="text-center">Loading operators...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -914,7 +1168,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.4.3</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.0</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -1778,7 +2032,144 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.4.3"></script>
-    <script src="/static/js/app.js?v=1.4.3"></script>
+    <!-- 12. Active Directory User Discovery & Synchronization Modal -->
+    <div class="modal-backdrop" id="ad-sync-modal" style="display: none;">
+        <div class="modal modal-wide" style="max-width: 960px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="modal-icon text-blue" style="background: rgba(59, 130, 246, 0.1); padding: 8px; border-radius: 8px; font-size: 1.3rem;">🏢</div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="ad_sync_modal_title">Active Directory User Synchronization</h3>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="ad_sync_modal_sub">Discover &amp; onboard domain users, analysts, and groups into SIEM</div>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeADSyncModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px; max-height: 75vh; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <div style="font-size: 0.82rem; color: var(--text-muted);">Configured DC / Search Base:</div>
+                        <div style="font-size: 0.95rem; font-weight: 600; font-family: monospace;" id="ad-sync-dc-info">Loading AD status...</div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" id="btn-ad-preview-users" onclick="loadADPreviewUsers()">🔍 Scan / Preview Users</button>
+                        <button class="btn btn-primary" id="btn-ad-run-sync" onclick="executeADSync()">📥 Import All to SIEM</button>
+                    </div>
+                </div>
+
+                <div id="ad-sync-status-box" style="margin-bottom: 14px; display: none;"></div>
+
+                <div class="table-container">
+                    <table class="data-table" id="ad-preview-table">
+                        <thead>
+                            <tr>
+                                <th>Username (sAMAccountName)</th>
+                                <th>Full Display Name</th>
+                                <th>Email</th>
+                                <th>Domain Groups / OU</th>
+                                <th>Account Status</th>
+                                <th>Mapped Role</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ad-preview-body">
+                            <tr><td colspan="6" class="text-center" style="padding: 24px; color: var(--text-muted);">Click "Scan / Preview Users" to query domain directory.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                    Domain users will authenticate directly against Active Directory via Kerberos/LDAP bind.
+                </div>
+                <button class="btn btn-secondary" onclick="closeADSyncModal()" data-i18n="btn_close">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 13. Multi-Factor Authentication (MFA) Setup & Enrollment Modal -->
+    <div class="modal-backdrop" id="user-mfa-modal" style="display: none;">
+        <div class="modal" style="max-width: 580px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="modal-icon text-green" style="background: rgba(34, 197, 94, 0.1); padding: 8px; border-radius: 8px; font-size: 1.3rem;">🔐</div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="mfa_setup_modal_title">MFA Token Setup &amp; Enrollment</h3>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">RFC 6238 Time-based One-Time Password (TOTP)</div>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeUserMFAModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <!-- Compatible apps banner -->
+                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.8rem; text-align: center;">
+                    <span style="color: var(--text-muted);">Compatible Apps:</span>
+                    <strong>MS Authenticator</strong> &bull;
+                    <strong>Google Auth</strong> &bull;
+                    <strong>WatchGuard AuthPoint</strong> &bull;
+                    <strong>FortiAuthenticator</strong>
+                </div>
+
+                <div id="mfa-setup-step1">
+                    <div style="text-align: center; margin-bottom: 16px;">
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+                            <strong>Step 1:</strong> Scan this QR code using any of the authenticator apps above:
+                        </p>
+                        <div style="display: inline-block; padding: 12px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
+                            <img id="mfa-qr-img" src="" width="180" height="180" alt="MFA QR Code" style="display: block;">
+                        </div>
+                    </div>
+
+                    <div style="background: var(--bg-surface-elevated); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 16px;">
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Or enter secret key manually:</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                            <code style="font-size: 0.95rem; font-weight: 700; color: #818cf8; letter-spacing: 1.5px;" id="mfa-secret-display">--------</code>
+                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="copyMFASecret()">Copy Key</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 14px;">
+                        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 6px;">
+                            <strong>Step 2:</strong> Enter 6-digit verification code from your authenticator:
+                        </label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="mfa-verify-input" class="input mono-code" placeholder="000000" maxlength="6" style="text-align: center; font-size: 1.2rem; letter-spacing: 4px; font-weight: 700; flex: 1;">
+                            <button class="btn btn-primary" onclick="confirmMFAActivation()" id="btn-mfa-confirm-activate">Activate MFA</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Success & Recovery Codes -->
+                <div id="mfa-setup-step2" style="display: none;">
+                    <div class="alert-box alert-success" style="margin-bottom: 16px;">
+                        <div>
+                            <strong>✓ Multi-Factor Authentication Successfully Activated!</strong>
+                            <div style="font-size: 0.8rem; margin-top: 4px;">Your account is now secured with two-factor authentication.</div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <strong style="color: #f59e0b; font-size: 0.85rem; display: block; margin-bottom: 6px;">
+                            ⚠️ Important: Save Your One-Time Backup Recovery Codes
+                        </strong>
+                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px;">
+                            If you lose access to your authenticator app, these emergency codes allow you to regain access. Each code can only be used once.
+                        </p>
+                        <div id="mfa-recovery-codes-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-family: monospace; font-size: 0.85rem; font-weight: 600; color: #cbd5e1; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px;">
+                            <!-- Populated with 8 codes -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 0.8rem; color: var(--text-muted);" id="mfa-modal-footer-text">
+                    Supported by all standard TOTP authenticators
+                </div>
+                <button class="btn btn-secondary" onclick="closeUserMFAModal()" data-i18n="btn_close">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/translations.js?v=1.5.0"></script>
+    <script src="/static/js/app.js?v=1.5.0"></script>
 </body>
 </html>

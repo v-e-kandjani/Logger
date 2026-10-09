@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initUpdatesManagement();
     loadUpdateStatus();
     initSIEMManagement();
+    initADAndMFAManagement();
     if (window.i18n) {
         window.i18n.setLanguage(window.i18n.currentLang);
     }
@@ -875,6 +876,90 @@ async function loadSettings() {
             document.getElementById('setting-tls-listen-addr').value = s.syslog_tls_listen_addr;
         }
 
+        // Active Directory & LDAP Settings
+        if (document.getElementById('setting-ad-enabled')) {
+            document.getElementById('setting-ad-enabled').checked = s.ad_enabled === 'true' || s.ad_enabled === true;
+        }
+        if (s.ad_server && document.getElementById('setting-ad-server')) {
+            document.getElementById('setting-ad-server').value = s.ad_server;
+        }
+        if (s.ad_port && document.getElementById('setting-ad-port')) {
+            document.getElementById('setting-ad-port').value = s.ad_port;
+        }
+        if (s.ad_default_role && document.getElementById('setting-ad-default-role')) {
+            document.getElementById('setting-ad-default-role').value = s.ad_default_role;
+        }
+        if (document.getElementById('setting-ad-use-ssl')) {
+            document.getElementById('setting-ad-use-ssl').checked = s.ad_use_ssl === 'true' || s.ad_use_ssl === true;
+        }
+        if (document.getElementById('setting-ad-start-tls')) {
+            document.getElementById('setting-ad-start-tls').checked = s.ad_start_tls === 'true' || s.ad_start_tls === true;
+        }
+        if (document.getElementById('setting-ad-insecure-skip-verify')) {
+            document.getElementById('setting-ad-insecure-skip-verify').checked = s.ad_insecure_skip_verify !== 'false' && s.ad_insecure_skip_verify !== false;
+        }
+        if (s.ad_base_dn && document.getElementById('setting-ad-base-dn')) {
+            document.getElementById('setting-ad-base-dn').value = s.ad_base_dn;
+        }
+        if (s.ad_bind_dn && document.getElementById('setting-ad-bind-dn')) {
+            document.getElementById('setting-ad-bind-dn').value = s.ad_bind_dn;
+        }
+        if (s.ad_bind_password && s.ad_bind_password !== '********' && document.getElementById('setting-ad-bind-pass')) {
+            document.getElementById('setting-ad-bind-pass').value = s.ad_bind_password;
+        }
+        if (s.ad_user_filter && document.getElementById('setting-ad-user-filter')) {
+            document.getElementById('setting-ad-user-filter').value = s.ad_user_filter;
+        }
+        if (s.ad_username_attr && document.getElementById('setting-ad-username-attr')) {
+            document.getElementById('setting-ad-username-attr').value = s.ad_username_attr;
+        }
+        if (s.ad_email_attr && document.getElementById('setting-ad-email-attr')) {
+            document.getElementById('setting-ad-email-attr').value = s.ad_email_attr;
+        }
+
+        // Multi-Factor Authentication Policy
+        if (s.mfa_policy && document.getElementById('setting-mfa-policy')) {
+            document.getElementById('setting-mfa-policy').value = s.mfa_policy;
+        }
+
+        // SMTP Mail Delivery Settings
+        if (document.getElementById('setting-smtp-enabled')) {
+            document.getElementById('setting-smtp-enabled').checked = s.smtp_enabled === 'true' || s.smtp_enabled === true;
+        }
+        if (s.smtp_host && document.getElementById('setting-smtp-host')) {
+            document.getElementById('setting-smtp-host').value = s.smtp_host;
+        }
+        if (s.smtp_port && document.getElementById('setting-smtp-port')) {
+            document.getElementById('setting-smtp-port').value = s.smtp_port;
+        }
+        if (s.smtp_encryption && document.getElementById('setting-smtp-encryption')) {
+            document.getElementById('setting-smtp-encryption').value = s.smtp_encryption;
+        }
+        if (document.getElementById('setting-smtp-insecure-skip-verify')) {
+            document.getElementById('setting-smtp-insecure-skip-verify').checked = s.smtp_insecure_skip_verify === 'true' || s.smtp_insecure_skip_verify === true;
+        }
+        if (s.smtp_username && document.getElementById('setting-smtp-username')) {
+            document.getElementById('setting-smtp-username').value = s.smtp_username;
+        }
+        if (s.smtp_password && s.smtp_password !== '********' && document.getElementById('setting-smtp-password')) {
+            document.getElementById('setting-smtp-password').value = s.smtp_password;
+        }
+        if (s.smtp_from_address && document.getElementById('setting-smtp-from-address')) {
+            document.getElementById('setting-smtp-from-address').value = s.smtp_from_address;
+        }
+        if (s.smtp_from_name && document.getElementById('setting-smtp-from-name')) {
+            document.getElementById('setting-smtp-from-name').value = s.smtp_from_name;
+        }
+        if (document.getElementById('setting-smtp-notify-on-assignment')) {
+            document.getElementById('setting-smtp-notify-on-assignment').checked = s.smtp_notify_on_assignment !== 'false';
+        }
+        if (document.getElementById('setting-smtp-notify-on-critical')) {
+            document.getElementById('setting-smtp-notify-on-critical').checked = s.smtp_notify_on_critical !== 'false';
+        }
+        if (s.smtp_recipients && document.getElementById('setting-smtp-recipients')) {
+            document.getElementById('setting-smtp-recipients').value = s.smtp_recipients;
+        }
+
         const isStrict = s.strict_device_filtering === 'true' || s.strict_device_filtering === true;
         updateIngestionSecurityUI(isStrict);
 
@@ -1160,7 +1245,7 @@ function initUserModal() {
 async function loadUsers() {
     const tbody = document.getElementById('users-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center">Loading operators and security profiles...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center">Loading operators and security profiles...</td></tr>';
 
     try {
         const res = await fetch('/api/v1/users');
@@ -1169,14 +1254,17 @@ async function loadUsers() {
             return;
         }
         if (res.status === 403) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-red">Erişim Reddedildi: Yalnızca Süper Yöneticiler operatör hesaplarını görüntüleyebilir ve yönetebilir.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-red">Erişim Reddedildi: Yalnızca Süper Yöneticiler operatör hesaplarını görüntüleyebilir ve yönetebilir.</td></tr>';
             return;
         }
         const users = await res.json();
         if (!users || users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No operator accounts found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center">No operator accounts found.</td></tr>';
             return;
         }
+
+        window.activeUsersList = users;
+        updateSIEMAssigneeDatalist(users);
 
         const roleBadges = {
             'Super Administrator': 'badge-primary',
@@ -1188,6 +1276,9 @@ async function loadUsers() {
 
         tbody.innerHTML = users.map(u => {
             const isSelf = window.currentUser && (u.username === window.currentUser.username || u.id === window.currentUser.user_id);
+            const isAD = u.auth_source === 'ad';
+            const mfaOn = u.mfa_enabled === true;
+
             return `
             <tr>
                 <td>
@@ -1202,18 +1293,37 @@ async function loadUsers() {
                     </span>
                 </td>
                 <td>
+                    <span class="badge ${isAD ? 'badge-info' : 'badge-secondary'}" title="${isAD ? 'Synced from Active Directory Domain Controller' : 'Local LogSeal Database'}">
+                        ${isAD ? '🏢 Active Directory' : '👤 Local DB'}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge ${mfaOn ? 'badge-success' : 'badge-warning'}" title="${mfaOn ? 'RFC 6238 TOTP Multi-Factor Authentication Active' : 'MFA is disabled'}">
+                        ${mfaOn ? '🔐 Active (TOTP)' : 'Disabled'}
+                    </span>
+                </td>
+                <td>
                     <span class="badge ${u.is_enabled ? 'badge-success' : 'badge-danger'}">
                         ${u.is_enabled ? 'Active' : 'Disabled'}
                     </span>
                 </td>
                 <td>${u.last_login_at ? new Date(u.last_login_at).toLocaleString() : 'Never'}</td>
-                <td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
                 <td>
                     <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-                        <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="openResetPasswordModal('${u.id}', '${escapeHtml(u.username)}')">
-                            Reset Password
-                        </button>
+                        ${!isAD ? `
+                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="openResetPasswordModal('${u.id}', '${escapeHtml(u.username)}')">
+                                Reset Password
+                            </button>
+                        ` : ''}
+                        ${mfaOn ? `
+                            <button class="btn btn-outline text-warning" style="padding: 3px 8px; font-size: 11px;" onclick="resetUserMFA('${u.id}', '${escapeHtml(u.username)}')">
+                                Reset MFA
+                            </button>
+                        ` : ''}
                         ${isSelf ? `
+                            <button class="btn btn-outline text-green" style="padding: 3px 8px; font-size: 11px;" onclick="openMyMFASetupModal()">
+                                Setup MFA
+                            </button>
                             <span class="badge badge-secondary" style="font-size: 10px;" title="Cannot deactivate or delete your own active account">Active Session</span>
                         ` : `
                             <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="toggleUserStatus('${u.id}')">
@@ -1229,8 +1339,24 @@ async function loadUsers() {
             `;
         }).join('');
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-red">Failed loading users: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-red">Failed loading users: ${e.message}</td></tr>`;
     }
+}
+
+function updateSIEMAssigneeDatalist(users) {
+    let dl = document.getElementById('siem-analysts-datalist');
+    if (!dl) {
+        dl = document.createElement('datalist');
+        dl.id = 'siem-analysts-datalist';
+        document.body.appendChild(dl);
+    }
+    const assignedInput = document.getElementById('siem-inv-assigned-input');
+    if (assignedInput) {
+        assignedInput.setAttribute('list', 'siem-analysts-datalist');
+    }
+    dl.innerHTML = users.filter(u => u.is_enabled).map(u => 
+        `<option value="${escapeHtml(u.username)}">${escapeHtml(u.full_name || u.username)} (${escapeHtml(u.role)})</option>`
+    ).join('');
 }
 
 window.toggleUserStatus = async (id) => {
@@ -1349,12 +1475,416 @@ function initResetPasswordModal() {
                     alert('Error: ' + err.message);
                 }
             } finally {
-                btnSave.disabled = false;
                 btnSave.textContent = 'Update Password';
             }
         });
     }
 }
+
+// ==========================================
+// Active Directory, MFA & SMTP Management
+// ==========================================
+let currentMFASecret = '';
+
+function initADAndMFAManagement() {
+    // 1. Settings Action Listeners
+    const btnSaveAD = document.getElementById('btn-save-ad-settings');
+    if (btnSaveAD) {
+        btnSaveAD.addEventListener('click', async () => {
+            btnSaveAD.disabled = true;
+            btnSaveAD.textContent = 'Saving AD Settings...';
+            const payload = {
+                ad_enabled: document.getElementById('setting-ad-enabled').checked ? 'true' : 'false',
+                ad_server: document.getElementById('setting-ad-server').value.trim(),
+                ad_port: document.getElementById('setting-ad-port').value.trim() || '389',
+                ad_default_role: document.getElementById('setting-ad-default-role').value,
+                ad_use_ssl: document.getElementById('setting-ad-use-ssl').checked ? 'true' : 'false',
+                ad_start_tls: document.getElementById('setting-ad-start-tls').checked ? 'true' : 'false',
+                ad_insecure_skip_verify: document.getElementById('setting-ad-insecure-skip-verify').checked ? 'true' : 'false',
+                ad_base_dn: document.getElementById('setting-ad-base-dn').value.trim(),
+                ad_bind_dn: document.getElementById('setting-ad-bind-dn').value.trim(),
+                ad_user_filter: document.getElementById('setting-ad-user-filter').value.trim(),
+                ad_username_attr: document.getElementById('setting-ad-username-attr').value.trim() || 'sAMAccountName',
+                ad_email_attr: document.getElementById('setting-ad-email-attr').value.trim() || 'mail',
+            };
+            const passVal = document.getElementById('setting-ad-bind-pass').value.trim();
+            if (passVal && passVal !== '********') {
+                payload.ad_bind_password = passVal;
+            }
+            try {
+                const res = await fetch('/api/v1/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error(await res.text());
+                alert('Active Directory & LDAP configuration saved successfully!');
+            } catch (e) {
+                alert('Failed saving AD configuration: ' + e.message);
+            } finally {
+                btnSaveAD.disabled = false;
+                btnSaveAD.textContent = 'Save Active Directory Settings';
+            }
+        });
+    }
+
+    const btnTestAD = document.getElementById('btn-test-ad-conn');
+    if (btnTestAD) {
+        btnTestAD.addEventListener('click', async () => {
+            btnTestAD.disabled = true;
+            btnTestAD.textContent = 'Testing DC Connection...';
+            const resultDiv = document.getElementById('ad-test-result');
+            if (resultDiv) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'alert-box alert-info';
+                resultDiv.textContent = 'Connecting and binding to Domain Controller...';
+            }
+            try {
+                const res = await fetch('/api/v1/auth/ad/test', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    resultDiv.className = 'alert-box alert-success';
+                    resultDiv.textContent = '✓ ' + data.message;
+                } else {
+                    resultDiv.className = 'alert-box alert-danger';
+                    resultDiv.textContent = '✗ ' + (data.error || data.message || 'Connection test failed');
+                }
+            } catch (e) {
+                if (resultDiv) {
+                    resultDiv.className = 'alert-box alert-danger';
+                    resultDiv.textContent = '✗ AD Test failed: ' + e.message;
+                }
+            } finally {
+                btnTestAD.disabled = false;
+                btnTestAD.textContent = '🔌 Test Connection to Domain Controller';
+            }
+        });
+    }
+
+    const btnSaveMFA = document.getElementById('btn-save-mfa-policy');
+    if (btnSaveMFA) {
+        btnSaveMFA.addEventListener('click', async () => {
+            btnSaveMFA.disabled = true;
+            btnSaveMFA.textContent = 'Saving MFA Policy...';
+            const policy = document.getElementById('setting-mfa-policy').value;
+            try {
+                const res = await fetch('/api/v1/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mfa_policy: policy })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                alert(`MFA Policy updated to: ${policy === 'enforced' ? 'MANDATORY ENFORCEMENT' : 'OPTIONAL'}`);
+            } catch (e) {
+                alert('Failed saving MFA policy: ' + e.message);
+            } finally {
+                btnSaveMFA.disabled = false;
+                btnSaveMFA.textContent = 'Save MFA Policy';
+            }
+        });
+    }
+
+    const btnSaveSMTP = document.getElementById('btn-save-smtp-settings');
+    if (btnSaveSMTP) {
+        btnSaveSMTP.addEventListener('click', async () => {
+            btnSaveSMTP.disabled = true;
+            btnSaveSMTP.textContent = 'Saving SMTP Settings...';
+            const payload = {
+                smtp_enabled: document.getElementById('setting-smtp-enabled').checked ? 'true' : 'false',
+                smtp_host: document.getElementById('setting-smtp-host').value.trim(),
+                smtp_port: document.getElementById('setting-smtp-port').value.trim() || '587',
+                smtp_encryption: document.getElementById('setting-smtp-encryption').value,
+                smtp_insecure_skip_verify: document.getElementById('setting-smtp-insecure-skip-verify').checked ? 'true' : 'false',
+                smtp_username: document.getElementById('setting-smtp-username').value.trim(),
+                smtp_from_address: document.getElementById('setting-smtp-from-address').value.trim(),
+                smtp_from_name: document.getElementById('setting-smtp-from-name').value.trim() || 'Valtrivo LogSeal SIEM',
+                smtp_notify_on_assignment: document.getElementById('setting-smtp-notify-on-assignment').checked ? 'true' : 'false',
+                smtp_notify_on_critical: document.getElementById('setting-smtp-notify-on-critical').checked ? 'true' : 'false',
+                smtp_recipients: document.getElementById('setting-smtp-recipients').value.trim(),
+            };
+            const passVal = document.getElementById('setting-smtp-password').value.trim();
+            if (passVal && passVal !== '********') {
+                payload.smtp_password = passVal;
+            }
+            try {
+                const res = await fetch('/api/v1/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error(await res.text());
+                alert('SMTP Mail Server & Alert Notification settings saved successfully!');
+            } catch (e) {
+                alert('Failed saving SMTP settings: ' + e.message);
+            } finally {
+                btnSaveSMTP.disabled = false;
+                btnSaveSMTP.textContent = 'Save SMTP Settings';
+            }
+        });
+    }
+
+    const btnTestSMTP = document.getElementById('btn-test-smtp');
+    if (btnTestSMTP) {
+        btnTestSMTP.addEventListener('click', async () => {
+            const recipient = document.getElementById('setting-smtp-test-recipient').value.trim();
+            if (!recipient) {
+                alert('Please enter a recipient email address to receive the test email.');
+                return;
+            }
+            btnTestSMTP.disabled = true;
+            btnTestSMTP.textContent = 'Sending Test Mail...';
+            const resultDiv = document.getElementById('smtp-test-result');
+            if (resultDiv) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'alert-box alert-info';
+                resultDiv.textContent = `Connecting to SMTP host and dispatching test email to ${recipient}...`;
+            }
+            try {
+                const res = await fetch('/api/v1/smtp/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipient })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    resultDiv.className = 'alert-box alert-success';
+                    resultDiv.textContent = '✓ ' + data.message;
+                } else {
+                    resultDiv.className = 'alert-box alert-danger';
+                    resultDiv.textContent = '✗ ' + (data.error || data.message || 'SMTP test delivery failed');
+                }
+            } catch (e) {
+                if (resultDiv) {
+                    resultDiv.className = 'alert-box alert-danger';
+                    resultDiv.textContent = '✗ SMTP Test failed: ' + e.message;
+                }
+            } finally {
+                btnTestSMTP.disabled = false;
+                btnTestSMTP.textContent = '✉️ Send Test Email';
+            }
+        });
+    }
+
+    // Modal triggers from Users pane
+    const btnADSyncModal = document.getElementById('btn-ad-sync-modal');
+    if (btnADSyncModal) {
+        btnADSyncModal.addEventListener('click', openADSyncModal);
+    }
+    const btnMyMFAModal = document.getElementById('btn-my-mfa-modal');
+    if (btnMyMFAModal) {
+        btnMyMFAModal.addEventListener('click', openMyMFASetupModal);
+    }
+}
+
+// Active Directory Sync Modal Handlers
+window.openADSyncModal = async () => {
+    const modal = document.getElementById('ad-sync-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    const serverVal = document.getElementById('setting-ad-server') ? document.getElementById('setting-ad-server').value : '';
+    const baseDNVal = document.getElementById('setting-ad-base-dn') ? document.getElementById('setting-ad-base-dn').value : '';
+    const infoEl = document.getElementById('ad-sync-dc-info');
+    if (infoEl) {
+        infoEl.textContent = serverVal ? `${serverVal} (${baseDNVal || 'Default Base DN'})` : 'Domain Controller configured in Settings';
+    }
+    const statusBox = document.getElementById('ad-sync-status-box');
+    if (statusBox) statusBox.style.display = 'none';
+    await loadADPreviewUsers();
+};
+
+window.closeADSyncModal = () => {
+    const modal = document.getElementById('ad-sync-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.loadADPreviewUsers = async () => {
+    const tbody = document.getElementById('ad-preview-body');
+    const btnScan = document.getElementById('btn-ad-preview-users');
+    if (btnScan) {
+        btnScan.disabled = true;
+        btnScan.textContent = 'Scanning Directory...';
+    }
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding: 20px;">Querying Active Directory Domain Controller...</td></tr>';
+    }
+    try {
+        const res = await fetch('/api/v1/auth/ad/preview');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed previewing domain users');
+        const users = data.users || [];
+        if (users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-warning" style="padding: 20px;">No users found matching filter or Active Directory is not reachable.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = users.map(u => `
+            <tr>
+                <td><strong>${escapeHtml(u.username)}</strong></td>
+                <td>${escapeHtml(u.full_name || '-')}</td>
+                <td class="mono-code">${escapeHtml(u.email || '-')}</td>
+                <td style="font-size: 11px; color: var(--text-muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(u.dn || '')}">
+                    ${escapeHtml(u.dn || '-')}
+                </td>
+                <td>
+                    <span class="badge ${u.is_enabled ? 'badge-success' : 'badge-danger'}">
+                        ${u.is_enabled ? 'Active / Enabled' : 'Disabled in AD'}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge badge-info">${escapeHtml(u.role || 'Security Analyst')}</span>
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-red" style="padding: 20px;">Active Directory query failed: ${escapeHtml(e.message)}</td></tr>`;
+        }
+    } finally {
+        if (btnScan) {
+            btnScan.disabled = false;
+            btnScan.textContent = '🔍 Scan / Preview Users';
+        }
+    }
+};
+
+window.executeADSync = async () => {
+    const btnSync = document.getElementById('btn-ad-run-sync');
+    const statusBox = document.getElementById('ad-sync-status-box');
+    if (btnSync) {
+        btnSync.disabled = true;
+        btnSync.textContent = 'Synchronizing...';
+    }
+    if (statusBox) {
+        statusBox.style.display = 'block';
+        statusBox.className = 'alert-box alert-info';
+        statusBox.textContent = 'Connecting to Active Directory and syncing user accounts...';
+    }
+    try {
+        const res = await fetch('/api/v1/auth/ad/sync', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Sync failed');
+        if (statusBox) {
+            statusBox.className = 'alert-box alert-success';
+            statusBox.innerHTML = `<strong>✓ Sync Complete:</strong> ${escapeHtml(data.message)} (${data.created_count || 0} created, ${data.updated_count || 0} updated).`;
+        }
+        loadUsers();
+    } catch (e) {
+        if (statusBox) {
+            statusBox.className = 'alert-box alert-danger';
+            statusBox.textContent = 'Sync failed: ' + e.message;
+        }
+    } finally {
+        if (btnSync) {
+            btnSync.disabled = false;
+            btnSync.textContent = '📥 Import All to SIEM';
+        }
+    }
+};
+
+// MFA Enrollment & Setup Modal Handlers
+window.openMyMFASetupModal = async () => {
+    const modal = document.getElementById('user-mfa-modal');
+    if (!modal) return;
+    const step1 = document.getElementById('mfa-setup-step1');
+    const step2 = document.getElementById('mfa-setup-step2');
+    const qrImg = document.getElementById('mfa-qr-img');
+    const secretDisplay = document.getElementById('mfa-secret-display');
+    const verifyInput = document.getElementById('mfa-verify-input');
+
+    if (step1) step1.style.display = 'block';
+    if (step2) step2.style.display = 'none';
+    if (verifyInput) verifyInput.value = '';
+    modal.style.display = 'flex';
+
+    try {
+        const res = await fetch('/api/v1/auth/mfa/setup', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed generating MFA enrollment key');
+
+        currentMFASecret = data.secret;
+        if (qrImg) qrImg.src = data.qr_png_base64;
+        if (secretDisplay) secretDisplay.textContent = data.secret;
+    } catch (e) {
+        alert('Failed loading MFA enrollment: ' + e.message);
+        modal.style.display = 'none';
+    }
+};
+
+window.closeUserMFAModal = () => {
+    const modal = document.getElementById('user-mfa-modal');
+    if (modal) modal.style.display = 'none';
+    loadUsers();
+};
+
+window.copyMFASecret = () => {
+    if (!currentMFASecret) return;
+    navigator.clipboard.writeText(currentMFASecret).then(() => {
+        alert('MFA Secret Key copied to clipboard! You can paste it into MS Authenticator, Google Auth, AuthPoint, or FortiAuthenticator.');
+    }).catch(() => {
+        prompt('Copy your MFA Secret Key:', currentMFASecret);
+    });
+};
+
+window.confirmMFAActivation = async () => {
+    const verifyInput = document.getElementById('mfa-verify-input');
+    const code = verifyInput ? verifyInput.value.trim() : '';
+    if (!code || code.length !== 6) {
+        alert('Please enter a valid 6-digit verification code from your authenticator app.');
+        return;
+    }
+    const btn = document.getElementById('btn-mfa-confirm-activate');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Verifying...';
+    }
+    try {
+        const res = await fetch('/api/v1/auth/mfa/verify-enable', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Verification failed');
+
+        const step1 = document.getElementById('mfa-setup-step1');
+        const step2 = document.getElementById('mfa-setup-step2');
+        if (step1) step1.style.display = 'none';
+        if (step2) step2.style.display = 'block';
+
+        const recoveryGrid = document.getElementById('mfa-recovery-codes-grid');
+        if (recoveryGrid && data.recovery_codes) {
+            recoveryGrid.innerHTML = data.recovery_codes.map(c => `
+                <div style="padding: 4px 6px; background: rgba(255,255,255,0.06); border-radius: 4px; text-align: center;">${escapeHtml(c)}</div>
+            `).join('');
+        }
+        loadUsers();
+    } catch (e) {
+        alert('MFA Verification failed: ' + e.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Activate MFA';
+        }
+    }
+};
+
+window.resetUserMFA = async (userId, username) => {
+    if (!confirm(`Are you sure you want to reset and disable Multi-Factor Authentication (MFA) for user "${username}"?\n\nThe user will be able to log in with their password and re-enroll their authenticator app.`)) {
+        return;
+    }
+    try {
+        const res = await fetch('/api/v1/auth/mfa/admin-reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Reset failed');
+        alert(`MFA successfully reset and disabled for ${username}.`);
+        loadUsers();
+    } catch (e) {
+        alert('Failed resetting MFA: ' + e.message);
+    }
+};
 
 function escapeHtml(str) {
     if (!str) return '';

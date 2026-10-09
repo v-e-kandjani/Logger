@@ -257,6 +257,58 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        .mfa-code-input {
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 24px;
+            letter-spacing: 8px;
+            font-weight: 700;
+        }
+
+        .mfa-badges-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 12px 0 16px 0;
+            justify-content: center;
+        }
+
+        .mfa-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #cbd5e1;
+        }
+
+        .mfa-toggle-recovery {
+            display: block;
+            margin-top: 12px;
+            text-align: center;
+            font-size: 12px;
+            color: #818cf8;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .mfa-back-btn {
+            display: block;
+            margin-top: 12px;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+            cursor: pointer;
+        }
+
+        .mfa-back-btn:hover {
+            color: #f1f5f9;
+        }
     </style>
 </head>
 <body class="login-page">
@@ -310,7 +362,46 @@
             </button>
         </form>
 
-        <div class="demo-credentials">
+        <!-- Step 2: MFA Two-Factor Verification Form -->
+        <form id="mfa-form" style="display: none;">
+            <div style="text-align: center; margin-bottom: 12px;">
+                <div style="font-size: 15px; font-weight: 600; color: #f8fafc;" id="mfa-title-text">İki Aşamalı Doğrulama (MFA)</div>
+                <div style="font-size: 12px; color: #94a3b8; margin-top: 4px;" id="mfa-desc-text">
+                    Lütfen Authenticator uygulamanızdaki 6 haneli kodu girin:
+                </div>
+            </div>
+
+            <div class="mfa-badges-container">
+                <span class="mfa-chip">🛡️ MS Authenticator</span>
+                <span class="mfa-chip">🔑 Google Auth</span>
+                <span class="mfa-chip">🔴 WatchGuard AuthPoint</span>
+                <span class="mfa-chip">⚡ FortiAuthenticator</span>
+            </div>
+
+            <div class="form-group" id="mfa-totp-group">
+                <label class="form-label" for="mfa-code" id="mfa-code-label">6 Haneli Doğrulama Kodu</label>
+                <div class="input-wrapper">
+                    <input type="text" id="mfa-code" class="login-input mfa-code-input" placeholder="000000" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
+                </div>
+            </div>
+
+            <div class="form-group" id="mfa-recovery-group" style="display: none;">
+                <label class="form-label" for="mfa-recovery-code" id="mfa-recovery-label">Yedek Kurtarma Kodu</label>
+                <div class="input-wrapper">
+                    <input type="text" id="mfa-recovery-code" class="login-input" placeholder="ABCD-EFGH" maxlength="15" autocomplete="off" style="font-family: 'JetBrains Mono', monospace; text-transform: uppercase;">
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit" id="btn-mfa-verify">
+                <span class="spinner" id="mfa-spinner"></span>
+                <span id="btn-mfa-text">Doğrula ve Giriş Yap</span>
+            </button>
+
+            <span class="mfa-toggle-recovery" id="toggle-recovery-mode">Yedek Kurtarma Kodu Kullan</span>
+            <span class="mfa-back-btn" id="mfa-back-btn">&larr; Parola Adımına Geri Dön</span>
+        </form>
+
+        <div class="demo-credentials" id="demo-creds-box">
             Default Admin: <strong>admin</strong> &bull; Password: <strong>admin5651!</strong>
         </div>
 
@@ -325,6 +416,19 @@
         const btnText = document.getElementById('btn-text');
         const spinner = document.getElementById('login-spinner');
         const errorBox = document.getElementById('error-box');
+
+        const mfaForm = document.getElementById('mfa-form');
+        const mfaCodeInput = document.getElementById('mfa-code');
+        const mfaRecoveryInput = document.getElementById('mfa-recovery-code');
+        const btnMfa = document.getElementById('btn-mfa-verify');
+        const btnMfaText = document.getElementById('btn-mfa-text');
+        const mfaSpinner = document.getElementById('mfa-spinner');
+        const toggleRecovery = document.getElementById('toggle-recovery-mode');
+        const mfaBackBtn = document.getElementById('mfa-back-btn');
+        const demoCredsBox = document.getElementById('demo-creds-box');
+
+        let activeMFATicket = '';
+        let isRecoveryMode = false;
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -354,6 +458,20 @@
                     throw new Error(data.error || 'Authentication failed. Please verify credentials.');
                 }
 
+                if (data.mfa_required) {
+                    // Transition to MFA Step 2
+                    activeMFATicket = data.mfa_ticket;
+                    form.style.display = 'none';
+                    if (demoCredsBox) demoCredsBox.style.display = 'none';
+                    mfaForm.style.display = 'block';
+                    btn.disabled = false;
+                    spinner.style.display = 'none';
+                    btnText.textContent = 'Authenticate';
+                    mfaCodeInput.value = '';
+                    mfaCodeInput.focus();
+                    return;
+                }
+
                 // Success
                 btnText.textContent = 'Access Granted. Redirecting...';
                 setTimeout(() => {
@@ -363,8 +481,75 @@
                 showError(err.message);
                 btn.disabled = false;
                 spinner.style.display = 'none';
-                btnText.textContent = 'Authenticate & Enter Platform';
+                btnText.textContent = currentLoginLang === 'tr' ? 'Giriş Yap ve Platforma Eriş' : 'Authenticate & Enter Platform';
             }
+        });
+
+        // Step 2 MFA Submission
+        mfaForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorBox.style.display = 'none';
+
+            const code = isRecoveryMode ? mfaRecoveryInput.value.trim() : mfaCodeInput.value.trim();
+            if (!code) {
+                showError(isRecoveryMode ? 'Lütfen kurtarma kodunu girin.' : 'Lütfen 6 haneli doğrulama kodunu girin.');
+                return;
+            }
+
+            btnMfa.disabled = true;
+            mfaSpinner.style.display = 'block';
+            btnMfaText.textContent = currentLoginLang === 'tr' ? 'Kod Doğrulanıyor...' : 'Verifying MFA Code...';
+
+            try {
+                const res = await fetch('/api/v1/auth/login/mfa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mfa_ticket: activeMFATicket,
+                        code: code
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || 'Doğrulama kodu geçersiz.');
+                }
+
+                btnMfaText.textContent = currentLoginLang === 'tr' ? 'Doğrulandı. Yönlendiriliyor...' : 'Verified. Redirecting...';
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 400);
+            } catch (err) {
+                showError(err.message);
+                btnMfa.disabled = false;
+                mfaSpinner.style.display = 'none';
+                btnMfaText.textContent = currentLoginLang === 'tr' ? 'Doğrula ve Giriş Yap' : 'Verify & Enter';
+            }
+        });
+
+        // Toggle Recovery Code Mode
+        toggleRecovery.addEventListener('click', () => {
+            isRecoveryMode = !isRecoveryMode;
+            document.getElementById('mfa-totp-group').style.display = isRecoveryMode ? 'none' : 'block';
+            document.getElementById('mfa-recovery-group').style.display = isRecoveryMode ? 'block' : 'none';
+            if (isRecoveryMode) {
+                toggleRecovery.textContent = currentLoginLang === 'tr' ? '6 Haneli Authenticator Kodu Kullan' : 'Use 6-digit Authenticator Code';
+                mfaRecoveryInput.focus();
+            } else {
+                toggleRecovery.textContent = currentLoginLang === 'tr' ? 'Yedek Kurtarma Kodu Kullan' : 'Use Backup Recovery Code';
+                mfaCodeInput.focus();
+            }
+        });
+
+        // Return to Password Step
+        mfaBackBtn.addEventListener('click', () => {
+            mfaForm.style.display = 'none';
+            form.style.display = 'block';
+            if (demoCredsBox) demoCredsBox.style.display = 'block';
+            errorBox.style.display = 'none';
+            activeMFATicket = '';
+            document.getElementById('password').value = '';
+            document.getElementById('password').focus();
         });
 
         function showError(msg) {

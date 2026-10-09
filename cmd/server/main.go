@@ -20,6 +20,7 @@ import (
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
 	"github.com/syslog-platform/logger/internal/metrics"
+	"github.com/syslog-platform/logger/internal/notification/smtp"
 	"github.com/syslog-platform/logger/internal/siem/correlation"
 	"github.com/syslog-platform/logger/internal/siem/normalizer"
 	"github.com/syslog-platform/logger/internal/syslog/generator"
@@ -156,6 +157,24 @@ func main() {
 	defer siemEngine.Stop()
 	pipe.SetSIEMEngine(siemEngine)
 	log.Println("[SIEM] Detection & Correlation Engine active with real-time sliding windows")
+
+	// Start background critical alert SMTP broadcast listener
+	go func() {
+		alertCh := siemEngine.SubscribeAlerts()
+		defer siemEngine.UnsubscribeAlerts(alertCh)
+		for alert := range alertCh {
+			if alert != nil && alert.Severity == "CRITICAL" {
+				settings, err := pgDB.GetSettings(context.Background())
+				if err == nil {
+					smtpCfg := smtp.LoadConfigFromSettings(settings)
+					if smtpCfg.Enabled && smtpCfg.NotifyOnCritical && len(smtpCfg.NotificationRecipients) > 0 {
+						mailer := smtp.NewMailer(smtpCfg)
+						_ = mailer.SendCriticalAlertEmail(alert)
+					}
+				}
+			}
+		}
+	}()
 
 	pipe.Start()
 	defer pipe.Stop()

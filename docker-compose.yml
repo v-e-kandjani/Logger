@@ -73,16 +73,19 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    # Host networking allows the container to receive syslog UDP/TCP packets
-    # directly from the host network interfaces (ens192) without docker-proxy SNAT rewriting source IPs.
-    network_mode: host
+    ports:
+      - "${APP_PORT:-8080}:8080"
+      - "${SYSLOG_TCP_PORT:-514}:514/tcp"
+      - "${SYSLOG_UDP_PORT:-514}:514/udp"
+      - "${SYSLOG_ALT_TCP_PORT:-5514}:5514/tcp"
+      - "${SYSLOG_ALT_UDP_PORT:-5514}:5514/udp"
     environment:
-      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-127.0.0.1}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-clickhouse}
       - CLICKHOUSE_PORT=${CLICKHOUSE_PORT:-9000}
       - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-syslog}
       - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
-      - POSTGRES_HOST=${POSTGRES_HOST:-127.0.0.1}
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_DB=${POSTGRES_DB:-syslog_manager}
       - POSTGRES_USER=${POSTGRES_USER:-syslog_admin}

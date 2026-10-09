@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/syslog-platform/logger/internal/models"
+	"github.com/syslog-platform/logger/internal/notification/smtp"
 	"github.com/syslog-platform/logger/internal/siem/mitre"
 )
 
@@ -189,6 +190,42 @@ func (h *Handler) handleSIEMAlertStatus(w http.ResponseWriter, r *http.Request) 
 			},
 		})
 	}()
+
+	// Dispatch incident task assignment email notification asynchronously
+	if req.AssignedTo != "" && req.AssignedTo != "Unassigned" {
+		assignedUser := req.AssignedTo
+		assignedBy := "Administrator"
+		if session, ok := h.getSession(r); ok && session.Username != "" {
+			assignedBy = session.Username
+		}
+
+		go func() {
+			mailCtx, mailCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer mailCancel()
+
+			settings, err := h.pgDB.GetSettings(mailCtx)
+			if err != nil {
+				return
+			}
+			smtpCfg := smtp.LoadConfigFromSettings(settings)
+			if !smtpCfg.Enabled || !smtpCfg.NotifyOnAssignment {
+				return
+			}
+
+			user, err := h.pgDB.GetUserByUsername(mailCtx, assignedUser)
+			if err != nil || user.Email == "" {
+				return
+			}
+
+			alert, _, err := h.pgDB.GetSIEMAlert(mailCtx, alertID)
+			if err != nil {
+				return
+			}
+
+			mailer := smtp.NewMailer(smtpCfg)
+			_ = mailer.SendAlertAssignmentEmail(user.Email, alert, assignedBy)
+		}()
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{
 		"message":     "Alert status updated",
