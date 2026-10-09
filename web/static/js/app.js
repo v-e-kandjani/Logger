@@ -2235,6 +2235,47 @@ function initTelemetryCharts() {
 
     if (!canvasCPU || !canvasRAM || !canvasLogs || !canvasNet) return;
 
+    // Register direct click listeners for CPU and Network telemetry cards
+    const cardCPU = document.getElementById('telemetry-card-cpu');
+    if (cardCPU) {
+        cardCPU.style.cursor = 'pointer';
+        cardCPU.addEventListener('click', (e) => {
+            e.preventDefault();
+            openCPUDetailsModal();
+        });
+    }
+
+    const cardNet = document.getElementById('telemetry-card-net');
+    if (cardNet) {
+        cardNet.style.cursor = 'pointer';
+        cardNet.addEventListener('click', (e) => {
+            e.preventDefault();
+            openNetDetailsModal();
+        });
+    }
+
+    // Modal backdrop click-to-close handlers
+    const cpuModal = document.getElementById('cpu-details-modal');
+    if (cpuModal) {
+        cpuModal.addEventListener('click', (e) => {
+            if (e.target === cpuModal) closeCPUDetailsModal();
+        });
+    }
+    const netModal = document.getElementById('net-details-modal');
+    if (netModal) {
+        netModal.addEventListener('click', (e) => {
+            if (e.target === netModal) closeNetDetailsModal();
+        });
+    }
+
+    // Escape key listener to close open telemetry detail modals
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (window.cpuModalOpen) closeCPUDetailsModal();
+            if (window.netModalOpen) closeNetDetailsModal();
+        }
+    });
+
     // Attach resize listeners to re-render smoothly
     window.addEventListener('resize', () => {
         if (telemetryHistoryData) renderAllTelemetryCharts(telemetryHistoryData);
@@ -2337,6 +2378,26 @@ function closeCPUDetailsModal() {
     const modal = document.getElementById('cpu-details-modal');
     if (modal) modal.style.display = 'none';
 }
+
+function openNetDetailsModal() {
+    window.netModalOpen = true;
+    const modal = document.getElementById('net-details-modal');
+    if (modal) modal.style.display = 'flex';
+    if (telemetryHistoryData && telemetryHistoryData.current) {
+        renderNetDetails(telemetryHistoryData.current);
+    }
+}
+
+function closeNetDetailsModal() {
+    window.netModalOpen = false;
+    const modal = document.getElementById('net-details-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+window.openCPUDetailsModal = openCPUDetailsModal;
+window.closeCPUDetailsModal = closeCPUDetailsModal;
+window.openNetDetailsModal = openNetDetailsModal;
+window.closeNetDetailsModal = closeNetDetailsModal;
 
 function renderCPUDetails(cur) {
     if (!cur) return;

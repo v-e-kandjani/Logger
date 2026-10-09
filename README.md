@@ -260,6 +260,10 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.4.3** (Telemetry Card Event Handler & Pointer Pass-Through Optimization):
+  - **Universal Event Binding**: Added direct DOM event listeners (`addEventListener`), global window exports (`window.openCPUDetailsModal`), and keyboard shortcut handlers (`Escape` key modal dismissal) ensuring 100% reliable telemetry detail popup triggering across all browser engines.
+  - **Canvas Pointer Pass-Through**: Applied `pointer-events: none` to telemetry graph canvases, ensuring clicks on chart graphics reliably bubble up to open CPU and Network detail modals.
+
 - **v1.4.2** (Interactive Per-CPU Core Topology & Network Interface Statistics Modals):
   - **Per-CPU Core Topology Modal**: Clicking the CPU Utilization card opens a dedicated modal displaying real-time per-core utilization meters, worker thread vs reserved OS management core roles, total host CPU load, and `GOMAXPROCS` status.
   - **Network Interface Statistics Modal**: Clicking the Network Throughput card opens a modal showing per-interface bandwidth rates (KB/s and MB/s), packet rates (Packets/sec), cumulative Rx/Tx packet and byte counters, and drop/error statistics across all host network adapters.

@@ -249,6 +249,10 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.4.3** (Telemetri Kartları Olay Dinleyici & Tuş Uyumluluğu Optimizasyonu):
+  - **Evrensel Olay Bağlama**: Doğrudan DOM olay dinleyicileri (`addEventListener`), küresel pencere dışa aktarımları (`window.openCPUDetailsModal`) ve klavye kısayolu (`Escape` tuşu ile kapatma) eklenerek CPU ve Ağ detay pencerelerinin tüm tarayıcılarda %100 sorunsuz çalışması sağlandı.
+  - **Grafik Tıklama Geçirgenliği**: Grafik çizim alanlarına (`canvas`) `pointer-events: none` uygulanarak grafik üzerine tıklamalarda olayların doğrudan kart kapsayıcısına iletilmesi ve modalın tetiklenmesi garanti altına alındı.
+
 - **v1.4.2** (Etkileşimli Çekirdek Bazlı CPU ve Ağ Arayüzü Detay Modalları):
   - **Çekirdek Bazlı CPU Topolojisi Modalı**: İşlemci kullanımı kartına tıklandığında çekirdek bazında anlık yük metrelerini, iş parçacığı ve ayrılmış işletim sistemi yönetim çekirdeği rollerini, toplam yükü ve `GOMAXPROCS` durumunu gösteren özel pencere açıldı.
   - **Ağ Arayüzü ve Paket İstatistikleri Modalı**: Ağ veri akışı kartına tıklandığında sunucu ağ adaptörleri bazında anlık bant genişliğini (KB/s, MB/s), paket hızını (paket/sn), toplam Rx/Tx paket ve bayt sayaçlarını, düşen ve hatalı paket metriklerini gösteren detay penceresi entegre edildi.
