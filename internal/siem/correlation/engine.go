@@ -15,6 +15,7 @@ import (
 // AlertPersister abstracts database persistence for SIEM alerts
 type AlertPersister interface {
 	CreateOrUpdateSIEMAlert(ctx context.Context, alert *models.SIEMAlert) (*models.SIEMAlert, error)
+	GetActiveSIEMAlertByRuleAndGroup(ctx context.Context, ruleID, groupKey string) (*models.SIEMAlert, error)
 	ListSIEMRules(ctx context.Context) ([]models.SIEMRule, error)
 	ToggleSIEMRule(ctx context.Context, ruleID string, enabled bool) error
 }
@@ -173,6 +174,15 @@ func (e *Engine) Evaluate(event *models.NormalizedEvent) {
 				GroupKey: groupVal,
 				Events:   make([]WindowEvent, 0, rule.Threshold*2),
 			}
+			// Attempt to restore active alert from database if engine just initialized or restarted
+			if e.persister != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				if activeAlert, err := e.persister.GetActiveSIEMAlertByRuleAndGroup(ctx, rule.ID, groupVal); err == nil && activeAlert != nil {
+					bucket.ActiveAlert = activeAlert
+					bucket.LastFired = activeAlert.LastSeen
+				}
+				cancel()
+			}
 			e.buckets[bucketKey] = bucket
 		}
 
@@ -217,20 +227,46 @@ func (e *Engine) Evaluate(event *models.NormalizedEvent) {
 		}
 
 		if shouldTrigger {
-			// Throttle firing to avoid flooding duplicate alerts within 30 seconds
-			if time.Since(bucket.LastFired) > 30*time.Second || bucket.ActiveAlert == nil {
+			active := bucket.ActiveAlert
+			// Check if existing alert has been resolved/closed/ignored or expired (> 1h of silence)
+			if active != nil && (active.Status == "RESOLVED" || active.Status == "CLOSED" || active.Status == "IGNORED" || now.Sub(active.LastSeen) > 1*time.Hour) {
+				active = nil
+				bucket.ActiveAlert = nil
+			}
+
+			if active == nil {
+				// No active alert: create a new alert record
 				e.triggerAlert(rule, bucket, event)
 				bucket.LastFired = now
 			} else {
-				// Update existing active alert event count and last seen
-				if bucket.ActiveAlert != nil {
-					bucket.ActiveAlert.EventCount = len(bucket.Events)
-					bucket.ActiveAlert.LastSeen = now
-					if len(bucket.ActiveAlert.EvidenceLogs) < 10 && event.RawMessage != "" {
-						bucket.ActiveAlert.EvidenceLogs = append(bucket.ActiveAlert.EvidenceLogs, event.RawMessage)
+				// Deduplicate & aggregate into existing active alert
+				active.EventCount++
+				active.LastSeen = now
+				active.UpdatedAt = now
+				active.Summary = fmt.Sprintf("[%s] %s triggered by %s (%d events)",
+					rule.Severity, rule.Name, bucket.GroupKey, active.EventCount)
+
+				// Append raw log message to evidence if under cap and not duplicate
+				if len(active.EvidenceLogs) < 10 && event.RawMessage != "" {
+					dup := false
+					for _, evLog := range active.EvidenceLogs {
+						if evLog == event.RawMessage {
+							dup = true
+							break
+						}
 					}
-					// Persist async
-					go e.persistAlert(bucket.ActiveAlert)
+					if !dup {
+						active.EvidenceLogs = append(active.EvidenceLogs, event.RawMessage)
+					}
+				}
+
+				// Persist update async
+				go e.persistAlert(active)
+
+				// Broadcast live alert update every 5 seconds to avoid websocket spam
+				if time.Since(bucket.LastFired) >= 5*time.Second {
+					bucket.LastFired = now
+					e.broadcastAlert(active)
 				}
 			}
 		}

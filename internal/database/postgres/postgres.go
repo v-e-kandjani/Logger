@@ -644,6 +644,7 @@ func (db *DB) EnsureSIEMSchema(ctx context.Context) error {
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	);
 	CREATE INDEX IF NOT EXISTS idx_siem_alerts_technique ON siem_alerts(mitre_technique);
+	CREATE INDEX IF NOT EXISTS idx_siem_alerts_rule_status ON siem_alerts(rule_id, status);
 	`
 	if _, err := db.pool.Exec(ctx, schema); err != nil {
 		return err
@@ -789,6 +790,7 @@ func (db *DB) CreateOrUpdateSIEMAlert(ctx context.Context, alert *models.SIEMAle
 		ON CONFLICT (id) DO UPDATE SET
 			event_count = EXCLUDED.event_count,
 			last_seen = EXCLUDED.last_seen,
+			summary = EXCLUDED.summary,
 			evidence_logs = EXCLUDED.evidence_logs,
 			updated_at = NOW()
 		RETURNING id, created_at, updated_at`
@@ -801,6 +803,42 @@ func (db *DB) CreateOrUpdateSIEMAlert(ctx context.Context, alert *models.SIEMAle
 	).Scan(&alert.ID, &alert.CreatedAt, &alert.UpdatedAt)
 
 	return alert, err
+}
+
+// GetActiveSIEMAlertByRuleAndGroup finds the most recent non-resolved alert for a rule and entity
+func (db *DB) GetActiveSIEMAlertByRuleAndGroup(ctx context.Context, ruleID, groupKey string) (*models.SIEMAlert, error) {
+	query := `
+		SELECT id, rule_id, rule_name, severity, risk_score, category, status,
+		       source_ip, destination_ip, username, device_name, event_count,
+		       first_seen, last_seen, mitre_tactic, mitre_technique, summary,
+		       evidence_logs, assigned_to, created_at, updated_at
+		FROM siem_alerts
+		WHERE rule_id = $1
+		  AND (source_ip = $2 OR username = $2 OR device_name = $2 OR $2 = 'global')
+		  AND status IN ('NEW', 'IN_PROGRESS')
+		  AND last_seen > NOW() - INTERVAL '1 hour'
+		ORDER BY last_seen DESC
+		LIMIT 1`
+
+	row := db.pool.QueryRow(ctx, query, ruleID, groupKey)
+	var a models.SIEMAlert
+	var evidenceJSON []byte
+	err := row.Scan(
+		&a.ID, &a.RuleID, &a.RuleName, &a.Severity, &a.RiskScore, &a.Category, &a.Status,
+		&a.SourceIP, &a.DestinationIP, &a.Username, &a.DeviceName, &a.EventCount,
+		&a.FirstSeen, &a.LastSeen, &a.MitreTactic, &a.MitreTechnique, &a.Summary,
+		&evidenceJSON, &a.AssignedTo, &a.CreatedAt, &a.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if len(evidenceJSON) > 0 {
+		_ = json.Unmarshal(evidenceJSON, &a.EvidenceLogs)
+	}
+	return &a, nil
 }
 
 // ListSIEMAlerts lists alerts with optional filtering and pagination

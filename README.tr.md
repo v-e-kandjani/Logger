@@ -249,7 +249,10 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
-## Sürüm Geçmişi (Release History)
+- **v1.4.0** (SIEM Alarm Yaşam Döngüsü Tekilleştirme ve Yerinde Olay Toplama):
+  - **Tehdit Varlığı Başına Tek Etkin Olay Kaydı**: Sürekli devam eden ağ taramaları veya parola denemelerinde her 30 saniyede bir mükerrer alarm satırı oluşması sorunu çözüldü. Korelasyon motoru artık aynı Kural ID ve Kaynak IP / Varlık için açık (`NEW` veya `IN_PROGRESS`) bir alarmın varlığını kontrol eder. Müteakip eşleşen loglar doğrudan `EventCount` değerini artırır, `LastSeen` zaman damgasını günceller, kanıt log parçalarını ekler ve özeti yerinde günceller.
+  - **Yeniden Başlatmaya Dayanıklı Durum Koruma**: Motor, açılışta PostgreSQL'den (`GetActiveSIEMAlertByRuleAndGroup`) mevcut açık alarmları yükler; böylece SIEM yeniden başlatılsa dahi açık güvenlik vakaları parçalanmaz.
+  - **Optimize Veritabanı İndeksi**: Açık alarm kayıtlarının milisaniye altı sorgulanması için `idx_siem_alerts_rule_status` indeksi eklendi.
 
 - **v1.3.9** (Kalıcı MITRE ATT&CK Kataloğu ve Yeni Sürümlerin Otomatik Etkinleştirilmesi):
   - **Senkronize Katalog Yeniden Başlatmada Kaybolmuyor**: Resmi STIX kataloğu yalnızca bellekte tutuluyordu; her yeniden başlatma veya web yükseltmesinde matris 30 teknikli gömülü temel kataloğa geri dönüyordu. Ayrıştırılan katalog artık PostgreSQL'de (`mitre_catalog_cache`, ~430 KB) saklanır ve açılışta geri yüklenir.

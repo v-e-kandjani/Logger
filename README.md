@@ -260,7 +260,10 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
-## Release History
+- **v1.4.0** (SIEM Alert Lifecycle Deduplication & In-Place Event Aggregation):
+  - **Single Active Incident Record per Threat Entity**: Resolved an issue where continuous network scanning or brute force attacks generated duplicate alert rows every 30 seconds. The correlation engine now checks for an existing active (`NEW` or `IN_PROGRESS`) alert for the same Rule ID and Source IP / Entity. Subsequent matching logs directly increment `EventCount`, update `LastSeen` timestamp, append evidence log snippets, and refresh the summary in place.
+  - **Restart-Resilient Active Bucket State**: The engine restores existing active alerts from PostgreSQL (`GetActiveSIEMAlertByRuleAndGroup`) upon startup, ensuring SIEM restarts do not fragment open security incidents.
+  - **Optimized Database Indexing**: Added `idx_siem_alerts_rule_status` for sub-millisecond lookup of active alert records.
 
 - **v1.3.9** (Persistent MITRE ATT&CK Catalog & Automatic Release Activation):
   - **Synced Catalog Survives Restarts/Upgrades**: The official STIX catalog was held only in memory, so every restart or web upgrade silently reverted the matrix to the 30-technique embedded baseline. The parsed catalog is now persisted in PostgreSQL (`mitre_catalog_cache`, ~430 KB) and restored at startup.
