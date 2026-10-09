@@ -2370,6 +2370,10 @@ function openCPUDetailsModal() {
     if (modal) modal.style.display = 'flex';
     if (telemetryHistoryData && telemetryHistoryData.current) {
         renderCPUDetails(telemetryHistoryData.current);
+    } else {
+        fetch('/api/v1/system/metrics').then(r => r.json()).then(data => {
+            renderCPUDetails(data);
+        }).catch(err => console.error(err));
     }
 }
 
@@ -2385,6 +2389,10 @@ function openNetDetailsModal() {
     if (modal) modal.style.display = 'flex';
     if (telemetryHistoryData && telemetryHistoryData.current) {
         renderNetDetails(telemetryHistoryData.current);
+    } else {
+        fetch('/api/v1/system/metrics').then(r => r.json()).then(data => {
+            renderNetDetails(data);
+        }).catch(err => console.error(err));
     }
 }
 
