@@ -39,6 +39,8 @@ type CurrentMetrics struct {
 	NetInKBps        float64 `json:"net_in_kbps"`
 	NetOutKBps       float64 `json:"net_out_kbps"`
 	CPUCores         int     `json:"cpu_cores"`
+	GOMAXPROCS       int     `json:"gomaxprocs"`
+	ReservedCore     bool    `json:"reserved_core"`
 	OS               string  `json:"os"`
 	Timestamp        string  `json:"timestamp"`
 }
@@ -154,9 +156,8 @@ func (c *Collector) sample() {
 	}
 
 	onlineCores := getOnlineCPUCores()
-	if onlineCores > runtime.GOMAXPROCS(0) {
-		runtime.GOMAXPROCS(onlineCores)
-	}
+	currentMaxProcs := runtime.GOMAXPROCS(0)
+	reservedCore := onlineCores > 1 && currentMaxProcs < onlineCores
 
 	current := CurrentMetrics{
 		CPUPercent:       point.CPUPercent,
@@ -168,6 +169,8 @@ func (c *Collector) sample() {
 		NetInKBps:        point.NetInKBps,
 		NetOutKBps:       point.NetOutKBps,
 		CPUCores:         onlineCores,
+		GOMAXPROCS:       currentMaxProcs,
+		ReservedCore:     reservedCore,
 		OS:               runtime.GOOS,
 		Timestamp:        tsStr,
 	}

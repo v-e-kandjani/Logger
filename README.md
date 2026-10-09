@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.4.1** (Dynamic Management Core Reservation & Build Thread Throttling):
+  - **Host OS & Management Interface Protection**: Implemented automated core reservation (`configureCPUCoreReservation`) dynamically setting `GOMAXPROCS = NumCPU - 1` whenever `NumCPU > 1`. This guarantees at least 1 dedicated CPU core remains free for Host OS, SSH management, and critical web interface handling, preventing 100% CPU lockouts under heavy system load or log ingestion spikes.
+  - **Build Core Throttling**: Added `GOMAXPROCS` environment exports to `upgrade.sh` so container compilation (`docker compose build`) leaves 1 logical CPU core available for system administration tasks.
+  - **Telemetry Dashboard Indicator**: Updated CPU Telemetry panel (`web/static/js/app.js`) to display an active status badge whenever core reservation is enforced.
+
 - **v1.4.0** (SIEM Alert Lifecycle Deduplication & In-Place Event Aggregation):
   - **Single Active Incident Record per Threat Entity**: Resolved an issue where continuous network scanning or brute force attacks generated duplicate alert rows every 30 seconds. The correlation engine now checks for an existing active (`NEW` or `IN_PROGRESS`) alert for the same Rule ID and Source IP / Entity. Subsequent matching logs directly increment `EventCount`, update `LastSeen` timestamp, append evidence log snippets, and refresh the summary in place.
   - **Restart-Resilient Active Bucket State**: The engine restores existing active alerts from PostgreSQL (`GetActiveSIEMAlertByRuleAndGroup`) upon startup, ensuring SIEM restarts do not fragment open security incidents.

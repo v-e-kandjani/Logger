@@ -118,6 +118,11 @@ fi
 
 # 4. Rebuild syslog-app Docker image
 info "Rebuilding syslog-app container..."
+HOST_CORES=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+if [ "$HOST_CORES" -gt 1 ]; then
+    export GOMAXPROCS=$((HOST_CORES - 1))
+    info "Set GOMAXPROCS=${GOMAXPROCS} during container compilation (1 core reserved for OS management)"
+fi
 docker compose build syslog-app
 
 # 5. Recreate and restart containers

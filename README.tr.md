@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.4.1** (Dinamik Yönetim Çekirdeği Tahsisi ve Derleme İş Parçacığı Sınırlandırması):
+  - **İşletim Sistemi & Yönetim Arayüzü Koruması**: Sistemde `NumCPU > 1` olduğunda `GOMAXPROCS = NumCPU - 1` olarak dinamik ayarlayan otomatik çekirdek tahsisi (`configureCPUCoreReservation`) uygulandı. Böylece yüksek log yükünde veya sistem işlemlerinde Host OS, SSH ve web yönetim arayüzü için en az 1 CPU çekirdeğinin kesintisiz ayrılması sağlandı ve %100 CPU kilitlenmeleri önlendi.
+  - **Derleme İş Parçacığı Sınırlandırması**: `upgrade.sh` betiğine `GOMAXPROCS` çevre değişkeni eklenerek konteyner derlemelerinde (`docker compose build`) sistem yönetimi için 1 CPU çekirdeğinin boşta tutulması sağlandı.
+  - **Telemetri Paneli Göstergesi**: İşlemci telemetri paneline (`web/static/js/app.js`) ayrılmış çekirdek aktif olduğunda canlı durum göstergesi rozeti eklendi.
+
 - **v1.4.0** (SIEM Alarm Yaşam Döngüsü Tekilleştirme ve Yerinde Olay Toplama):
   - **Tehdit Varlığı Başına Tek Etkin Olay Kaydı**: Sürekli devam eden ağ taramaları veya parola denemelerinde her 30 saniyede bir mükerrer alarm satırı oluşması sorunu çözüldü. Korelasyon motoru artık aynı Kural ID ve Kaynak IP / Varlık için açık (`NEW` veya `IN_PROGRESS`) bir alarmın varlığını kontrol eder. Müteakip eşleşen loglar doğrudan `EventCount` değerini artırır, `LastSeen` zaman damgasını günceller, kanıt log parçalarını ekler ve özeti yerinde günceller.
   - **Yeniden Başlatmaya Dayanıklı Durum Koruma**: Motor, açılışta PostgreSQL'den (`GetActiveSIEMAlertByRuleAndGroup`) mevcut açık alarmları yükler; böylece SIEM yeniden başlatılsa dahi açık güvenlik vakaları parçalanmaz.

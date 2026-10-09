@@ -2268,7 +2268,13 @@ async function fetchAndRenderTelemetryCharts() {
             const elCpu = document.getElementById('chart-metric-cpu');
             if (elCpu) elCpu.textContent = `${(cur.cpu_percent || 0).toFixed(1)}%`;
             const elCores = document.getElementById('chart-meta-cores');
-            if (elCores) elCores.textContent = `${cur.cpu_cores || 1} Cores (${cur.os || 'Linux'})`;
+            if (elCores) {
+                let coreTxt = `${cur.cpu_cores || 1} Cores (${cur.os || 'Linux'})`;
+                if (cur.reserved_core) {
+                    coreTxt += ` • 1 Core Reserved for Management`;
+                }
+                elCores.textContent = coreTxt;
+            }
 
             // 2. RAM Label
             const elRam = document.getElementById('chart-metric-ram');

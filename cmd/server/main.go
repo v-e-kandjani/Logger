@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -35,6 +37,9 @@ func main() {
 
 	configPath := flag.String("config", "config/config.yaml", "Path to YAML configuration")
 	flag.Parse()
+
+	// Configure CPU core allocation to reserve 1 core for Host OS & Management Interface
+	configureCPUCoreReservation()
 
 	log.Println("[Syslog Platform] Booting high-throughput logging & evidence engine...")
 
@@ -263,4 +268,26 @@ func runProduceLogsCLI(args []string) {
 		log.Fatalf("Error producing logs: %v\n", err)
 	}
 	fmt.Printf("Successfully produced and sent %d syslog packets to %s!\n", sent, *target)
+}
+
+func configureCPUCoreReservation() {
+	numCPU := runtime.NumCPU()
+	envMax := strings.TrimSpace(os.Getenv("GOMAXPROCS"))
+	if envMax != "" {
+		if v, err := strconv.Atoi(envMax); err == nil && v > 0 {
+			runtime.GOMAXPROCS(v)
+			log.Printf("[CPU Core Manager] GOMAXPROCS set to %d via environment override (Total CPU Cores: %d)", v, numCPU)
+			return
+		}
+	}
+
+	// Automatic Core Reservation: If total CPU cores > 1, reserve 1 core for Host OS & Management Interface
+	if numCPU > 1 {
+		allocatedCores := numCPU - 1
+		runtime.GOMAXPROCS(allocatedCores)
+		log.Printf("[CPU Core Manager] Automatic Management Reservation Active: Reserved 1 CPU core for OS & Management Interface (Allocated: %d of %d cores, GOMAXPROCS=%d)", allocatedCores, numCPU, allocatedCores)
+	} else {
+		runtime.GOMAXPROCS(1)
+		log.Printf("[CPU Core Manager] Single CPU core detected (GOMAXPROCS=1)")
+	}
 }
