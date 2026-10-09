@@ -260,6 +260,9 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.3** (Admin MFA Reset Payload Alignment & Parameter Harmonization):
+  - **MFA Admin Reset Multi-Payload Parser**: Updated `handleMFAAdminResetAPI` to accept target user identification from both URL query parameters (`?id=...` and `?user_id=...`) and JSON request bodies (`{"user_id": ...}` and `{"id": ...}`). Updated client-side `resetUserMFA` to pass both parameters simultaneously with pre-validation, eliminating the `user id required` error when resetting MFA for operator accounts.
+
 - **v1.5.2** (MFA Verification Route Alignment & Payload Harmonization):
   - **MFA Activation Endpoint & Payload Alignment**: Registered `/api/v1/auth/mfa/verify-enable` alongside `/api/v1/auth/mfa/verify` to eliminate 404 responses. Updated client-side activation to submit the active Base32 secret key, code, and recovery codes bundle, and added safe non-JSON response parsing to prevent unexpected JSON.parse parse exceptions.
 

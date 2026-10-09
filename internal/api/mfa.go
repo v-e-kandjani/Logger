@@ -287,6 +287,22 @@ func (h *Handler) handleMFAAdminResetAPI(w http.ResponseWriter, r *http.Request)
 
 	userIDStr := r.URL.Query().Get("id")
 	if userIDStr == "" {
+		userIDStr = r.URL.Query().Get("user_id")
+	}
+	if userIDStr == "" && r.Body != nil {
+		var req struct {
+			UserID string `json:"user_id"`
+			ID     string `json:"id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			if req.UserID != "" {
+				userIDStr = req.UserID
+			} else if req.ID != "" {
+				userIDStr = req.ID
+			}
+		}
+	}
+	if userIDStr == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "user id required"})
 		return
 	}

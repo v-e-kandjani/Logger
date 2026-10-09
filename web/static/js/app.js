@@ -1900,16 +1900,26 @@ window.confirmMFAActivation = async () => {
 };
 
 window.resetUserMFA = async (userId, username) => {
+    if (!userId) {
+        alert('Cannot reset MFA: user ID is missing.');
+        return;
+    }
     if (!confirm(`Are you sure you want to reset and disable Multi-Factor Authentication (MFA) for user "${username}"?\n\nThe user will be able to log in with their password and re-enroll their authenticator app.`)) {
         return;
     }
     try {
-        const res = await fetch('/api/v1/auth/mfa/admin-reset', {
+        const res = await fetch(`/api/v1/auth/mfa/admin-reset?id=${encodeURIComponent(userId)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId })
+            body: JSON.stringify({ user_id: userId, id: userId })
         });
-        const data = await res.json();
+        const text = await res.text();
+        let data = {};
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error(`Server returned status ${res.status}: ${text.substring(0, 100)}`);
+        }
         if (!res.ok) throw new Error(data.error || 'Reset failed');
         alert(`MFA successfully reset and disabled for ${username}.`);
         loadUsers();
