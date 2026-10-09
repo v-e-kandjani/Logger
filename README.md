@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.4.2** (Interactive Per-CPU Core Topology & Network Interface Statistics Modals):
+  - **Per-CPU Core Topology Modal**: Clicking the CPU Utilization card opens a dedicated modal displaying real-time per-core utilization meters, worker thread vs reserved OS management core roles, total host CPU load, and `GOMAXPROCS` status.
+  - **Network Interface Statistics Modal**: Clicking the Network Throughput card opens a modal showing per-interface bandwidth rates (KB/s and MB/s), packet rates (Packets/sec), cumulative Rx/Tx packet and byte counters, and drop/error statistics across all host network adapters.
+  - **Live 2-Second Telemetry Sync**: Modal viewports automatically sync live telemetry every 2 seconds without requiring manual refreshes.
+
 - **v1.4.1** (Dynamic Management Core Reservation & Build Thread Throttling):
   - **Host OS & Management Interface Protection**: Implemented automated core reservation (`configureCPUCoreReservation`) dynamically setting `GOMAXPROCS = NumCPU - 1` whenever `NumCPU > 1`. This guarantees at least 1 dedicated CPU core remains free for Host OS, SSH management, and critical web interface handling, preventing 100% CPU lockouts under heavy system load or log ingestion spikes.
   - **Build Core Throttling**: Added `GOMAXPROCS` environment exports to `upgrade.sh` so container compilation (`docker compose build`) leaves 1 logical CPU core available for system administration tasks.

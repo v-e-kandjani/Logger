@@ -3,7 +3,7 @@ const translations = {
     tr: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.4.1",
+        app_version: "v1.4.2",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         view_title_dashboard: "Operasyon & Güvenlik Paneli",
@@ -124,6 +124,10 @@ const translations = {
         telemetry_ram_title: "Bellek Kullanımı (RAM)",
         telemetry_logs_title: "Gelen Log Hacmi (EPS)",
         telemetry_net_title: "Ağ Giriş / Çıkış Hacmi",
+        cpu_modal_title: "İşlemci Çekirdek Kullanımı & Topolojisi",
+        cpu_modal_click_hint: "🔍 Çekirdek Detayları İçin Tıklayın",
+        net_modal_title: "Ağ Arayüzleri & Paket Veri Akışı",
+        net_modal_click_hint: "🌐 Paketler & G/Ç İçin Tıklayın",
 
         // Dashboard Panels
         panel_syslog_status: "Syslog Dinleyici Durumu",
@@ -278,7 +282,7 @@ const translations = {
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.4.1",
+        app_version: "v1.4.2",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         view_title_dashboard: "Operations & Security Dashboard",
@@ -399,6 +403,10 @@ const translations = {
         telemetry_ram_title: "RAM Memory Usage",
         telemetry_logs_title: "Logs Received Rate",
         telemetry_net_title: "Network Throughput (In / Out)",
+        cpu_modal_title: "Per-CPU Core Utilization & Topology",
+        cpu_modal_click_hint: "🔍 Click for Core Details",
+        net_modal_title: "Network Interfaces & Packet Throughput",
+        net_modal_click_hint: "🌐 Click for Packets & I/O",
 
         // Dashboard Panels
         panel_syslog_status: "Syslog Listener Status",

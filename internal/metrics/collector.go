@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"math"
 	"os"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +16,32 @@ import (
 
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 )
+
+// CPUCoreMetrics holds metrics for an individual CPU core
+type CPUCoreMetrics struct {
+	ID         int     `json:"id"`
+	Name       string  `json:"name"`
+	Percent    float64 `json:"percent"`
+	Role       string  `json:"role"`
+	IsReserved bool    `json:"is_reserved"`
+}
+
+// NetInterfaceMetrics holds metrics for an individual network interface
+type NetInterfaceMetrics struct {
+	Name            string  `json:"name"`
+	RxBytes         uint64  `json:"rx_bytes"`
+	RxPackets       uint64  `json:"rx_packets"`
+	RxErrs          uint64  `json:"rx_errs"`
+	RxDrop          uint64  `json:"rx_drop"`
+	TxBytes         uint64  `json:"tx_bytes"`
+	TxPackets       uint64  `json:"tx_packets"`
+	TxErrs          uint64  `json:"tx_errs"`
+	TxDrop          uint64  `json:"tx_drop"`
+	NetInKBps       float64 `json:"net_in_kbps"`
+	NetOutKBps      float64 `json:"net_out_kbps"`
+	RxPacketsPerSec float64 `json:"rx_packets_per_sec"`
+	TxPacketsPerSec float64 `json:"tx_packets_per_sec"`
+}
 
 // MetricPoint holds a single telemetry snapshot at a point in time
 type MetricPoint struct {
@@ -30,19 +58,21 @@ type MetricPoint struct {
 
 // CurrentMetrics holds current live stats
 type CurrentMetrics struct {
-	CPUPercent       float64 `json:"cpu_percent"`
-	RAMUsedMB        float64 `json:"ram_used_mb"`
-	RAMTotalMB       float64 `json:"ram_total_mb"`
-	RAMPercent       float64 `json:"ram_percent"`
-	LogsReceivedRate float64 `json:"logs_received_rate"`
-	TotalPacketsRx   uint64  `json:"total_packets_rx"`
-	NetInKBps        float64 `json:"net_in_kbps"`
-	NetOutKBps       float64 `json:"net_out_kbps"`
-	CPUCores         int     `json:"cpu_cores"`
-	GOMAXPROCS       int     `json:"gomaxprocs"`
-	ReservedCore     bool    `json:"reserved_core"`
-	OS               string  `json:"os"`
-	Timestamp        string  `json:"timestamp"`
+	CPUPercent       float64               `json:"cpu_percent"`
+	RAMUsedMB        float64               `json:"ram_used_mb"`
+	RAMTotalMB       float64               `json:"ram_total_mb"`
+	RAMPercent       float64               `json:"ram_percent"`
+	LogsReceivedRate float64               `json:"logs_received_rate"`
+	TotalPacketsRx   uint64                `json:"total_packets_rx"`
+	NetInKBps        float64               `json:"net_in_kbps"`
+	NetOutKBps       float64               `json:"net_out_kbps"`
+	CPUCores         int                   `json:"cpu_cores"`
+	GOMAXPROCS       int                   `json:"gomaxprocs"`
+	ReservedCore     bool                  `json:"reserved_core"`
+	OS               string                `json:"os"`
+	Timestamp        string                `json:"timestamp"`
+	CPUCoresList     []CPUCoreMetrics      `json:"cpu_cores_list"`
+	NetInterfaces    []NetInterfaceMetrics `json:"net_interfaces"`
 }
 
 // HistoryResponse returns time-series arrays optimized for graphing
@@ -50,6 +80,13 @@ type HistoryResponse struct {
 	Current   CurrentMetrics `json:"current"`
 	Points    []MetricPoint  `json:"points"`
 	MaxPoints int            `json:"max_points"`
+}
+
+type ifaceSample struct {
+	rxBytes   uint64
+	rxPackets uint64
+	txBytes   uint64
+	txPackets uint64
 }
 
 // Collector continuously gathers host and daemon telemetry
@@ -68,6 +105,10 @@ type Collector struct {
 	prevPacketsRx  uint64
 	prevNetRxBytes uint64
 	prevNetTxBytes uint64
+
+	prevCoreTotals map[string]uint64
+	prevCoreIdles  map[string]uint64
+	prevIfaceStats map[string]ifaceSample
 }
 
 // NewCollector initializes collector with pipeline binding
@@ -118,8 +159,12 @@ func (c *Collector) sample() {
 	}
 	c.lastSampleTime = now
 
-	// 1. CPU Utilization
-	cpuPct := c.readCPUPercent()
+	onlineCores := getOnlineCPUCores()
+	currentMaxProcs := runtime.GOMAXPROCS(0)
+	reservedCore := onlineCores > 1 && currentMaxProcs < onlineCores
+
+	// 1. CPU Utilization (Total & Per-Core)
+	cpuPct, cpuCoresList := c.readCPUMetrics(reservedCore, currentMaxProcs)
 
 	// 2. RAM Memory Utilization
 	ramUsedMB, ramTotalMB, ramPct := c.readMemory()
@@ -137,8 +182,8 @@ func (c *Collector) sample() {
 		c.prevPacketsRx = totalPackets
 	}
 
-	// 4. Network Throughput (In / Out in KB/s)
-	netInKBps, netOutKBps := c.readNetworkThroughput(timeDeltaSec)
+	// 4. Network Throughput (In / Out in KB/s & Per-Interface statistics)
+	netInKBps, netOutKBps, netIfacesList := c.readNetworkThroughput(timeDeltaSec)
 
 	// Format timestamp
 	tsStr := now.Format("15:04:05")
@@ -155,10 +200,6 @@ func (c *Collector) sample() {
 		NetOutKBps:       math.Round(netOutKBps*10) / 10,
 	}
 
-	onlineCores := getOnlineCPUCores()
-	currentMaxProcs := runtime.GOMAXPROCS(0)
-	reservedCore := onlineCores > 1 && currentMaxProcs < onlineCores
-
 	current := CurrentMetrics{
 		CPUPercent:       point.CPUPercent,
 		RAMUsedMB:        point.RAMUsedMB,
@@ -173,6 +214,8 @@ func (c *Collector) sample() {
 		ReservedCore:     reservedCore,
 		OS:               runtime.GOOS,
 		Timestamp:        tsStr,
+		CPUCoresList:     cpuCoresList,
+		NetInterfaces:    netIfacesList,
 	}
 
 	c.mu.Lock()
@@ -185,46 +228,132 @@ func (c *Collector) sample() {
 	}
 }
 
-// readCPUPercent reads /proc/stat on Linux or estimates on non-Linux
-func (c *Collector) readCPUPercent() float64 {
+// readCPUMetrics reads /proc/stat on Linux or generates fallback stats per core
+func (c *Collector) readCPUMetrics(reservedCore bool, gomaxprocs int) (float64, []CPUCoreMetrics) {
 	statBytes, err := os.ReadFile("/proc/stat")
 	if err != nil {
 		// Non-Linux fallback
-		return fallbackCPU()
+		totalPct := fallbackCPU()
+		cores := getOnlineCPUCores()
+		coresList := make([]CPUCoreMetrics, cores)
+		for i := 0; i < cores; i++ {
+			isRes := reservedCore && i == cores-1
+			role := "Worker Thread"
+			if isRes {
+				role = "Reserved for OS / Management"
+			}
+			var pct float64
+			if cores > 1 {
+				pct = totalPct + float64((i*7)%5) - 2.0
+				if pct < 0.5 {
+					pct = 0.5
+				}
+				if pct > 99.5 {
+					pct = 99.5
+				}
+			} else {
+				pct = totalPct
+			}
+			coresList[i] = CPUCoreMetrics{
+				ID:         i,
+				Name:       fmt.Sprintf("CPU Core %d", i),
+				Percent:    math.Round(pct*10) / 10,
+				Role:       role,
+				IsReserved: isRes,
+			}
+		}
+		return totalPct, coresList
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(statBytes))
+	var totalCPU float64
+	coresMap := make(map[int]float64)
+	coreIndices := make([]int, 0)
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "cpu ") {
-			fields := strings.Fields(line)
-			if len(fields) >= 5 {
-				var total uint64
-				var idle uint64
-				for i := 1; i < len(fields); i++ {
-					val, _ := strconv.ParseUint(fields[i], 10, 64)
-					total += val
-					if i == 4 || i == 5 { // idle and iowait
-						idle += val
-					}
-				}
+		fields := strings.Fields(line)
+		if len(fields) < 5 {
+			continue
+		}
 
-				if c.prevCPUTotal > 0 && total > c.prevCPUTotal {
-					deltaTotal := total - c.prevCPUTotal
-					deltaIdle := idle - c.prevCPUIdle
-					if deltaTotal > deltaIdle {
-						c.prevCPUTotal = total
-						c.prevCPUIdle = idle
-						return float64(deltaTotal-deltaIdle) / float64(deltaTotal) * 100.0
-					}
+		if fields[0] == "cpu" {
+			total, idle := parseCPULine(fields)
+			if c.prevCPUTotal > 0 && total > c.prevCPUTotal {
+				deltaTotal := total - c.prevCPUTotal
+				deltaIdle := idle - c.prevCPUIdle
+				if deltaTotal > deltaIdle {
+					totalCPU = float64(deltaTotal-deltaIdle) / float64(deltaTotal) * 100.0
 				}
-				c.prevCPUTotal = total
-				c.prevCPUIdle = idle
 			}
-			break
+			c.prevCPUTotal = total
+			c.prevCPUIdle = idle
+			continue
+		}
+
+		if strings.HasPrefix(fields[0], "cpu") {
+			coreNumStr := strings.TrimPrefix(fields[0], "cpu")
+			coreID, err := strconv.Atoi(coreNumStr)
+			if err != nil {
+				continue
+			}
+
+			total, idle := parseCPULine(fields)
+			coreKey := fields[0]
+			if c.prevCoreTotals == nil {
+				c.prevCoreTotals = make(map[string]uint64)
+				c.prevCoreIdles = make(map[string]uint64)
+			}
+
+			prevTotal := c.prevCoreTotals[coreKey]
+			prevIdle := c.prevCoreIdles[coreKey]
+
+			var corePct float64
+			if prevTotal > 0 && total > prevTotal {
+				deltaTotal := total - prevTotal
+				deltaIdle := idle - prevIdle
+				if deltaTotal > deltaIdle {
+					corePct = float64(deltaTotal-deltaIdle) / float64(deltaTotal) * 100.0
+				}
+			}
+			c.prevCoreTotals[coreKey] = total
+			c.prevCoreIdles[coreKey] = idle
+
+			coresMap[coreID] = math.Round(corePct*10) / 10
+			coreIndices = append(coreIndices, coreID)
 		}
 	}
-	return 0.0
+
+	sort.Ints(coreIndices)
+	numCores := len(coreIndices)
+	coresList := make([]CPUCoreMetrics, 0, numCores)
+	for idx, coreID := range coreIndices {
+		isRes := reservedCore && idx == numCores-1
+		role := "Worker Thread"
+		if isRes {
+			role = "Reserved for OS / Management"
+		}
+		coresList = append(coresList, CPUCoreMetrics{
+			ID:         coreID,
+			Name:       fmt.Sprintf("CPU Core %d", coreID),
+			Percent:    coresMap[coreID],
+			Role:       role,
+			IsReserved: isRes,
+		})
+	}
+
+	return totalCPU, coresList
+}
+
+func parseCPULine(fields []string) (total uint64, idle uint64) {
+	for i := 1; i < len(fields); i++ {
+		val, _ := strconv.ParseUint(fields[i], 10, 64)
+		total += val
+		if i == 4 || i == 5 { // idle & iowait
+			idle += val
+		}
+	}
+	return total, idle
 }
 
 // readMemory reads /proc/meminfo on Linux or runtime.MemStats on non-Linux
@@ -279,16 +408,24 @@ func (c *Collector) readMemory() (usedMB, totalMB, pct float64) {
 	return usedMB, totalMB, pct
 }
 
-// readNetworkThroughput reads /proc/net/dev on Linux or calculates delta bytes/sec
-func (c *Collector) readNetworkThroughput(deltaSec float64) (inKBps, outKBps float64) {
+// readNetworkThroughput reads /proc/net/dev on Linux or returns interface metrics
+func (c *Collector) readNetworkThroughput(deltaSec float64) (float64, float64, []NetInterfaceMetrics) {
 	netBytes, err := os.ReadFile("/proc/net/dev")
 	if err != nil {
-		// Non-Linux estimation based on syslog packet rate
-		return 0, 0
+		// Non-Linux fallback
+		return 0, 0, []NetInterfaceMetrics{}
 	}
 
 	var totalRx uint64
 	var totalTx uint64
+	var totalInKBps float64
+	var totalOutKBps float64
+
+	if c.prevIfaceStats == nil {
+		c.prevIfaceStats = make(map[string]ifaceSample)
+	}
+
+	ifaces := make([]NetInterfaceMetrics, 0)
 
 	scanner := bufio.NewScanner(bytes.NewReader(netBytes))
 	for scanner.Scan() {
@@ -297,29 +434,72 @@ func (c *Collector) readNetworkThroughput(deltaSec float64) (inKBps, outKBps flo
 			continue
 		}
 		parts := strings.SplitN(line, ":", 2)
-		iface := strings.TrimSpace(parts[0])
-		if iface == "lo" {
-			continue // skip loopback
-		}
+		ifaceName := strings.TrimSpace(parts[0])
 		fields := strings.Fields(parts[1])
-		if len(fields) >= 9 {
-			rx, _ := strconv.ParseUint(fields[0], 10, 64)
-			tx, _ := strconv.ParseUint(fields[8], 10, 64)
-			totalRx += rx
-			totalTx += tx
+		if len(fields) < 16 {
+			continue
 		}
-	}
 
-	if c.prevNetRxBytes > 0 && totalRx >= c.prevNetRxBytes && deltaSec > 0 {
-		inKBps = float64(totalRx-c.prevNetRxBytes) / deltaSec / 1024.0
-	}
-	if c.prevNetTxBytes > 0 && totalTx >= c.prevNetTxBytes && deltaSec > 0 {
-		outKBps = float64(totalTx-c.prevNetTxBytes) / deltaSec / 1024.0
+		rxBytes, _ := strconv.ParseUint(fields[0], 10, 64)
+		rxPackets, _ := strconv.ParseUint(fields[1], 10, 64)
+		rxErrs, _ := strconv.ParseUint(fields[2], 10, 64)
+		rxDrop, _ := strconv.ParseUint(fields[3], 10, 64)
+
+		txBytes, _ := strconv.ParseUint(fields[8], 10, 64)
+		txPackets, _ := strconv.ParseUint(fields[9], 10, 64)
+		txErrs, _ := strconv.ParseUint(fields[10], 10, 64)
+		txDrop, _ := strconv.ParseUint(fields[11], 10, 64)
+
+		if ifaceName != "lo" {
+			totalRx += rxBytes
+			totalTx += txBytes
+		}
+
+		prev := c.prevIfaceStats[ifaceName]
+		var inKBps, outKBps, rxPps, txPps float64
+
+		if prev.rxBytes > 0 && rxBytes >= prev.rxBytes && deltaSec > 0 {
+			inKBps = float64(rxBytes-prev.rxBytes) / deltaSec / 1024.0
+			rxPps = float64(rxPackets-prev.rxPackets) / deltaSec
+		}
+		if prev.txBytes > 0 && txBytes >= prev.txBytes && deltaSec > 0 {
+			outKBps = float64(txBytes-prev.txBytes) / deltaSec / 1024.0
+			txPps = float64(txPackets-prev.txPackets) / deltaSec
+		}
+
+		c.prevIfaceStats[ifaceName] = ifaceSample{
+			rxBytes:   rxBytes,
+			rxPackets: rxPackets,
+			txBytes:   txBytes,
+			txPackets: txPackets,
+		}
+
+		if ifaceName != "lo" {
+			totalInKBps += inKBps
+			totalOutKBps += outKBps
+		}
+
+		ifaces = append(ifaces, NetInterfaceMetrics{
+			Name:            ifaceName,
+			RxBytes:         rxBytes,
+			RxPackets:       rxPackets,
+			RxErrs:          rxErrs,
+			RxDrop:          rxDrop,
+			TxBytes:         txBytes,
+			TxPackets:       txPackets,
+			TxErrs:          txErrs,
+			TxDrop:          txDrop,
+			NetInKBps:       math.Round(inKBps*10) / 10,
+			NetOutKBps:      math.Round(outKBps*10) / 10,
+			RxPacketsPerSec: math.Round(rxPps*10) / 10,
+			TxPacketsPerSec: math.Round(txPps*10) / 10,
+		})
 	}
 
 	c.prevNetRxBytes = totalRx
 	c.prevNetTxBytes = totalTx
-	return inKBps, outKBps
+
+	return totalInKBps, totalOutKBps, ifaces
 }
 
 // fallbackCPU generates smooth fallback CPU stats for dev environments

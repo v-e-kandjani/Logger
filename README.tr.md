@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.4.2** (Etkileşimli Çekirdek Bazlı CPU ve Ağ Arayüzü Detay Modalları):
+  - **Çekirdek Bazlı CPU Topolojisi Modalı**: İşlemci kullanımı kartına tıklandığında çekirdek bazında anlık yük metrelerini, iş parçacığı ve ayrılmış işletim sistemi yönetim çekirdeği rollerini, toplam yükü ve `GOMAXPROCS` durumunu gösteren özel pencere açıldı.
+  - **Ağ Arayüzü ve Paket İstatistikleri Modalı**: Ağ veri akışı kartına tıklandığında sunucu ağ adaptörleri bazında anlık bant genişliğini (KB/s, MB/s), paket hızını (paket/sn), toplam Rx/Tx paket ve bayt sayaçlarını, düşen ve hatalı paket metriklerini gösteren detay penceresi entegre edildi.
+  - **Canlı 2 Saniyelik Telemetri Senkronizasyonu**: Açık olan detay pencereleri 2 saniyede bir arka plan telemetrisi ile canlı olarak güncellenir.
+
 - **v1.4.1** (Dinamik Yönetim Çekirdeği Tahsisi ve Derleme İş Parçacığı Sınırlandırması):
   - **İşletim Sistemi & Yönetim Arayüzü Koruması**: Sistemde `NumCPU > 1` olduğunda `GOMAXPROCS = NumCPU - 1` olarak dinamik ayarlayan otomatik çekirdek tahsisi (`configureCPUCoreReservation`) uygulandı. Böylece yüksek log yükünde veya sistem işlemlerinde Host OS, SSH ve web yönetim arayüzü için en az 1 CPU çekirdeğinin kesintisiz ayrılması sağlandı ve %100 CPU kilitlenmeleri önlendi.
   - **Derleme İş Parçacığı Sınırlandırması**: `upgrade.sh` betiğine `GOMAXPROCS` çevre değişkeni eklenerek konteyner derlemelerinde (`docker compose build`) sistem yönetimi için 1 CPU çekirdeğinin boşta tutulması sağlandı.

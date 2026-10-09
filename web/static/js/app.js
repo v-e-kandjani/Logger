@@ -2301,12 +2301,227 @@ async function fetchAndRenderTelemetryCharts() {
                 const outFmt = formatTelemetryRate(cur.net_out_kbps || 0);
                 elNet.textContent = `↓ ${inFmt} | ↑ ${outFmt}`;
             }
+
+            // Refresh open modals live
+            if (window.cpuModalOpen) {
+                renderCPUDetails(cur);
+            }
+            if (window.netModalOpen) {
+                renderNetDetails(cur);
+            }
         }
 
         renderAllTelemetryCharts(data);
     } catch (e) {
         console.error('Error fetching telemetry metrics:', e);
     }
+}
+
+// ==============================================================================
+// CPU Core Utilization & Network Interfaces Detail Modals
+// ==============================================================================
+window.cpuModalOpen = false;
+window.netModalOpen = false;
+
+function openCPUDetailsModal() {
+    window.cpuModalOpen = true;
+    const modal = document.getElementById('cpu-details-modal');
+    if (modal) modal.style.display = 'flex';
+    if (telemetryHistoryData && telemetryHistoryData.current) {
+        renderCPUDetails(telemetryHistoryData.current);
+    }
+}
+
+function closeCPUDetailsModal() {
+    window.cpuModalOpen = false;
+    const modal = document.getElementById('cpu-details-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function renderCPUDetails(cur) {
+    if (!cur) return;
+
+    // Top Summary
+    const elTotPct = document.getElementById('cpu-modal-total-pct');
+    if (elTotPct) elTotPct.textContent = `${(cur.cpu_percent || 0).toFixed(1)}%`;
+
+    const elCores = document.getElementById('cpu-modal-core-count');
+    if (elCores) elCores.textContent = `${cur.cpu_cores || 1}`;
+
+    const elMaxProcs = document.getElementById('cpu-modal-maxprocs');
+    if (elMaxProcs) elMaxProcs.textContent = `${cur.gomaxprocs || cur.cpu_cores || 1}`;
+
+    const elResStatus = document.getElementById('cpu-modal-res-status');
+    if (elResStatus) {
+        if (cur.reserved_core) {
+            elResStatus.innerHTML = `<span class="badge badge-warning" style="font-size: 0.75rem;">🛡️ 1 Core Reserved for Management</span>`;
+        } else {
+            elResStatus.innerHTML = `<span class="badge badge-secondary" style="font-size: 0.75rem;">⚡ All Cores Worker Active</span>`;
+        }
+    }
+
+    // Cores Container
+    const container = document.getElementById('cpu-cores-container');
+    if (!container) return;
+
+    const coresList = cur.cpu_cores_list || [];
+    if (coresList.length === 0) {
+        const totalCores = cur.cpu_cores || 1;
+        for (let i = 0; i < totalCores; i++) {
+            const isRes = cur.reserved_core && i === totalCores - 1;
+            coresList.push({
+                id: i,
+                name: `CPU Core ${i}`,
+                percent: cur.cpu_percent || 0,
+                role: isRes ? 'Reserved for OS / Management' : 'Worker Thread',
+                is_reserved: isRes
+            });
+        }
+    }
+
+    let html = '';
+    coresList.forEach(core => {
+        const pct = Math.max(0, Math.min(100, core.percent || 0));
+        let barColor = '#06b6d4'; // cyan
+        if (pct >= 85) {
+            barColor = '#ef4444'; // red
+        } else if (pct >= 60) {
+            barColor = '#eab308'; // yellow
+        }
+
+        let roleBadge = `<span class="badge badge-info" style="font-size: 0.7rem;">⚡ ${core.role || 'Worker Thread'}</span>`;
+        if (core.is_reserved) {
+            roleBadge = `<span class="badge badge-warning" style="font-size: 0.7rem; background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.5); color: #fde047;">🛡️ ${core.role || 'Management Reserved'}</span>`;
+        }
+
+        html += `
+            <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                        <span>💻 ${core.name}</span>
+                        ${roleBadge}
+                    </div>
+                    <div style="font-family: monospace; font-size: 1.15rem; font-weight: 700; color: ${barColor};">
+                        ${pct.toFixed(1)}%
+                    </div>
+                </div>
+                <div style="width: 100%; height: 10px; background: rgba(255, 255, 255, 0.08); border-radius: 5px; overflow: hidden; position: relative;">
+                    <div style="width: ${pct}%; height: 100%; background: ${barColor}; transition: width 0.4s ease; border-radius: 5px;"></div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function openNetDetailsModal() {
+    window.netModalOpen = true;
+    const modal = document.getElementById('net-details-modal');
+    if (modal) modal.style.display = 'flex';
+    if (telemetryHistoryData && telemetryHistoryData.current) {
+        renderNetDetails(telemetryHistoryData.current);
+    }
+}
+
+function closeNetDetailsModal() {
+    window.netModalOpen = false;
+    const modal = document.getElementById('net-details-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function renderNetDetails(cur) {
+    if (!cur) return;
+
+    // Top Summary
+    const elIn = document.getElementById('net-modal-in-rate');
+    if (elIn) elIn.textContent = `↓ ${formatTelemetryRate(cur.net_in_kbps || 0)}`;
+
+    const elOut = document.getElementById('net-modal-out-rate');
+    if (elOut) elOut.textContent = `↑ ${formatTelemetryRate(cur.net_out_kbps || 0)}`;
+
+    const elRx = document.getElementById('net-modal-total-rx');
+    if (elRx) elRx.textContent = `${(cur.total_packets_rx || 0).toLocaleString()} rx`;
+
+    const ifaces = cur.net_interfaces || [];
+    const elIfCount = document.getElementById('net-modal-iface-count');
+    if (elIfCount) elIfCount.textContent = `${ifaces.length}`;
+
+    // Interfaces Container
+    const container = document.getElementById('net-interfaces-container');
+    if (!container) return;
+
+    if (ifaces.length === 0) {
+        container.innerHTML = `
+            <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; text-align: center;" class="text-muted">
+                🌐 Main Host Network (Inbound: ${formatTelemetryRate(cur.net_in_kbps || 0)} | Outbound: ${formatTelemetryRate(cur.net_out_kbps || 0)})
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    ifaces.forEach(iface => {
+        const isLoopback = iface.name === 'lo';
+        const badgeColor = isLoopback ? 'badge-secondary' : 'badge-warning';
+
+        html += `
+            <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="badge ${badgeColor}" style="font-size: 0.85rem; font-weight: 700; padding: 4px 10px;">🌐 ${iface.name}</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">${isLoopback ? 'Internal Loopback Interface' : 'Network Device Adapter'}</span>
+                    </div>
+                    <div style="font-size: 0.85rem; font-weight: 600; display: flex; gap: 16px;">
+                        <span style="color: #22c55e;">↓ ${formatTelemetryRate(iface.net_in_kbps || 0)} (${(iface.rx_packets_per_sec || 0).toFixed(1)} pkts/s)</span>
+                        <span style="color: #eab308;">↑ ${formatTelemetryRate(iface.net_out_kbps || 0)} (${(iface.tx_packets_per_sec || 0).toFixed(1)} pkts/s)</span>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                    <!-- Inbound (Rx) -->
+                    <div style="background: rgba(34, 197, 94, 0.05); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 6px; padding: 12px;">
+                        <div style="font-weight: 600; font-size: 0.85rem; color: #22c55e; margin-bottom: 6px; display: flex; justify-content: space-between;">
+                            <span>📥 Inbound Traffic (Rx)</span>
+                            <span>${formatBytes(iface.rx_bytes || 0)}</span>
+                        </div>
+                        <div style="font-size: 0.8rem; display: flex; justify-content: space-between; color: var(--text-muted);">
+                            <span>Total Packets: <strong style="color: var(--text-main);">${(iface.rx_packets || 0).toLocaleString()}</strong></span>
+                            <span>Drops/Errors: <strong style="color: ${iface.rx_drop > 0 || iface.rx_errs > 0 ? '#ef4444' : 'var(--text-muted)'};">${iface.rx_drop || 0} / ${iface.rx_errs || 0}</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Outbound (Tx) -->
+                    <div style="background: rgba(234, 179, 8, 0.05); border: 1px solid rgba(234, 179, 8, 0.2); border-radius: 6px; padding: 12px;">
+                        <div style="font-weight: 600; font-size: 0.85rem; color: #eab308; margin-bottom: 6px; display: flex; justify-content: space-between;">
+                            <span>📤 Outbound Traffic (Tx)</span>
+                            <span>${formatBytes(iface.tx_bytes || 0)}</span>
+                        </div>
+                        <div style="font-size: 0.8rem; display: flex; justify-content: space-between; color: var(--text-muted);">
+                            <span>Total Packets: <strong style="color: var(--text-main);">${(iface.tx_packets || 0).toLocaleString()}</strong></span>
+                            <span>Drops/Errors: <strong style="color: ${iface.tx_drop > 0 || iface.tx_errs > 0 ? '#ef4444' : 'var(--text-muted)'};">${iface.tx_drop || 0} / ${iface.tx_errs || 0}</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function formatBytes(bytes) {
+    if (!bytes || bytes <= 0) return '0 B';
+    if (bytes >= 1073741824) {
+        return `${(bytes / 1073741824).toFixed(2)} GB`;
+    }
+    if (bytes >= 1048576) {
+        return `${(bytes / 1048576).toFixed(1)} MB`;
+    }
+    if (bytes >= 1024) {
+        return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${bytes} B`;
 }
 
 function formatTelemetryRate(kbps) {
