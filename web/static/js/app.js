@@ -1801,7 +1801,10 @@ window.openMyMFASetupModal = async () => {
         if (!res.ok) throw new Error(data.error || 'Failed generating MFA enrollment key');
 
         currentMFASecret = data.secret;
-        if (qrImg) qrImg.src = data.qr_png_base64;
+        const qrSrc = data.qr_code_base64 || data.qr_png_base64 || '';
+        if (qrImg) {
+            qrImg.src = qrSrc;
+        }
         if (secretDisplay) secretDisplay.textContent = data.secret;
     } catch (e) {
         alert('Failed loading MFA enrollment: ' + e.message);

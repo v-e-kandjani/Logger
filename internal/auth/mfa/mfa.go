@@ -37,6 +37,7 @@ type SetupResult struct {
 	Secret        string   `json:"secret"`          // Base32 secret string
 	OTPAuthURL    string   `json:"otpauth_url"`     // Standard otpauth:// URI
 	QRCodeBase64  string   `json:"qr_code_base64"`  // data:image/png;base64,...
+	QRPngBase64   string   `json:"qr_png_base64"`   // data:image/png;base64,... (alias)
 	RecoveryCodes []string `json:"recovery_codes"`  // 8 single-use recovery codes
 	Issuer        string   `json:"issuer"`
 	AccountName   string   `json:"account_name"`
@@ -118,6 +119,7 @@ func GenerateSetupPackage(username string) (*SetupResult, error) {
 		Secret:        secret,
 		OTPAuthURL:    otpAuthURL,
 		QRCodeBase64:  qrCodeBase64,
+		QRPngBase64:   qrCodeBase64,
 		RecoveryCodes: recoveryCodes,
 		Issuer:        IssuerName,
 		AccountName:   username,

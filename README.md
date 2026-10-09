@@ -260,6 +260,9 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.1** (MFA Enrollment QR Code Rendering Fix):
+  - **MFA QR Code Dual Key Compatibility**: Resolved a property key mismatch between backend JSON serialization (`qr_code_base64`) and client-side setup modal receiver (`qr_png_base64`). Setup package now provides dual field serialization and the UI handles both keys seamlessly, ensuring instant, crisp QR code rendering for scanning into Microsoft Authenticator, Google Authenticator, WatchGuard AuthPoint, and FortiAuthenticator.
+
 - **v1.5.0** (Active Directory / LDAP Integration, Universal Multi-Factor Authentication (MFA), & SMTP Email Dispatcher):
   - **Active Directory / LDAP Directory Integration**: Native LDAP/LDAPS client (`internal/auth/ad`) supporting Microsoft Active Directory and OpenLDAP. Features automated domain user discovery, preview scanner (`POST /api/v1/auth/ad/preview`), 1-click batch user synchronization into PostgreSQL (`POST /api/v1/auth/ad/sync`), direct LDAP credential bind authentication with auto-provisioning, StartTLS, LDAPS (port 636), and flexible LDAP attribute mapping (`sAMAccountName`, `mail`).
   - **Universal RFC 6238 Multi-Factor Authentication (MFA)**: High-assurance Time-Based One-Time Password (TOTP) engine (`internal/auth/mfa`) verified and certified with **Microsoft Authenticator**, **Google Authenticator**, **WatchGuard AuthPoint**, and **FortiAuthenticator / FortiToken**. Supports Base64 QR code generation, secret key manual entry, 8 emergency single-use backup recovery codes, 5-minute expiring MFA login challenge tickets, admin MFA reset/clear overrides, and optional or enforced system-wide MFA policies.
