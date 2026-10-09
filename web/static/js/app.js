@@ -1781,6 +1781,8 @@ window.executeADSync = async () => {
 };
 
 // MFA Enrollment & Setup Modal Handlers
+let currentMFARecoveryCodes = [];
+
 window.openMyMFASetupModal = async () => {
     const modal = document.getElementById('user-mfa-modal');
     if (!modal) return;
@@ -1797,15 +1799,22 @@ window.openMyMFASetupModal = async () => {
 
     try {
         const res = await fetch('/api/v1/auth/mfa/setup', { method: 'POST' });
-        const data = await res.json();
+        const text = await res.text();
+        let data = {};
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error(`Server returned status ${res.status}: ${text.substring(0, 100)}`);
+        }
         if (!res.ok) throw new Error(data.error || 'Failed generating MFA enrollment key');
 
-        currentMFASecret = data.secret;
+        currentMFASecret = data.secret || '';
+        currentMFARecoveryCodes = data.recovery_codes || [];
         const qrSrc = data.qr_code_base64 || data.qr_png_base64 || '';
         if (qrImg) {
             qrImg.src = qrSrc;
         }
-        if (secretDisplay) secretDisplay.textContent = data.secret;
+        if (secretDisplay) secretDisplay.textContent = data.secret || '--------';
     } catch (e) {
         alert('Failed loading MFA enrollment: ' + e.message);
         modal.style.display = 'none';
@@ -1819,11 +1828,12 @@ window.closeUserMFAModal = () => {
 };
 
 window.copyMFASecret = () => {
-    if (!currentMFASecret) return;
-    navigator.clipboard.writeText(currentMFASecret).then(() => {
+    const secret = currentMFASecret || (document.getElementById('mfa-secret-display') ? document.getElementById('mfa-secret-display').textContent.trim() : '');
+    if (!secret || secret.includes('-')) return;
+    navigator.clipboard.writeText(secret).then(() => {
         alert('MFA Secret Key copied to clipboard! You can paste it into MS Authenticator, Google Auth, AuthPoint, or FortiAuthenticator.');
     }).catch(() => {
-        prompt('Copy your MFA Secret Key:', currentMFASecret);
+        prompt('Copy your MFA Secret Key:', secret);
     });
 };
 
@@ -1834,18 +1844,36 @@ window.confirmMFAActivation = async () => {
         alert('Please enter a valid 6-digit verification code from your authenticator app.');
         return;
     }
+
+    const secret = currentMFASecret || (document.getElementById('mfa-secret-display') ? document.getElementById('mfa-secret-display').textContent.trim() : '');
+    if (!secret || secret.includes('-')) {
+        alert('MFA secret key is missing. Please close and re-open the MFA setup window.');
+        return;
+    }
+
     const btn = document.getElementById('btn-mfa-confirm-activate');
     if (btn) {
         btn.disabled = true;
         btn.textContent = 'Verifying...';
     }
     try {
-        const res = await fetch('/api/v1/auth/mfa/verify-enable', {
+        const res = await fetch('/api/v1/auth/mfa/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code })
+            body: JSON.stringify({
+                secret: secret,
+                code: code,
+                recovery_codes: currentMFARecoveryCodes || [],
+                provider: 'ms_authenticator'
+            })
         });
-        const data = await res.json();
+        const text = await res.text();
+        let data = {};
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error(`Server returned status ${res.status}: ${text.substring(0, 100)}`);
+        }
         if (!res.ok) throw new Error(data.error || 'Verification failed');
 
         const step1 = document.getElementById('mfa-setup-step1');
@@ -1854,8 +1882,9 @@ window.confirmMFAActivation = async () => {
         if (step2) step2.style.display = 'block';
 
         const recoveryGrid = document.getElementById('mfa-recovery-codes-grid');
-        if (recoveryGrid && data.recovery_codes) {
-            recoveryGrid.innerHTML = data.recovery_codes.map(c => `
+        const recoveryCodes = data.recovery_codes || currentMFARecoveryCodes || [];
+        if (recoveryGrid && recoveryCodes.length > 0) {
+            recoveryGrid.innerHTML = recoveryCodes.map(c => `
                 <div style="padding: 4px 6px; background: rgba(255,255,255,0.06); border-radius: 4px; text-align: center;">${escapeHtml(c)}</div>
             `).join('');
         }

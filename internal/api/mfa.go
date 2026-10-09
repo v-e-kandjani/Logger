@@ -223,6 +223,10 @@ func (h *Handler) handleMFAVerifyAndEnableAPI(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if len(req.RecoveryCodes) == 0 {
+		req.RecoveryCodes, _ = mfa.GenerateRecoveryCodes(8)
+	}
+
 	if req.Provider == "" {
 		req.Provider = "totp"
 	}
@@ -235,9 +239,10 @@ func (h *Handler) handleMFAVerifyAndEnableAPI(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{
-		"status":  "ok",
-		"message": "multi-factor authentication successfully enabled",
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":         "ok",
+		"message":        "multi-factor authentication successfully enabled",
+		"recovery_codes": req.RecoveryCodes,
 	})
 }
 

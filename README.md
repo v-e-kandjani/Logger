@@ -260,6 +260,9 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.2** (MFA Verification Route Alignment & Payload Harmonization):
+  - **MFA Activation Endpoint & Payload Alignment**: Registered `/api/v1/auth/mfa/verify-enable` alongside `/api/v1/auth/mfa/verify` to eliminate 404 responses. Updated client-side activation to submit the active Base32 secret key, code, and recovery codes bundle, and added safe non-JSON response parsing to prevent unexpected JSON.parse parse exceptions.
+
 - **v1.5.1** (MFA Enrollment QR Code Rendering Fix):
   - **MFA QR Code Dual Key Compatibility**: Resolved a property key mismatch between backend JSON serialization (`qr_code_base64`) and client-side setup modal receiver (`qr_png_base64`). Setup package now provides dual field serialization and the UI handles both keys seamlessly, ensuring instant, crisp QR code rendering for scanning into Microsoft Authenticator, Google Authenticator, WatchGuard AuthPoint, and FortiAuthenticator.
 

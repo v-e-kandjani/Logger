@@ -140,6 +140,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Protected API v1 Endpoints (Require valid session)
 	mux.HandleFunc("/api/v1/auth/mfa/setup", h.requireAuth(h.handleMFASetupAPI))
 	mux.HandleFunc("/api/v1/auth/mfa/verify", h.requireAuth(h.handleMFAVerifyAndEnableAPI))
+	mux.HandleFunc("/api/v1/auth/mfa/verify-enable", h.requireAuth(h.handleMFAVerifyAndEnableAPI))
 	mux.HandleFunc("/api/v1/auth/mfa/disable", h.requireAuth(h.handleMFADisableAPI))
 	mux.HandleFunc("/api/v1/auth/mfa/admin-reset", h.requireAuth(h.handleMFAAdminResetAPI))
 
