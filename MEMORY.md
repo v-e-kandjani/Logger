@@ -9,7 +9,7 @@
 - **Tagline**: *"Her kayıt, zamanıyla kanıt."*
 - **Path**: `/Users/valp/Documents/CLAUDE/Logger`
 - **GitHub**: `https://github.com/v-e-kandjani/Logger` (main)
-- **Current Version**: `v1.5.13` (Build Date: `2026-10-11`)
+- **Current Version**: `v1.5.14` (Build Date: `2026-10-11`, Commit: `1990094`)
 - **Production Server**:
   - **Host**: `168.231.106.208`
   - **SSH**: `alex` / `9m1KE=LPW=N*jd`
@@ -22,7 +22,7 @@
 
 ---
 
-## 2. Key Modules & Features (as of v1.5.13)
+## 2. Key Modules & Features (as of v1.5.14)
 1. **Certificate Management**:
    - Explicit Certificate Format selector (`cert-upload-type`):
      - **PKCS#12 / PFX Arşivi (`.pfx`, `.p12`)**: Single archive + password. Private key field is hidden.
@@ -30,7 +30,7 @@
    - Hot-swappable certificate engine, automated SAN generation, and HTTP->HTTPS redirection.
 2. **Multi-Tenant Architecture (MSSP)**:
    - Database `tenants` table with quotas (`max_nodes`, `max_eps`).
-   - Global Tenant Context Switcher (`#tenant-context-selector`) in the header bar.
+   - Tenant Context Switcher (`#tenant-context-selector`) lives in the **sidebar** (`.sidebar-tenant` card, usage/quota meta). Locked for tenant users.
    - Settings > "Kiracı Yönetimi (Tenants)" tab with tenant creation and admin provisioning.
 3. **Edge Proxy Forwarder Daemon (`logseal-proxy`)**:
    - Standalone Go binary (`cmd/proxy/main.go`) installable directly on minimal Ubuntu (22.04 / 24.04 / 26.04).
@@ -48,6 +48,19 @@
    - Active device rule optimizer.
 6. **Query Acceleration**:
    - In-memory result cache using up to 60% of available RAM (`GOMEMLIMIT` aware).
+
+---
+
+## 2b. Multi-Tenant Data Isolation (v1.5.14)
+- **Ownership columns**: ClickHouse `syslog_events.tenant LowCardinality(String) DEFAULT 'default'` (auto `ALTER ... ADD COLUMN IF NOT EXISTS` in `clickhouse.NewClient`), Postgres `devices.tenant_slug` (EnsureEdgeSchema). `models.LogEvent.Tenant`, `models.Device.TenantSlug`.
+- **Attribution**: `pipeline.RawPacket.Tenant` set by edge ingest (`node.TenantName`); else device's tenant; else `default`.
+- **Scope resolution**: `Handler.tenantScope(r)` in `internal/api/auth.go` → tenant users forced to `Session.TenantSlug`; root reads `X-Tenant` header or `?tenant=` (`all`/empty = global). Frontend wraps `window.fetch` to send `X-Tenant` from `localStorage.active_tenant_slug`; WebSocket uses `?tenant=`.
+- **Scoped endpoints**: `/api/v1/logs`, `/api/v1/logs/live`, `/api/v1/dashboard` (tenant_scope, tenant_eps), `/api/v1/devices` (GET/POST/DELETE), `/api/v1/settings/edge/nodes`, `/api/v1/unregistered/onboard-all`, `/api/v1/tenants` (usage, current_eps, totals, is_root).
+- **Root tenant** (`default`): max_nodes/max_eps = 0 (unlimited, ∞), aggregates all tenants. Node quota enforced on edge node creation only for customer tenants.
+- **Users**: `tenant_slug`/`is_tenant_admin` now persisted by `CreateUser` and read by `GetUserByUsername/ID/ListUsers`; backfill for existing tenant admins. Sessions carry `TenantSlug`, `IsTenantAdmin`; `/api/v1/auth/me` returns `tenant_slug`, `is_root`.
+- **SIEM rule optimizer**: `SetSIEMRulesEnabledState` persists is_enabled (BatchUpsertSIEMRules intentionally preserves operator toggles). 12 categories: authentication, privilege, network_admin, perimeter, network, windows, linux, cloud, mail_web, data, defense_evasion, health.
+- **Query cache**: frontend reads backend `CacheStats` JSON names (`total_system_memory_mb`, `avail_system_memory_mb`, `current_memory_mb`, `item_count`, `hit_count`, `miss_count`, `hit_ratio_percent`). Search cache key uses time-bucketed `now` (15s / 1m).
+- **Not yet tenant-scoped (future)**: SIEM alerts/overview, archives/exports, storage stats, users list.
 
 ---
 

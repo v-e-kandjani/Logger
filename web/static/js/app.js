@@ -1991,8 +1991,9 @@ async function loadCacheStats() {
 
         const usageEl = document.getElementById('cache-usage-ram');
         if (usageEl) {
-            const usedPct = maxMB > 0 ? ` · ${((curMB / maxMB) * 100).toFixed(2)}%` : '';
-            usageEl.textContent = `${curMB.toFixed(2)} MB${usedPct}`;
+            const usedPct = maxMB > 0 ? ` · ${((curMB / maxMB) * 100).toFixed(3)}%` : '';
+            const usedStr = curMB >= 1 ? `${curMB.toFixed(2)} MB` : `${(Number(s.current_memory_bytes || curMB * 1048576) / 1024).toFixed(1)} KB`;
+            usageEl.textContent = `${usedStr}${usedPct}`;
         }
 
         const itemsEl = document.getElementById('cache-items-count');
