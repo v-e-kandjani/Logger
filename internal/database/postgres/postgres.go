@@ -8,6 +8,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -71,21 +72,28 @@ func (db *DB) Ping(ctx context.Context) error {
 	return db.pool.Ping(ctx)
 }
 
+type deviceMaps struct {
+	byIP map[string]*models.Device
+	byID map[uuid.UUID]*models.Device
+}
+
 // DeviceCache maintains lock-free in-memory lookups for active IPs to avoid querying Postgres on every syslog packet
 type DeviceCache struct {
-	mu      sync.RWMutex
-	byIP    map[string]*models.Device
-	byID    map[uuid.UUID]*models.Device
+	maps    atomic.Pointer[deviceMaps]
+	mu      sync.Mutex
 	db      *DB
 	lastRef time.Time
 }
 
 func NewDeviceCache(db *DB) *DeviceCache {
 	dc := &DeviceCache{
+		db: db,
+	}
+	empty := &deviceMaps{
 		byIP: make(map[string]*models.Device),
 		byID: make(map[uuid.UUID]*models.Device),
-		db:   db,
 	}
+	dc.maps.Store(empty)
 	_ = dc.Refresh(context.Background())
 	return dc
 }
@@ -106,17 +114,21 @@ func (dc *DeviceCache) Refresh(ctx context.Context) error {
 	}
 
 	dc.mu.Lock()
-	dc.byIP = newByIP
-	dc.byID = newByID
+	dc.maps.Store(&deviceMaps{
+		byIP: newByIP,
+		byID: newByID,
+	})
 	dc.lastRef = time.Now()
 	dc.mu.Unlock()
 	return nil
 }
 
 func (dc *DeviceCache) LookupIP(ipStr string) (*models.Device, bool) {
-	dc.mu.RLock()
-	defer dc.mu.RUnlock()
-	dev, ok := dc.byIP[ipStr]
+	m := dc.maps.Load()
+	if m == nil {
+		return nil, false
+	}
+	dev, ok := m.byIP[ipStr]
 	return dev, ok
 }
 

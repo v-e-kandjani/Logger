@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.4** (Zero-Allocation Batch Ingestion & Lock-Free Atomic Device Cache Optimization):
+  - **ClickHouse Batch Ingestion Zero-Allocation Pipeline**: Pre-allocated and cached the parameterized `INSERT INTO` query template at client initialization, eliminating runtime `fmt.Sprintf` overhead during batch flushes. Reused internal micro-batch slice capacity via `batch = batch[:0]` and introduced static fallback IPv4 representations to minimize garbage collection cycles under high EPS loads.
+  - **Lock-Free Atomic Device Cache**: Transitioned `DeviceCache` to `atomic.Pointer[deviceMaps]`, eliminating read/write mutex lock contention (`sync.RWMutex`) across concurrent worker ingestion routines and providing instantaneous wait-free IP resolution.
+  - **CHANGES.md Audit Compliance**: Documented Phase 2 security hardening, zero-trust perimeter ingestion filtering, database isolation, and high-concurrency ingestion benchmarks in `CHANGES.md`.
+
 - **v1.5.3** (Admin MFA Reset Payload Alignment & Parameter Harmonization):
   - **MFA Admin Reset Multi-Payload Parser**: Updated `handleMFAAdminResetAPI` to accept target user identification from both URL query parameters (`?id=...` and `?user_id=...`) and JSON request bodies (`{"user_id": ...}` and `{"id": ...}`). Updated client-side `resetUserMFA` to pass both parameters simultaneously with pre-validation, eliminating the `user id required` error when resetting MFA for operator accounts.
 

@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.4** (Sıfır Bellek Tahsisli Toplu Yazma ve Kilitsiz Atomik Cihaz Önbelleği Optimizasyonu):
+  - **ClickHouse Sıfır Bellek Tahsisli Toplu Yazma**: İstemci başlangıcında parametrik `INSERT INTO` şablonu önceden oluşturulup önbelleğe alındı, böylece her toplu yazmada `fmt.Sprintf` yükü ortadan kaldırıldı. Mikro toplu yazma dilimi kapasitesi `batch = batch[:0]` ile korunarak yüksek EPS altında çöp toplayıcı (GC) baskısı en aza indirildi.
+  - **Kilitsiz Atomik Cihaz Önbelleği**: `DeviceCache` yapısı `atomic.Pointer[deviceMaps]` modeline geçirilerek eş zamanlı çalışan işlem hatlarında `sync.RWMutex` kilit çekişmesi tamamen kaldırıldı ve beklemesiz (wait-free) IP çözümlemesi sağlandı.
+  - **CHANGES.md Denetim Uyumluluğu**: Sıfır güven (zero-trust) giriş filtreleme, veritabanı port izolasyonu ve mimari güncellemeler `CHANGES.md` dosyası ile belgelendi.
+
 - **v1.5.3** (Yönetici MFA Sıfırlama Parametre ve Yük Uyumlaştırması):
   - **MFA Sıfırlama Çoklu Yük Ayrıştırıcısı**: `handleMFAAdminResetAPI` uç noktası hedef kullanıcı kimliğini hem URL sorgu parametrelerinden (`?id=...` ve `?user_id=...`) hem de JSON istek gövdesinden (`{"user_id": ...}` ve `{"id": ...}`) alacak şekilde genişletildi. İstemci tarafındaki `resetUserMFA` fonksiyonu ön denetim eklenerek her iki parametreyi eş zamanlı gönderecek şekilde güncellendi; böylece operatör hesaplarının MFA sıfırlama işlemlerindeki `user id required` hatası giderildi.
 

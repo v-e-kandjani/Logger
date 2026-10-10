@@ -15,14 +15,17 @@ import (
 	"github.com/syslog-platform/logger/internal/models"
 )
 
+var defaultZeroIPv4 = net.IPv4(0, 0, 0, 0).To4()
+
 // Client wraps ClickHouse connection and asynchronous batch inserter
 type Client struct {
-	conn       driver.Conn
-	cfg        config.ClickHouseConfig
-	batchCh    chan *models.LogEvent
-	stopCh     chan struct{}
-	wg         sync.WaitGroup
-	isHealthy  atomic.Bool
+	conn        driver.Conn
+	cfg         config.ClickHouseConfig
+	batchCh     chan *models.LogEvent
+	stopCh      chan struct{}
+	wg          sync.WaitGroup
+	isHealthy   atomic.Bool
+	insertQuery string
 
 	// Metrics
 	TotalInserted atomic.Uint64
@@ -71,6 +74,15 @@ func NewClient(cfg config.ClickHouseConfig) (*Client, error) {
 		batchCh: make(chan *models.LogEvent, cfg.BatchSize*2),
 		stopCh:  make(chan struct{}),
 	}
+	c.insertQuery = fmt.Sprintf(`
+		INSERT INTO %s.syslog_events (
+			internal_id, event_timestamp, received_at, source_ip, source_port,
+			transport_protocol, device_id, device_name, device_group, vendor,
+			product, facility_code, facility, severity_code, severity,
+			hostname, application_name, process_id, message_id, structured_data,
+			message, raw_message, collector_node, parser_status, ingestion_timestamp
+		)
+	`, c.Database())
 	c.isHealthy.Store(true)
 
 	// Start background batch writer worker
@@ -122,7 +134,8 @@ func (c *Client) batchWorker() {
 			c.TotalInserted.Add(uint64(len(batch)))
 			c.LastFlushTime.Store(time.Now().Unix())
 		}
-		batch = make([]*models.LogEvent, 0, c.cfg.BatchSize)
+		// Zero-allocation: retain slice capacity for next batch
+		batch = batch[:0]
 	}
 
 	for {
@@ -160,16 +173,7 @@ func (c *Client) flushBatch(events []*models.LogEvent) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	batchQuery := fmt.Sprintf(`
-		INSERT INTO %s.syslog_events (
-			internal_id, event_timestamp, received_at, source_ip, source_port,
-			transport_protocol, device_id, device_name, device_group, vendor,
-			product, facility_code, facility, severity_code, severity,
-			hostname, application_name, process_id, message_id, structured_data,
-			message, raw_message, collector_node, parser_status, ingestion_timestamp
-		)
-	`, c.Database())
-	batch, err := c.conn.PrepareBatch(ctx, batchQuery)
+	batch, err := c.conn.PrepareBatch(ctx, c.insertQuery)
 	if err != nil {
 		return fmt.Errorf("prepare batch: %w", err)
 	}
@@ -177,10 +181,8 @@ func (c *Client) flushBatch(events []*models.LogEvent) error {
 	for _, ev := range events {
 		srcIP := ev.SourceIP
 		if srcIP == nil {
-			srcIP = net.IPv4(0, 0, 0, 0)
-		}
-		// Convert to IPv4 4-byte slice if possible
-		if ip4 := srcIP.To4(); ip4 != nil {
+			srcIP = defaultZeroIPv4
+		} else if ip4 := srcIP.To4(); ip4 != nil {
 			srcIP = ip4
 		}
 
