@@ -249,6 +249,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.11** (Çoklu Format Sertifika Yükleme (.crt, .pfx, .pem), Kullanıcı Rol Logoları ve Kompakt Başlık Optimizasyonu):
+  - **Doğrudan Çoklu Format Sertifika Yükleme ve Parolalı PFX Desteği**: Metin alanı yerine doğrudan dosya yükleme (`.crt`, `.pfx`, `.pem`, `.p12`) mimarisine geçildi. Yerel PKCS#12 çözücü ile parolalı PFX arşivleri otomatik açılarak sertifika ve özel anahtar ayrıştırılır. Tek dosya PEM paketleri ve bağımsız sertifika + anahtar dosyaları sorunsuz işlenir.
+  - **Aktif Kullanıcı Rolü Dinamik Vektör Logoları**: Sağ üst kullanıcı rozetine rol bazlı modern SVG ikonlar ve renk temaları entegre edildi (Süper Yönetici için Taç, Güvenlik Analisti için Tehdit Radarı, Denetçi için Adalet Terazisi, Operatör için Sunucu Terminali, Salt Okunur için Göz ikonu).
+  - **Duyarlı ve Kompakt Üst Başlık Optimizasyonu**: Başlık çubuğu yüksekliği, EPS sayacı, buton boyutları ve fontlar optimize edildi; farklı pencere boyutlarında sayfa taşmasını engelleyen duyarlı medya sorguları eklendi.
+  - **Genişletilmiş Alt Menüler İçin Yan Menü Kaydırma Onarımı**: Yan menüye bağımsız ve ince kaydırma çubuğu (`overflow-y: auto`) eklenerek alt menüler açıldığında alt kısımdaki menü öğelerinin ekran dışına taşması ve ulaşılamaması sorunu giderildi.
+
 - **v1.5.10** (Ayarlar Alt Menüsü Bölüm İzolasyonu ve Odaklı Modüler Görünüm):
   - **İzole Ayarlar Bölüm Görünümü**: Ayarlar sayfası tek parça kaydırmalı yapıdan çıkarılarak modüler ve odaklı tekil bölüm görünümüne (`displaySettingsSection()`) dönüştürüldü. Yan menüden veya yapışkan hap bardan herhangi bir alt menü seçildiğinde (KamuSM, Dinleyiciler, HTTPS & TLS, FQDN, Önbellek, Active Directory, MFA, Saklama, SMTP) sayfada yalnızca ilgili ayar paneli gösterilir (`.settings-panel-single`), diğer bölümler gizlenir ve sayfa kaydırma karmaşası sonlandırılır.
   - **Genişletilmiş Alt Menü ve Hap Bar Hedefleri**: Yan menü alt grubuna ve sayfa içi yapışkan hap bara "Tüm Ayarlar" (`all`) ve "MFA & TOTP Güvenliği" (`setting-section-mfa`) seçenekleri dahil edildi.

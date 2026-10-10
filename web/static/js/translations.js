@@ -3,7 +3,7 @@ const translations = {
     tr: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.5.10",
+        app_version: "v1.5.11",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         nav_sub_all: "Tüm Ayarlar",
@@ -337,7 +337,7 @@ const translations = {
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.5.10",
+        app_version: "v1.5.11",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         nav_sub_all: "All Settings",

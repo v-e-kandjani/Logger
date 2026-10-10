@@ -260,6 +260,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.11** (Multi-Format Certificate File Upload (.crt, .pfx, .pem), Role Logo Badges & Header Layout Optimization):
+  - **Direct Multi-Format Certificate Upload with PFX Password Support**: Replaced raw PEM textareas with direct file uploads (`.crt`, `.pfx`, `.pem`, `.p12`). Native PKCS#12 decoding automatically decrypts password-protected PFX archives into leaf certificates, intermediate chains, and private keys. Single-file PEM bundles and standalone cert + key pairs are parsed seamlessly.
+  - **Active User Role Identity Badges**: Integrated dynamic role-specific SVG logos and color themes for the authenticated user in the top right header (Crown for Super Administrator, Threat Radar for Security Analyst, Scale of Justice for Auditor, Server Rack for Operator, and Eye for Read Only).
+  - **Responsive Header & Compact Topbar Scaling**: Streamlined header padding, font sizes, EPS counter, and action buttons. Responsive media queries dynamically adjust elements to guarantee optimal visibility across all screen and window sizes without layout overflow.
+  - **Sidebar Scroll Fix for Extended Submenus**: Added a dedicated sleek scroll container (`overflow-y: auto; scrollbar-width: thin;`) to the sidebar navigation menu, ensuring all menu items remain fully accessible when submenus are expanded.
+
 - **v1.5.10** (Isolated Settings Section Tab Navigation & Submenu Scope Display):
   - **Isolated Settings Section Display**: Transformed the Settings page from a vertically scrolled monolithic view into an isolated, dedicated modular section view (`displaySettingsSection()`). When selecting any settings submenu item (e.g., KamuSM, Ingestion, HTTPS & TLS, FQDN, Cache, Active Directory, MFA, Retention, SMTP), only the target configuration panel is rendered on the page (`.settings-panel-single`) while extraneous sections are cleanly hidden without auto-scrolling jitter.
   - **Full-Breadth Settings Subnav Navigation**: Added dedicated "All Settings" (`all`) and "MFA & TOTP Governance" (`setting-section-mfa`) navigation targets across both the sidebar collapsible submenu and the in-pane sticky glassmorphic pill bar.

@@ -126,7 +126,7 @@ func (h *Handler) handleHTTPSGenerateCert(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// handleHTTPSUploadCert accepts and activates custom TLS certificate and private key
+// handleHTTPSUploadCert accepts and activates custom TLS certificate and private key (.crt, .pem, .pfx, .p12)
 func (h *Handler) handleHTTPSUploadCert(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -135,19 +135,26 @@ func (h *Handler) handleHTTPSUploadCert(w http.ResponseWriter, r *http.Request) 
 
 	var certData []byte
 	var keyData []byte
+	var filename string
+	var pfxPassword string
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "multipart/form-data") {
 		// Multipart file upload
-		if err := r.ParseMultipartForm(10 * 1024 * 1024); err != nil {
+		if err := r.ParseMultipartForm(15 * 1024 * 1024); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Failed parsing multipart upload: " + err.Error()})
 			return
 		}
 
-		certFile, _, err := r.FormFile("certificate")
+		pfxPassword = strings.TrimSpace(r.FormValue("pfx_password"))
+
+		certFile, certHeader, err := r.FormFile("certificate")
 		if err == nil {
 			defer certFile.Close()
 			certData, _ = io.ReadAll(certFile)
+			if certHeader != nil {
+				filename = certHeader.Filename
+			}
 		}
 
 		keyFile, _, err := r.FormFile("private_key")
@@ -158,8 +165,10 @@ func (h *Handler) handleHTTPSUploadCert(w http.ResponseWriter, r *http.Request) 
 	} else {
 		// JSON payload containing PEM text
 		var req struct {
-			CertPEM string `json:"cert_pem"`
-			KeyPEM  string `json:"key_pem"`
+			CertPEM     string `json:"cert_pem"`
+			KeyPEM      string `json:"key_pem"`
+			Filename    string `json:"filename"`
+			PFXPassword string `json:"pfx_password"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON body"})
@@ -167,10 +176,12 @@ func (h *Handler) handleHTTPSUploadCert(w http.ResponseWriter, r *http.Request) 
 		}
 		certData = []byte(req.CertPEM)
 		keyData = []byte(req.KeyPEM)
+		filename = req.Filename
+		pfxPassword = strings.TrimSpace(req.PFXPassword)
 	}
 
-	if len(certData) == 0 || len(keyData) == 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Both certificate (.crt/.pem) and private key (.key/.pem) are required"})
+	if len(certData) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Certificate file (.crt/.pem/.pfx/.p12) is required"})
 		return
 	}
 
@@ -182,7 +193,7 @@ func (h *Handler) handleHTTPSUploadCert(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	meta, err := h.httpsMgr.UploadCertificate(ctx, certData, keyData)
+	meta, err := h.httpsMgr.UploadCertificate(ctx, certData, keyData, filename, pfxPassword)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Certificate validation failed: " + err.Error()})
 		return

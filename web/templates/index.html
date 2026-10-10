@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=3.1">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=3.2">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.10</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.11</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -152,19 +152,29 @@
                         <button class="lang-btn" id="lang-btn-en" onclick="i18n.setLanguage('en')">🇬🇧 EN</button>
                     </div>
 
-                    <button class="btn btn-primary" id="btn-open-custom-export" data-i18n="btn_custom_export">Özel Aralık İndir & Mühürle</button>
-                    <button class="btn btn-outline" id="btn-manual-archive" data-i18n="btn_manual_archive">Create Archive Now</button>
+                    <button class="btn btn-primary btn-top-compact" id="btn-open-custom-export">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span class="btn-label-long" data-i18n="btn_custom_export">Özel Aralık İndir & Mühürle</span>
+                        <span class="btn-label-short" style="display: none;">Özel İndir</span>
+                    </button>
+                    <button class="btn btn-outline btn-top-compact" id="btn-manual-archive">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                        <span class="btn-label-long" data-i18n="btn_manual_archive">Arşiv Oluştur</span>
+                        <span class="btn-label-short" style="display: none;">Arşivle</span>
+                    </button>
                     <div class="rate-counter">
-                        <span class="label" data-i18n="ingestion_rate">Ingestion Rate</span>
+                        <span class="label" data-i18n="ingestion_rate">Ingestion</span>
                         <span class="value" id="current-eps">0 EPS</span>
                     </div>
                     <div class="user-profile-badge">
-                        <span class="user-avatar">🛡️</span>
+                        <div class="user-avatar-badge role-superadmin" id="current-user-avatar">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        </div>
                         <div class="user-info">
                             <span class="user-name" id="current-user-name">admin</span>
                             <span class="user-role" id="current-user-role">Super Administrator</span>
                         </div>
-                        <button class="btn btn-outline text-red" id="btn-logout" data-i18n="sign_out" style="padding: 4px 10px; font-size: 12px; margin-left: 6px;">Sign Out</button>
+                        <button class="btn btn-outline text-red" id="btn-logout" data-i18n="sign_out" style="padding: 3px 8px; font-size: 11px; margin-left: 4px;">Sign Out</button>
                     </div>
                 </div>
             </header>
@@ -1304,24 +1314,31 @@
                                     </button>
                                 </div>
 
-                                <!-- Option B: Upload Custom Certificate & Key -->
+                                <!-- Option B: Upload Custom Certificate & Key (.crt, .pfx, .pem, .p12) -->
                                 <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; background: rgba(34, 197, 94, 0.04);">
                                     <h4 style="margin: 0 0 10px 0; font-size: 0.9rem; color: #4ade80; display: flex; align-items: center; gap: 6px;">
                                         <span>📤</span> Upload Custom Enterprise / CA Certificate
                                     </h4>
                                     <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">
-                                        Upload official certificates issued by your enterprise CA, Let's Encrypt, DigiCert, or Sectigo.
+                                        Upload official certificates (.crt, .pfx, .pem, .p12). Bundles and PFX containers are unpacked automatically.
                                     </p>
                                     <div class="form-group">
-                                        <label>Certificate PEM (.crt / .pem)</label>
-                                        <textarea class="input mono-code" id="cert-upload-cert" rows="3" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>
+                                        <label>Certificate File (.crt, .pfx, .pem, .p12)</label>
+                                        <input type="file" class="input" id="cert-upload-file" accept=".crt,.pem,.pfx,.p12,.cer" style="padding: 7px 10px; cursor: pointer;">
+                                        <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;" id="cert-file-help">
+                                            Select your certificate file (.crt/.pem) or PFX/P12 container
+                                        </span>
                                     </div>
-                                    <div class="form-group">
-                                        <label>Private Key PEM (.key / .pem)</label>
-                                        <textarea class="input mono-code" id="cert-upload-key" rows="3" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>
+                                    <div class="form-group" id="cert-pfx-pass-group" style="display: none;">
+                                        <label>PFX / P12 Password <span style="font-weight: 400; color: var(--text-muted);">(Leave blank if none)</span></label>
+                                        <input type="password" class="input" id="cert-upload-pfx-pass" placeholder="Password (leave empty if not encrypted)">
+                                    </div>
+                                    <div class="form-group" id="cert-key-file-group">
+                                        <label>Private Key File (.key, .pem) <span style="font-weight: 400; color: var(--text-muted);">(Optional if included in bundle/PFX)</span></label>
+                                        <input type="file" class="input" id="cert-upload-key-file" accept=".key,.pem" style="padding: 7px 10px; cursor: pointer;">
                                     </div>
                                     <button class="btn btn-outline" id="btn-upload-cert" style="width: 100%; margin-top: 6px;">
-                                        📤 Install &amp; Hot-Swap Certificate
+                                        📤 Upload &amp; Activate Certificate
                                     </button>
                                 </div>
                             </div>
@@ -1497,12 +1514,12 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.10</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.11</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">16926af</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">b3fdde2</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-10</div>
                     </div>
                     <div class="stat-card">
@@ -2512,7 +2529,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.10"></script>
-    <script src="/static/js/app.js?v=1.5.10"></script>
+    <script src="/static/js/translations.js?v=1.5.11"></script>
+    <script src="/static/js/app.js?v=1.5.11"></script>
 </body>
 </html>

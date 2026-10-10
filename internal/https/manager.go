@@ -1,6 +1,7 @@
 package https
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -23,6 +24,7 @@ import (
 	"time"
 
 	"github.com/syslog-platform/logger/internal/database/postgres"
+	"golang.org/x/crypto/pkcs12"
 )
 
 const (
@@ -342,19 +344,114 @@ func (m *Manager) generateSelfSignedLocked(ctx context.Context, commonName strin
 	return string(certPEM), string(keyPEM), meta, nil
 }
 
-// UploadCertificate parses and activates an uploaded custom certificate and private key
-func (m *Manager) UploadCertificate(ctx context.Context, certBytes, keyBytes []byte) (*CertMetadata, error) {
+// ProcessCertificateData normalizes and decodes raw uploaded certificate files (.crt, .pem, .pfx, .p12).
+// If a PFX/P12 archive is provided, it extracts the certificates and private key using the optional password.
+// If a PEM/CRT bundle containing both certificate and key is provided, it cleanly separates them.
+func ProcessCertificateData(certBytes, keyBytes []byte, filename, pfxPassword string) ([]byte, []byte, error) {
+	lowerName := strings.ToLower(filename)
+	isPFX := strings.HasSuffix(lowerName, ".pfx") || strings.HasSuffix(lowerName, ".p12")
+
+	// If not identified by extension, check if it's binary ASN.1 / PKCS#12 (not starting with -----BEGIN)
+	if !isPFX && len(certBytes) > 4 && certBytes[0] == 0x30 && !strings.Contains(string(certBytes[:min(64, len(certBytes))]), "-----BEGIN") {
+		isPFX = true
+	}
+
+	if isPFX {
+		// Attempt pkcs12 decoding
+		blocks, err := pkcs12.ToPEM(certBytes, pfxPassword)
+		if err != nil {
+			// If ToPEM failed, try pkcs12.Decode as direct fallback
+			priv, cert, errDec := pkcs12.Decode(certBytes, pfxPassword)
+			if errDec != nil {
+				return nil, nil, fmt.Errorf("failed decoding PFX/P12: %w (verify password)", err)
+			}
+			var cBuf, kBuf bytes.Buffer
+			pem.Encode(&cBuf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+			keyDER, errK := x509.MarshalPKCS8PrivateKey(priv)
+			if errK != nil {
+				return nil, nil, fmt.Errorf("marshal PFX private key: %w", errK)
+			}
+			pem.Encode(&kBuf, &pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
+			return cBuf.Bytes(), kBuf.Bytes(), nil
+		}
+
+		var certBuf bytes.Buffer
+		var keyBuf bytes.Buffer
+		for _, b := range blocks {
+			if strings.Contains(b.Type, "CERTIFICATE") {
+				pem.Encode(&certBuf, b)
+			} else if strings.Contains(b.Type, "KEY") {
+				pem.Encode(&keyBuf, b)
+			}
+		}
+
+		if certBuf.Len() == 0 || keyBuf.Len() == 0 {
+			priv, cert, errDec := pkcs12.Decode(certBytes, pfxPassword)
+			if errDec != nil {
+				return nil, nil, fmt.Errorf("PFX archive does not contain both certificate and private key")
+			}
+			certBuf.Reset()
+			keyBuf.Reset()
+			pem.Encode(&certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+			keyDER, errK := x509.MarshalPKCS8PrivateKey(priv)
+			if errK != nil {
+				return nil, nil, fmt.Errorf("marshal PFX private key: %w", errK)
+			}
+			pem.Encode(&keyBuf, &pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
+		}
+		return certBuf.Bytes(), keyBuf.Bytes(), nil
+	}
+
+	// PEM / CRT handling
+	// Case A: certBytes contains both CERTIFICATE and KEY blocks (PEM bundle)
+	if len(keyBytes) == 0 {
+		var certBuf bytes.Buffer
+		var keyBuf bytes.Buffer
+		rest := certBytes
+		hasCert := false
+		hasKey := false
+		for {
+			var block *pem.Block
+			block, rest = pem.Decode(rest)
+			if block == nil {
+				break
+			}
+			if strings.Contains(block.Type, "CERTIFICATE") {
+				pem.Encode(&certBuf, block)
+				hasCert = true
+			} else if strings.Contains(block.Type, "KEY") {
+				pem.Encode(&keyBuf, block)
+				hasKey = true
+			}
+		}
+		if hasCert && hasKey {
+			return certBuf.Bytes(), keyBuf.Bytes(), nil
+		}
+		return nil, nil, fmt.Errorf("private key (.key) is required when uploading a standalone certificate file")
+	}
+
+	// Case B: Separate certificate and key files
+	return certBytes, keyBytes, nil
+}
+
+// UploadCertificate parses and activates an uploaded custom certificate and private key (.crt, .pem, .pfx, .p12)
+func (m *Manager) UploadCertificate(ctx context.Context, certBytes, keyBytes []byte, filename, pfxPassword string) (*CertMetadata, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	cert, meta, err := parseKeyPair(certBytes, keyBytes)
+	parsedCert, parsedKey, err := ProcessCertificateData(certBytes, keyBytes, filename, pfxPassword)
+	if err != nil {
+		return nil, fmt.Errorf("process certificate data: %w", err)
+	}
+
+	cert, meta, err := parseKeyPair(parsedCert, parsedKey)
 	if err != nil {
 		return nil, fmt.Errorf("validate certificate/key pair: %w", err)
 	}
 
-	// Persist to database
-	_ = m.pgDB.SaveSetting(ctx, SettingHTTPSCertPEM, string(certBytes))
-	_ = m.pgDB.SaveSetting(ctx, SettingHTTPSKeyPEM, string(keyBytes))
+	// Persist to database in clean PEM format
+	_ = m.pgDB.SaveSetting(ctx, SettingHTTPSCertPEM, string(parsedCert))
+	_ = m.pgDB.SaveSetting(ctx, SettingHTTPSKeyPEM, string(parsedKey))
 
 	// Hot-swap certificate
 	m.currentCert.Store(cert)

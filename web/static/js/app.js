@@ -47,6 +47,7 @@ async function initAuthSession() {
             const roleEl = document.getElementById('current-user-role');
             if (nameEl) nameEl.textContent = data.username;
             if (roleEl) roleEl.textContent = data.role || 'Operator';
+            renderUserRoleBadge(data.role || 'Operator');
         }
 
         // Only Super Administrators can see or manage users & system upgrades
@@ -61,6 +62,40 @@ async function initAuthSession() {
     } catch (e) {
         window.location.href = '/login';
     }
+}
+
+// Dynamically render logo / badge for the active user's type/role
+function renderUserRoleBadge(role) {
+    const avatarEl = document.getElementById('current-user-avatar');
+    if (!avatarEl) return;
+
+    avatarEl.className = 'user-avatar-badge';
+    let iconSvg = '';
+    const r = (role || '').toLowerCase();
+
+    if (r.includes('super') || r.includes('admin')) {
+        avatarEl.classList.add('role-superadmin');
+        // Star Crown icon for Super Administrator
+        iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+    } else if (r.includes('analyst') || r.includes('security')) {
+        avatarEl.classList.add('role-analyst');
+        // Threat Radar / Crosshair icon for Security Analyst
+        iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>`;
+    } else if (r.includes('audit')) {
+        avatarEl.classList.add('role-auditor');
+        // Balance scales of compliance for Auditor
+        iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v18M3 9l9-6 9 6M6 15l-3-6h6l-3 6a3 3 0 0 1-6 0zm12 0l-3-6h6l-3 6a3 3 0 0 1-6 0z"/></svg>`;
+    } else if (r.includes('operator')) {
+        avatarEl.classList.add('role-operator');
+        // Network server terminal icon for Operator
+        iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>`;
+    } else {
+        avatarEl.classList.add('role-readonly');
+        // View-only eye icon for Read Only user
+        iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    }
+
+    avatarEl.innerHTML = iconSvg;
 
     const logoutBtn = document.getElementById('btn-logout');
     if (logoutBtn) {
@@ -2017,15 +2052,34 @@ function initHTTPSAndFQDNManagement() {
         });
     }
 
-    // 3. Custom Certificate Upload
+    // 3. Custom Certificate Upload (.crt, .pfx, .pem, .p12)
+    const certFileInput = document.getElementById('cert-upload-file');
+    const keyFileInput = document.getElementById('cert-upload-key-file');
+    const pfxPassGroup = document.getElementById('cert-pfx-pass-group');
+    const keyFileGroup = document.getElementById('cert-key-file-group');
+
+    if (certFileInput) {
+        certFileInput.addEventListener('change', () => {
+            const file = certFileInput.files[0];
+            if (file) {
+                const ext = file.name.split('.').pop().toLowerCase();
+                if (ext === 'pfx' || ext === 'p12') {
+                    if (pfxPassGroup) pfxPassGroup.style.display = 'block';
+                    if (keyFileGroup) keyFileGroup.style.display = 'none';
+                } else {
+                    if (pfxPassGroup) pfxPassGroup.style.display = 'none';
+                    if (keyFileGroup) keyFileGroup.style.display = 'block';
+                }
+            }
+        });
+    }
+
     const btnUploadCert = document.getElementById('btn-upload-cert');
     if (btnUploadCert) {
         btnUploadCert.addEventListener('click', async () => {
-            const certPem = document.getElementById('cert-upload-cert').value.trim();
-            const keyPem = document.getElementById('cert-upload-key').value.trim();
-
-            if (!certPem || !keyPem) {
-                alert('Please paste both Certificate PEM and Private Key PEM.');
+            const certFile = certFileInput?.files[0];
+            if (!certFile) {
+                alert('Please select a certificate file (.crt, .pem, .pfx, or .p12) to upload.');
                 return;
             }
 
@@ -2033,17 +2087,34 @@ function initHTTPSAndFQDNManagement() {
             btnUploadCert.textContent = 'Installing & Hot-Swapping Certificate...';
 
             try {
+                const formData = new FormData();
+                formData.append('certificate', certFile);
+
+                const keyFile = keyFileInput?.files[0];
+                if (keyFile) {
+                    formData.append('private_key', keyFile);
+                }
+
+                const pfxPass = document.getElementById('cert-upload-pfx-pass')?.value || '';
+                if (pfxPass) {
+                    formData.append('pfx_password', pfxPass);
+                }
+
                 const res = await fetch('/api/v1/settings/https/certificate/upload', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cert_pem: certPem, key_pem: keyPem })
+                    body: formData
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed uploading certificate');
 
                 alert('✓ Enterprise TLS certificate uploaded, validated, and hot-swapped successfully!');
-                document.getElementById('cert-upload-cert').value = '';
-                document.getElementById('cert-upload-key').value = '';
+                if (certFileInput) certFileInput.value = '';
+                if (keyFileInput) keyFileInput.value = '';
+                const pfxPassEl = document.getElementById('cert-upload-pfx-pass');
+                if (pfxPassEl) pfxPassEl.value = '';
+                if (pfxPassGroup) pfxPassGroup.style.display = 'none';
+                if (keyFileGroup) keyFileGroup.style.display = 'block';
+
                 await loadHTTPSSettings();
 
                 const redEl = document.getElementById('setting-https-redirect');
@@ -2058,7 +2129,7 @@ function initHTTPSAndFQDNManagement() {
                 alert('Failed uploading certificate: ' + e.message);
             } finally {
                 btnUploadCert.disabled = false;
-                btnUploadCert.textContent = '📤 Install & Hot-Swap Certificate';
+                btnUploadCert.textContent = '📤 Upload & Activate Certificate';
             }
         });
     }
