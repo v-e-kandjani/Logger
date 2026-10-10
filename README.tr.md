@@ -249,6 +249,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.16** (Çoklu Kiracı Log Arşiv İzolasyonu ve Kapsamlı Sayfa İçi Doküman Yerelleştirmesi):
+  - **Çoklu Kiracı 5651 Log Arşiv İzolasyonu**: Yasal log arşivleri (`log_archives.tenant_slug`) ve ClickHouse veri çekme sorguları kiracı bazında tamamen izole edildi. Saatlik otomatik arşivleme işçisi her dilimde etkinlik üreten kiracıları tespit ederek bağımsız kiracı arşivleri üretir.
+  - **Özel Aralık Dışa Aktarma ve İndirme Yetkilendirmesi**: Özel aralık (Custom Range Export) arşivleme talepleri, iş takibi ve arşiv indirme uç noktaları (`/api/v1/archives/{id}/download`, `/api/v1/archives/custom/...`) kiracı bağlamını sıkı şekilde doğrular. Çapraz kiracı indirmeleri HTTP 403 Forbidden ile engellenir.
+  - **Kiracı Kapsamlı Arşiv Tablosu**: Yasal arşivler tablosuna Kiracı sütunu ve çipi (`🏢 {tenant}`) eklendi; kenar çubuğundan kiracı seçimi değiştiğinde arşiv tablosu otomatik filtrelenir.
+  - **Kapsamlı Sayfa İçi Doküman ve Arayüz Yerelleştirmesi**: Dil değiştirildiğinde (TR / EN) çevrilmeyen modal dokümanları, form etiketleri, yer tutucular, donanım gereksinim kartları, tablo başlıkları, dinamik seçenekler ve boş durum mesajları seçili dile göre dinamik ve eksiksiz güncellenir.
+
 - **v1.5.15** (Çoklu Kiracı SIEM & SOC İzolasyonu, Kiracıya Özel Güvenlik Alarmları ve Canlı Tehdit Akışı):
   - **Çoklu Kiracı SIEM Alarm İzolasyonu**: SIEM alarmları (`siem_alerts.tenant_slug`) ve normalize edilmiş olaylar kiracı sahipliği taşır. Alarmlar, vaka sayıları, SOC metrikleri ve adli kanıt logları kiracılara göre tamamen izole edilmiştir.
   - **Kiracıya Özel Korelasyon Havuzları**: Kayan pencereli korelasyon motoru kova anahtarlarını `tenant::rule_id::group_val` olarak ayrıştırır. Kayan pencere eşikleri ve parola püskürtme sayaçları kiracı bazında çalışır; farklı kiracılar arasında eşik sızıntısı veya alarm tetiklenmesi kesin olarak önlenir.

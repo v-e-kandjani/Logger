@@ -103,6 +103,7 @@ type LogArchive struct {
 	TimestampEvidencePath   string     `json:"timestamp_evidence_path,omitempty"`
 	RetryCount              int        `json:"retry_count"`
 	LastError               string     `json:"last_error,omitempty"`
+	Tenant                  string     `json:"tenant"` // Multi-tenant isolation: tenant slug (e.g. "default", "1ware")
 	CreatedAt               time.Time  `json:"created_at"`
 }
 

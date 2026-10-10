@@ -84,11 +84,13 @@ CREATE TABLE IF NOT EXISTS log_archives (
     timestamp_evidence_path TEXT DEFAULT '',
     retry_count INT NOT NULL DEFAULT 0,
     last_error TEXT DEFAULT '',
+    tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_archives_timestamps ON log_archives(start_timestamp, end_timestamp);
 CREATE INDEX IF NOT EXISTS idx_archives_status ON log_archives(timestamp_status);
+CREATE INDEX IF NOT EXISTS idx_archives_tenant ON log_archives(tenant_slug);
 
 -- Audit Logs
 CREATE TABLE IF NOT EXISTS audit_logs (

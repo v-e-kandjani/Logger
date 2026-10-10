@@ -54,6 +54,7 @@ type ExportJobSnapshot struct {
 	Result      *CustomArchiveResult `json:"result,omitempty"`
 	DownloadURL string               `json:"download_url,omitempty"`
 	Error       string               `json:"error,omitempty"`
+	Options     CustomRangeOptions   `json:"options"`
 	CreatedAt   time.Time            `json:"created_at"`
 	CompletedAt *time.Time           `json:"completed_at,omitempty"`
 }
@@ -84,6 +85,7 @@ func (j *ExportJob) Snapshot() *ExportJobSnapshot {
 		Result:      j.Result,
 		DownloadURL: j.DownloadURL,
 		Error:       j.Error,
+		Options:     j.Options,
 		CreatedAt:   j.CreatedAt,
 		CompletedAt: j.CompletedAt,
 	}

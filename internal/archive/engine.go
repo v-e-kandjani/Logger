@@ -10,8 +10,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/google/uuid"
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
@@ -67,15 +69,34 @@ func (e *Engine) StartAutoArchiving(ctx context.Context, interval string, schedu
 							sliceStart.Format("2006-01-02 15:04:05"), sliceEnd.Format("15:04:05"))
 
 						sliceCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-						arch, err := e.CreateArchiveSlice(sliceCtx, sliceStart, sliceEnd)
-						cancel()
-
-						if err != nil {
-							log.Printf("[Archive Engine] Auto-archive error for slice %s: %v", sliceStart.Format(time.RFC3339), err)
-						} else {
-							log.Printf("[Archive Engine] Auto-archive completed: %s (Logs: %d, SHA-256: %s, Status: %s)",
-								arch.ArchiveName, arch.RecordCount, arch.HashValue, arch.TimestampStatus)
+						
+						// Query all distinct tenants that logged within this hour
+						tenants := []string{"default"}
+						tQuery := fmt.Sprintf("SELECT DISTINCT tenant FROM %s.syslog_events WHERE event_timestamp >= ? AND event_timestamp < ?", e.chClient.Database())
+						if tRows, err := e.chClient.QueryEvents(sliceCtx, tQuery, sliceStart, sliceEnd); err == nil && tRows != nil {
+							var found []string
+							for tRows.Next() {
+								var t string
+								if err := tRows.Scan(&t); err == nil && t != "" {
+									found = append(found, t)
+								}
+							}
+							tRows.Close()
+							if len(found) > 0 {
+								tenants = found
+							}
 						}
+
+						for _, t := range tenants {
+							arch, err := e.CreateArchiveSliceForTenant(sliceCtx, t, sliceStart, sliceEnd)
+							if err != nil {
+								log.Printf("[Archive Engine] Auto-archive error for tenant %s slice %s: %v", t, sliceStart.Format(time.RFC3339), err)
+							} else {
+								log.Printf("[Archive Engine] Auto-archive completed for tenant %s: %s (Logs: %d, SHA-256: %s, Status: %s)",
+									t, arch.ArchiveName, arch.RecordCount, arch.HashValue, arch.TimestampStatus)
+							}
+						}
+						cancel()
 					}
 				}
 			}
@@ -84,8 +105,17 @@ func (e *Engine) StartAutoArchiving(ctx context.Context, interval string, schedu
 }
 
 
-// CreateArchiveSlice queries an immutable time slice, writes deterministic JSONL.GZ, computes SHA-256, and submits to KamuSM
+// CreateArchiveSlice queries an immutable time slice for default tenant
 func (e *Engine) CreateArchiveSlice(ctx context.Context, start, end time.Time) (*models.LogArchive, error) {
+	return e.CreateArchiveSliceForTenant(ctx, "default", start, end)
+}
+
+// CreateArchiveSliceForTenant queries an immutable time slice for a specific tenant, writes deterministic JSONL.GZ, computes SHA-256, and submits to KamuSM
+func (e *Engine) CreateArchiveSliceForTenant(ctx context.Context, tenant string, start, end time.Time) (*models.LogArchive, error) {
+	if tenant == "" {
+		tenant = "default"
+	}
+
 	// Construct directory: /archive/YYYY/MM/DD/
 	dirPath := filepath.Join(
 		e.baseDir,
@@ -97,21 +127,42 @@ func (e *Engine) CreateArchiveSlice(ctx context.Context, start, end time.Time) (
 		return nil, fmt.Errorf("creating archive directory: %w", err)
 	}
 
-	archiveBaseName := fmt.Sprintf("logs-%s-%s", start.Format("20060102-150405"), end.Format("150405"))
+	var archiveBaseName string
+	if tenant == "default" {
+		archiveBaseName = fmt.Sprintf("logs-%s-%s", start.Format("20060102-150405"), end.Format("150405"))
+	} else {
+		archiveBaseName = fmt.Sprintf("logs-%s-%s-%s", tenant, start.Format("20060102-150405"), end.Format("150405"))
+	}
 	archiveFilePath := filepath.Join(dirPath, archiveBaseName+".jsonl.gz")
 
-	// Query ClickHouse for records strictly inside bounds
-	query := fmt.Sprintf(`
-		SELECT internal_id, event_timestamp, received_at, source_ip, source_port,
-		       transport_protocol, device_id, device_name, device_group, vendor,
-		       product, facility_code, facility, severity_code, severity,
-		       hostname, application_name, process_id, message_id, structured_data,
-		       message, raw_message, collector_node, parser_status, ingestion_timestamp
-		FROM %s.syslog_events
-		WHERE event_timestamp >= ? AND event_timestamp < ?
-		ORDER BY event_timestamp ASC, internal_id ASC`, e.chClient.Database())
+	// Query ClickHouse for records strictly inside bounds, filtered by tenant
+	var query string
+	var rows driver.Rows
+	var err error
 
-	rows, err := e.chClient.QueryEvents(ctx, query, start, end)
+	if tenant != "" && tenant != "all" && tenant != "*" {
+		query = fmt.Sprintf(`
+			SELECT internal_id, event_timestamp, received_at, source_ip, source_port,
+			       transport_protocol, device_id, device_name, device_group, vendor,
+			       product, facility_code, facility, severity_code, severity,
+			       hostname, application_name, process_id, message_id, structured_data,
+			       message, raw_message, collector_node, parser_status, ingestion_timestamp
+			FROM %s.syslog_events
+			WHERE event_timestamp >= ? AND event_timestamp < ? AND tenant = ?
+			ORDER BY event_timestamp ASC, internal_id ASC`, e.chClient.Database())
+		rows, err = e.chClient.QueryEvents(ctx, query, start, end, tenant)
+	} else {
+		query = fmt.Sprintf(`
+			SELECT internal_id, event_timestamp, received_at, source_ip, source_port,
+			       transport_protocol, device_id, device_name, device_group, vendor,
+			       product, facility_code, facility, severity_code, severity,
+			       hostname, application_name, process_id, message_id, structured_data,
+			       message, raw_message, collector_node, parser_status, ingestion_timestamp
+			FROM %s.syslog_events
+			WHERE event_timestamp >= ? AND event_timestamp < ?
+			ORDER BY event_timestamp ASC, internal_id ASC`, e.chClient.Database())
+		rows, err = e.chClient.QueryEvents(ctx, query, start, end)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("querying clickhouse for archive slice: %w", err)
 	}
@@ -184,6 +235,7 @@ func (e *Engine) CreateArchiveSlice(ctx context.Context, start, end time.Time) (
 		HashAlgorithm:   "SHA-256",
 		HashValue:       hashVal,
 		TimestampStatus: "PENDING",
+		Tenant:          tenant,
 	}
 
 	// Record in PostgreSQL catalog
@@ -227,6 +279,7 @@ type CustomRangeOptions struct {
 	Format    string    `json:"format"`     // "bundle" (zip with jsonl.gz + zd + sha256), "archive" (jsonl.gz), "csv"
 	Seal      bool      `json:"seal"`       // whether to apply cryptographic timestamp seal (.zd)
 	Register  bool      `json:"register"`   // whether to save in the system archives catalog
+	Tenant    string    `json:"tenant"`     // multi-tenant isolation scope
 }
 
 // CustomArchiveResult holds the paths and metadata for the generated export
@@ -300,15 +353,35 @@ func (e *Engine) CreateCustomRangeArchiveWithProgress(ctx context.Context, opts 
 	if opts.TimeField == "received_at" {
 		prefix = "logseal-rx"
 	}
-	baseName := fmt.Sprintf("%s-%s-%s", prefix, opts.Start.Format("20060102-150405"), opts.End.Format("20060102-150405"))
+
+	tenantScope := strings.TrimSpace(opts.Tenant)
+	if tenantScope == "all" || tenantScope == "*" {
+		tenantScope = ""
+	}
+
+	var baseName string
+	if tenantScope != "" && tenantScope != "default" {
+		baseName = fmt.Sprintf("%s-%s-%s-%s", prefix, tenantScope, opts.Start.Format("20060102-150405"), opts.End.Format("20060102-150405"))
+	} else {
+		baseName = fmt.Sprintf("%s-%s-%s", prefix, opts.Start.Format("20060102-150405"), opts.End.Format("20060102-150405"))
+	}
 
 	// Pre-count total matching events for progress percentage calculation
 	var estimatedCount uint64
-	countQuery := fmt.Sprintf("SELECT count() FROM %s.syslog_events WHERE %s >= ? AND %s <= ?", e.chClient.Database(), timeCol, timeCol)
+	var countQuery string
+	var countRows driver.Rows
+	var err error
+	if tenantScope != "" {
+		countQuery = fmt.Sprintf("SELECT count() FROM %s.syslog_events WHERE %s >= ? AND %s <= ? AND tenant = ?", e.chClient.Database(), timeCol, timeCol)
+		countRows, err = e.chClient.QueryEvents(ctx, countQuery, opts.Start, opts.End, tenantScope)
+	} else {
+		countQuery = fmt.Sprintf("SELECT count() FROM %s.syslog_events WHERE %s >= ? AND %s <= ?", e.chClient.Database(), timeCol, timeCol)
+		countRows, err = e.chClient.QueryEvents(ctx, countQuery, opts.Start, opts.End)
+	}
+
 	notify("QUERYING", 8, fmt.Sprintf("ClickHouse veritabanı taranıyor (%s - %s, referans: %s)...", opts.Start.Format("2006-01-02 15:04:05"), opts.End.Format("2006-01-02 15:04:05"), opts.TimeField), 0, 0)
 
-	countRows, err := e.chClient.QueryEvents(ctx, countQuery, opts.Start, opts.End)
-	if err == nil {
+	if err == nil && countRows != nil {
 		if countRows.Next() {
 			_ = countRows.Scan(&estimatedCount)
 		}
@@ -321,17 +394,31 @@ func (e *Engine) CreateCustomRangeArchiveWithProgress(ctx context.Context, opts 
 		notify("EXTRACTING", 15, fmt.Sprintf("ClickHouse üzerinde toplam %d adet log kaydı bulundu. Veri akışı ve sıkıştırma başlatılıyor...", estimatedCount), 0, int64(estimatedCount))
 	}
 
-	query := fmt.Sprintf(`
-		SELECT internal_id, event_timestamp, received_at, source_ip, source_port,
-		       transport_protocol, device_id, device_name, device_group, vendor,
-		       product, facility_code, facility, severity_code, severity,
-		       hostname, application_name, process_id, message_id, structured_data,
-		       message, raw_message, collector_node, parser_status, ingestion_timestamp
-		FROM %s.syslog_events
-		WHERE %s >= ? AND %s <= ?
-		ORDER BY %s ASC, internal_id ASC`, e.chClient.Database(), timeCol, timeCol, timeCol)
-
-	rows, err := e.chClient.QueryEvents(ctx, query, opts.Start, opts.End)
+	var query string
+	var rows driver.Rows
+	if tenantScope != "" {
+		query = fmt.Sprintf(`
+			SELECT internal_id, event_timestamp, received_at, source_ip, source_port,
+			       transport_protocol, device_id, device_name, device_group, vendor,
+			       product, facility_code, facility, severity_code, severity,
+			       hostname, application_name, process_id, message_id, structured_data,
+			       message, raw_message, collector_node, parser_status, ingestion_timestamp
+			FROM %s.syslog_events
+			WHERE %s >= ? AND %s <= ? AND tenant = ?
+			ORDER BY %s ASC, internal_id ASC`, e.chClient.Database(), timeCol, timeCol, timeCol)
+		rows, err = e.chClient.QueryEvents(ctx, query, opts.Start, opts.End, tenantScope)
+	} else {
+		query = fmt.Sprintf(`
+			SELECT internal_id, event_timestamp, received_at, source_ip, source_port,
+			       transport_protocol, device_id, device_name, device_group, vendor,
+			       product, facility_code, facility, severity_code, severity,
+			       hostname, application_name, process_id, message_id, structured_data,
+			       message, raw_message, collector_node, parser_status, ingestion_timestamp
+			FROM %s.syslog_events
+			WHERE %s >= ? AND %s <= ?
+			ORDER BY %s ASC, internal_id ASC`, e.chClient.Database(), timeCol, timeCol, timeCol)
+		rows, err = e.chClient.QueryEvents(ctx, query, opts.Start, opts.End)
+	}
 	if err != nil {
 		notify("FAILED", 0, "ClickHouse sorgu hatası: "+err.Error(), 0, int64(estimatedCount))
 		return nil, fmt.Errorf("querying clickhouse for custom range: %w", err)
@@ -619,6 +706,10 @@ Doğrulama için TÜBİTAK KamuSM doğrulayıcı veya LogSeal dahili doğrulayı
 	// Register in PostgreSQL catalog if requested
 	if opts.Register {
 		notify("REGISTERING", 97, "Arşiv kaydı PostgreSQL sistem kataloğuna tescil ediliyor...", recordCount, int64(estimatedCount))
+		regTenant := opts.Tenant
+		if regTenant == "" || regTenant == "all" || regTenant == "*" {
+			regTenant = "default"
+		}
 		rec := &models.LogArchive{
 			ArchiveName:           baseName,
 			StartTimestamp:        opts.Start,
@@ -630,6 +721,7 @@ Doğrulama için TÜBİTAK KamuSM doğrulayıcı veya LogSeal dahili doğrulayı
 			HashValue:             hashVal,
 			TimestampStatus:       tsStatus,
 			TimestampEvidencePath: evidencePath,
+			Tenant:                regTenant,
 		}
 		if err := e.pgDB.CreateArchiveRecord(ctx, rec); err == nil {
 			result.ArchiveRecord = rec

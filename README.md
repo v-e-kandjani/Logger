@@ -260,6 +260,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.16** (Multi-Tenant Log Archive Isolation & Comprehensive Page Document Localization):
+  - **Multi-Tenant 5651 Log Archive Isolation**: Extended legal log archives (`log_archives.tenant_slug`) and ClickHouse extraction queries to strictly isolate archive records per customer/tenant. Hourly auto-archiving automatically generates discrete archives for each active tenant in that time slice.
+  - **Custom Range Export & Download Authorization**: Custom export requests, job tracking, and download endpoints (`/api/v1/archives/{id}/download`, `/api/v1/archives/custom/...`) enforce tenant scoping. Attempted downloads across tenant boundaries are strictly rejected with HTTP 403 Forbidden.
+  - **Tenant-Scoped Archives Table & Context Refresh**: Added Tenant column and chip (`🏢 {tenant}`) to the legal archives table; changing tenant context in the sidebar instantly filters available archives.
+  - **Comprehensive Page Document & UI Localization**: Fixed untranslated text when switching languages (TR / EN). Modals (Add Edge Node, Activate Edge Node, New Tenant), hardware specification reference cards, table headers, form placeholders, helper labels, dynamic interval options, and empty states now update dynamically and accurately based on the active language.
+
 - **v1.5.15** (Multi-Tenant SIEM & SOC Isolation, Tenant-Scoped Security Alerts & Live Threat Streams):
   - **Multi-Tenant SIEM Alert Isolation**: Extended SIEM alerts (`siem_alerts.tenant_slug`) and normalized events to carry tenant ownership. Alerts, incident counts, SOC metrics, and forensic evidence are strictly segregated by tenant.
   - **Tenant-Scoped Correlation Buckets**: Updated the sliding-window correlation engine to key evaluation buckets by `tenant::rule_id::group_val`. Sliding window thresholds and password-spraying counters are strictly isolated per tenant, preventing cross-tenant threshold leaks or cross-tenant alert triggers.

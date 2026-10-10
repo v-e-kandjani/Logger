@@ -300,7 +300,7 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	unreg, _ := h.pgDB.ListUnregisteredSources(ctx)
-	archives, _ := h.pgDB.ListArchives(ctx, 5)
+	archives, _ := h.pgDB.ListArchives(ctx, tenantScope, 5)
 
 	// Query today's logs and storage metrics from ClickHouse (cached for 10s to prevent disk query thrashing)
 	var countToday uint64
@@ -1121,7 +1121,8 @@ func (h *Handler) handleArchives(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := contextWithTimeout(r, 5*time.Second)
 	defer cancel()
 
-	archives, err := h.pgDB.ListArchives(ctx, 50)
+	tenantScope := h.tenantScope(r)
+	archives, err := h.pgDB.ListArchives(ctx, tenantScope, 50)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1159,7 +1160,14 @@ func (h *Handler) handleCreateArchiveNow(w http.ResponseWriter, r *http.Request)
 	end := time.Now().UTC()
 	start := end.Add(-1 * time.Hour)
 
-	arch, err := h.archEngine.CreateArchiveSlice(ctx, start, end)
+	tenantScope := h.tenantScope(r)
+	var arch *models.LogArchive
+	var err error
+	if tenantScope != "" {
+		arch, err = h.archEngine.CreateArchiveSliceForTenant(ctx, tenantScope, start, end)
+	} else {
+		arch, err = h.archEngine.CreateArchiveSlice(ctx, start, end)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1195,6 +1203,12 @@ func (h *Handler) handleDownloadArchive(w http.ResponseWriter, r *http.Request) 
 	arch, err := h.pgDB.GetArchive(ctx, id)
 	if err != nil {
 		http.Error(w, "archive not found: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	scope := h.tenantScope(r)
+	if scope != "" && arch.Tenant != "" && arch.Tenant != scope {
+		http.Error(w, "forbidden: archive belongs to a different tenant", http.StatusForbidden)
 		return
 	}
 
@@ -1379,6 +1393,7 @@ func (h *Handler) handleExportCustomStart(w http.ResponseWriter, r *http.Request
 		Format    string `json:"format"`
 		Seal      *bool  `json:"seal"`
 		Register  *bool  `json:"register"`
+		Tenant    string `json:"tenant"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request payload: "+err.Error(), http.StatusBadRequest)
@@ -1420,6 +1435,11 @@ func (h *Handler) handleExportCustomStart(w http.ResponseWriter, r *http.Request
 		register = *req.Register
 	}
 
+	tenantScope := h.tenantScope(r)
+	if tenantScope == "" && req.Tenant != "" {
+		tenantScope = req.Tenant
+	}
+
 	opts := archive.CustomRangeOptions{
 		Start:     startTime,
 		End:       endTime,
@@ -1427,6 +1447,7 @@ func (h *Handler) handleExportCustomStart(w http.ResponseWriter, r *http.Request
 		Format:    format,
 		Seal:      seal,
 		Register:  register,
+		Tenant:    tenantScope,
 	}
 
 	job, err := h.exportJobMgr.StartJob(opts)
@@ -1465,6 +1486,18 @@ func (h *Handler) handleExportCustomProgress(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
+
+	job, ok := h.exportJobMgr.GetJob(jobID)
+	if !ok {
+		http.Error(w, "job not found", http.StatusNotFound)
+		return
+	}
+	snapCheck := job.Snapshot()
+	scope := h.tenantScope(r)
+	if scope != "" && snapCheck.Options.Tenant != "" && snapCheck.Options.Tenant != scope {
+		http.Error(w, "forbidden: export job belongs to another tenant", http.StatusForbidden)
+		return
+	}
 
 	subCh, unsubscribe, ok := h.exportJobMgr.Subscribe(jobID)
 	if !ok {
@@ -1515,7 +1548,14 @@ func (h *Handler) handleExportCustomStatus(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSON(w, http.StatusOK, job.Snapshot())
+	snap := job.Snapshot()
+	scope := h.tenantScope(r)
+	if scope != "" && snap.Options.Tenant != "" && snap.Options.Tenant != scope {
+		http.Error(w, "forbidden: export job belongs to another tenant", http.StatusForbidden)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, snap)
 }
 
 func (h *Handler) handleExportCustomDownload(w http.ResponseWriter, r *http.Request) {
@@ -1532,6 +1572,12 @@ func (h *Handler) handleExportCustomDownload(w http.ResponseWriter, r *http.Requ
 	}
 
 	snap := job.Snapshot()
+	scope := h.tenantScope(r)
+	if scope != "" && snap.Options.Tenant != "" && snap.Options.Tenant != scope {
+		http.Error(w, "forbidden: export job belongs to another tenant", http.StatusForbidden)
+		return
+	}
+
 	if snap.Status != archive.JobStatusCompleted {
 		http.Error(w, "export job not completed yet (current: "+string(snap.Status)+")", http.StatusBadRequest)
 		return
@@ -1671,6 +1717,11 @@ func (h *Handler) handleExportCustomRange(w http.ResponseWriter, r *http.Request
 		format = "bundle"
 	}
 
+	tenantScope := h.tenantScope(r)
+	if tenantScope == "" && r.URL.Query().Get("tenant") != "" {
+		tenantScope = r.URL.Query().Get("tenant")
+	}
+
 	opts := archive.CustomRangeOptions{
 		Start:     startTime,
 		End:       endTime,
@@ -1678,6 +1729,7 @@ func (h *Handler) handleExportCustomRange(w http.ResponseWriter, r *http.Request
 		Format:    format,
 		Seal:      seal,
 		Register:  register,
+		Tenant:    tenantScope,
 	}
 
 	// Use generous 15-minute timeout for synchronous fallback requests

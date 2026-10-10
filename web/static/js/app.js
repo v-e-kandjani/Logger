@@ -693,18 +693,25 @@ window.onboardDevice = (ip, sample = '', sourceObj = null) => {
 // Archives & KamuSM Zaman Damgası
 async function loadArchives() {
     const tbody = document.getElementById('archives-body');
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center">Loading archives...</td></tr>';
+    if (!tbody) return;
+    const t = (k, fb) => (window.i18n ? window.i18n.t(k) : (fb || k));
+    tbody.innerHTML = `<tr><td colspan="10" class="text-center">${t('archives_loading', 'Loading archives...')}</td></tr>`;
     try {
-        const res = await fetch('/api/v1/archives');
+        let url = '/api/v1/archives';
+        if (currentTenantContext && currentTenantContext !== 'all' && currentTenantContext !== '*') {
+            url += `?tenant=${encodeURIComponent(currentTenantContext)}`;
+        }
+        const res = await fetch(url);
         const list = await res.json();
         if (!list || list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center">No archives generated yet. Click "Create Archive Now" above.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center">${t('archives_empty', 'No archives generated yet. Click "Create Archive Now" above.')}</td></tr>`;
             return;
         }
 
         tbody.innerHTML = list.map(a => `
             <tr>
                 <td><strong>${escapeHtml(a.archive_name)}</strong></td>
+                <td><span class="badge badge-outline" style="font-size: 0.78rem;">🏢 ${escapeHtml(a.tenant || 'default')}</span></td>
                 <td>${new Date(a.start_timestamp).toISOString().substring(0, 16)}</td>
                 <td>${new Date(a.end_timestamp).toISOString().substring(0, 16)}</td>
                 <td>${Number(a.record_count).toLocaleString()}</td>
@@ -719,21 +726,21 @@ async function loadArchives() {
                 <td>
                     <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                         <a href="/api/v1/archives/download?id=${a.id}&type=bundle" class="btn btn-primary" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download complete compliance package (.zip containing logs, .zd evidence, and .sha256 hash)" download>
-                            📦 Bundle (.zip)
+                            ${t('btn_bundle_dl', '📦 Bundle (.zip)')}
                         </a>
                         <a href="/api/v1/archives/download?id=${a.id}&type=archive" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download raw compressed logs (.jsonl.gz)" download>
-                            📄 Logs (.gz)
+                            ${t('btn_logs_dl', '📄 Logs (.gz)')}
                         </a>
                         ${a.timestamp_status === 'STAMPED' && a.timestamp_evidence_path ? `
                         <a href="/api/v1/archives/download?id=${a.id}&type=evidence" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download legal proof / KamuSM timestamp (.zd)" download>
-                            🛡️ Evidence (.zd)
+                            ${t('btn_evidence_dl', '🛡️ Evidence (.zd)')}
                         </a>` : ''}
                     </div>
                 </td>
             </tr>
         `).join('');
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-red">Failed: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-red">${t('archives_failed', 'Failed to load archives')}: ${e.message}</td></tr>`;
     }
 }
 
@@ -2562,6 +2569,22 @@ window.onLanguageChanged = (lang) => {
     if (window.i18n) {
         window.i18n.applyTranslations();
     }
+    if (typeof renderTenantSidebarMeta === 'function') {
+        renderTenantSidebarMeta();
+    }
+    // Re-render active dynamic tab immediately upon language switch
+    if (activeTab === 'settings') {
+        if (typeof loadEdgeNodes === 'function') loadEdgeNodes();
+        if (typeof loadTenants === 'function') loadTenants();
+    } else if (activeTab === 'archives') {
+        if (typeof loadArchives === 'function') loadArchives();
+    } else if (activeTab === 'dashboard') {
+        if (typeof loadDashboard === 'function') loadDashboard();
+    } else if (activeTab === 'siem') {
+        if (typeof loadSIEMAlerts === 'function') loadSIEMAlerts();
+    } else if (activeTab === 'devices') {
+        if (typeof loadDevices === 'function') loadDevices();
+    }
 };
 
 function formatBytes(bytes, decimals = 2) {
@@ -2789,7 +2812,8 @@ function initCustomExportModal() {
                         time_field: timeField,
                         format: format,
                         seal: seal,
-                        register: register
+                        register: register,
+                        tenant: (currentTenantContext && currentTenantContext !== 'all' && currentTenantContext !== '*') ? currentTenantContext : ''
                     })
                 });
 
@@ -5289,6 +5313,7 @@ function refreshTenantScopedViews() {
     try { loadEdgeNodes(); } catch (e) { /* noop */ }
     if (typeof loadDevices === 'function') { try { loadDevices(); } catch (e) { /* noop */ } }
     if (typeof loadUnregisteredSources === 'function') { try { loadUnregisteredSources(); } catch (e) { /* noop */ } }
+    if (typeof loadArchives === 'function') { try { loadArchives(); } catch (e) { /* noop */ } }
     // Dashboard counters: reset EPS baseline and poll immediately
     lastPacketCount = 0;
     fetch('/api/v1/dashboard').then(r => r.ok ? r.json() : null).then(data => {
@@ -5575,6 +5600,7 @@ async function deleteTenant(slug, name) {
 async function loadEdgeNodes() {
     const tbody = document.getElementById('tbody-edge-nodes');
     if (!tbody) return;
+    const t = (k, fb) => (window.i18n ? window.i18n.t(k) : (fb || k));
 
     try {
         let url = '/api/v1/settings/edge/nodes';
@@ -5592,21 +5618,21 @@ async function loadEdgeNodes() {
                 <tr>
                     <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 32px 16px;">
                         <div style="font-size: 28px; margin-bottom: 8px;">🌐</div>
-                        <div style="font-weight: 600; margin-bottom: 4px;">Seçili bağlamda kayıtlı Edge Proxy düğümü bulunmuyor.</div>
-                        <div style="font-size: 0.82rem; margin-bottom: 12px;">Uzak ofis veya müşteri ağlarınızdan güvenli log aktarımı için yeni bir düğüm ekleyin.</div>
-                        <button class="btn btn-primary" onclick="openAddEdgeNodeModal()">+ Yeni Proxy Düğümü Ekle</button>
+                        <div style="font-weight: 600; margin-bottom: 4px;">${t('edge_empty_title', 'Seçili bağlamda kayıtlı Edge Proxy düğümü bulunmuyor.')}</div>
+                        <div style="font-size: 0.82rem; margin-bottom: 12px;">${t('edge_empty_desc', 'Uzak ofis veya müşteri ağlarınızdan güvenli log aktarımı için yeni bir düğüm ekleyin.')}</div>
+                        <button class="btn btn-primary" onclick="openAddEdgeNodeModal()">${t('btn_add_edge_node', '+ Yeni Proxy Düğümü Ekle')}</button>
                     </td>
                 </tr>`;
             return;
         }
 
         const intervals = [
-            { id: 'online', label: 'online (Anlık / Gerçek Zamanlı)' },
-            { id: 'every 60 second', label: 'every 60 second (60 saniyede bir)' },
-            { id: 'every 5 min', label: 'every 5 min (5 dakikada bir)' },
-            { id: 'every 15 min', label: 'every 15 min (15 dakikada bir)' },
-            { id: 'every 30 min', label: 'every 30 min (30 dakikada bir)' },
-            { id: 'every hour', label: 'every hour (Her saat başı)' }
+            { id: 'online', label: t('opt_sync_online', 'online (Anlık / Gerçek Zamanlı)') },
+            { id: 'every 60 second', label: t('opt_sync_60s', 'every 60 second (60 saniyede bir)') },
+            { id: 'every 5 min', label: t('opt_sync_5m', 'every 5 min (5 dakikada bir)') },
+            { id: 'every 15 min', label: t('opt_sync_15m', 'every 15 min (15 dakikada bir)') },
+            { id: 'every 30 min', label: t('opt_sync_30m', 'every 30 min (30 dakikada bir)') },
+            { id: 'every hour', label: t('opt_sync_1h', 'every hour (Her saat başı)') }
         ];
 
         let html = '';
@@ -5614,23 +5640,23 @@ async function loadEdgeNodes() {
             const isOnline = (n.status === 'online');
             const isPending = (n.status === 'pending');
             const statusBadge = isOnline
-                ? `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-weight: 600;">● Online</span>`
+                ? `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-weight: 600;">${t('status_online', '● Online')}</span>`
                 : (isPending
-                    ? `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);">⏳ Bekliyor</span>`
-                    : `<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3);">○ Çevrimdışı</span>`);
+                    ? `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);">${t('status_pending', '⏳ Bekliyor')}</span>`
+                    : `<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3);">${t('status_offline', '○ Çevrimdışı')}</span>`);
 
             const isActPending = (n.activation_status === 'pending_activation');
             const actBadge = isActPending
-                ? `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); font-size: 0.72rem;">⏳ Etkinleştirme Bekliyor</span></div>`
-                : `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-size: 0.72rem;">✓ Aktif</span></div>`;
+                ? `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); font-size: 0.72rem;">${t('act_pending_badge', '⏳ Etkinleştirme Bekliyor')}</span></div>`
+                : `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-size: 0.72rem;">${t('act_active_badge', '✓ Aktif')}</span></div>`;
 
-            let lastSeenStr = 'Henüz bağlanmadı';
+            let lastSeenStr = t('not_connected_yet', 'Henüz bağlanmadı');
             if (n.last_seen_at) {
                 const diffMs = Date.now() - new Date(n.last_seen_at).getTime();
                 const diffSec = Math.floor(diffMs / 1000);
-                if (diffSec < 60) lastSeenStr = `${diffSec} sn önce`;
-                else if (diffSec < 3600) lastSeenStr = `${Math.floor(diffSec / 60)} dk önce`;
-                else lastSeenStr = `${Math.floor(diffSec / 3600)} sa önce`;
+                if (diffSec < 60) lastSeenStr = `${diffSec} ${t('ago_sec', 'sn önce')}`;
+                else if (diffSec < 3600) lastSeenStr = `${Math.floor(diffSec / 60)} ${t('ago_min', 'dk önce')}`;
+                else lastSeenStr = `${Math.floor(diffSec / 3600)} ${t('ago_hour', 'sa önce')}`;
             }
             if (n.last_ip) {
                 lastSeenStr += ` <span style="color: var(--text-muted); font-size: 0.75rem;">(${escapeHtml(n.last_ip)})</span>`;
@@ -5649,7 +5675,7 @@ async function loadEdgeNodes() {
 
             const adminInfo = (n.admin_name || n.admin_username)
                 ? `<div><strong>${escapeHtml(n.admin_name || n.admin_username)}</strong> <span style="font-size: 0.72rem; color: var(--text-muted);">(@${escapeHtml(n.admin_username || '')})</span></div><div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(n.admin_email || '')}</div>`
-                : `<span style="color: var(--text-muted); font-size: 0.75rem;">Atanmadı</span>`;
+                : `<span style="color: var(--text-muted); font-size: 0.75rem;">${t('unassigned', 'Atanmadı')}</span>`;
 
             html += `
                 <tr>
@@ -5658,7 +5684,7 @@ async function loadEdgeNodes() {
                             <span style="font-size: 1.1rem;">🖥️</span>
                             <div>
                                 <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(n.name)}</div>
-                                <div style="font-size: 0.72rem; color: var(--text-muted);">v${escapeHtml(n.version || '1.5.13')}</div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted);">v${escapeHtml(n.version || '1.5.16')}</div>
                             </div>
                         </div>
                     </td>
@@ -5678,7 +5704,7 @@ async function loadEdgeNodes() {
                     <td>
                         <div style="display: flex; align-items: center; gap: 6px;">
                             <code style="font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">${escapeHtml(maskedToken)}</code>
-                            <button class="btn btn-outline" style="padding: 2px 6px; font-size: 0.72rem;" onclick="copyToClipboard('${n.token}', 'Token panoya kopyalandı!')" title="Tokenı Kopyala">
+                            <button class="btn btn-outline" style="padding: 2px 6px; font-size: 0.72rem;" onclick="copyToClipboard('${n.token}', '${t('token_copied', 'Token panoya kopyalandı!')}')" title="Copy Token">
                                 📋
                             </button>
                         </div>
@@ -5686,16 +5712,16 @@ async function loadEdgeNodes() {
                     <td style="text-align: right;">
                         <div style="display: flex; justify-content: flex-end; gap: 6px;">
                             ${isActPending ? `
-                            <button class="btn btn-primary" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openActivateEdgeNodeModal('${n.id}')" title="Düğümü Etkinleştir &amp; Ön-Yapılandır">
-                                ⚡ Etkinleştir
+                            <button class="btn btn-primary" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openActivateEdgeNodeModal('${n.id}')" title="Activate &amp; Configure">
+                                ${t('btn_activate', '⚡ Etkinleştir')}
                             </button>` : `
-                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openActivateEdgeNodeModal('${n.id}')" title="Düğüm Yöneticisi ve LDAP Ayarları">
-                                ⚙️ Ayarlar
+                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openActivateEdgeNodeModal('${n.id}')" title="Settings">
+                                ${t('btn_settings', '⚙️ Ayarlar')}
                             </button>`}
-                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="copyNodeInstallCurl('${n.token}', '${escapeHtml(n.name)}')" title="Tek satırlık Linux kurulum komutu">
-                                💻 Kurulum
+                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="copyNodeInstallCurl('${n.token}', '${escapeHtml(n.name)}')" title="Install Command">
+                                ${t('btn_install', '💻 Kurulum')}
                             </button>
-                            <button class="btn btn-outline text-danger" style="padding: 3px 8px; font-size: 0.75rem;" onclick="deleteEdgeNode('${n.id}', '${escapeHtml(n.name)}')" title="Düğümü Sil">
+                            <button class="btn btn-outline text-danger" style="padding: 3px 8px; font-size: 0.75rem;" onclick="deleteEdgeNode('${n.id}', '${escapeHtml(n.name)}')" title="Delete Node">
                                 🗑️
                             </button>
                         </div>

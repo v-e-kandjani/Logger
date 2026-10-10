@@ -329,15 +329,19 @@ func (db *DB) UpdateDeviceTypeAndVendor(ctx context.Context, id uuid.UUID, vendo
 
 // LogArchive methods
 func (db *DB) CreateArchiveRecord(ctx context.Context, a *models.LogArchive) error {
+	tenant := a.Tenant
+	if tenant == "" {
+		tenant = "default"
+	}
 	query := `
 		INSERT INTO log_archives (archive_name, start_timestamp, end_timestamp, record_count,
-		                          archive_path, archive_size, hash_algorithm, hash_value, timestamp_status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		                          archive_path, archive_size, hash_algorithm, hash_value, timestamp_status, tenant_slug)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id, created_at`
 
 	return db.pool.QueryRow(ctx, query,
 		a.ArchiveName, a.StartTimestamp, a.EndTimestamp, a.RecordCount,
-		a.ArchivePath, a.ArchiveSize, a.HashAlgorithm, a.HashValue, a.TimestampStatus,
+		a.ArchivePath, a.ArchiveSize, a.HashAlgorithm, a.HashValue, a.TimestampStatus, tenant,
 	).Scan(&a.ID, &a.CreatedAt)
 }
 
@@ -355,16 +359,36 @@ func (db *DB) UpdateArchiveTimestamp(ctx context.Context, id uuid.UUID, status, 
 	return err
 }
 
-func (db *DB) ListArchives(ctx context.Context, limit int) ([]models.LogArchive, error) {
-	query := `
-		SELECT id, archive_name, start_timestamp, end_timestamp, record_count, archive_path,
-		       archive_size, hash_algorithm, hash_value, timestamp_status, timestamp_request_time,
-		       timestamp_completion_time, timestamp_evidence_path, retry_count, last_error, created_at
-		FROM log_archives
-		ORDER BY start_timestamp DESC
-		LIMIT $1`
+func (db *DB) ListArchives(ctx context.Context, tenant string, limit int) ([]models.LogArchive, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	var query string
+	var rows pgx.Rows
+	var err error
 
-	rows, err := db.pool.Query(ctx, query, limit)
+	if tenant != "" && tenant != "all" && tenant != "*" {
+		query = `
+			SELECT id, archive_name, start_timestamp, end_timestamp, record_count, archive_path,
+			       archive_size, hash_algorithm, hash_value, timestamp_status, timestamp_request_time,
+			       timestamp_completion_time, timestamp_evidence_path, retry_count, last_error, created_at,
+			       COALESCE(tenant_slug, 'default')
+			FROM log_archives
+			WHERE COALESCE(tenant_slug, 'default') = $1
+			ORDER BY start_timestamp DESC
+			LIMIT $2`
+		rows, err = db.pool.Query(ctx, query, tenant, limit)
+	} else {
+		query = `
+			SELECT id, archive_name, start_timestamp, end_timestamp, record_count, archive_path,
+			       archive_size, hash_algorithm, hash_value, timestamp_status, timestamp_request_time,
+			       timestamp_completion_time, timestamp_evidence_path, retry_count, last_error, created_at,
+			       COALESCE(tenant_slug, 'default')
+			FROM log_archives
+			ORDER BY start_timestamp DESC
+			LIMIT $1`
+		rows, err = db.pool.Query(ctx, query, limit)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -377,6 +401,7 @@ func (db *DB) ListArchives(ctx context.Context, limit int) ([]models.LogArchive,
 			&a.ID, &a.ArchiveName, &a.StartTimestamp, &a.EndTimestamp, &a.RecordCount, &a.ArchivePath,
 			&a.ArchiveSize, &a.HashAlgorithm, &a.HashValue, &a.TimestampStatus, &a.TimestampRequestTime,
 			&a.TimestampCompletionTime, &a.TimestampEvidencePath, &a.RetryCount, &a.LastError, &a.CreatedAt,
+			&a.Tenant,
 		)
 		if err != nil {
 			return nil, err
@@ -390,7 +415,8 @@ func (db *DB) GetArchive(ctx context.Context, id uuid.UUID) (*models.LogArchive,
 	query := `
 		SELECT id, archive_name, start_timestamp, end_timestamp, record_count, archive_path,
 		       archive_size, hash_algorithm, hash_value, timestamp_status, timestamp_request_time,
-		       timestamp_completion_time, timestamp_evidence_path, retry_count, last_error, created_at
+		       timestamp_completion_time, timestamp_evidence_path, retry_count, last_error, created_at,
+		       COALESCE(tenant_slug, 'default')
 		FROM log_archives
 		WHERE id = $1`
 
@@ -399,6 +425,7 @@ func (db *DB) GetArchive(ctx context.Context, id uuid.UUID) (*models.LogArchive,
 		&a.ID, &a.ArchiveName, &a.StartTimestamp, &a.EndTimestamp, &a.RecordCount, &a.ArchivePath,
 		&a.ArchiveSize, &a.HashAlgorithm, &a.HashValue, &a.TimestampStatus, &a.TimestampRequestTime,
 		&a.TimestampCompletionTime, &a.TimestampEvidencePath, &a.RetryCount, &a.LastError, &a.CreatedAt,
+		&a.Tenant,
 	)
 	if err != nil {
 		return nil, err
@@ -831,6 +858,10 @@ func (db *DB) EnsureSIEMSchema(ctx context.Context) error {
 	CREATE INDEX IF NOT EXISTS idx_siem_alerts_rule_status ON siem_alerts(rule_id, status);
 	ALTER TABLE siem_alerts ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
 	CREATE INDEX IF NOT EXISTS idx_siem_alerts_tenant ON siem_alerts(tenant_slug);
+
+	-- Multi-Tenant Log Archives Isolation
+	ALTER TABLE log_archives ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
+	CREATE INDEX IF NOT EXISTS idx_log_archives_tenant ON log_archives(tenant_slug);
 
 	-- Multi-Factor Authentication (MFA) & Active Directory (AD) Schema Migrations
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_source VARCHAR(32) DEFAULT 'local';
@@ -1494,6 +1525,10 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 	-- Device ownership for tenant-scoped data views
 	ALTER TABLE devices ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
 	CREATE INDEX IF NOT EXISTS idx_devices_tenant ON devices(tenant_slug);
+
+	-- Multi-Tenant Log Archives
+	ALTER TABLE log_archives ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
+	CREATE INDEX IF NOT EXISTS idx_log_archives_tenant ON log_archives(tenant_slug);
 
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) DEFAULT 'default';
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS is_tenant_admin BOOLEAN DEFAULT FALSE;

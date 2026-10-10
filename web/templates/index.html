@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.15</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.16</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -696,15 +696,16 @@
                     <table class="data-table" id="archives-table">
                         <thead>
                             <tr>
-                                <th>Archive Name</th>
-                                <th>Start Time</th>
-                                <th>End Time</th>
-                                <th>Records</th>
-                                <th>Size</th>
-                                <th>SHA-256 Hash</th>
-                                <th>Timestamp Status</th>
-                                <th>Evidence (.zd)</th>
-                                <th>Downloads & Compliance Bundle</th>
+                                <th data-i18n="th_archive_name">Archive Name</th>
+                                <th data-i18n="th_tenant">Tenant</th>
+                                <th data-i18n="th_start_time">Start Time</th>
+                                <th data-i18n="th_end_time">End Time</th>
+                                <th data-i18n="th_records">Records</th>
+                                <th data-i18n="th_size">Size</th>
+                                <th data-i18n="th_hash">SHA-256 Hash</th>
+                                <th data-i18n="th_timestamp_status">Timestamp Status</th>
+                                <th data-i18n="th_evidence">Evidence (.zd)</th>
+                                <th data-i18n="th_downloads">Downloads & Compliance Bundle</th>
                             </tr>
                         </thead>
                         <tbody id="archives-body">
@@ -1565,26 +1566,26 @@
                                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
                                     <div style="background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 6px; border-left: 3px solid #eab308;">
                                         <div style="font-weight: 600; font-size: 0.85rem; color: #facc15; display: flex; align-items: center; gap: 6px;">
-                                            <span>⚠️</span> <span>Minimum Sistem Gereksinimi (Temel Seviye)</span>
+                                            <span>⚠️</span> <span data-i18n="edge_specs_min_title">Minimum Sistem Gereksinimi (Temel Seviye)</span>
                                         </div>
                                         <ul style="font-size: 0.8rem; margin: 8px 0 0 16px; padding: 0; color: var(--text-color); line-height: 1.55;">
-                                            <li><strong>İşlemci (CPU):</strong> 1 vCPU (x86_64 veya arm64)</li>
-                                            <li><strong>Bellek (RAM):</strong> 512 MB RAM (minimum boş alan)</li>
-                                            <li><strong>Disk Alanı:</strong> 2 GB boş disk (Yerel SQLite spool kuyruğu)</li>
-                                            <li><strong>Ağ Bağlantısı:</strong> Giden HTTPS (Port 8443 / 443) erişimi</li>
-                                            <li><strong>İşletim Sistemi:</strong> Ubuntu 22.04 LTS / 24.04 LTS / 26.04 Minimal</li>
+                                            <li data-i18n-html="edge_specs_min_cpu"><strong>İşlemci (CPU):</strong> 1 vCPU (x86_64 veya arm64)</li>
+                                            <li data-i18n-html="edge_specs_min_ram"><strong>Bellek (RAM):</strong> 512 MB RAM (minimum boş alan)</li>
+                                            <li data-i18n-html="edge_specs_min_disk"><strong>Disk Alanı:</strong> 2 GB boş disk (Yerel SQLite spool kuyruğu)</li>
+                                            <li data-i18n-html="edge_specs_min_net"><strong>Ağ Bağlantısı:</strong> Giden HTTPS (Port 8443 / 443) erişimi</li>
+                                            <li data-i18n-html="edge_specs_min_os"><strong>İşletim Sistemi:</strong> Ubuntu 22.04 LTS / 24.04 LTS / 26.04 Minimal</li>
                                         </ul>
                                     </div>
                                     <div style="background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 6px; border-left: 3px solid #22c55e;">
                                         <div style="font-weight: 600; font-size: 0.85rem; color: #4ade80; display: flex; align-items: center; gap: 6px;">
-                                            <span>🚀</span> <span>Önerilen Prodüksiyon Konfigürasyonu (&gt; 5.000 EPS)</span>
+                                            <span>🚀</span> <span data-i18n="edge_specs_rec_title">Önerilen Prodüksiyon Konfigürasyonu (&gt; 5.000 EPS)</span>
                                         </div>
                                         <ul style="font-size: 0.8rem; margin: 8px 0 0 16px; padding: 0; color: var(--text-color); line-height: 1.55;">
-                                            <li><strong>İşlemci (CPU):</strong> 2 - 4 vCPU</li>
-                                            <li><strong>Bellek (RAM):</strong> 1 GB - 2 GB RAM</li>
-                                            <li><strong>Disk Alanı:</strong> 10 GB - 20 GB NVMe / SSD (Geniş spool tamponu)</li>
-                                            <li><strong>Ağ Bant Genişliği:</strong> 100 Mbps+ yerel ağ, 10 Mbps+ İnternet</li>
-                                            <li><strong>Kapasite:</strong> 10.000+ EPS sürekli aktarım kapasitesi</li>
+                                            <li data-i18n-html="edge_specs_rec_cpu"><strong>İşlemci (CPU):</strong> 2 - 4 vCPU</li>
+                                            <li data-i18n-html="edge_specs_rec_ram"><strong>Bellek (RAM):</strong> 1 GB - 2 GB RAM</li>
+                                            <li data-i18n-html="edge_specs_rec_disk"><strong>Disk Alanı:</strong> 10 GB - 20 GB NVMe / SSD (Geniş spool tamponu)</li>
+                                            <li data-i18n-html="edge_specs_rec_net"><strong>Ağ Bant Genişliği:</strong> 100 Mbps+ yerel ağ, 10 Mbps+ İnternet</li>
+                                            <li data-i18n-html="edge_specs_rec_cap"><strong>Kapasite:</strong> 10.000+ EPS sürekli aktarım kapasitesi</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -1697,7 +1698,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.15</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.16</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -2730,7 +2731,7 @@
                     <div style="background: rgba(56, 189, 248, 0.1); padding: 8px; border-radius: 8px; font-size: 1.3rem;">🌐</div>
                     <div>
                         <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_add_edge_title">Yeni Edge Proxy Düğümü Ekle</h3>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">MSSP &amp; Uzak Ağ Syslog Forwarder İstemcisi</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="modal_add_edge_type">MSSP &amp; Uzak Ağ Syslog Forwarder İstemcisi</div>
                     </div>
                 </div>
                 <button class="btn-close" onclick="closeAddEdgeNodeModal()">&times;</button>
@@ -2743,44 +2744,44 @@
 
                     <div class="form-group" style="margin-bottom: 12px;">
                         <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_edge_node_name">Düğüm Adı (Node Name)</span> <span class="text-danger">*</span></label>
-                        <input type="text" class="input" id="edge-new-node-name" placeholder="Örn: Istanbul-Merkez-FW veya Ankara-Sube" required>
-                        <small style="color: var(--text-muted); font-size: 0.75rem;">Uzak ağı veya sunucuyu tanımlayan benzersiz isim.</small>
+                        <input type="text" class="input" id="edge-new-node-name" data-i18n-placeholder="ph_edge_node_name" placeholder="Örn: Istanbul-Merkez-FW veya Ankara-Sube" required>
+                        <small style="color: var(--text-muted); font-size: 0.75rem;" data-i18n="help_edge_node_name">Uzak ağı veya sunucuyu tanımlayan benzersiz isim.</small>
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                         <div class="form-group">
                             <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_edge_tenant_name">Müşteri / Organizasyon (Tenant)</span></label>
-                            <input type="text" class="input" id="edge-new-tenant-name" placeholder="Örn: default veya acme-corp" value="default">
+                            <input type="text" class="input" id="edge-new-tenant-name" data-i18n-placeholder="ph_edge_tenant_name" placeholder="Örn: default veya acme-corp" value="default">
                         </div>
                         <div class="form-group">
                             <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_edge_act_status">Aktivasyon Durumu</span></label>
                             <select class="input" id="edge-new-act-status">
-                                <option value="active" selected>Aktif (Hemen Kullanıma Açık)</option>
-                                <option value="pending_activation">Etkinleştirme Bekliyor (Web Siparişi / Beklemede)</option>
+                                <option value="active" data-i18n="opt_status_active" selected>Aktif (Hemen Kullanıma Açık)</option>
+                                <option value="pending_activation" data-i18n="opt_status_pending_act">Etkinleştirme Bekliyor (Web Siparişi / Beklemede)</option>
                             </select>
                         </div>
                     </div>
 
                     <!-- Optional Node Administrator fields for preconfiguration -->
                     <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-                        <div style="font-weight: 600; font-size: 0.82rem; color: var(--accent-primary); margin-bottom: 8px;">👤 Düğüm Yöneticisi Bilgileri (İsteğe Bağlı)</div>
+                        <div style="font-weight: 600; font-size: 0.82rem; color: var(--accent-primary); margin-bottom: 8px;" data-i18n="sec_node_admin_info">👤 Düğüm Yöneticisi Bilgileri (İsteğe Bağlı)</div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
                             <div class="form-group">
-                                <label style="font-size: 0.78rem;">Yönetici Adı</label>
-                                <input type="text" class="input" id="edge-new-admin-name" placeholder="Örn: Ali Veli">
+                                <label style="font-size: 0.78rem;" data-i18n="lbl_admin_name">Yönetici Adı</label>
+                                <input type="text" class="input" id="edge-new-admin-name" data-i18n-placeholder="ph_admin_name" placeholder="Örn: Ali Veli">
                             </div>
                             <div class="form-group">
-                                <label style="font-size: 0.78rem;">E-Posta</label>
-                                <input type="email" class="input" id="edge-new-admin-email" placeholder="ali@musteri.com">
+                                <label style="font-size: 0.78rem;" data-i18n="lbl_admin_email">E-Posta</label>
+                                <input type="email" class="input" id="edge-new-admin-email" data-i18n-placeholder="ph_admin_email" placeholder="ali@musteri.com">
                             </div>
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             <div class="form-group">
-                                <label style="font-size: 0.78rem;">Kullanıcı Adı</label>
-                                <input type="text" class="input" id="edge-new-admin-username" placeholder="ali_admin">
+                                <label style="font-size: 0.78rem;" data-i18n="lbl_admin_username">Kullanıcı Adı</label>
+                                <input type="text" class="input" id="edge-new-admin-username" data-i18n-placeholder="ph_admin_username" placeholder="ali_admin">
                             </div>
                             <div class="form-group">
-                                <label style="font-size: 0.78rem;">Başlangıç Şifresi</label>
+                                <label style="font-size: 0.78rem;" data-i18n="lbl_admin_pass">Başlangıç Şifresi</label>
                                 <input type="password" class="input" id="edge-new-admin-pass" placeholder="••••••••">
                             </div>
                         </div>
@@ -2789,26 +2790,26 @@
                     <div class="form-group" style="margin-bottom: 14px;">
                         <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_edge_sync_interval">Log Gönderim Zamanlaması (Cloud Schedule)</span></label>
                         <select class="input" id="edge-new-sync-interval">
-                            <option value="online" selected>online (Anlık / Gerçek Zamanlı - Varsayılan)</option>
-                            <option value="every 60 second">every 60 second (Her 60 saniyede bir)</option>
-                            <option value="every 5 min">every 5 min (Her 5 dakikada bir)</option>
-                            <option value="every 15 min">every 15 min (Her 15 dakikada bir)</option>
-                            <option value="every 30 min">every 30 min (Her 30 dakikada bir)</option>
-                            <option value="every hour">every hour (Her saat başı)</option>
+                            <option value="online" data-i18n="opt_sync_online" selected>online (Anlık / Gerçek Zamanlı - Varsayılan)</option>
+                            <option value="every 60 second" data-i18n="opt_sync_60s">every 60 second (Her 60 saniyede bir)</option>
+                            <option value="every 5 min" data-i18n="opt_sync_5m">every 5 min (Her 5 dakikada bir)</option>
+                            <option value="every 15 min" data-i18n="opt_sync_15m">every 15 min (Her 15 dakikada bir)</option>
+                            <option value="every 30 min" data-i18n="opt_sync_30m">every 30 min (Her 30 dakikada bir)</option>
+                            <option value="every hour" data-i18n="opt_sync_1h">every hour (Her saat başı)</option>
                         </select>
-                        <small style="color: var(--text-muted); font-size: 0.75rem;">İstemci bu ayarı buluttan otomatik alır. İleride doğrudan tablodan değiştirilebilir.</small>
+                        <small style="color: var(--text-muted); font-size: 0.75rem;" data-i18n="help_edge_sync_interval">İstemci bu ayarı buluttan otomatik alır. İleride doğrudan tablodan değiştirilebilir.</small>
                     </div>
                 </div>
 
                 <!-- Success Box showing token and 1-line installation curl command -->
                 <div id="edge-create-success-box" style="display: none;">
                     <div class="alert alert-success" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid var(--accent-green); padding: 12px; border-radius: 6px; margin-bottom: 16px;">
-                        <strong style="color: #4ade80;">✓ Düğüm Başarıyla Oluşturuldu!</strong>
-                        <div style="font-size: 0.82rem; margin-top: 4px; color: var(--text-muted);">Uzak Ubuntu sunucusunda aşağıdaki tek satırlık komutu çalıştırarak proxy'yi hemen başlatabilirsiniz.</div>
+                        <strong style="color: #4ade80;" data-i18n="edge_created_success">✓ Düğüm Başarıyla Oluşturuldu!</strong>
+                        <div style="font-size: 0.82rem; margin-top: 4px; color: var(--text-muted);" data-i18n="edge_created_success_desc">Uzak Ubuntu sunucusunda aşağıdaki tek satırlık komutu çalıştırarak proxy'yi hemen başlatabilirsiniz.</div>
                     </div>
 
                     <div class="form-group" style="margin-bottom: 12px;">
-                        <label style="font-size: 0.82rem; font-weight: 600;">Oluşturulan Erişim Tokenı (Token)</label>
+                        <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="lbl_result_token">Oluşturulan Erişim Tokenı (Token)</label>
                         <div style="display: flex; gap: 8px;">
                             <input type="text" class="input mono-code" id="edge-result-token" readonly style="background: rgba(0,0,0,0.3); font-size: 0.8rem;">
                             <button class="btn btn-outline" onclick="copyEdgeResultToken()" title="Kopyala">📋</button>
@@ -2816,10 +2817,10 @@
                     </div>
 
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <label style="font-size: 0.82rem; font-weight: 600;">Tek Satırda Otomatik Ubuntu Kurulum Komutu</label>
+                        <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="lbl_result_curl">Tek Satırda Otomatik Ubuntu Kurulum Komutu</label>
                         <div style="position: relative;">
                             <textarea class="input mono-code" id="edge-result-curl" readonly rows="3" style="background: rgba(0,0,0,0.3); font-size: 0.78rem; resize: none;"></textarea>
-                            <button class="btn btn-primary" onclick="copyEdgeResultCurl()" style="position: absolute; right: 8px; bottom: 8px; font-size: 0.75rem; padding: 4px 10px;">
+                            <button class="btn btn-primary" onclick="copyEdgeResultCurl()" style="position: absolute; right: 8px; bottom: 8px; font-size: 0.75rem; padding: 4px 10px;" data-i18n="btn_copy_curl">
                                 📋 Komutu Kopyala
                             </button>
                         </div>
@@ -2827,7 +2828,7 @@
                 </div>
             </div>
             <div class="modal-footer" id="modal-add-edge-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="btn btn-outline" onclick="closeAddEdgeNodeModal()" data-i18n="btn_cancel">Kapat</button>
+                <button class="btn btn-outline" onclick="closeAddEdgeNodeModal()" data-i18n="btn_close">Kapat</button>
                 <button class="btn btn-primary" id="btn-save-edge-node" onclick="submitAddEdgeNode()" data-i18n="btn_create_node">Oluştur ve Token Al</button>
             </div>
         </div>
@@ -2841,7 +2842,7 @@
                     <div style="background: rgba(34, 197, 94, 0.1); padding: 8px; border-radius: 8px; font-size: 1.3rem;">⚡</div>
                     <div>
                         <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_act_edge_title">Düğüm Etkinleştirme &amp; Ön-Konfigürasyon</h3>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);" id="act-edge-node-subtitle">Uzak Proxy Yönetici Hesabı ve LDAP Ayarları</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);" id="act-edge-node-subtitle" data-i18n="modal_act_edge_sub">Uzak Proxy Yönetici Hesabı ve LDAP Ayarları</div>
                     </div>
                 </div>
                 <button class="btn-close" onclick="closeActivateEdgeNodeModal()">&times;</button>
@@ -2850,32 +2851,32 @@
                 <input type="hidden" id="act-edge-node-id">
                 
                 <div class="alert alert-info" style="margin-bottom: 16px; font-size: 0.82rem; background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--accent-primary); padding: 10px 14px; border-radius: 6px;">
-                    <strong>Düğüm Adı:</strong> <span id="act-edge-node-name-disp" style="font-weight: 600;">-</span> | 
-                    <strong>Kiracı:</strong> <span id="act-edge-tenant-disp" style="font-weight: 600;">-</span>
+                    <strong data-i18n="act_lbl_node_name">Düğüm Adı:</strong> <span id="act-edge-node-name-disp" style="font-weight: 600;">-</span> | 
+                    <strong data-i18n="act_lbl_tenant">Kiracı:</strong> <span id="act-edge-tenant-disp" style="font-weight: 600;">-</span>
                 </div>
 
                 <!-- 1. Node Admin User Preconfiguration -->
                 <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px; background: rgba(255,255,255,0.02);">
                     <h4 style="margin: 0 0 10px 0; font-size: 0.9rem; color: var(--accent-primary); display: flex; align-items: center; gap: 6px;">
-                        <span>👤</span> <span>Düğüm Yöneticisi Hesabı (Node Admin Preconfiguration)</span>
+                        <span>👤</span> <span data-i18n="act_sec_admin">Düğüm Yöneticisi Hesabı (Node Admin Preconfiguration)</span>
                     </h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
                         <div class="form-group">
-                            <label style="font-size: 0.82rem; font-weight: 600;">Yönetici Adı Soyadı</label>
+                            <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="act_lbl_admin_fullname">Yönetici Adı Soyadı</label>
                             <input type="text" class="input" id="act-edge-admin-name" placeholder="Örn: Ahmet Yılmaz">
                         </div>
                         <div class="form-group">
-                            <label style="font-size: 0.82rem; font-weight: 600;">Yönetici E-Posta</label>
+                            <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="act_lbl_admin_email">Yönetici E-Posta</label>
                             <input type="email" class="input" id="act-edge-admin-email" placeholder="admin@node.local">
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                         <div class="form-group">
-                            <label style="font-size: 0.82rem; font-weight: 600;">Kullanıcı Adı (Username)</label>
+                            <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="act_lbl_admin_user">Kullanıcı Adı (Username)</label>
                             <input type="text" class="input" id="act-edge-admin-username" placeholder="Örn: node_admin">
                         </div>
                         <div class="form-group">
-                            <label style="font-size: 0.82rem; font-weight: 600;">Şifre (Password)</label>
+                            <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="act_lbl_admin_pass">Şifre (Password)</label>
                             <input type="password" class="input" id="act-edge-admin-pass" placeholder="Yeni veya mevcut şifre">
                         </div>
                     </div>
@@ -2885,43 +2886,43 @@
                 <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px; background: rgba(255,255,255,0.02);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <h4 style="margin: 0; font-size: 0.9rem; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
-                            <span>🏢</span> <span>Proxy Üzerinden LDAP / AD Entegrasyonu (Cloud Configured)</span>
+                            <span>🏢</span> <span data-i18n="act_sec_ldap">Proxy Üzerinden LDAP / AD Entegrasyonu (Cloud Configured)</span>
                         </h4>
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;">
                             <input type="checkbox" id="act-edge-ldap-enabled">
-                            <span>Etkin</span>
+                            <span data-i18n="act_lbl_enabled">Etkin</span>
                         </label>
                     </div>
-                    <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">
+                    <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;" data-i18n="act_desc_ldap">
                         Proxy aktif olduğunda, uzak ağdaki Active Directory / LDAP sunucusu bu proxy üzerinden tünellenir. Ayarları buradan bulut üzerinden yapılandırın.
                     </p>
                     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 10px;">
                         <div class="form-group">
-                            <label style="font-size: 0.82rem; font-weight: 600;">Yerel LDAP / AD Sunucu IP / Host</label>
+                            <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="act_lbl_ldap_host">Yerel LDAP / AD Sunucu IP / Host</label>
                             <input type="text" class="input mono-code" id="act-edge-ldap-host" placeholder="Örn: 192.168.1.10 veya dc01.corp.local">
                         </div>
                         <div class="form-group">
-                            <label style="font-size: 0.82rem; font-weight: 600;">Port</label>
+                            <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="act_lbl_ldap_port">Port</label>
                             <input type="number" class="input mono-code" id="act-edge-ldap-port" value="389">
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
                         <div class="form-group">
-                            <label style="font-size: 0.82rem; font-weight: 600;">Base DN</label>
+                            <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="act_lbl_ldap_basedn">Base DN</label>
                             <input type="text" class="input mono-code" id="act-edge-ldap-basedn" placeholder="DC=corp,DC=local">
                         </div>
                         <div class="form-group">
-                            <label style="font-size: 0.82rem; font-weight: 600;">Bind DN</label>
+                            <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="act_lbl_ldap_binddn">Bind DN</label>
                             <input type="text" class="input mono-code" id="act-edge-ldap-binddn" placeholder="CN=svc_logger,OU=Services,DC=corp,DC=local">
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                         <div class="form-group">
-                            <label style="font-size: 0.82rem; font-weight: 600;">Bind Şifresi</label>
+                            <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="act_lbl_ldap_bindpass">Bind Şifresi</label>
                             <input type="password" class="input" id="act-edge-ldap-bindpass" placeholder="••••••••">
                         </div>
                         <div class="form-group">
-                            <label style="font-size: 0.82rem; font-weight: 600;">Kullanıcı Arama Filtresi</label>
+                            <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="act_lbl_ldap_filter">Kullanıcı Arama Filtresi</label>
                             <input type="text" class="input mono-code" id="act-edge-ldap-filter" placeholder="(&(objectClass=user)(sAMAccountName={username}))">
                         </div>
                     </div>
@@ -2929,20 +2930,20 @@
 
                 <!-- 3. Cloud Schedule -->
                 <div class="form-group">
-                    <label style="font-size: 0.85rem; font-weight: 600;">Log Gönderim Sıklığı (Cloud Schedule)</label>
+                    <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="act_lbl_sync_freq">Log Gönderim Sıklığı (Cloud Schedule)</label>
                     <select class="input" id="act-edge-sync-interval">
-                        <option value="online">online (Anlık / Gerçek Zamanlı)</option>
-                        <option value="every 60 second">every 60 second (60 saniyede bir)</option>
-                        <option value="every 5 min">every 5 min (5 dakikada bir)</option>
-                        <option value="every 15 min">every 15 min (15 dakikada bir)</option>
-                        <option value="every 30 min">every 30 min (30 dakikada bir)</option>
-                        <option value="every hour">every hour (Her saat başı)</option>
+                        <option value="online" data-i18n="opt_sync_online">online (Anlık / Gerçek Zamanlı)</option>
+                        <option value="every 60 second" data-i18n="opt_sync_60s">every 60 second (60 saniyede bir)</option>
+                        <option value="every 5 min" data-i18n="opt_sync_5m">every 5 min (5 dakikada bir)</option>
+                        <option value="every 15 min" data-i18n="opt_sync_15m">every 15 min (15 dakikada bir)</option>
+                        <option value="every 30 min" data-i18n="opt_sync_30m">every 30 min (30 dakikada bir)</option>
+                        <option value="every hour" data-i18n="opt_sync_1h">every hour (Her saat başı)</option>
                     </select>
                 </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
                 <button class="btn btn-outline" onclick="closeActivateEdgeNodeModal()" data-i18n="btn_cancel">İptal</button>
-                <button class="btn btn-primary" id="btn-save-act-edge" onclick="submitActivateEdgeNode()">⚡ Düğümü Etkinleştir &amp; Kaydet</button>
+                <button class="btn btn-primary" id="btn-save-act-edge" onclick="submitActivateEdgeNode()" data-i18n="btn_save_act_edge">⚡ Düğümü Etkinleştir &amp; Kaydet</button>
             </div>
         </div>
     </div>
@@ -2955,7 +2956,7 @@
                     <div style="background: rgba(56, 189, 248, 0.1); padding: 8px; border-radius: 8px; font-size: 1.3rem;">🏢</div>
                     <div>
                         <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_add_tenant_title">Yeni Kiracı / Müşteri Ekle</h3>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">Çoklu Kiracı (MSSP) Organizasyon ve Süper Admin Tanımlama</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="modal_add_tenant_sub">Çoklu Kiracı (MSSP) Organizasyon ve Süper Admin Tanımlama</div>
                     </div>
                 </div>
                 <button class="btn-close" onclick="closeAddTenantModal()">&times;</button>
@@ -2963,40 +2964,40 @@
             <div class="modal-body" style="padding: 20px;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div class="form-group">
-                        <label style="font-size: 0.85rem; font-weight: 600;">Kiracı Kodu (Slug) <span class="text-danger">*</span></label>
+                        <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_tenant_slug">Kiracı Kodu (Slug)</span> <span class="text-danger">*</span></label>
                         <input type="text" class="input mono-code" id="tenant-new-slug" placeholder="Örn: acme-corp" required>
-                        <small style="color: var(--text-muted); font-size: 0.72rem;">Küçük harf ve tire, benzersiz kod.</small>
+                        <small style="color: var(--text-muted); font-size: 0.72rem;" data-i18n="help_tenant_slug">Küçük harf ve tire, benzersiz kod.</small>
                     </div>
                     <div class="form-group">
-                        <label style="font-size: 0.85rem; font-weight: 600;">Müşteri / Kurum Adı <span class="text-danger">*</span></label>
+                        <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_tenant_name">Müşteri / Kurum Adı</span> <span class="text-danger">*</span></label>
                         <input type="text" class="input" id="tenant-new-name" placeholder="Örn: Acme Holding A.Ş." required>
                     </div>
                 </div>
 
                 <div class="form-group" style="margin-bottom: 12px;">
-                    <label style="font-size: 0.85rem; font-weight: 600;">Açıklama</label>
+                    <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="lbl_tenant_desc">Açıklama</label>
                     <input type="text" class="input" id="tenant-new-desc" placeholder="Örn: Finans Grubu ve Şubeler">
                 </div>
 
                 <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-                    <div style="font-weight: 600; font-size: 0.85rem; color: var(--accent-primary); margin-bottom: 8px;">👤 Kiracı Süper Yöneticisi (Tenant Super Admin)</div>
+                    <div style="font-weight: 600; font-size: 0.85rem; color: var(--accent-primary); margin-bottom: 8px;" data-i18n="sec_tenant_super_admin">👤 Kiracı Süper Yöneticisi (Tenant Super Admin)</div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
                         <div class="form-group">
-                            <label style="font-size: 0.8rem; font-weight: 600;">Yönetici Adı</label>
+                            <label style="font-size: 0.8rem; font-weight: 600;" data-i18n="lbl_admin_name">Yönetici Adı</label>
                             <input type="text" class="input" id="tenant-new-admin-name" placeholder="Örn: Can Demir">
                         </div>
                         <div class="form-group">
-                            <label style="font-size: 0.8rem; font-weight: 600;">E-Posta</label>
+                            <label style="font-size: 0.8rem; font-weight: 600;" data-i18n="lbl_admin_email">E-Posta</label>
                             <input type="email" class="input" id="tenant-new-admin-email" placeholder="can@acme.com">
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div class="form-group">
-                            <label style="font-size: 0.8rem; font-weight: 600;">Kullanıcı Adı <span class="text-danger">*</span></label>
+                            <label style="font-size: 0.8rem; font-weight: 600;"><span data-i18n="lbl_admin_username">Kullanıcı Adı</span> <span class="text-danger">*</span></label>
                             <input type="text" class="input" id="tenant-new-admin-username" placeholder="acme_admin">
                         </div>
                         <div class="form-group">
-                            <label style="font-size: 0.8rem; font-weight: 600;">Başlangıç Şifresi <span class="text-danger">*</span></label>
+                            <label style="font-size: 0.8rem; font-weight: 600;"><span data-i18n="lbl_admin_pass">Başlangıç Şifresi</span> <span class="text-danger">*</span></label>
                             <input type="password" class="input" id="tenant-new-admin-pass" placeholder="••••••••">
                         </div>
                     </div>
@@ -3004,11 +3005,11 @@
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <div class="form-group">
-                        <label style="font-size: 0.85rem; font-weight: 600;">Maksimum Proxy Node</label>
+                        <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="lbl_tenant_max_nodes">Maksimum Proxy Node</label>
                         <input type="number" class="input" id="tenant-new-max-nodes" value="10" min="1" max="500">
                     </div>
                     <div class="form-group">
-                        <label style="font-size: 0.85rem; font-weight: 600;">Maksimum EPS Limiti</label>
+                        <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="lbl_tenant_max_eps">Maksimum EPS Limiti</label>
                         <input type="number" class="input" id="tenant-new-max-eps" value="5000" min="100" max="100000">
                     </div>
                 </div>
@@ -3020,7 +3021,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.15"></script>
-    <script src="/static/js/app.js?v=1.5.15"></script>
+    <script src="/static/js/translations.js?v=1.5.16"></script>
+    <script src="/static/js/app.js?v=1.5.16"></script>
 </body>
 </html>
