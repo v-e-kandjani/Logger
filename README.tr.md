@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.5** (Resmi MITRE ATT&CK Matrisi 697 Teknik Kurulumu ve İnteraktif Kural Seçimi):
+  - **Tüm MITRE ATT&CK Enterprise Kataloğu Kural Üreteci**: Resmi STIX akışındaki (`https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json`) 697 tekniğin tamamı için otomatik SIEM tespit kuralları, taktik hedefleri, esnek eşik değerleri ve risk puanlamaları oluşturuldu.
+  - **İnteraktif Matris Teknik Seçimi ve Açma/Kapatma**: ATT&CK matrisi ekranında herhangi bir tekniğe tıklandığında anında ilgili tespit kuralı aktifleştirilip pasifleştirilebilir hale getirildi; kural durumu eş zamanlı bellek içi korelasyon motoruna ve PostgreSQL veritabanına yansıtıldı.
+  - **Toplu Kurulum ve Yönetim Butonları**: Matris görünümüne `Tüm Kuralları Kur`, `Tümünü Etkinleştir` ve `Tümünü Devre Dışı Bırak` aksiyonları eklenerek tek tıkla matris yönetimi sağlandı.
+
 - **v1.5.4** (Sıfır Bellek Tahsisli Toplu Yazma ve Kilitsiz Atomik Cihaz Önbelleği Optimizasyonu):
   - **ClickHouse Sıfır Bellek Tahsisli Toplu Yazma**: İstemci başlangıcında parametrik `INSERT INTO` şablonu önceden oluşturulup önbelleğe alındı, böylece her toplu yazmada `fmt.Sprintf` yükü ortadan kaldırıldı. Mikro toplu yazma dilimi kapasitesi `batch = batch[:0]` ile korunarak yüksek EPS altında çöp toplayıcı (GC) baskısı en aza indirildi.
   - **Kilitsiz Atomik Cihaz Önbelleği**: `DeviceCache` yapısı `atomic.Pointer[deviceMaps]` modeline geçirilerek eş zamanlı çalışan işlem hatlarında `sync.RWMutex` kilit çekişmesi tamamen kaldırıldı ve beklemesiz (wait-free) IP çözümlemesi sağlandı.

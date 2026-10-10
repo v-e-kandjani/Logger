@@ -4127,6 +4127,15 @@ function wireSIEMMitreControls() {
 
     const btnCheck = document.getElementById('btn-check-mitre-release');
     if (btnCheck) btnCheck.addEventListener('click', checkSIEMMitreRelease);
+
+    const btnInstallAll = document.getElementById('btn-install-all-mitre');
+    if (btnInstallAll) btnInstallAll.addEventListener('click', installAllSIEMMitre);
+
+    const btnEnableAll = document.getElementById('btn-enable-all-mitre');
+    if (btnEnableAll) btnEnableAll.addEventListener('click', () => toggleAllSIEMMitre(true));
+
+    const btnDisableAll = document.getElementById('btn-disable-all-mitre');
+    if (btnDisableAll) btnDisableAll.addEventListener('click', () => toggleAllSIEMMitre(false));
 }
 
 async function openSIEMMitreModal() {
@@ -4317,29 +4326,159 @@ function renderSIEMMitreTechnique(tech) {
     const ruleBadges = (tech.rule_ids || []).map((r, i) =>
         `<span class="badge badge-secondary" style="font-size: 9.5px; padding: 2px 4px;" title="${escapeHtml((tech.rule_names || [])[i] || '')}">${escapeHtml(r)}</span>`
     ).join(' ');
-    const bg = isCovered ? 'rgba(16, 185, 129, 0.08)' : (tech.is_new ? 'rgba(139, 92, 246, 0.07)' : 'var(--bg-main)');
-    const border = isCovered ? 'rgba(16, 185, 129, 0.3)' : (tech.is_new ? 'rgba(139, 92, 246, 0.4)' : 'var(--border-color)');
+    const bg = isCovered ? 'rgba(16, 185, 129, 0.09)' : (tech.is_new ? 'rgba(139, 92, 246, 0.07)' : 'var(--bg-main)');
+    const border = isCovered ? 'rgba(16, 185, 129, 0.4)' : (tech.is_new ? 'rgba(139, 92, 246, 0.4)' : 'var(--border-color)');
     const lastSeen = tech.last_seen_alert ? ` • last ${mitreFmtTime(tech.last_seen_alert)}` : '';
 
     return `
-        <div style="padding: 8px 10px; ${isSub ? 'margin-left: 10px; border-left-width: 3px;' : ''} background: ${bg}; border: 1px solid ${border}; border-radius: 6px; display: flex; flex-direction: column; gap: 4px;">
+        <div class="mitre-tech-card" id="mitre-card-${escapeHtml(tech.id)}" 
+             onclick="toggleSIEMMitreTechnique('${escapeHtml(tech.id)}', ${!isCovered}, event)"
+             style="padding: 9px 11px; ${isSub ? 'margin-left: 10px; border-left-width: 3px;' : ''} background: ${bg}; border: 1px solid ${border}; border-radius: 6px; display: flex; flex-direction: column; gap: 5px; cursor: pointer; transition: all 0.2s ease; position: relative;"
+             title="Click to ${isCovered ? 'disable' : 'enable'} this detection rule">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
-                <a href="${escapeHtml(tech.url || '#')}" target="_blank" rel="noopener" style="font-size: ${isSub ? '11.5px' : '12px'}; font-weight: 600; color: ${isCovered ? 'var(--text-main)' : 'var(--text-muted)'}; text-decoration: none;" title="${escapeHtml(tech.description || '')}">
-                    ${escapeHtml(tech.id)}: ${escapeHtml(tech.name)}
-                </a>
-                <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <span class="mono-code" style="font-size: 11px; font-weight: 700; color: ${isCovered ? '#34d399' : 'var(--primary)'};">${escapeHtml(tech.id)}</span>
+                        <span style="font-size: ${isSub ? '11.5px' : '12px'}; font-weight: 600; color: ${isCovered ? 'var(--text-main)' : 'var(--text-muted)'};" title="${escapeHtml(tech.description || '')}">
+                            ${escapeHtml(tech.name)}
+                        </span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation()">
                     ${tech.is_new ? '<span class="badge" style="font-size: 9px; background: rgba(139, 92, 246, 0.25); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.5);">NEW</span>' : ''}
-                    ${tech.inferred ? '<span class="badge badge-outline" style="font-size: 9px;" title="Referenced by a rule but not present in the loaded catalog">rule-only</span>' : ''}
-                    ${isCovered ? '<span class="badge badge-success" style="font-size: 9.5px;">Covered</span>' : '<span class="badge badge-outline" style="font-size: 9.5px; opacity: 0.6;">Uncovered</span>'}
+                    <button class="btn ${isCovered ? 'btn-success' : 'btn-outline'} mitre-toggle-pill" 
+                            id="mitre-btn-${escapeHtml(tech.id)}"
+                            onclick="toggleSIEMMitreTechnique('${escapeHtml(tech.id)}', ${!isCovered}, event)"
+                            style="padding: 2px 7px; font-size: 10px; font-weight: 600; border-radius: 12px; cursor: pointer; transition: all 0.15s ease; ${isCovered ? 'background: #059669; border-color: #059669;' : 'opacity: 0.75;'}"
+                            title="${isCovered ? 'Rule Active — Click to Disable' : 'Rule Inactive — Click to Enable'}">
+                        ${isCovered ? '✓ Active' : '○ Enable'}
+                    </button>
+                    <a href="${escapeHtml(tech.url || '#')}" target="_blank" rel="noopener" style="font-size: 11px; color: var(--text-muted); padding: 0 2px; text-decoration: none;" title="Open in MITRE ATT&CK Website">↗</a>
                 </div>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; gap: 6px;">
-                <div style="display: flex; gap: 4px; flex-wrap: wrap;">${ruleBadges || '<span style="font-size: 10px; color: var(--text-muted);">No active rules</span>'}</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px; gap: 6px; font-size: 10.5px;">
+                <div style="display: flex; gap: 4px; flex-wrap: wrap;">${ruleBadges || '<span style="font-size: 10px; color: var(--text-muted); font-style: italic;">Auto-managed</span>'}</div>
                 ${tech.alert_count > 0 ? `<span class="badge badge-danger" style="font-size: 9.5px;" title="${escapeHtml(lastSeen)}">${tech.alert_count.toLocaleString()} alerts</span>` : ''}
             </div>
         </div>
     `;
 }
+
+window.toggleSIEMMitreTechnique = async (techId, enable, event) => {
+    if (event) event.stopPropagation();
+    
+    const btn = document.getElementById(`mitre-btn-${techId}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '…';
+    }
+
+    try {
+        const res = await fetch('/api/v1/siem/mitre/toggle-technique', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ technique_id: techId, enabled: enable })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed toggling technique');
+
+        // Smoothly update local state without harsh reload
+        if (mitreUIState.report && mitreUIState.report.tactics) {
+            mitreUIState.report.tactics.forEach(tac => {
+                (tac.techniques || []).forEach(t => {
+                    if (t.id === techId || (!techId.includes('.') && t.sub_technique_of === techId)) {
+                        const was = t.covered;
+                        t.covered = enable;
+                        if (was !== enable) {
+                            if (enable) tac.covered_techniques++;
+                            else tac.covered_techniques = Math.max(0, tac.covered_techniques - 1);
+                        }
+                    }
+                });
+                if (tac.total_techniques > 0) {
+                    tac.coverage_percent = (tac.covered_techniques / tac.total_techniques) * 100.0;
+                }
+            });
+
+            const allTechs = mitreUIState.report.tactics.flatMap(t => t.techniques || []);
+            const uniqueCovered = new Set(allTechs.filter(t => t.covered).map(t => t.id)).size;
+            mitreUIState.report.covered_techniques = uniqueCovered;
+
+            const elCovered = document.getElementById('mitre-stat-covered');
+            if (elCovered) elCovered.textContent = uniqueCovered.toLocaleString();
+            const elCovPct = document.getElementById('mitre-stat-coverage-pct');
+            if (elCovPct && mitreUIState.report.total_techniques > 0) {
+                const pct = ((uniqueCovered / mitreUIState.report.total_techniques) * 100).toFixed(1);
+                elCovPct.textContent = `${pct}% Active Detection Coverage`;
+            }
+        }
+
+        renderSIEMMitreMatrix();
+        showToast(`Technique ${techId} ${enable ? 'activated & covered' : 'disabled'}`, 'success');
+    } catch (e) {
+        showToast(`Error: ${e.message}`, 'error');
+        renderSIEMMitreMatrix();
+    }
+};
+
+window.installAllSIEMMitre = async () => {
+    if (!confirm('This will install and enable SIEM correlation detection rules for all 697 MITRE ATT&CK techniques in the official catalog.\n\nProceed with installation?')) {
+        return;
+    }
+    const btn = document.getElementById('btn-install-all-mitre');
+    const alertBox = document.getElementById('mitre-sync-alert');
+    if (btn) btn.disabled = true;
+    if (alertBox) {
+        alertBox.style.display = 'block';
+        alertBox.className = 'alert-box alert-info';
+        alertBox.textContent = '⚡ Installing detection rules for all MITRE ATT&CK techniques from official STIX feed…';
+    }
+
+    try {
+        const res = await fetch('/api/v1/siem/mitre/install-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Install failed');
+
+        if (alertBox) {
+            alertBox.className = 'alert-box alert-success';
+            alertBox.textContent = `✓ ${data.message || 'All MITRE ATT&CK techniques successfully installed!'}`;
+        }
+        showToast('Tüm MITRE ATT&CK teknikleri başarıyla kuruldu!', 'success');
+        setTimeout(loadSIEMMitreMatrix, 400);
+    } catch (e) {
+        if (alertBox) {
+            alertBox.className = 'alert-box alert-danger';
+            alertBox.textContent = `✗ Hata: ${e.message}`;
+        }
+        showToast(`Kurulum hatası: ${e.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+};
+
+window.toggleAllSIEMMitre = async (enable) => {
+    const action = enable ? 'enable' : 'disable';
+    if (!confirm(`Are you sure you want to ${action} all MITRE ATT&CK detection rules across the matrix?`)) {
+        return;
+    }
+    try {
+        const res = await fetch('/api/v1/siem/mitre/toggle-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enable })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Bulk toggle failed');
+        showToast(data.message || `All rules ${action}d!`, 'success');
+        setTimeout(loadSIEMMitreMatrix, 300);
+    } catch (e) {
+        showToast(`Error: ${e.message}`, 'error');
+    }
+};
 
 async function syncSIEMMitreFeed() {
     const btn = document.getElementById('btn-sync-mitre-feed');

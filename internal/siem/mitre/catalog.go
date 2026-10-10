@@ -217,6 +217,25 @@ func (c *Catalog) TechniqueCount() int {
 	return len(c.techniques)
 }
 
+// GetAllTechniques returns all loaded techniques sorted by ID
+func (c *Catalog) GetAllTechniques() []Technique {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	res := make([]Technique, 0, len(c.techniques))
+	for _, t := range c.techniques {
+		res = append(res, t)
+	}
+	sort.Slice(res, func(i, j int) bool { return res[i].ID < res[j].ID })
+	return res
+}
+
+// IsBaseline reports whether the catalog is only the embedded 30-technique baseline
+func (c *Catalog) IsBaseline() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.isBaseline
+}
+
 // GenerateCoverageReport compares active SIEM rules and alerts against the ATT&CK matrix
 func (c *Catalog) GenerateCoverageReport(rules []models.SIEMRule, alerts []models.SIEMAlert) MatrixReport {
 	stats := make(map[string]AlertStat)

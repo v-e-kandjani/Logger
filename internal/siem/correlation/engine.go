@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -459,6 +460,58 @@ func (e *Engine) ToggleRule(ruleID string, enabled bool) error {
 		}()
 	}
 	return nil
+}
+
+// ToggleTechniqueRules enables or disables all loaded rules mapped to a specific MITRE technique
+func (e *Engine) ToggleTechniqueRules(techniqueID string, enabled bool) int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	count := 0
+	now := time.Now().UTC()
+	for _, r := range e.rules {
+		if r.MitreTechnique == techniqueID || (strings.HasPrefix(r.MitreTechnique, techniqueID+".") && !strings.Contains(techniqueID, ".")) {
+			r.IsEnabled = enabled
+			r.UpdatedAt = now
+			count++
+		}
+	}
+	if count > 0 {
+		e.rebuildRuleIndexLocked()
+	}
+	return count
+}
+
+// ToggleAllMitreRules enables or disables all loaded rules mapped to any MITRE technique
+func (e *Engine) ToggleAllMitreRules(enabled bool) int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	count := 0
+	now := time.Now().UTC()
+	for _, r := range e.rules {
+		if r.MitreTechnique != "" {
+			r.IsEnabled = enabled
+			r.UpdatedAt = now
+			count++
+		}
+	}
+	if count > 0 {
+		e.rebuildRuleIndexLocked()
+	}
+	return count
+}
+
+// AddOrUpdateRules batch registers new or updated rules in the engine and rebuilds index
+func (e *Engine) AddOrUpdateRules(rules []models.SIEMRule) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	for _, r := range rules {
+		ruleCopy := r
+		e.rules[r.ID] = &ruleCopy
+	}
+	e.rebuildRuleIndexLocked()
 }
 
 // GetRules returns all loaded detection rules

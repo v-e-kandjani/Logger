@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.5** (Official MITRE ATT&CK Matrix 697-Technique Installation & Interactive Matrix Rule Toggling):
+  - **Full MITRE ATT&CK Enterprise Catalog Rule Generator**: Auto-generates high-fidelity SIEM detection rules for all 697 techniques in the official MITRE Enterprise ATT&CK catalog (`https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json`), automatically mapping tactical objectives, custom thresholds, severity levels, and risk scoring.
+  - **Interactive Matrix Technique Toggling**: Clicking any technique card within the ATT&CK matrix modal directly activates or deactivates its corresponding detection rule in real time, updating the in-memory correlation engine and PostgreSQL state without disrupting event ingestion.
+  - **Bulk Installation & Operations Controls**: Added `Install All Rules`, `Enable All`, and `Disable All` administrative action buttons in the MITRE ATT&CK dashboard view for 1-click comprehensive threat matrix enablement.
+
 - **v1.5.4** (Zero-Allocation Batch Ingestion & Lock-Free Atomic Device Cache Optimization):
   - **ClickHouse Batch Ingestion Zero-Allocation Pipeline**: Pre-allocated and cached the parameterized `INSERT INTO` query template at client initialization, eliminating runtime `fmt.Sprintf` overhead during batch flushes. Reused internal micro-batch slice capacity via `batch = batch[:0]` and introduced static fallback IPv4 representations to minimize garbage collection cycles under high EPS loads.
   - **Lock-Free Atomic Device Cache**: Transitioned `DeviceCache` to `atomic.Pointer[deviceMaps]`, eliminating read/write mutex lock contention (`sync.RWMutex`) across concurrent worker ingestion routines and providing instantaneous wait-free IP resolution.

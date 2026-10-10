@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.4</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.5</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -1168,12 +1168,12 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.4</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.5</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">49979ab</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">62dfa5e</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-10</div>
                     </div>
                     <div class="stat-card">
@@ -1852,12 +1852,15 @@
                         <span style="font-size: 11px; color: var(--text-muted);" id="mitre-matrix-version-label">Loading catalog…</span>
                     </div>
                 </div>
-                <div style="display: flex; gap: 8px; align-items: center;">
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                     <button class="btn btn-outline" id="btn-check-mitre-release" style="font-size: 12px; padding: 6px 12px;" title="Conditional check (ETag) – downloads only when MITRE publishes a new release">
                         <span>🔎</span> <span data-i18n="btn_check_mitre">Check for New Release</span>
                     </button>
                     <button class="btn btn-primary" id="btn-sync-mitre-feed" style="font-size: 12px; padding: 6px 12px;" title="Force a full re-download of the official STIX feed">
                         <span>🔄</span> <span data-i18n="btn_sync_mitre">Sync Official Feed</span>
+                    </button>
+                    <button class="btn btn-success" id="btn-install-all-mitre" style="font-size: 12px; padding: 6px 12px; background: #059669; border-color: #059669; color: #fff;" title="Install & enable SIEM detection rules for all MITRE ATT&CK techniques in the matrix">
+                        <span>⚡</span> <span data-i18n="btn_install_all_mitre">Install All Rules</span>
                     </button>
                     <button class="close-btn" id="btn-close-siem-mitre">&times;</button>
                 </div>
@@ -1902,7 +1905,7 @@
                     <span id="mitre-autosync-status" style="font-size: 11.5px; color: var(--text-muted);">—</span>
                 </div>
 
-                <!-- Filters -->
+                <!-- Filters & Bulk Controls -->
                 <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px;">
                     <div id="mitre-filter-group" style="display: flex; gap: 4px; flex-wrap: wrap;">
                         <button class="btn btn-primary mitre-filter-btn" data-filter="all" style="font-size: 11.5px; padding: 5px 10px;" data-i18n="mitre_filter_all">All</button>
@@ -1910,6 +1913,14 @@
                         <button class="btn btn-outline mitre-filter-btn" data-filter="uncovered" style="font-size: 11.5px; padding: 5px 10px;" data-i18n="mitre_filter_uncovered">Uncovered</button>
                         <button class="btn btn-outline mitre-filter-btn" data-filter="alerts" style="font-size: 11.5px; padding: 5px 10px;" data-i18n="mitre_filter_alerts">With Alerts</button>
                         <button class="btn btn-outline mitre-filter-btn" data-filter="new" style="font-size: 11.5px; padding: 5px 10px;" data-i18n="mitre_filter_new">New in Release</button>
+                    </div>
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                        <button class="btn btn-outline" id="btn-enable-all-mitre" style="font-size: 11px; padding: 5px 9px; color: var(--success); border-color: rgba(16,185,129,0.4);" title="Enable all MITRE ATT&CK correlation rules">
+                            <span>✓</span> Enable All
+                        </button>
+                        <button class="btn btn-outline" id="btn-disable-all-mitre" style="font-size: 11px; padding: 5px 9px; color: var(--text-muted); border-color: var(--border-color);" title="Disable all MITRE ATT&CK correlation rules">
+                            <span>⏸</span> Disable All
+                        </button>
                     </div>
                     <label style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer;">
                         <input type="checkbox" id="mitre-show-subtechniques" checked style="accent-color: var(--primary);">
@@ -2169,7 +2180,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.4"></script>
-    <script src="/static/js/app.js?v=1.5.4"></script>
+    <script src="/static/js/translations.js?v=1.5.5"></script>
+    <script src="/static/js/app.js?v=1.5.5"></script>
 </body>
 </html>

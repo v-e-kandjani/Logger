@@ -190,6 +190,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/siem/mitre", h.requireAuth(h.handleSIEMMitreMatrix))
 	mux.HandleFunc("/api/v1/siem/mitre/sync", h.requireAuth(h.handleSIEMMitreSync))
 	mux.HandleFunc("/api/v1/siem/mitre/autosync", h.requireAuth(h.handleSIEMMitreAutoSync))
+	mux.HandleFunc("/api/v1/siem/mitre/install-all", h.requireAuth(h.handleSIEMMitreInstallAll))
+	mux.HandleFunc("/api/v1/siem/mitre/toggle-technique", h.requireAuth(h.handleSIEMMitreToggleTechnique))
+	mux.HandleFunc("/api/v1/siem/mitre/toggle-all", h.requireAuth(h.handleSIEMMitreToggleAll))
 
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))

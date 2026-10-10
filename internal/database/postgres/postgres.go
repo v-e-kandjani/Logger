@@ -942,6 +942,70 @@ func (db *DB) ToggleSIEMRule(ctx context.Context, ruleID string, enabled bool) e
 	return err
 }
 
+// ToggleTechniqueRules enables or disables all rules associated with a MITRE technique (including sub-techniques)
+func (db *DB) ToggleTechniqueRules(ctx context.Context, techniqueID string, enabled bool) (int64, error) {
+	query := `UPDATE siem_rules SET is_enabled = $1, updated_at = NOW() WHERE mitre_technique = $2 OR (mitre_technique LIKE $3 AND $4 NOT LIKE '%.%')`
+	tag, err := db.pool.Exec(ctx, query, enabled, techniqueID, techniqueID+".%", techniqueID)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+// ToggleAllMitreRules enables or disables all rules with an assigned MITRE technique
+func (db *DB) ToggleAllMitreRules(ctx context.Context, enabled bool) (int64, error) {
+	query := `UPDATE siem_rules SET is_enabled = $1, updated_at = NOW() WHERE mitre_technique IS NOT NULL AND mitre_technique != ''`
+	tag, err := db.pool.Exec(ctx, query, enabled)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+// BatchUpsertSIEMRules inserts or updates multiple detection rules in a single transaction
+func (db *DB) BatchUpsertSIEMRules(ctx context.Context, rules []models.SIEMRule) error {
+	if len(rules) == 0 {
+		return nil
+	}
+
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	query := `
+		INSERT INTO siem_rules (
+			id, name, description, severity, risk_score, category, priority, source_ref,
+			threshold, timeframe_seconds, group_by, mitre_tactic, mitre_technique,
+			is_enabled, match_category, match_action, match_outcome, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8,
+			$9, $10, $11, $12, $13,
+			$14, $15, $16, $17, $18, $19
+		)
+		ON CONFLICT (id) DO UPDATE SET
+			name = EXCLUDED.name,
+			description = EXCLUDED.description,
+			mitre_tactic = EXCLUDED.mitre_tactic,
+			mitre_technique = EXCLUDED.mitre_technique,
+			source_ref = EXCLUDED.source_ref,
+			updated_at = NOW()`
+
+	for _, r := range rules {
+		_, err := tx.Exec(ctx, query,
+			r.ID, r.Name, r.Description, r.Severity, r.RiskScore, r.Category, r.Priority, r.SourceRef,
+			r.Threshold, r.TimeframeSeconds, r.GroupBy, r.MitreTactic, r.MitreTechnique,
+			r.IsEnabled, r.MatchCategory, r.MatchAction, r.MatchOutcome, r.CreatedAt, r.UpdatedAt,
+		)
+		if err != nil {
+			return fmt.Errorf("upsert rule %s: %w", r.ID, err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
 // CreateOrUpdateSIEMAlert inserts a new alert or updates an existing alert in the database
 func (db *DB) CreateOrUpdateSIEMAlert(ctx context.Context, alert *models.SIEMAlert) (*models.SIEMAlert, error) {
 	evidenceJSON, _ := json.Marshal(alert.EvidenceLogs)

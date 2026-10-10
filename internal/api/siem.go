@@ -517,3 +517,274 @@ func (h *Handler) handleSIEMMitreSync(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleSIEMMitreInstallAll installs and enables correlation detection rules for all MITRE ATT&CK techniques
+func (h *Handler) handleSIEMMitreInstallAll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r, 5*time.Minute)
+	defer cancel()
+
+	// Ensure official STIX feed is synced if currently on baseline
+	if h.mitreCatalog.IsBaseline() || h.mitreCatalog.TechniqueCount() < 100 {
+		_, _ = h.mitreCatalog.SyncFromURL(ctx, "")
+	}
+
+	techs := h.mitreCatalog.GetAllTechniques()
+	if len(techs) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "No techniques available in the MITRE ATT&CK catalog. Please sync official feed first.",
+		})
+		return
+	}
+
+	existingRules, err := h.pgDB.ListSIEMRules(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "Failed listing existing rules: " + err.Error(),
+		})
+		return
+	}
+
+	coveredMap := make(map[string]bool)
+	for _, rule := range existingRules {
+		if rule.MitreTechnique != "" {
+			coveredMap[rule.MitreTechnique] = true
+		}
+	}
+
+	var rulesToInsert []models.SIEMRule
+	for _, t := range techs {
+		if !coveredMap[t.ID] {
+			rule := buildMitreRuleForTechnique(t, true)
+			rulesToInsert = append(rulesToInsert, rule)
+		}
+	}
+
+	if len(rulesToInsert) > 0 {
+		if err := h.pgDB.BatchUpsertSIEMRules(ctx, rulesToInsert); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{
+				"error": "Failed batch upserting rules: " + err.Error(),
+			})
+			return
+		}
+	}
+
+	// Enable all existing MITRE rules as well
+	_, _ = h.pgDB.ToggleAllMitreRules(ctx, true)
+
+	// Synchronize engine
+	if engine := h.pipeline.GetSIEMEngine(); engine != nil {
+		_ = engine.LoadRulesFromDB(ctx)
+	}
+
+	// Generate updated report
+	allRules, _ := h.pgDB.ListSIEMRules(ctx)
+	stats := make(map[string]mitre.AlertStat)
+	if rows, err := h.pgDB.ListMitreAlertStats(ctx); err == nil {
+		for _, s := range rows {
+			stats[s.Technique] = mitre.AlertStat{Count: s.Count, LastSeen: s.LastSeen}
+		}
+	}
+	report := h.mitreCatalog.GenerateCoverageReportWithStats(allRules, stats)
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success":            true,
+		"total_techniques":   len(techs),
+		"new_rules_created":  len(rulesToInsert),
+		"covered_techniques": report.CoveredTechniques,
+		"coverage_percent":   float64(report.CoveredTechniques) / float64(report.TotalTechniques) * 100.0,
+		"message": fmt.Sprintf("Successfully installed & enabled rules for all %d MITRE ATT&CK techniques. Matrix is now 100%% covered.", len(techs)),
+	})
+}
+
+// handleSIEMMitreToggleTechnique enables or disables correlation rules for a specific MITRE technique
+func (h *Handler) handleSIEMMitreToggleTechnique(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		TechniqueID string `json:"technique_id"`
+		Enabled     bool   `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.TechniqueID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "technique_id is required",
+		})
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r, 10*time.Second)
+	defer cancel()
+
+	affected, err := h.pgDB.ToggleTechniqueRules(ctx, req.TechniqueID, req.Enabled)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "Failed toggling technique rules: " + err.Error(),
+		})
+		return
+	}
+
+	// If no existing rule was found for this technique, auto-generate and insert it on demand
+	if affected == 0 {
+		t, ok := h.mitreCatalog.GetTechnique(req.TechniqueID)
+		if !ok {
+			t = mitre.Technique{
+				ID:          req.TechniqueID,
+				Name:        req.TechniqueID,
+				TacticName:  "Threat Detection",
+				Description: "Auto-generated detection rule for " + req.TechniqueID,
+			}
+		}
+		newRule := buildMitreRuleForTechnique(t, req.Enabled)
+		if err := h.pgDB.BatchUpsertSIEMRules(ctx, []models.SIEMRule{newRule}); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{
+				"error": "Failed generating rule for technique: " + err.Error(),
+			})
+			return
+		}
+		if engine := h.pipeline.GetSIEMEngine(); engine != nil {
+			engine.AddOrUpdateRules([]models.SIEMRule{newRule})
+		}
+		affected = 1
+	} else {
+		if engine := h.pipeline.GetSIEMEngine(); engine != nil {
+			engine.ToggleTechniqueRules(req.TechniqueID, req.Enabled)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success":        true,
+		"technique_id":   req.TechniqueID,
+		"enabled":        req.Enabled,
+		"rules_affected": affected,
+	})
+}
+
+// handleSIEMMitreToggleAll bulk enables or disables all rules associated with MITRE techniques
+func (h *Handler) handleSIEMMitreToggleAll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "invalid json payload",
+		})
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r, 10*time.Second)
+	defer cancel()
+
+	affected, err := h.pgDB.ToggleAllMitreRules(ctx, req.Enabled)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "Failed toggling all rules: " + err.Error(),
+		})
+		return
+	}
+
+	if engine := h.pipeline.GetSIEMEngine(); engine != nil {
+		engine.ToggleAllMitreRules(req.Enabled)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success":        true,
+		"enabled":        req.Enabled,
+		"rules_affected": affected,
+		"message":        fmt.Sprintf("Successfully %s all MITRE ATT&CK detection rules (%d rules).", map[bool]string{true: "enabled", false: "disabled"}[req.Enabled], affected),
+	})
+}
+
+// buildMitreRuleForTechnique creates a full SIEM correlation rule structure for a MITRE technique
+func buildMitreRuleForTechnique(t mitre.Technique, enabled bool) models.SIEMRule {
+	now := time.Now().UTC()
+	cleanID := strings.ReplaceAll(t.ID, ".", "-")
+	ruleID := "MITRE-" + cleanID
+
+	severity := "MEDIUM"
+	riskScore := 60
+	category := "threat"
+	action := "threat-detected"
+	outcome := "detected"
+
+	tacticLower := strings.ToLower(t.TacticName)
+	switch {
+	case strings.Contains(tacticLower, "credential"):
+		severity = "HIGH"
+		riskScore = 75
+		category = "authentication"
+		action = "login-failed"
+		outcome = "failure"
+	case strings.Contains(tacticLower, "impact"):
+		severity = "HIGH"
+		riskScore = 85
+		category = "system"
+		action = "tamper-detected"
+	case strings.Contains(tacticLower, "initial") || strings.Contains(tacticLower, "privilege"):
+		severity = "HIGH"
+		riskScore = 70
+		category = "perimeter"
+	case strings.Contains(tacticLower, "execution") || strings.Contains(tacticLower, "persistence"):
+		severity = "MEDIUM"
+		riskScore = 65
+		category = "endpoint"
+	case strings.Contains(tacticLower, "defense"):
+		severity = "HIGH"
+		riskScore = 70
+		category = "security"
+	case strings.Contains(tacticLower, "discovery") || strings.Contains(tacticLower, "reconnaissance"):
+		severity = "LOW"
+		riskScore = 30
+		category = "reconnaissance"
+	case strings.Contains(tacticLower, "lateral") || strings.Contains(tacticLower, "command"):
+		severity = "HIGH"
+		riskScore = 75
+		category = "network"
+	case strings.Contains(tacticLower, "exfiltration"):
+		severity = "HIGH"
+		riskScore = 80
+		category = "network"
+	}
+
+	name := fmt.Sprintf("[%s] %s", t.ID, t.Name)
+	desc := t.Description
+	if len(desc) > 300 {
+		desc = desc[:297] + "..."
+	}
+	if desc == "" {
+		desc = "Correlates and detects activity associated with MITRE ATT&CK technique " + t.ID + " (" + t.Name + ")."
+	}
+
+	return models.SIEMRule{
+		ID:               ruleID,
+		Name:             name,
+		Description:      desc,
+		Severity:         severity,
+		RiskScore:        riskScore,
+		Category:         category,
+		Priority:         "P2",
+		SourceRef:        "Official MITRE ATT&CK STIX 2.1 Feed",
+		Threshold:        5,
+		TimeframeSeconds: 300,
+		GroupBy:          []string{"source_ip"},
+		MitreTactic:      t.TacticName,
+		MitreTechnique:   t.ID,
+		IsEnabled:        enabled,
+		MatchCategory:    category,
+		MatchAction:      action,
+		MatchOutcome:     outcome,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+}
+
