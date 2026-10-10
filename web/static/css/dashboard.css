@@ -248,6 +248,28 @@ body.dark-theme {
     stroke-width: 2;
 }
 
+/* Settings Modular Section Isolated View */
+#pane-settings .panel.settings-panel-hidden {
+    display: none !important;
+}
+
+#pane-settings .panel.settings-panel-single {
+    grid-column: 1 / -1 !important;
+    width: 100%;
+    animation: settingSectionFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes settingSectionFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .sidebar-footer {
     padding: 16px 20px;
     border-top: 1px solid var(--border-color);

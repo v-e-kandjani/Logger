@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.10** (Isolated Settings Section Tab Navigation & Submenu Scope Display):
+  - **Isolated Settings Section Display**: Transformed the Settings page from a vertically scrolled monolithic view into an isolated, dedicated modular section view (`displaySettingsSection()`). When selecting any settings submenu item (e.g., KamuSM, Ingestion, HTTPS & TLS, FQDN, Cache, Active Directory, MFA, Retention, SMTP), only the target configuration panel is rendered on the page (`.settings-panel-single`) while extraneous sections are cleanly hidden without auto-scrolling jitter.
+  - **Full-Breadth Settings Subnav Navigation**: Added dedicated "All Settings" (`all`) and "MFA & TOTP Governance" (`setting-section-mfa`) navigation targets across both the sidebar collapsible submenu and the in-pane sticky glassmorphic pill bar.
+  - **Smooth View Entrance Animation**: Integrated refined subtle entrance animations (`settingSectionFadeIn`) and instant top-alignment for focused, distraction-free configuration management.
+
 - **v1.5.9** (Sidebar Navigation Fix, Minimal Modern SVG Icons, Settings Sub-Menu Navigation & Dashboard Ingestion Telemetry):
   - **Syntax Error Fix & Sidebar Navigation Restoration**: Resolved duplicate `redEl` and `badge` variable declarations in `loadHTTPSSettings()`, eliminating client-side script parse exceptions and restoring smooth navigation tab switching across all dashboard panes.
   - **Minimal Modern SVG Iconography**: Replaced generic emoji icons in the sidebar navigation with crisp, scalable, minimal SVG vector icons (Dashboard, Live Stream, Log Search, SIEM & SOC, Registered Devices, Unknown Sources, Archives, System Health, Settings, Users, and Upgrades).

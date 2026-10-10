@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.10** (Ayarlar Alt Menüsü Bölüm İzolasyonu ve Odaklı Modüler Görünüm):
+  - **İzole Ayarlar Bölüm Görünümü**: Ayarlar sayfası tek parça kaydırmalı yapıdan çıkarılarak modüler ve odaklı tekil bölüm görünümüne (`displaySettingsSection()`) dönüştürüldü. Yan menüden veya yapışkan hap bardan herhangi bir alt menü seçildiğinde (KamuSM, Dinleyiciler, HTTPS & TLS, FQDN, Önbellek, Active Directory, MFA, Saklama, SMTP) sayfada yalnızca ilgili ayar paneli gösterilir (`.settings-panel-single`), diğer bölümler gizlenir ve sayfa kaydırma karmaşası sonlandırılır.
+  - **Genişletilmiş Alt Menü ve Hap Bar Hedefleri**: Yan menü alt grubuna ve sayfa içi yapışkan hap bara "Tüm Ayarlar" (`all`) ve "MFA & TOTP Güvenliği" (`setting-section-mfa`) seçenekleri dahil edildi.
+  - **Pürüzsüz Geçiş Animasyonu**: Bölüm geçişlerinde zarif odaklanma animasyonu (`settingSectionFadeIn`) ve anında başa hizalama ile dikkat dağıtmayan kurumsal yönetim deneyimi sağlandı.
+
 - **v1.5.9** (Yan Menü Gezinme Düzeltmesi, Minimal Modern SVG İkonlar, Ayarlar Alt Menüsü ve Dashboard Telemetri İyileştirmesi):
   - **Sözdizimi Hatası Giderimi ve Yan Menü Gezinme Onarımı**: `loadHTTPSSettings()` içerisindeki mükerrer `redEl` ve `badge` değişken tanımları kaldırılarak istemci tarafı betik ayrıştırma hatası giderildi; paneller arası pürüzsüz sekme geçişleri yeniden sağlandı.
   - **Minimal Modern SVG İkon Mimarisi**: Yan menüdeki emojiler yerine kurumsal standartlarda, temiz ve ölçeklenebilir minimal modern SVG vektör ikonlar entegre edildi.

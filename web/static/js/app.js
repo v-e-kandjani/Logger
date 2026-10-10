@@ -74,6 +74,8 @@ async function initAuthSession() {
     }
 }
 
+let currentSettingsSection = 'setting-section-kamusm';
+
 // Navigation Tab Switcher & Submenu Controller
 function switchTab(tab, targetSectionId = null) {
     const navItems = document.querySelectorAll('.nav-item');
@@ -113,31 +115,38 @@ function switchTab(tab, targetSectionId = null) {
         if (tab === 'unregistered') loadUnregisteredSources();
         if (tab === 'archives') loadArchives();
         if (tab === 'health') loadHealthTelemetry();
-        if (tab === 'settings') loadSettings();
+        if (tab === 'settings') {
+            loadSettings();
+            displaySettingsSection(targetSectionId || currentSettingsSection || 'setting-section-kamusm');
+        }
         if (tab === 'users') loadUsers();
         if (tab === 'updates') loadUpdateStatus();
     } catch (err) {
         console.error('Tab refresh error for', tab, err);
     }
-
-    if (targetSectionId) {
-        setTimeout(() => scrollToSettingsSection(targetSectionId), 100);
-    }
 }
 
-function scrollToSettingsSection(targetId) {
-    if (!targetId) return;
-    const el = document.getElementById(targetId);
-    if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        el.style.transition = 'box-shadow 0.4s ease, border-color 0.4s ease';
-        el.style.boxShadow = '0 0 24px rgba(56, 189, 248, 0.4)';
-        el.style.borderColor = 'rgba(56, 189, 248, 0.7)';
-        setTimeout(() => {
-            el.style.boxShadow = '';
-            el.style.borderColor = '';
-        }, 1800);
-    }
+// Display ONLY the chosen settings section without auto-scrolling
+function displaySettingsSection(targetId) {
+    if (!targetId) targetId = currentSettingsSection || 'setting-section-kamusm';
+    currentSettingsSection = targetId;
+
+    const panels = document.querySelectorAll('#pane-settings .panel');
+    const isAll = (targetId === 'all');
+
+    panels.forEach(p => {
+        if (isAll || p.id === targetId) {
+            p.classList.remove('settings-panel-hidden');
+            if (!isAll) {
+                p.classList.add('settings-panel-single');
+            } else {
+                p.classList.remove('settings-panel-single');
+            }
+        } else {
+            p.classList.add('settings-panel-hidden');
+            p.classList.remove('settings-panel-single');
+        }
+    });
 
     // Sync active classes on sidebar subitems and settings pill buttons
     document.querySelectorAll('.nav-subitem').forEach(sub => {
@@ -146,6 +155,14 @@ function scrollToSettingsSection(targetId) {
     document.querySelectorAll('.settings-subnav-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-target') === targetId);
     });
+
+    // Reset scroll to top of view instantly
+    window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+// Backward-compatible alias
+function scrollToSettingsSection(targetId) {
+    displaySettingsSection(targetId);
 }
 
 function initNavigation() {
@@ -182,7 +199,7 @@ function initNavigation() {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             const targetId = btn.getAttribute('data-target');
-            scrollToSettingsSection(targetId);
+            displaySettingsSection(targetId);
         });
     });
 
