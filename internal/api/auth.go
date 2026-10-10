@@ -21,12 +21,20 @@ const (
 )
 
 type Session struct {
-	ID        string    `json:"id"`
-	UserID    uuid.UUID `json:"user_id"`
-	Username  string    `json:"username"`
-	FullName  string    `json:"full_name"`
-	Role      string    `json:"role"`
-	ExpiresAt time.Time `json:"expires_at"`
+	ID            string    `json:"id"`
+	UserID        uuid.UUID `json:"user_id"`
+	Username      string    `json:"username"`
+	FullName      string    `json:"full_name"`
+	Role          string    `json:"role"`
+	TenantSlug    string    `json:"tenant_slug"`
+	IsTenantAdmin bool      `json:"is_tenant_admin"`
+	ExpiresAt     time.Time `json:"expires_at"`
+}
+
+// IsRootOperator reports whether the session belongs to the root (MSSP) organization,
+// which may view and manage every tenant's nodes, devices and logs without quotas.
+func (s *Session) IsRootOperator() bool {
+	return s.TenantSlug == "" || s.TenantSlug == "default"
 }
 
 type SessionManager struct {
@@ -53,13 +61,19 @@ func (sm *SessionManager) Create(user *models.User) string {
 	_, _ = rand.Read(b)
 	token := hex.EncodeToString(b)
 
+	tenant := user.TenantSlug
+	if tenant == "" {
+		tenant = "default"
+	}
 	s := &Session{
-		ID:        token,
-		UserID:    user.ID,
-		Username:  user.Username,
-		FullName:  user.FullName,
-		Role:      user.Role,
-		ExpiresAt: time.Now().Add(SessionDuration),
+		ID:            token,
+		UserID:        user.ID,
+		Username:      user.Username,
+		FullName:      user.FullName,
+		Role:          user.Role,
+		TenantSlug:    tenant,
+		IsTenantAdmin: user.IsTenantAdmin,
+		ExpiresAt:     time.Now().Add(SessionDuration),
 	}
 
 	sm.mu.Lock()
@@ -276,12 +290,34 @@ func (h *Handler) handleMeAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"authenticated": true,
-		"user_id":       session.UserID,
-		"username":      session.Username,
-		"full_name":     session.FullName,
-		"role":          session.Role,
+		"authenticated":   true,
+		"user_id":         session.UserID,
+		"username":        session.Username,
+		"full_name":       session.FullName,
+		"role":            session.Role,
+		"tenant_slug":     session.TenantSlug,
+		"is_tenant_admin": session.IsTenantAdmin,
+		"is_root":         session.IsRootOperator(),
 	})
+}
+
+// tenantScope resolves which tenant's data a request may see.
+// Returns "" for the global (all tenants) view.
+//   - Tenant users are always locked to their own tenant (header/query ignored).
+//   - Root operators may pick a tenant via the X-Tenant header or ?tenant= query;
+//     empty or "all" means every tenant aggregated.
+func (h *Handler) tenantScope(r *http.Request) string {
+	if session, ok := h.getSession(r); ok && !session.IsRootOperator() {
+		return session.TenantSlug
+	}
+	t := strings.TrimSpace(r.Header.Get("X-Tenant"))
+	if q := strings.TrimSpace(r.URL.Query().Get("tenant")); q != "" {
+		t = q
+	}
+	if t == "all" || t == "*" {
+		return ""
+	}
+	return t
 }
 
 func (h *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {

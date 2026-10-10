@@ -74,13 +74,21 @@ func NewClient(cfg config.ClickHouseConfig) (*Client, error) {
 		batchCh: make(chan *models.LogEvent, cfg.BatchSize*2),
 		stopCh:  make(chan struct{}),
 	}
+	// Multi-tenant scoping column (idempotent migration; existing rows belong to root tenant)
+	if err := conn.Exec(ctx, fmt.Sprintf(
+		"ALTER TABLE %s.syslog_events ADD COLUMN IF NOT EXISTS tenant LowCardinality(String) DEFAULT 'default'",
+		c.Database())); err != nil {
+		log.Printf("[ClickHouse] tenant column migration warning: %v", err)
+	}
+
 	c.insertQuery = fmt.Sprintf(`
 		INSERT INTO %s.syslog_events (
 			internal_id, event_timestamp, received_at, source_ip, source_port,
 			transport_protocol, device_id, device_name, device_group, vendor,
 			product, facility_code, facility, severity_code, severity,
 			hostname, application_name, process_id, message_id, structured_data,
-			message, raw_message, collector_node, parser_status, ingestion_timestamp
+			message, raw_message, collector_node, parser_status, ingestion_timestamp,
+			tenant
 		)
 	`, c.Database())
 	c.isHealthy.Store(true)
@@ -186,6 +194,11 @@ func (c *Client) flushBatch(events []*models.LogEvent) error {
 			srcIP = ip4
 		}
 
+		tenant := ev.Tenant
+		if tenant == "" {
+			tenant = "default"
+		}
+
 		err := batch.Append(
 			ev.InternalID,
 			ev.EventTimestamp,
@@ -212,6 +225,7 @@ func (c *Client) flushBatch(events []*models.LogEvent) error {
 			ev.CollectorNode,
 			ev.ParserStatus,
 			ev.IngestionTimestamp,
+			tenant,
 		)
 		if err != nil {
 			return fmt.Errorf("batch append: %w", err)

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/syslog-platform/logger/internal/cache"
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 )
@@ -224,6 +226,7 @@ func (h *Handler) handleEdgeIngest(w http.ResponseWriter, r *http.Request) {
 			SourcePort: srcPort,
 			Protocol:   proto,
 			ReceivedAt: recTime,
+			Tenant:     node.TenantName,
 		})
 	}
 
@@ -254,7 +257,7 @@ func (h *Handler) handleEdgeNodes(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := contextWithTimeout(r, 3*time.Second)
 		defer cancel()
 
-		tenantFilter := r.URL.Query().Get("tenant")
+		tenantFilter := h.tenantScope(r)
 		nodes, err := h.pgDB.ListEdgeNodes(ctx, tenantFilter)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -299,8 +302,32 @@ func (h *Handler) handleEdgeNodes(w http.ResponseWriter, r *http.Request) {
 		}
 
 		tenant := strings.TrimSpace(req.TenantName)
+		if sess, ok := h.getSession(r); ok && !sess.IsRootOperator() {
+			tenant = sess.TenantSlug // tenant admins can only provision nodes for themselves
+		}
 		if tenant == "" {
 			tenant = "default"
+		}
+
+		// Quota: root (default) tenant is unlimited; other tenants honour max_nodes (0 = unlimited)
+		if tenant != "default" {
+			qctx, qcancel := contextWithTimeout(r, 3*time.Second)
+			t, terr := h.pgDB.GetTenantBySlug(qctx, tenant)
+			if terr == nil && t == nil {
+				qcancel()
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown tenant: " + tenant})
+				return
+			}
+			if t != nil && t.MaxNodes > 0 {
+				if n, cerr := h.pgDB.CountEdgeNodesByTenant(qctx, tenant); cerr == nil && n >= t.MaxNodes {
+					qcancel()
+					writeJSON(w, http.StatusForbidden, map[string]string{
+						"error": fmt.Sprintf("tenant '%s' node quota reached (%d/%d)", tenant, n, t.MaxNodes),
+					})
+					return
+				}
+			}
+			qcancel()
 		}
 
 		interval := strings.TrimSpace(req.SyncInterval)
@@ -535,6 +562,13 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := contextWithTimeout(r, 4*time.Second)
 	defer cancel()
 
+	session, _ := h.getSession(r)
+	isRoot := session == nil || session.IsRootOperator()
+	if r.Method != http.MethodGet && !isRoot {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "only the root organization can manage tenants"})
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		tenants, err := h.pgDB.ListTenants(ctx)
@@ -545,8 +579,51 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 		if tenants == nil {
 			tenants = []*models.Tenant{}
 		}
+
+		usage, _ := h.pgDB.GetTenantUsage(ctx)
+		epsByTenant := h.currentEPSByTenant(ctx)
+
+		type tenantView struct {
+			*models.Tenant
+			Unlimited   bool    `json:"unlimited"`
+			NodeCount   int     `json:"node_count"`
+			DeviceCount int     `json:"device_count"`
+			CurrentEPS  float64 `json:"current_eps"`
+		}
+		views := make([]tenantView, 0, len(tenants))
+		var totalNodes, totalDevices int
+		var totalEPS float64
+		for _, t := range tenants {
+			// Tenant users only see their own organization
+			if !isRoot && t.Slug != session.TenantSlug {
+				continue
+			}
+			v := tenantView{Tenant: t, Unlimited: t.Slug == "default" || (t.MaxNodes <= 0 && t.MaxEPS <= 0)}
+			if u, ok := usage[t.Slug]; ok {
+				v.NodeCount = u.NodeCount
+				v.DeviceCount = u.DeviceCount
+			}
+			v.CurrentEPS = epsByTenant[t.Slug]
+			totalNodes += v.NodeCount
+			totalDevices += v.DeviceCount
+			totalEPS += v.CurrentEPS
+			views = append(views, v)
+		}
+
+		currentTenant := "default"
+		if session != nil {
+			currentTenant = session.TenantSlug
+		}
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"tenants": tenants,
+			"tenants":        views,
+			"is_root":        isRoot,
+			"current_tenant": currentTenant,
+			// Root operates every tenant's nodes/EPS without quota: aggregate totals
+			"totals": map[string]interface{}{
+				"nodes":   totalNodes,
+				"devices": totalDevices,
+				"eps":     totalEPS,
+			},
 		})
 
 	case http.MethodPost:
@@ -617,4 +694,34 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// currentEPSByTenant returns events-per-second over the last 60s grouped by tenant (cached 10s)
+func (h *Handler) currentEPSByTenant(ctx context.Context) map[string]float64 {
+	out := map[string]float64{}
+	key := cache.MakeKey("tenant_eps")
+	if h.resultCache != nil {
+		if b, ok := h.resultCache.Get(key); ok && json.Unmarshal(b, &out) == nil {
+			return out
+		}
+	}
+	q := fmt.Sprintf("SELECT tenant, count() FROM %s.syslog_events WHERE received_at >= now() - INTERVAL 60 SECOND GROUP BY tenant", h.chClient.Database())
+	rows, err := h.chClient.QueryEvents(ctx, q)
+	if err != nil || rows == nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var t string
+		var n uint64
+		if rows.Scan(&t, &n) == nil {
+			out[t] = float64(n) / 60.0
+		}
+	}
+	if h.resultCache != nil {
+		if b, err := json.Marshal(out); err == nil {
+			h.resultCache.Set(key, b, 10*time.Second)
+		}
+	}
+	return out
 }

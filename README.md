@@ -260,6 +260,15 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.14** (Real Tenant Data Isolation, Sidebar Tenant Selector, Unlimited Root Tenant, Working Rule Optimizer & Query Cache Telemetry):
+  - **True Multi-Tenant Data Isolation**: Logs (`syslog_events.tenant` ClickHouse column) and devices (`devices.tenant_slug`) now carry tenant ownership. Edge-proxy logs inherit their node's tenant; direct syslog inherits the registered device's tenant. Search, dashboard counters, devices, edge nodes, live stream and EPS are filtered server-side by the selected tenant (`X-Tenant` header / `?tenant=`). Tenant users are always locked to their own tenant.
+  - **Sidebar Tenant Selector**: The tenant context switcher moved from the header into the sidebar, showing usage (nodes · devices · EPS) and quota for the selected tenant; switching instantly refreshes all scoped views. Locked (🔒) for tenant admins.
+  - **Unlimited Root Tenant**: The `default` (root/MSSP) tenant has no node/EPS quota (shown as ∞) and aggregates every tenant's nodes and EPS. Node quotas are enforced only for customer tenants.
+  - **Tenant Admin Persistence Fix**: `tenant_slug` / `is_tenant_admin` are now stored and loaded for users (previously dropped), with an automatic backfill for existing tenant admins.
+  - **Device-Aware Rule Optimizer Fix**: "Optimize rules for my devices" now really enables/disables detection rules (the upsert previously ignored `is_enabled`), maps devices to the 12 real rule categories, and reports enabled/disabled counts.
+  - **Detection Rules Header**: Shows "12 Categories · active/shown rules" instead of the raw "72" rule count; fixed category filter values (`data`, `health`).
+  - **In-Memory Query Cache Telemetry Fix**: Total/available host RAM, budget, usage, items, hits/misses now display correctly (JSON field mismatch). Search cache keys are time-bucketed so repeated queries actually hit the cache; tenant counters/EPS are cached too.
+
 - **v1.5.13** (Dedicated Certificate Type Selection (PFX/P12 vs PEM), Multi-Tenant MSSP Management, Node Admin Activation & Pre-Configuration, Proxy-Routed LDAP, Hardware Specs Pre-Flight):
   - **Dedicated Certificate Format Selector (PFX/P12 Archive vs. Standart PEM/CRT)**: Added an explicit certificate type selector. Selecting `PFX / PKCS#12` prompts exclusively for the single archive file (`.pfx`, `.p12`) and password, hiding separate private key inputs. Selecting `PEM / CRT` prompts for certificate and private key files.
   - **Multi-Tenant Organization Management & Global Context Switching**: Built a full MSSP multi-tenant governance module with a dedicated `tenants` table, tenant administrator account provisioning, and a global Tenant Context Switcher dropdown in the top header. Root Super Admins can seamlessly view and manage tenant-specific datasets or global views.

@@ -24,6 +24,7 @@ type RawPacket struct {
 	SourcePort uint16
 	Protocol   string
 	ReceivedAt time.Time
+	Tenant     string // owning tenant slug when known at ingest (e.g. edge proxy node); empty = resolve from device
 }
 
 // Pipeline orchestrates ingestion, parser workers, enrichment, ClickHouse batching, and live broadcast
@@ -163,6 +164,17 @@ func (p *Pipeline) workerLoop() {
 			if err != nil {
 				p.ParsingErrors.Add(1)
 				continue
+			}
+
+			// Tenant attribution: edge-proxy packets carry their node's tenant; otherwise
+			// inherit the registered device's tenant; unknown senders belong to root.
+			switch {
+			case pkt.Tenant != "":
+				event.Tenant = pkt.Tenant
+			case found && dev.TenantSlug != "":
+				event.Tenant = dev.TenantSlug
+			default:
+				event.Tenant = "default"
 			}
 
 			// Cooldown rate-limiting: only persist device metadata updates to PostgreSQL once every 30 seconds per source

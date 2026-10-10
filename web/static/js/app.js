@@ -6,6 +6,34 @@ const MAX_LIVE_ROWS = 15;
 let lastPacketCount = 0;
 let lastSampleTime = Date.now();
 
+// Multi-tenant scoping: every same-origin API call carries the tenant chosen in the sidebar
+// (X-Tenant). The server ignores it for tenant users, who are always locked to their own tenant.
+(function installTenantAwareFetch() {
+    if (window.__tenantFetchInstalled) return;
+    window.__tenantFetchInstalled = true;
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+        try {
+            const url = typeof input === 'string' ? input : (input && input.url) || '';
+            const sameOrigin = url.startsWith('/') || url.startsWith(window.location.origin);
+            if (sameOrigin && url.includes('/api/')) {
+                const slug = localStorage.getItem('active_tenant_slug') || 'all';
+                const opts = Object.assign({}, init || {});
+                const headers = new Headers(opts.headers || (typeof input !== 'string' && input.headers) || {});
+                if (!headers.has('X-Tenant')) headers.set('X-Tenant', slug);
+                opts.headers = headers;
+                return nativeFetch(input, opts);
+            }
+        } catch (e) { /* fall through to native fetch */ }
+        return nativeFetch(input, init);
+    };
+})();
+
+function tenantQuerySuffix(prefix = '?') {
+    const slug = localStorage.getItem('active_tenant_slug') || 'all';
+    return slug && slug !== 'all' ? `${prefix}tenant=${encodeURIComponent(slug)}` : '';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     initAuthSession();
     initNavigation();
@@ -264,10 +292,12 @@ function startPollingTelemetry() {
             document.getElementById('unknown-count-badge').textContent = data.unknown_sources || 0;
             document.getElementById('metric-queue-depth').textContent = `${data.queue_depth || 0} / 250,000`;
 
-            // Calculate current EPS rate
+            // Calculate current EPS rate (tenant view uses server-side per-tenant EPS)
             const now = Date.now();
             const timeDiffSec = (now - lastSampleTime) / 1000;
-            if (timeDiffSec > 0 && lastPacketCount > 0) {
+            if (data.tenant_scope) {
+                document.getElementById('current-eps').textContent = `${Math.round(data.tenant_eps || 0).toLocaleString()} EPS`;
+            } else if (timeDiffSec > 0 && lastPacketCount > 0) {
                 const rxDiff = (data.packets_rx || 0) - lastPacketCount;
                 const eps = Math.max(0, Math.round(rxDiff / timeDiffSec));
                 document.getElementById('current-eps').textContent = `${eps.toLocaleString()} EPS`;
@@ -336,7 +366,7 @@ function initLiveStream() {
 
     const connect = () => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        liveSocket = new WebSocket(`${protocol}//${window.location.host}/api/v1/logs/live`);
+        liveSocket = new WebSocket(`${protocol}//${window.location.host}/api/v1/logs/live${tenantQuerySuffix()}`);
 
         liveSocket.onmessage = (event) => {
             if (isLivePaused) return;
@@ -452,7 +482,7 @@ async function loadDevices() {
 
         tbody.innerHTML = devices.map(d => `
             <tr>
-                <td><strong>${escapeHtml(d.name)}</strong></td>
+                <td><strong>${escapeHtml(d.name)}</strong>${d.tenant_slug && d.tenant_slug !== 'default' ? ` <span class="tenant-chip" title="Kiracı / Tenant">🏢 ${escapeHtml(d.tenant_slug)}</span>` : ''}</td>
                 <td class="mono-code">${d.ip_address}</td>
                 <td>${escapeHtml(d.vendor)}</td>
                 <td>${escapeHtml(d.device_type)}</td>
@@ -772,6 +802,7 @@ function initDeviceModal() {
             const ipInp = document.getElementById('dev-ip');
             if (nameInp) nameInp.value = '';
             if (ipInp) ipInp.value = '';
+            populateDeviceTenantSelect();
             modal.style.display = 'flex';
         });
     }
@@ -810,6 +841,8 @@ function initDeviceModal() {
             device_type: document.getElementById('dev-type').value,
             group_name: document.getElementById('dev-group') ? document.getElementById('dev-group').value : 'Default',
         };
+        const tenantSel = document.getElementById('dev-tenant');
+        if (tenantSel && tenantSel.value) payload.tenant_slug = tenantSel.value;
         try {
             const res = await fetch('/api/v1/devices', {
                 method: 'POST',
@@ -1939,35 +1972,46 @@ async function loadCacheStats() {
         const enEl = document.getElementById('setting-cache-enabled');
         if (enEl) enEl.checked = !!s.enabled;
 
+        // Field names must match internal/cache.CacheStats JSON tags
+        const totalMB = Number(s.total_system_memory_mb || 0);
+        const availMB = Number(s.avail_system_memory_mb || 0);
+        const maxMB = Number(s.max_memory_mb || 0);
+        const curMB = Number(s.current_memory_mb || 0);
+        const pct = Math.round(Number(s.target_percent || 60));
+        const fmtMB = (mb) => mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(1)} MB`;
+
         const totEl = document.getElementById('cache-total-ram');
-        if (totEl) totEl.textContent = s.total_ram_mb > 0 ? `${(s.total_ram_mb / 1024).toFixed(2)} GB` : '-';
+        if (totEl) totEl.textContent = totalMB > 0 ? fmtMB(totalMB) : '-';
 
         const availEl = document.getElementById('cache-avail-ram');
-        if (availEl) availEl.textContent = s.avail_ram_mb > 0 ? `${(s.avail_ram_mb / 1024).toFixed(2)} GB` : '-';
+        if (availEl) availEl.textContent = availMB > 0 ? fmtMB(availMB) : '-';
 
         const budgetEl = document.getElementById('cache-budget-ram');
-        if (budgetEl) budgetEl.textContent = s.max_memory_mb > 0 ? `${(s.max_memory_mb / 1024).toFixed(2)} GB (60%)` : '-';
+        if (budgetEl) budgetEl.textContent = maxMB > 0 ? `${fmtMB(maxMB)} (${pct}%)` : '-';
 
         const usageEl = document.getElementById('cache-usage-ram');
-        if (usageEl) usageEl.textContent = `${(s.used_memory_mb || 0).toFixed(2)} MB`;
+        if (usageEl) {
+            const usedPct = maxMB > 0 ? ` · ${((curMB / maxMB) * 100).toFixed(2)}%` : '';
+            usageEl.textContent = `${curMB.toFixed(2)} MB${usedPct}`;
+        }
 
         const itemsEl = document.getElementById('cache-items-count');
-        if (itemsEl) itemsEl.textContent = (s.cached_items || 0).toLocaleString();
+        if (itemsEl) itemsEl.textContent = Number(s.item_count || 0).toLocaleString();
 
         const hitRatioEl = document.getElementById('cache-hit-ratio');
-        if (hitRatioEl) hitRatioEl.textContent = `${(s.hit_ratio_pct || 0).toFixed(1)}%`;
+        if (hitRatioEl) hitRatioEl.textContent = `${Number(s.hit_ratio_percent || 0).toFixed(1)}%`;
 
         const hitsEl = document.getElementById('cache-hits-count');
-        if (hitsEl) hitsEl.textContent = (s.hits || 0).toLocaleString();
+        if (hitsEl) hitsEl.textContent = Number(s.hit_count || 0).toLocaleString();
 
         const missesEl = document.getElementById('cache-misses-count');
-        if (missesEl) missesEl.textContent = (s.misses || 0).toLocaleString();
+        if (missesEl) missesEl.textContent = Number(s.miss_count || 0).toLocaleString();
 
         const badge = document.getElementById('cache-status-badge');
         if (badge) {
             if (s.enabled) {
                 badge.className = 'badge badge-success';
-                badge.textContent = 'Active (Up to 60% RAM)';
+                badge.textContent = `Active (Up to ${pct}% RAM)`;
             } else {
                 badge.className = 'badge badge-secondary';
                 badge.textContent = 'Disabled';
@@ -4460,7 +4504,23 @@ function renderFilteredSIEMRules() {
     });
 
     if (badge) {
-        badge.textContent = `${filtered.length} / ${allSIEMRules.length} Rules`;
+        // Category-centric summary: count distinct curated catalog categories (MITRE-* dynamic rules excluded)
+        const catSet = new Set(
+            allSIEMRules
+                .filter(r => !(r.id || '').startsWith('MITRE-'))
+                .map(r => (r.category || '').toLowerCase())
+                .filter(Boolean)
+        );
+        const shownCats = new Set(filtered.map(r => (r.category || '').toLowerCase()).filter(Boolean));
+        const activeCount = filtered.filter(r => r.is_enabled).length;
+        const isTR = !window.i18n || window.i18n.currentLang !== 'en';
+        const catLabel = catVal ? `${shownCats.size} / ${catSet.size}` : `${catSet.size}`;
+        badge.textContent = isTR
+            ? `${catLabel} Kategori · ${activeCount}/${filtered.length} aktif kural`
+            : `${catLabel} Categories · ${activeCount}/${filtered.length} active rules`;
+        badge.title = isTR
+            ? `Toplam ${allSIEMRules.length} kural`
+            : `${allSIEMRules.length} rules total`;
     }
 
     if (filtered.length === 0) {
@@ -5201,18 +5261,91 @@ window.optimizeSIEMDeviceRules = async () => {
 let currentTenants = [];
 let currentTenantContext = localStorage.getItem('active_tenant_slug') || 'all';
 let currentEdgeNodes = [];
+let tenantSessionIsRoot = true;
+let tenantTotals = null;
+
+function setTenantContext(slug, { silent = false } = {}) {
+    currentTenantContext = slug || 'all';
+    localStorage.setItem('active_tenant_slug', currentTenantContext);
+    const sel = document.getElementById('tenant-context-selector');
+    if (sel && sel.value !== currentTenantContext) sel.value = currentTenantContext;
+    renderTenantSidebarMeta();
+    if (!silent) refreshTenantScopedViews();
+}
+
+// Re-query every tenant-scoped view so the UI only shows the selected tenant's data
+function refreshTenantScopedViews() {
+    try { loadEdgeNodes(); } catch (e) { /* noop */ }
+    if (typeof loadDevices === 'function') { try { loadDevices(); } catch (e) { /* noop */ } }
+    if (typeof loadUnregisteredSources === 'function') { try { loadUnregisteredSources(); } catch (e) { /* noop */ } }
+    // Dashboard counters: reset EPS baseline and poll immediately
+    lastPacketCount = 0;
+    fetch('/api/v1/dashboard').then(r => r.ok ? r.json() : null).then(data => {
+        if (!data) return;
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        set('stat-logs-today', Number(data.logs_today || 0).toLocaleString());
+        set('stat-total-inserted', Number(data.total_inserted || 0).toLocaleString());
+        set('stat-active-devices', data.active_devices || 0);
+        set('stat-total-devices', `${data.total_devices || 0} registered assets`);
+        set('stat-unknown-sources', data.unknown_sources || 0);
+        if (data.tenant_scope) set('current-eps', `${Math.round(data.tenant_eps || 0).toLocaleString()} EPS`);
+    }).catch(() => {});
+    // Live stream: reconnect with the new ?tenant= (onclose handler reconnects automatically)
+    if (liveSocket && liveSocket.readyState <= 1) {
+        const container = document.getElementById('live-log-container');
+        if (container) { container.innerHTML = ''; liveLogCount = 0; }
+        try { liveSocket.close(); } catch (e) { /* noop */ }
+    }
+    // Log search: re-run if the search view is open
+    const activeNav = document.querySelector('.nav-item.active');
+    if (activeNav && activeNav.getAttribute('data-tab') === 'search') {
+        document.getElementById('btn-search-exec')?.click();
+    }
+    populateDeviceTenantSelect();
+}
+
+function renderTenantSidebarMeta() {
+    const meta = document.getElementById('tenant-context-meta');
+    if (!meta) return;
+    const t = currentTenants.find(x => x.slug === currentTenantContext);
+    const fmtEps = (v) => Math.round(v || 0).toLocaleString();
+    if (!t) {
+        const tot = tenantTotals || { nodes: 0, devices: 0, eps: 0 };
+        meta.innerHTML = `<span class="tenant-meta-pill is-root">∞ Global</span>
+            <span>${tot.nodes} node · ${tot.devices} cihaz · ${fmtEps(tot.eps)} EPS</span>`;
+        return;
+    }
+    const unlimited = t.unlimited || t.slug === 'default';
+    const nodeQuota = unlimited || !t.max_nodes ? '∞' : t.max_nodes;
+    const epsQuota = unlimited || !t.max_eps ? '∞' : Number(t.max_eps).toLocaleString();
+    meta.innerHTML = `<span class="tenant-meta-pill ${unlimited ? 'is-root' : ''}">${unlimited ? '∞ Root' : 'Kiracı'}</span>
+        <span>${t.node_count || 0}/${nodeQuota} node · ${fmtEps(t.current_eps)}/${epsQuota} EPS</span>`;
+}
+
+function populateDeviceTenantSelect() {
+    const sel = document.getElementById('dev-tenant');
+    const group = document.getElementById('dev-tenant-group');
+    if (!sel) return;
+    if (!tenantSessionIsRoot) {
+        if (group) group.style.display = 'none';
+        sel.innerHTML = '';
+        return;
+    }
+    if (group) group.style.display = '';
+    const list = currentTenants.length ? currentTenants : [{ slug: 'default', name: 'Default Organization (Root)' }];
+    sel.innerHTML = list.map(t => `<option value="${escapeHtml(t.slug)}">${escapeHtml(t.name)} (${escapeHtml(t.slug)})</option>`).join('');
+    sel.value = (currentTenantContext && currentTenantContext !== 'all') ? currentTenantContext : 'default';
+}
 
 function initTenantManagement() {
     const sel = document.getElementById('tenant-context-selector');
     if (sel) {
         sel.addEventListener('change', (e) => {
-            currentTenantContext = e.target.value;
-            localStorage.setItem('active_tenant_slug', currentTenantContext);
+            setTenantContext(e.target.value);
             if (typeof showToast === 'function') {
-                showToast(`Kiracı bağlamı güncellendi: ${currentTenantContext}`, 'info');
+                const t = currentTenants.find(x => x.slug === currentTenantContext);
+                showToast(`Kiracı bağlamı: ${t ? t.name : 'Tüm Kiracılar (Global)'}`, 'info');
             }
-            loadEdgeNodes();
-            if (typeof loadDevices === 'function') loadDevices();
         });
     }
     loadTenants();
@@ -5227,17 +5360,34 @@ async function loadTenants() {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         currentTenants = data.tenants || [];
+        tenantTotals = data.totals || null;
+        tenantSessionIsRoot = data.is_root !== false;
 
-        // 1. Populate topbar tenant context selector
+        // Tenant users are locked to their own organization
+        if (!tenantSessionIsRoot && data.current_tenant) {
+            if (currentTenantContext !== data.current_tenant) setTenantContext(data.current_tenant);
+        } else if (currentTenantContext !== 'all' && !currentTenants.some(t => t.slug === currentTenantContext)) {
+            // Stale selection (tenant deleted) → fall back to global view
+            setTenantContext('all');
+        }
+
+        // 1. Populate sidebar tenant context selector
         if (sel) {
-            let options = `<option value="all">🏢 Tüm Kiracılar (Global Görünüm)</option>`;
+            let options = tenantSessionIsRoot ? `<option value="all">🌐 Tüm Kiracılar (Global Görünüm)</option>` : '';
             currentTenants.forEach(t => {
-                const s = (t.slug === currentTenantContext) ? 'selected' : '';
-                options += `<option value="${escapeHtml(t.slug)}" ${s}>🏢 ${escapeHtml(t.name)} (${escapeHtml(t.slug)})</option>`;
+                const icon = t.slug === 'default' ? '👑' : '🏢';
+                options += `<option value="${escapeHtml(t.slug)}">${icon} ${escapeHtml(t.name)}</option>`;
             });
             sel.innerHTML = options;
             sel.value = currentTenantContext;
+            sel.disabled = !tenantSessionIsRoot;
+            const wrap = document.getElementById('tenant-context-wrapper');
+            if (wrap) wrap.classList.toggle('is-locked', !tenantSessionIsRoot);
         }
+        renderTenantSidebarMeta();
+        populateDeviceTenantSelect();
+        const addTenantBtn = document.querySelector('[onclick="openAddTenantModal()"]');
+        if (addTenantBtn) addTenantBtn.style.display = tenantSessionIsRoot ? '' : 'none';
 
         // 2. Populate Settings > Tenants table
         if (tbody) {
@@ -5258,7 +5408,15 @@ async function loadTenants() {
                     ? `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3);">✓ Aktif</span>`
                     : `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);">${escapeHtml(t.status)}</span>`;
 
-                const limitsStr = `<span style="font-size: 0.78rem;">Node: <strong>${t.max_nodes || 'Sınırsız'}</strong> | EPS: <strong>${(t.max_eps || 0).toLocaleString()}</strong></span>`;
+                const unlimited = isDefault || t.unlimited;
+                const nodeQuota = unlimited || !t.max_nodes ? '∞' : t.max_nodes;
+                const epsQuota = unlimited || !t.max_eps ? '∞' : Number(t.max_eps).toLocaleString();
+                const limitsStr = `<div style="font-size: 0.78rem; line-height: 1.5;">
+                        ${unlimited ? '<span class="tenant-meta-pill is-root" style="margin-bottom:3px;">∞ Sınırsız (Root)</span><br>' : ''}
+                        Node: <strong>${t.node_count || 0}</strong> / ${nodeQuota}
+                        &nbsp;|&nbsp; EPS: <strong>${Math.round(t.current_eps || 0).toLocaleString()}</strong> / ${epsQuota}
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">${t.device_count || 0} kayıtlı cihaz</div>
+                    </div>`;
 
                 html += `
                     <tr>
@@ -5292,15 +5450,11 @@ async function loadTenants() {
 }
 
 function switchTenantContext(slug) {
-    currentTenantContext = slug;
-    localStorage.setItem('active_tenant_slug', slug);
-    const sel = document.getElementById('tenant-context-selector');
-    if (sel) sel.value = slug;
+    setTenantContext(slug);
     if (typeof showToast === 'function') {
-        showToast(`Kiracı bağlamına geçildi: ${slug}`, 'success');
+        const t = currentTenants.find(x => x.slug === slug);
+        showToast(`Kiracı bağlamına geçildi: ${t ? t.name : slug}`, 'success');
     }
-    loadEdgeNodes();
-    if (typeof loadDevices === 'function') loadDevices();
 }
 
 function openAddTenantModal() {

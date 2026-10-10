@@ -283,7 +283,8 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := contextWithTimeout(r, 5*time.Second)
 	defer cancel()
 
-	devices, _ := h.pgDB.ListDevices(ctx)
+	tenantScope := h.tenantScope(r)
+	devices, _ := h.pgDB.ListDevicesByTenant(ctx, tenantScope)
 	activeCount := 0
 	warningCount := 0
 	offlineCount := 0
@@ -340,6 +341,14 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	totalIngested += h.chClient.TotalInserted.Load()
 
+	// Tenant-specific counters (root "all" view keeps the global fast-path above)
+	var tenantEPS float64
+	if tenantScope != "" {
+		countToday, totalIngested = h.tenantLogCounts(ctx, tenantScope)
+		unreg = nil // unregistered sources are a root-level concern
+		tenantEPS = h.currentEPSByTenant(ctx)[tenantScope]
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"logs_today":              countToday,
 		"queue_depth":             h.pipeline.QueueDepth(),
@@ -356,7 +365,42 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"dropped_unauthorized":   h.pipeline.DroppedUnauthorized.Load(),
 		"storage":                 storageStats,
 		"metrics":                 h.metricsCollector.GetCurrent(),
+		"tenant_scope":            tenantScope,
+		"tenant_eps":              tenantEPS,
 	})
+}
+
+// tenantLogCounts returns (logs today, logs all-time) for one tenant, cached for 15s.
+func (h *Handler) tenantLogCounts(ctx context.Context, tenant string) (uint64, uint64) {
+	type counts struct {
+		Today uint64 `json:"today"`
+		Total uint64 `json:"total"`
+	}
+	key := cache.MakeKey("tenant_log_counts", tenant)
+	if h.resultCache != nil {
+		if b, ok := h.resultCache.Get(key); ok {
+			var c counts
+			if json.Unmarshal(b, &c) == nil {
+				return c.Today, c.Total
+			}
+		}
+	}
+
+	var c counts
+	todayStart := time.Now().UTC().Truncate(24 * time.Hour)
+	q := fmt.Sprintf("SELECT countIf(event_timestamp >= ?), count() FROM %s.syslog_events WHERE tenant = ?", h.chClient.Database())
+	if rows, err := h.chClient.QueryEvents(ctx, q, todayStart, tenant); err == nil && rows != nil {
+		if rows.Next() {
+			_ = rows.Scan(&c.Today, &c.Total)
+		}
+		rows.Close()
+	}
+	if h.resultCache != nil {
+		if b, err := json.Marshal(c); err == nil {
+			h.resultCache.Set(key, b, 15*time.Second)
+		}
+	}
+	return c.Today, c.Total
 }
 
 func (h *Handler) handleMetricsCurrent(w http.ResponseWriter, r *http.Request) {
@@ -395,7 +439,20 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 	var conditions []string
 	var args []any
 
-	now := time.Now().UTC()
+	// Tenant isolation: tenant users are locked to their tenant; root may pick one or see all
+	tenantScope := h.tenantScope(r)
+	if tenantScope != "" {
+		conditions = append(conditions, "tenant = ?")
+		args = append(args, tenantScope)
+	}
+
+	// Align the relative window to a time bucket so identical searches within the bucket
+	// produce identical SQL args (otherwise time.Now() makes every cache key unique).
+	bucket := 15 * time.Second
+	if timeRange == "7d" || timeRange == "30d" || timeRange == "all" {
+		bucket = time.Minute
+	}
+	now := time.Now().UTC().Truncate(bucket)
 	switch timeRange {
 	case "15m":
 		conditions = append(conditions, "(event_timestamp >= ? OR received_at >= ?)")
@@ -443,7 +500,7 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 	if len(conditions) > 0 {
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
-	cacheKey := cache.MakeKey("search_logs", whereClause, fmt.Sprint(args), strconv.Itoa(limit))
+	cacheKey := cache.MakeKey("search_logs", whereClause, fmt.Sprint(args), strconv.Itoa(limit), "tenant="+tenantScope)
 	if h.resultCache != nil {
 		if cached, hit := h.resultCache.Get(cacheKey); hit {
 			w.Header().Set("Content-Type", "application/json")
@@ -456,7 +513,7 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 
 	sql := fmt.Sprintf(`
 		SELECT internal_id, event_timestamp, source_ip, source_port, transport_protocol,
-		       device_name, vendor, severity, facility, hostname, application_name, message, raw_message
+		       device_name, vendor, severity, facility, hostname, application_name, message, raw_message, tenant
 		FROM %s.syslog_events
 		%s
 		ORDER BY event_timestamp DESC
@@ -485,8 +542,9 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 			app      string
 			msg      string
 			rawMsg   string
+			tenant   string
 		)
-		if err := rows.Scan(&id, &evTime, &srcIP, &srcPort, &proto, &devName, &vendor, &sev, &fac, &host, &app, &msg, &rawMsg); err != nil {
+		if err := rows.Scan(&id, &evTime, &srcIP, &srcPort, &proto, &devName, &vendor, &sev, &fac, &host, &app, &msg, &rawMsg, &tenant); err != nil {
 			continue
 		}
 		results = append(results, map[string]any{
@@ -503,6 +561,7 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 			"application": app,
 			"message":     msg,
 			"raw_message": rawMsg,
+			"tenant":      tenant,
 		})
 	}
 
@@ -512,7 +571,7 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	encoded, err := json.Marshal(respData)
 	if err == nil && h.resultCache != nil {
-		ttl := 15 * time.Second
+		ttl := 30 * time.Second
 		if timeRange == "7d" || timeRange == "30d" || timeRange == "all" {
 			ttl = 2 * time.Minute
 		}
@@ -596,7 +655,17 @@ func (h *Handler) handleLiveWebSocket(w http.ResponseWriter, r *http.Request) {
 	ch := h.pipeline.Subscribe()
 	defer h.pipeline.Unsubscribe(ch)
 
+	scope := h.tenantScope(r) // WebSocket: tenant passed via ?tenant= query
 	for event := range ch {
+		if scope != "" && event != nil {
+			evTenant := event.Tenant
+			if evTenant == "" {
+				evTenant = "default"
+			}
+			if evTenant != scope {
+				continue
+			}
+		}
 		data, err := json.Marshal(event)
 		if err != nil {
 			continue
@@ -631,6 +700,17 @@ func (h *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 		}
 		d.IsEnabled = true
 
+		// Tenant ownership: tenant users always create inside their tenant; root may set
+		// tenant_slug explicitly or inherit the tenant currently selected in the sidebar.
+		if scope := h.tenantScope(r); scope != "" {
+			if sess, ok := h.getSession(r); (ok && !sess.IsRootOperator()) || d.TenantSlug == "" {
+				d.TenantSlug = scope
+			}
+		}
+		if d.TenantSlug == "" {
+			d.TenantSlug = "default"
+		}
+
 		if err := h.pgDB.CreateDevice(ctx, &d); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -647,6 +727,21 @@ func (h *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid device id", http.StatusBadRequest)
 			return
 		}
+		if scope := h.tenantScope(r); scope != "" {
+			owned := false
+			if list, err := h.pgDB.ListDevicesByTenant(ctx, scope); err == nil {
+				for _, dv := range list {
+					if dv.ID == devID {
+						owned = true
+						break
+					}
+				}
+			}
+			if !owned {
+				http.Error(w, "device not found in selected tenant", http.StatusForbidden)
+				return
+			}
+		}
 		if err := h.pgDB.DeleteDevice(ctx, devID); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -656,7 +751,7 @@ func (h *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	devices, err := h.pgDB.ListDevices(ctx)
+	devices, err := h.pgDB.ListDevicesByTenant(ctx, h.tenantScope(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1004,6 +1099,7 @@ func (h *Handler) handleAutoOnboardAll(w http.ResponseWriter, r *http.Request) {
 			IsEnabled:        true,
 			RetentionDays:    365,
 			TimestampPolicy:  "HOURLY",
+			TenantSlug:       h.tenantScope(r),
 		}
 
 		if err := h.pgDB.CreateDevice(ctx, &d); err == nil {

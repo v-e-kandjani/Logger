@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=3.2">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=3.3">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,10 +19,26 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.13</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.14</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
+            </div>
+
+            <!-- Tenant Context Selector (Multi-Tenant MSSP) -->
+            <div class="sidebar-tenant" id="tenant-context-wrapper" title="Aktif Kiracı / Müşteri Görünümü (Tenant Context)">
+                <label class="sidebar-tenant-label" for="tenant-context-selector">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
+                    <span data-i18n="tenant_ctx_label">Aktif Kiracı</span>
+                    <span class="sidebar-tenant-lock" aria-hidden="true">🔒</span>
+                </label>
+                <div class="sidebar-tenant-select-wrap">
+                    <select id="tenant-context-selector" class="sidebar-tenant-select" aria-label="Tenant context">
+                        <option value="all">🌐 Tüm Kiracılar (Global Görünüm)</option>
+                        <option value="default">👑 Default Organization (Root)</option>
+                    </select>
+                </div>
+                <div class="sidebar-tenant-meta" id="tenant-context-meta"></div>
             </div>
 
             <nav class="nav-menu">
@@ -154,15 +170,6 @@
                     <p class="subtitle" id="view-subtitle">High-throughput ingestion & cryptographic verification</p>
                 </div>
                 <div class="top-actions">
-                    <!-- Tenant Context Selector (Multi-Tenant MSSP) -->
-                    <div class="tenant-selector-box" id="tenant-context-wrapper" style="display: flex; align-items: center; gap: 6px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 2px 8px;" title="Aktif Kiracı / Müşteri Görünümü (Tenant Context)">
-                        <span style="font-size: 13px;">🏢</span>
-                        <select id="tenant-context-selector" style="background: transparent; border: none; color: var(--text-main); font-size: 0.78rem; font-weight: 600; cursor: pointer; outline: none; padding: 3px 0;">
-                            <option value="all" style="background: var(--bg-surface); color: var(--text-main);">🏢 Tüm Kiracılar (Global Görünüm)</option>
-                            <option value="default" style="background: var(--bg-surface); color: var(--text-main);">🏢 default (Ana Sistem)</option>
-                        </select>
-                    </div>
-
                     <!-- Multilingual Switcher -->
                     <div class="lang-switcher">
                         <button class="lang-btn active" id="lang-btn-tr" onclick="i18n.setLanguage('tr')">🇹🇷 TR</button>
@@ -1690,12 +1697,12 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.13</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.14</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">a242e75</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">2288cc6</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-11</div>
                     </div>
                     <div class="stat-card">
@@ -1840,6 +1847,12 @@
                         <option value="Datacenter Servers">Datacenter Servers</option>
                         <option value="Edge / Branch Office">Edge / Branch Office</option>
                         <option value="Default" selected>Default Assets</option>
+                    </select>
+                </div>
+                <div class="form-group" id="dev-tenant-group">
+                    <label>🏢 Kiracı / Tenant</label>
+                    <select class="input" id="dev-tenant">
+                        <option value="default">Default Organization (Root)</option>
                     </select>
                 </div>
             </div>
@@ -2249,7 +2262,7 @@
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-size: 20px;">⚙️</span>
                     <h3 style="margin: 0;" data-i18n="siem_rules_title">SIEM Correlation & Detection Catalog</h3>
-                    <span class="badge badge-mitre" id="siem-rules-count-badge" style="margin-left: 8px;">72 Rules</span>
+                    <span class="badge badge-mitre" id="siem-rules-count-badge" style="margin-left: 8px;">12 Kategori</span>
                 </div>
                 <button class="close-btn" id="btn-close-siem-rules">&times;</button>
             </div>
@@ -2276,9 +2289,9 @@
                             <option value="linux">7. Linux Privilege & Persistence</option>
                             <option value="cloud">8. Cloud Identity & Control-Plane</option>
                             <option value="mail_web">9. Email, Collab & Web Apps</option>
-                            <option value="data_theft">10. Data Theft & Ransomware</option>
+                            <option value="data">10. Data Theft & Ransomware</option>
                             <option value="defense_evasion">11. Defense Evasion & Indicators</option>
-                            <option value="logger_health">12. Logger Health & Integrity</option>
+                            <option value="health">12. Logger Health & Integrity</option>
                         </select>
                     </div>
                     <div style="display: flex; align-items: center; gap: 6px;">
@@ -3003,7 +3016,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.13"></script>
-    <script src="/static/js/app.js?v=1.5.13"></script>
+    <script src="/static/js/translations.js?v=1.5.14"></script>
+    <script src="/static/js/app.js?v=1.5.14"></script>
 </body>
 </html>

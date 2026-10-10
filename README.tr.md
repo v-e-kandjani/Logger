@@ -249,6 +249,15 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.14** (Gerçek Kiracı Veri İzolasyonu, Kenar Çubuğunda Kiracı Seçici, Sınırsız Root Kiracı, Çalışan Kural Optimizasyonu ve Sorgu Önbelleği Telemetrisi):
+  - **Gerçek Çoklu Kiracı Veri İzolasyonu**: Loglar (ClickHouse `syslog_events.tenant`) ve cihazlar (`devices.tenant_slug`) artık kiracı sahipliği taşır. Edge proxy logları düğümün kiracısını, doğrudan syslog ise kayıtlı cihazın kiracısını alır. Arama, dashboard sayaçları, cihazlar, edge düğümleri, canlı akış ve EPS seçili kiracıya göre sunucu tarafında filtrelenir (`X-Tenant` başlığı / `?tenant=`). Kiracı kullanıcıları her zaman kendi kiracılarına kilitlidir.
+  - **Kenar Çubuğunda Kiracı Seçici**: Kiracı bağlam seçici üst başlıktan kenar çubuğuna taşındı; seçili kiracının kullanımını (node · cihaz · EPS) ve kotasını gösterir, değiştirildiğinde tüm görünümler anında yenilenir. Kiracı yöneticileri için kilitlidir (🔒).
+  - **Sınırsız Root Kiracı**: `default` (root/MSSP) kiracısının node/EPS kotası yoktur (∞) ve tüm kiracıların node ve EPS değerlerini toplar. Node kotası yalnızca müşteri kiracılarında uygulanır.
+  - **Kiracı Yöneticisi Kalıcılık Düzeltmesi**: Kullanıcıların `tenant_slug` / `is_tenant_admin` alanları artık kaydedilir ve okunur; mevcut kiracı yöneticileri otomatik olarak düzeltilir.
+  - **Cihaza Göre Kural Optimizasyonu Düzeltmesi**: "Kuralları cihazlarıma göre optimize et" artık tespit kurallarını gerçekten açıp kapatır (upsert `is_enabled` alanını yok sayıyordu), cihazları 12 gerçek kategoriye eşler ve açılan/kapatılan sayılarını raporlar.
+  - **Tespit Kuralları Başlığı**: Ham "72" yerine "12 Kategori · aktif/gösterilen kural" gösterilir; kategori filtre değerleri düzeltildi (`data`, `health`).
+  - **Bellek İçi Sorgu Önbelleği Telemetri Düzeltmesi**: Toplam/kullanılabilir RAM, bütçe, kullanım, öğe, isabet/ıska değerleri artık doğru görünür (JSON alan uyuşmazlığı). Arama önbellek anahtarları zaman dilimine hizalandı; tekrar eden sorgular gerçekten önbellekten döner.
+
 - **v1.5.13** (Özel Sertifika Formatı Seçimi (PFX/P12 vs PEM), Çoklu Kiracı (MSSP) Yönetimi, Düğüm Yöneticisi Aktivasyonu ve Ön-Yapılandırması, Proxy Üzerinden LDAP ve Donanım Ön-Kontrolü):
   - **Açık Sertifika Formatı Seçimi (PFX/P12 Arşivi vs. Standart PEM/CRT)**: Sertifika yükleme alanına format seçici açılır liste eklendi. `PFX / PKCS#12` seçildiğinde yalnızca tek dosya (.pfx, .p12) ve şifre istenir; ayrı özel anahtar alanı tamamen gizlenir. `PEM / CRT` seçildiğinde ise sertifika ve özel anahtar dosyaları istenir.
   - **Çoklu Kiracı (Multi-Tenant MSSP) Organizasyon ve Bağlam Değiştirici**: `tenants` tablosu, kiracı süper yöneticisi ataması ve kaynak kotaları (maksimum düğüm ve EPS) ile tam müşteri yönetimi sağlandı. Üst başlığa eklenen Kiracı Bağlamı Seçicisi ile Kök Süper Yönetici dilerse tüm sistem verilerini, dilerse belirli bir müşterinin izole verilerini görüntüleyebilir.

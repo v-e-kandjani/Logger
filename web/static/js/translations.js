@@ -3,7 +3,8 @@ const translations = {
     tr: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.5.13",
+        tenant_ctx_label: "Aktif Kiracı",
+        app_version: "v1.5.14",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         nav_sub_all: "Tüm Ayarlar",
@@ -121,8 +122,8 @@ const translations = {
         th_events: "Olay Sayısı",
         th_assigned: "Atanan",
         loading_alerts: "Güvenlik alarmları yükleniyor...",
-        siem_rules_title: "SIEM Korelasyon & Tespit Kataloğu (72 Kural)",
-        siem_rules_desc: "12 kategoride 72 tespit kuralı, gelen normalize logları kayan pencerelerde sürekli değerlendirir.",
+        siem_rules_title: "SIEM Korelasyon & Tespit Kataloğu (12 Kategori)",
+        siem_rules_desc: "12 operasyonel ve tehdit kategorisinde gruplanmış tespit kuralları, gelen normalize logları kayan pencerelerde sürekli değerlendirir.",
         sim_modal_title: "Güvenlik Saldırı Senaryoları Simülasyonu",
         sim_modal_desc: "Korelasyon motoruna anında saldırı telemetrisi enjekte ederek kuralları ve alarmları test edin.",
         filter_all: "Tümü",
@@ -370,7 +371,8 @@ const translations = {
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.5.13",
+        tenant_ctx_label: "Active Tenant",
+        app_version: "v1.5.14",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         nav_sub_all: "All Settings",
@@ -488,8 +490,8 @@ const translations = {
         th_events: "Events",
         th_assigned: "Assigned",
         loading_alerts: "Loading security alerts...",
-        siem_rules_title: "SIEM Correlation & Detection Catalog (72 Rules)",
-        siem_rules_desc: "Categorized 72-rule detection catalog across 12 operational and threat domains continuously evaluating sliding windows.",
+        siem_rules_title: "SIEM Correlation & Detection Catalog (12 Categories)",
+        siem_rules_desc: "Detection catalog grouped into 12 operational and threat categories, continuously evaluating sliding windows.",
         sim_modal_title: "Simulate Security Attack Scenarios",
         sim_modal_desc: "Instantly inject normalized attack telemetry into the correlation engine to verify detection rules, alert generation, and SOC response.",
         filter_all: "All",

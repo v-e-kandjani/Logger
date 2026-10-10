@@ -34,6 +34,7 @@ type LogEvent struct {
 	CollectorNode      string    `json:"collector_node"`
 	ParserStatus       string    `json:"parser_status"` // SUCCESS, PARTIAL, FAILED
 	IngestionTimestamp time.Time `json:"ingestion_timestamp"`
+	Tenant             string    `json:"tenant"` // owning tenant slug ("default" = root)
 }
 
 // Device represents a registered syslog sending asset
@@ -58,6 +59,7 @@ type Device struct {
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 	SyslogStatus      string    `json:"syslog_status"` // HEALTHY, WARNING, OFFLINE, NEVER_SEEN
+	TenantSlug        string    `json:"tenant_slug"`   // owning tenant ("default" = root)
 }
 
 // DeviceGroup groups devices for management, search, and policy enforcement

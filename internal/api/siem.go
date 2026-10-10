@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -878,21 +879,31 @@ func (h *Handler) handleSIEMMitreOptimizeDevices(w http.ResponseWriter, r *http.
 	// Make sure correlation rules are synced for known techniques
 	_, _ = h.AutoAddMitreCorrelationRules(ctx, h.mitreCatalog.GetAllTechniques())
 
-	// 1. Analyze device inventory: vendors, device types
+	// 1. Analyze device inventory: vendors, device types (enabled devices only)
 	vendorMap := make(map[string]int)
 	typeMap := make(map[string]int)
-	hasFirewall := false
-	hasActiveDirectory := false
-	hasLinuxServer := false
-	hasGenericNetwork := false
+	hasFirewall, hasWindows, hasLinux, hasSwitch := false, false, false, false
+	hasMailWeb, hasCloud, hasData := false, false, false
+	enabledDevices := 0
+
+	containsAny := func(s string, subs ...string) bool {
+		for _, sub := range subs {
+			if strings.Contains(s, sub) {
+				return true
+			}
+		}
+		return false
+	}
 
 	for _, d := range devices {
 		if !d.IsEnabled {
 			continue
 		}
+		enabledDevices++
 		v := strings.ToLower(strings.TrimSpace(d.Vendor))
 		dt := strings.ToLower(strings.TrimSpace(d.DeviceType))
 		name := strings.ToLower(strings.TrimSpace(d.Name))
+		all := v + " " + dt
 
 		if d.Vendor != "" {
 			vendorMap[strings.TrimSpace(d.Vendor)]++
@@ -901,105 +912,92 @@ func (h *Handler) handleSIEMMitreOptimizeDevices(w http.ResponseWriter, r *http.
 			typeMap[strings.TrimSpace(d.DeviceType)]++
 		}
 
-		// Check profiles
-		if strings.Contains(v, "forti") || strings.Contains(v, "watchguard") || strings.Contains(v, "cisco") ||
-			strings.Contains(v, "palo") || strings.Contains(v, "pfsense") || strings.Contains(v, "sophos") ||
-			strings.Contains(v, "checkpoint") || strings.Contains(dt, "firewall") || strings.Contains(dt, "utm") ||
-			strings.Contains(dt, "router") || strings.Contains(name, "fgt") || strings.Contains(name, "firewall") {
+		if containsAny(all, "forti", "watchguard", "palo", "pfsense", "opnsense", "sophos", "checkpoint", "check point", "firewall", "utm", "asa", "juniper srx") ||
+			containsAny(name, "fgt", "firewall", "fw-", "-fw") {
 			hasFirewall = true
 		}
-
-		if strings.Contains(v, "windows") || strings.Contains(v, "microsoft") || strings.Contains(dt, "active directory") ||
-			strings.Contains(dt, "domain") || strings.Contains(dt, "ldap") || strings.Contains(name, "dc") ||
-			strings.Contains(name, "ad") {
-			hasActiveDirectory = true
+		// Windows / AD — use explicit vendor/type tokens; avoid substring "ad"/"dc" which matched nearly every name
+		if containsAny(all, "windows", "microsoft", "active directory", "domain controller", "ldap", "exchange") ||
+			strings.HasPrefix(name, "dc0") || strings.HasPrefix(name, "dc-") || containsAny(name, "-dc0", "-dc-", "domain") {
+			hasWindows = true
 		}
-
-		if strings.Contains(v, "linux") || strings.Contains(v, "ubuntu") || strings.Contains(v, "debian") ||
-			strings.Contains(v, "centos") || strings.Contains(v, "redhat") || strings.Contains(dt, "server") ||
-			strings.Contains(name, "server") || strings.Contains(name, "linux") {
-			hasLinuxServer = true
+		if containsAny(all, "linux", "ubuntu", "debian", "centos", "redhat", "rhel", "rocky", "alma", "unix", "server") ||
+			containsAny(name, "linux", "ubuntu", "srv") {
+			hasLinux = true
 		}
-
-		if strings.Contains(v, "generic") || strings.Contains(dt, "switch") || strings.Contains(dt, "syslog") {
-			hasGenericNetwork = true
+		if containsAny(all, "switch", "router", "cisco", "aruba", "mikrotik", "huawei", "hp procurve", "juniper", "ubiquiti", "access point", "wlc") {
+			hasSwitch = true
+		}
+		if containsAny(all, "mail", "exchange", "postfix", "smtp", "nginx", "apache", "iis", "web", "proxy", "squid", "waf") {
+			hasMailWeb = true
+		}
+		if containsAny(all, "aws", "azure", "gcp", "google cloud", "office 365", "o365", "m365", "cloud") {
+			hasCloud = true
+		}
+		if containsAny(all, "sql", "oracle", "postgres", "mysql", "mongo", "database", "nas", "storage", "file server", "synology", "qnap") {
+			hasData = true
 		}
 	}
 
-	// Default fallback to perimeter + server defense if inventory is minimal
-	if len(devices) == 0 {
-		hasFirewall = true
-		hasLinuxServer = true
-		hasGenericNetwork = true
+	// Default fallback when no enabled devices are registered
+	if enabledDevices == 0 {
+		hasFirewall, hasLinux, hasSwitch = true, true, true
 	}
 
-	// 2. Build set of prioritized MITRE techniques & rule categories
+	// 2. Build set of prioritized rule categories (the 12 catalog categories) & MITRE techniques
 	relevantTechs := make(map[string]bool)
 	relevantCategories := make(map[string]bool)
 	var profiles []string
 
-	// Base Profile: Infrastructure Integrity & Log Protection (Always active)
-	profiles = append(profiles, "Log Integrity & Anti-Tampering (RFC 3164 / 5651)")
-	relevantTechs["T1562.001"] = true // Disable or Modify Tools
-	relevantTechs["T1070.002"] = true // Clear System Logs
-	relevantTechs["T1082"] = true     // System Information Discovery
-	relevantCategories["system"] = true
-	relevantCategories["compliance"] = true
+	// Base profile (always on): platform health & anti-tampering
+	profiles = append(profiles, "Log Integrity & Anti-Tampering (5651)")
 	relevantCategories["health"] = true
+	relevantCategories["defense_evasion"] = true
+	relevantTechs["T1562.001"] = true
+	relevantTechs["T1070.002"] = true
 
 	if hasFirewall {
-		profiles = append(profiles, "Next-Gen Firewall & Perimeter UTM (Fortinet, WatchGuard, Cisco)")
+		profiles = append(profiles, "Next-Gen Firewall & Perimeter UTM")
 		relevantCategories["perimeter"] = true
 		relevantCategories["network"] = true
-		relevantCategories["reconnaissance"] = true
-
-		firewallTechs := []string{
-			"T1046", "T1595", "T1595.001", "T1595.002", "T1190", "T1133",
-			"T1071", "T1071.001", "T1071.004", "T1048", "T1048.003",
-			"T1090", "T1090.001", "T1562.004", "T1498", "T1498.001",
-			"T1499", "T1041", "T1095", "T1571", "T1572", "T1573",
-			"T1021.001", "T1021.002", "T1021.004", "T1040", "T1210",
-		}
-		for _, t := range firewallTechs {
+		for _, t := range []string{"T1046", "T1595", "T1190", "T1133", "T1071", "T1048", "T1090", "T1562.004", "T1498", "T1499", "T1041", "T1095", "T1571", "T1572", "T1573"} {
 			relevantTechs[t] = true
 		}
 	}
-
-	if hasActiveDirectory {
-		profiles = append(profiles, "Active Directory & Identity Defense (LDAP / Kerberos / SSO)")
+	if hasSwitch {
+		profiles = append(profiles, "Network Infrastructure (Switch / Router / Wireless)")
+		relevantCategories["network"] = true
+		relevantCategories["network_admin"] = true
+	}
+	if hasWindows {
+		profiles = append(profiles, "Windows & Active Directory Identity Defense")
+		relevantCategories["windows"] = true
 		relevantCategories["authentication"] = true
-		relevantCategories["identity"] = true
-
-		adTechs := []string{
-			"T1110", "T1110.001", "T1110.002", "T1110.003", "T1078", "T1078.002", "T1078.003",
-			"T1003", "T1003.001", "T1003.002", "T1558", "T1558.003",
-			"T1098", "T1075", "T1069", "T1069.002", "T1484", "T1207",
-		}
-		for _, t := range adTechs {
+		relevantCategories["privilege"] = true
+		for _, t := range []string{"T1110", "T1078", "T1003", "T1558", "T1098", "T1069", "T1484", "T1207"} {
 			relevantTechs[t] = true
 		}
 	}
-
-	if hasLinuxServer {
+	if hasLinux {
 		profiles = append(profiles, "Linux / Unix Server & Remote Shell Auditing")
+		relevantCategories["linux"] = true
 		relevantCategories["authentication"] = true
-		relevantCategories["endpoint"] = true
-
-		serverTechs := []string{
-			"T1110.001", "T1548.003", "T1059.004", "T1070.003",
-			"T1053.003", "T1053", "T1543.002", "T1082", "T1057",
-		}
-		for _, t := range serverTechs {
+		relevantCategories["privilege"] = true
+		for _, t := range []string{"T1110.001", "T1548.003", "T1059.004", "T1070.003", "T1053.003", "T1543.002"} {
 			relevantTechs[t] = true
 		}
 	}
-
-	if hasGenericNetwork {
-		profiles = append(profiles, "Network Infrastructure & Syslog Anomaly Detection")
-		relevantTechs["T1046"] = true
-		relevantTechs["T1071.001"] = true
-		relevantTechs["T1110.001"] = true
-		relevantTechs["T1562.001"] = true
+	if hasMailWeb {
+		profiles = append(profiles, "Mail & Web Services")
+		relevantCategories["mail_web"] = true
+	}
+	if hasCloud {
+		profiles = append(profiles, "Cloud & SaaS Workloads")
+		relevantCategories["cloud"] = true
+	}
+	if hasData {
+		profiles = append(profiles, "Database & File / Storage Services")
+		relevantCategories["data"] = true
 	}
 
 	// 3. Fetch all current rules from PostgreSQL
@@ -1009,10 +1007,12 @@ func (h *Handler) handleSIEMMitreOptimizeDevices(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// 4. Determine enable/disable state for each rule
+	// 4. Determine enable/disable state for each rule.
+	// Curated catalog rules are decided by category; dynamic MITRE-* rules by technique.
 	activatedCount := 0
 	deactivatedCount := 0
-	var rulesToUpdate []models.SIEMRule
+	var enableIDs, disableIDs []string
+	activeCategorySet := make(map[string]bool)
 
 	for _, rule := range allRules {
 		tech := rule.MitreTechnique
@@ -1020,31 +1020,40 @@ func (h *Handler) handleSIEMMitreOptimizeDevices(w http.ResponseWriter, r *http.
 		if idx := strings.Index(tech, "."); idx != -1 {
 			baseTech = tech[:idx]
 		}
+		cat := strings.ToLower(rule.Category)
 
-		shouldEnable := relevantTechs[tech] || relevantTechs[baseTech] || relevantCategories[strings.ToLower(rule.Category)]
+		var shouldEnable bool
+		if strings.HasPrefix(rule.ID, "MITRE-") {
+			shouldEnable = relevantTechs[tech] || relevantTechs[baseTech]
+		} else {
+			shouldEnable = relevantCategories[cat]
+		}
 
 		if shouldEnable {
-			if !rule.IsEnabled {
-				rule.IsEnabled = true
-				rulesToUpdate = append(rulesToUpdate, rule)
-			}
 			activatedCount++
-		} else {
-			if rule.IsEnabled {
-				rule.IsEnabled = false
-				rulesToUpdate = append(rulesToUpdate, rule)
+			activeCategorySet[cat] = true
+			if !rule.IsEnabled {
+				enableIDs = append(enableIDs, rule.ID)
 			}
+		} else {
 			deactivatedCount++
+			if rule.IsEnabled {
+				disableIDs = append(disableIDs, rule.ID)
+			}
 		}
 	}
 
-	// 5. Batch update rules in PostgreSQL
-	if len(rulesToUpdate) > 0 {
-		if err := h.pgDB.BatchUpsertSIEMRules(ctx, rulesToUpdate); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed updating rules: " + err.Error()})
-			return
-		}
+	// 5. Persist enable state (explicit UPDATE — upsert intentionally preserves is_enabled)
+	if err := h.pgDB.SetSIEMRulesEnabledState(ctx, enableIDs, disableIDs); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed updating rules: " + err.Error()})
+		return
 	}
+
+	var activeCategories []string
+	for c := range activeCategorySet {
+		activeCategories = append(activeCategories, c)
+	}
+	sort.Strings(activeCategories)
 
 	// 6. Hot-reload SIEM correlation engine
 	if engine := h.pipeline.GetSIEMEngine(); engine != nil {
@@ -1068,9 +1077,12 @@ func (h *Handler) handleSIEMMitreOptimizeDevices(w http.ResponseWriter, r *http.
 		"profiles":          profiles,
 		"activated_rules":   activatedCount,
 		"deactivated_rules": deactivatedCount,
+		"changed_enabled":   len(enableIDs),
+		"changed_disabled":  len(disableIDs),
+		"active_categories": activeCategories,
 		"total_rules":       len(allRules),
 		"message": fmt.Sprintf("Optimized detection rule set applied for %d inventory devices (%s). %d relevant threat rules activated across %d security profiles.",
-			len(devices), strings.Join(vendorList, ", "), activatedCount, len(profiles)),
+			enabledDevices, strings.Join(vendorList, ", "), activatedCount, len(profiles)),
 	})
 }
 

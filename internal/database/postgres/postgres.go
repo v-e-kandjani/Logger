@@ -135,16 +135,27 @@ func (dc *DeviceCache) LookupIP(ipStr string) (*models.Device, bool) {
 // --- Device Repository Methods ---
 
 func (db *DB) ListDevices(ctx context.Context) ([]models.Device, error) {
+	return db.ListDevicesByTenant(ctx, "")
+}
+
+// ListDevicesByTenant returns devices owned by the given tenant slug ("" or "all" = every tenant)
+func (db *DB) ListDevicesByTenant(ctx context.Context, tenant string) ([]models.Device, error) {
 	query := `
 		SELECT d.id, d.name, host(d.ip_address), d.hostname, d.description, d.vendor,
 		       d.device_type, d.group_id, COALESCE(g.name, ''), d.site_location,
 		       d.expected_protocol, d.expected_port, d.is_enabled, d.retention_days,
-		       d.timestamping_policy, d.last_seen_at, d.tags, d.created_at, d.updated_at
+		       d.timestamping_policy, d.last_seen_at, d.tags, d.created_at, d.updated_at,
+		       COALESCE(d.tenant_slug, 'default')
 		FROM devices d
-		LEFT JOIN device_groups g ON d.group_id = g.id
-		ORDER BY d.name ASC`
+		LEFT JOIN device_groups g ON d.group_id = g.id`
+	var args []any
+	if tenant != "" && tenant != "all" {
+		query += ` WHERE COALESCE(d.tenant_slug, 'default') = $1`
+		args = append(args, tenant)
+	}
+	query += ` ORDER BY d.name ASC`
 
-	rows, err := db.pool.Query(ctx, query)
+	rows, err := db.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +172,7 @@ func (db *DB) ListDevices(ctx context.Context) ([]models.Device, error) {
 			&d.DeviceType, &d.GroupID, &d.GroupName, &d.SiteLocation,
 			&d.ExpectedProtocol, &d.ExpectedPort, &d.IsEnabled, &d.RetentionDays,
 			&d.TimestampPolicy, &lastSeen, &d.Tags, &d.CreatedAt, &d.UpdatedAt,
+			&d.TenantSlug,
 		)
 		if err != nil {
 			return nil, err
@@ -200,12 +212,15 @@ func (db *DB) CreateDevice(ctx context.Context, d *models.Device) error {
 	if d.Tags == nil {
 		d.Tags = []string{}
 	}
+	if d.TenantSlug == "" {
+		d.TenantSlug = "default"
+	}
 
 	query := `
 		INSERT INTO devices (name, ip_address, hostname, description, vendor, device_type,
 		                     group_id, site_location, expected_protocol, expected_port,
-		                     is_enabled, retention_days, timestamping_policy, tags)
-		VALUES ($1, $2::inet, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		                     is_enabled, retention_days, timestamping_policy, tags, tenant_slug)
+		VALUES ($1, $2::inet, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		ON CONFLICT (ip_address) DO UPDATE
 		SET name = EXCLUDED.name,
 		    hostname = CASE WHEN EXCLUDED.hostname != '' THEN EXCLUDED.hostname ELSE devices.hostname END,
@@ -213,6 +228,7 @@ func (db *DB) CreateDevice(ctx context.Context, d *models.Device) error {
 		    vendor = EXCLUDED.vendor,
 		    device_type = EXCLUDED.device_type,
 		    group_id = COALESCE(EXCLUDED.group_id, devices.group_id),
+		    tenant_slug = EXCLUDED.tenant_slug,
 		    is_enabled = TRUE,
 		    updated_at = NOW()
 		RETURNING id, created_at, updated_at`
@@ -220,7 +236,7 @@ func (db *DB) CreateDevice(ctx context.Context, d *models.Device) error {
 	err := db.pool.QueryRow(ctx, query,
 		d.Name, d.IPAddress, d.Hostname, d.Description, d.Vendor, d.DeviceType,
 		d.GroupID, d.SiteLocation, d.ExpectedProtocol, d.ExpectedPort,
-		d.IsEnabled, d.RetentionDays, d.TimestampPolicy, d.Tags,
+		d.IsEnabled, d.RetentionDays, d.TimestampPolicy, d.Tags, d.TenantSlug,
 	).Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		return err
@@ -461,7 +477,8 @@ func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.U
 		       COALESCE(auth_source, 'local'), COALESCE(mfa_enabled, false),
 		       COALESCE(mfa_secret, ''), COALESCE(mfa_recovery_codes, '{}'),
 		       mfa_enrolled_at, COALESCE(mfa_provider, 'totp'),
-		       last_login_at, created_at, updated_at
+		       last_login_at, created_at, updated_at,
+		       COALESCE(tenant_slug, 'default'), COALESCE(is_tenant_admin, false)
 		FROM users
 		WHERE LOWER(username) = LOWER($1)`
 
@@ -473,6 +490,7 @@ func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.U
 		&u.Role, &u.IsEnabled, &u.AuthSource, &u.MFAEnabled,
 		&u.MFASecret, &u.MFARecoveryCodes, &enrolledAt, &u.MFAProvider,
 		&lastLogin, &u.CreatedAt, &u.UpdatedAt,
+		&u.TenantSlug, &u.IsTenantAdmin,
 	)
 	if err != nil {
 		return nil, err
@@ -488,7 +506,8 @@ func (db *DB) GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, erro
 		       COALESCE(auth_source, 'local'), COALESCE(mfa_enabled, false),
 		       COALESCE(mfa_secret, ''), COALESCE(mfa_recovery_codes, '{}'),
 		       mfa_enrolled_at, COALESCE(mfa_provider, 'totp'),
-		       last_login_at, created_at, updated_at
+		       last_login_at, created_at, updated_at,
+		       COALESCE(tenant_slug, 'default'), COALESCE(is_tenant_admin, false)
 		FROM users
 		WHERE id = $1`
 
@@ -500,6 +519,7 @@ func (db *DB) GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, erro
 		&u.Role, &u.IsEnabled, &u.AuthSource, &u.MFAEnabled,
 		&u.MFASecret, &u.MFARecoveryCodes, &enrolledAt, &u.MFAProvider,
 		&lastLogin, &u.CreatedAt, &u.UpdatedAt,
+		&u.TenantSlug, &u.IsTenantAdmin,
 	)
 	if err != nil {
 		return nil, err
@@ -542,7 +562,8 @@ func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
 		SELECT id, username, full_name, email, role, is_enabled,
 		       COALESCE(auth_source, 'local'), COALESCE(mfa_enabled, false),
 		       mfa_enrolled_at, COALESCE(mfa_provider, 'totp'),
-		       last_login_at, created_at, updated_at
+		       last_login_at, created_at, updated_at,
+		       COALESCE(tenant_slug, 'default'), COALESCE(is_tenant_admin, false)
 		FROM users
 		ORDER BY created_at ASC`
 
@@ -562,6 +583,7 @@ func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
 			&u.Role, &u.IsEnabled, &u.AuthSource, &u.MFAEnabled,
 			&enrolledAt, &u.MFAProvider,
 			&lastLogin, &u.CreatedAt, &u.UpdatedAt,
+			&u.TenantSlug, &u.IsTenantAdmin,
 		)
 		if err != nil {
 			return nil, err
@@ -585,14 +607,18 @@ func (db *DB) CreateUser(ctx context.Context, u *models.User, plainPassword stri
 	if u.MFAProvider == "" {
 		u.MFAProvider = "totp"
 	}
+	if u.TenantSlug == "" {
+		u.TenantSlug = "default"
+	}
 
 	query := `
-		INSERT INTO users (username, password_hash, full_name, email, role, is_enabled, auth_source, mfa_enabled, mfa_provider)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (username, password_hash, full_name, email, role, is_enabled, auth_source, mfa_enabled, mfa_provider, tenant_slug, is_tenant_admin)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at, updated_at`
 
 	return db.pool.QueryRow(ctx, query,
 		u.Username, string(hash), u.FullName, u.Email, u.Role, u.IsEnabled, u.AuthSource, u.MFAEnabled, u.MFAProvider,
+		u.TenantSlug, u.IsTenantAdmin,
 	).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
 }
 
@@ -940,6 +966,29 @@ func (db *DB) ToggleSIEMRule(ctx context.Context, ruleID string, enabled bool) e
 	query := `UPDATE siem_rules SET is_enabled = $1, updated_at = NOW() WHERE id = $2`
 	_, err := db.pool.Exec(ctx, query, enabled, ruleID)
 	return err
+}
+
+// SetSIEMRulesEnabledState atomically sets is_enabled for the given rule ID sets.
+// Unlike BatchUpsertSIEMRules (which deliberately preserves operator-chosen is_enabled
+// on conflict), this explicitly overwrites the enable state.
+func (db *DB) SetSIEMRulesEnabledState(ctx context.Context, enableIDs, disableIDs []string) error {
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if len(enableIDs) > 0 {
+		if _, err := tx.Exec(ctx, `UPDATE siem_rules SET is_enabled = TRUE, updated_at = NOW() WHERE id = ANY($1)`, enableIDs); err != nil {
+			return fmt.Errorf("enabling rules: %w", err)
+		}
+	}
+	if len(disableIDs) > 0 {
+		if _, err := tx.Exec(ctx, `UPDATE siem_rules SET is_enabled = FALSE, updated_at = NOW() WHERE id = ANY($1)`, disableIDs); err != nil {
+			return fmt.Errorf("disabling rules: %w", err)
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 // ToggleTechniqueRules enables or disables all rules associated with a MITRE technique (including sub-techniques)
@@ -1352,8 +1401,23 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 	VALUES ('default', 'Default Organization (Root)', 'Primary root tenant', 'Root Super Admin', 'admin@syslog.local', 'admin', 'active')
 	ON CONFLICT (slug) DO NOTHING;
 
+	-- Root tenant is the MSSP operator: no node / EPS quota (0 = unlimited)
+	UPDATE tenants SET max_nodes = 0, max_eps = 0 WHERE slug = 'default' AND (max_nodes <> 0 OR max_eps <> 0);
+
+	-- Device ownership for tenant-scoped data views
+	ALTER TABLE devices ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
+	CREATE INDEX IF NOT EXISTS idx_devices_tenant ON devices(tenant_slug);
+
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) DEFAULT 'default';
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS is_tenant_admin BOOLEAN DEFAULT FALSE;
+
+	-- Backfill: tenant admins provisioned before tenant_slug was persisted (never touches Super Administrators)
+	UPDATE users u SET tenant_slug = t.slug, is_tenant_admin = TRUE
+	FROM tenants t
+	WHERE t.slug <> 'default' AND t.admin_username <> ''
+	  AND LOWER(u.username) = LOWER(t.admin_username)
+	  AND u.role <> 'Super Administrator'
+	  AND COALESCE(u.tenant_slug, 'default') = 'default';
 
 	CREATE TABLE IF NOT EXISTS edge_nodes (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1491,6 +1555,59 @@ func (db *DB) CreateTenant(ctx context.Context, t *models.Tenant, initialAdminPa
 	}
 
 	return nil
+}
+
+// TenantUsage summarizes resources consumed by a tenant
+type TenantUsage struct {
+	NodeCount   int `json:"node_count"`
+	DeviceCount int `json:"device_count"`
+}
+
+// GetTenantUsage returns edge-node and device counts grouped by tenant slug
+func (db *DB) GetTenantUsage(ctx context.Context) (map[string]*TenantUsage, error) {
+	usage := make(map[string]*TenantUsage)
+	get := func(slug string) *TenantUsage {
+		if u, ok := usage[slug]; ok {
+			return u
+		}
+		u := &TenantUsage{}
+		usage[slug] = u
+		return u
+	}
+
+	rows, err := db.pool.Query(ctx, `SELECT tenant_name, count(*) FROM edge_nodes GROUP BY tenant_name`)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var slug string
+		var n int
+		if err := rows.Scan(&slug, &n); err == nil {
+			get(slug).NodeCount = n
+		}
+	}
+	rows.Close()
+
+	rows, err = db.pool.Query(ctx, `SELECT COALESCE(tenant_slug, 'default'), count(*) FROM devices GROUP BY 1`)
+	if err != nil {
+		return usage, nil
+	}
+	for rows.Next() {
+		var slug string
+		var n int
+		if err := rows.Scan(&slug, &n); err == nil {
+			get(slug).DeviceCount = n
+		}
+	}
+	rows.Close()
+	return usage, nil
+}
+
+// CountEdgeNodesByTenant returns the number of edge nodes owned by a tenant
+func (db *DB) CountEdgeNodesByTenant(ctx context.Context, tenant string) (int, error) {
+	var n int
+	err := db.pool.QueryRow(ctx, `SELECT count(*) FROM edge_nodes WHERE tenant_name = $1`, tenant).Scan(&n)
+	return n, err
 }
 
 // DeleteTenant deletes a tenant and cascades
