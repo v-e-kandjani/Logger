@@ -137,3 +137,18 @@ type User struct {
 	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
+// EdgeNode represents a remote proxy forwarder node
+type EdgeNode struct {
+	ID            uuid.UUID  `json:"id"`
+	Name          string     `json:"name"`
+	Token         string     `json:"token"`
+	TenantName    string     `json:"tenant_name"`
+	SyncInterval  string     `json:"sync_interval"` // "online", "every 60 second", "every 5 min", "every 15 min", "every 30 min", "every hour"
+	LastSeenAt    *time.Time `json:"last_seen_at,omitempty"`
+	LastIP        string     `json:"last_ip"`
+	Version       string     `json:"version"`
+	Status        string     `json:"status"` // "online", "offline", "pending"
+	LogsForwarded int64      `json:"logs_forwarded"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+}

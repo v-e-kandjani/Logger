@@ -1329,3 +1329,183 @@ func joinWithAND(clauses []string) string {
 	}
 	return res
 }
+
+// EnsureEdgeSchema ensures the edge_nodes table exists for remote proxy nodes
+func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
+	schema := `
+	CREATE TABLE IF NOT EXISTS edge_nodes (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		name VARCHAR(128) NOT NULL,
+		token VARCHAR(128) NOT NULL UNIQUE,
+		tenant_name VARCHAR(128) NOT NULL DEFAULT 'default',
+		sync_interval VARCHAR(32) NOT NULL DEFAULT 'online',
+		last_seen_at TIMESTAMPTZ,
+		last_ip VARCHAR(64) DEFAULT '',
+		version VARCHAR(32) DEFAULT '',
+		status VARCHAR(32) NOT NULL DEFAULT 'offline',
+		logs_forwarded BIGINT NOT NULL DEFAULT 0,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_edge_nodes_token ON edge_nodes(token);
+	CREATE INDEX IF NOT EXISTS idx_edge_nodes_tenant ON edge_nodes(tenant_name);
+	`
+	_, err := db.pool.Exec(ctx, schema)
+	return err
+}
+
+// ListEdgeNodes retrieves all registered edge proxy nodes
+func (db *DB) ListEdgeNodes(ctx context.Context) ([]*models.EdgeNode, error) {
+	query := `
+		SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded, created_at, updated_at
+		FROM edge_nodes
+		ORDER BY created_at DESC`
+	rows, err := db.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("listing edge nodes: %w", err)
+	}
+	defer rows.Close()
+
+	var nodes []*models.EdgeNode
+	for rows.Next() {
+		var n models.EdgeNode
+		err := rows.Scan(
+			&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
+			&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
+			&n.CreatedAt, &n.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scanning edge node: %w", err)
+		}
+		// Dynamically compute online status if last_seen_at was within 90 seconds
+		if n.LastSeenAt != nil && time.Since(*n.LastSeenAt) < 90*time.Second {
+			n.Status = "online"
+		} else if n.LastSeenAt == nil {
+			n.Status = "pending"
+		} else {
+			n.Status = "offline"
+		}
+		nodes = append(nodes, &n)
+	}
+	return nodes, rows.Err()
+}
+
+// GetEdgeNodeByID retrieves a single edge node by UUID
+func (db *DB) GetEdgeNodeByID(ctx context.Context, id uuid.UUID) (*models.EdgeNode, error) {
+	query := `
+		SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded, created_at, updated_at
+		FROM edge_nodes
+		WHERE id = $1`
+	var n models.EdgeNode
+	err := db.pool.QueryRow(ctx, query, id).Scan(
+		&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
+		&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
+		&n.CreatedAt, &n.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("querying edge node by id: %w", err)
+	}
+	if n.LastSeenAt != nil && time.Since(*n.LastSeenAt) < 90*time.Second {
+		n.Status = "online"
+	} else if n.LastSeenAt == nil {
+		n.Status = "pending"
+	} else {
+		n.Status = "offline"
+	}
+	return &n, nil
+}
+
+// GetEdgeNodeByToken retrieves an edge node by its secret token
+func (db *DB) GetEdgeNodeByToken(ctx context.Context, token string) (*models.EdgeNode, error) {
+	query := `
+		SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded, created_at, updated_at
+		FROM edge_nodes
+		WHERE token = $1`
+	var n models.EdgeNode
+	err := db.pool.QueryRow(ctx, query, token).Scan(
+		&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
+		&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
+		&n.CreatedAt, &n.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("querying edge node by token: %w", err)
+	}
+	return &n, nil
+}
+
+// CreateEdgeNode inserts a new edge proxy node
+func (db *DB) CreateEdgeNode(ctx context.Context, node *models.EdgeNode) error {
+	if node.ID == uuid.Nil {
+		node.ID = uuid.New()
+	}
+	if node.SyncInterval == "" {
+		node.SyncInterval = "online"
+	}
+	if node.TenantName == "" {
+		node.TenantName = "default"
+	}
+	node.Status = "pending"
+	node.CreatedAt = time.Now()
+	node.UpdatedAt = time.Now()
+
+	query := `
+		INSERT INTO edge_nodes (id, name, token, tenant_name, sync_interval, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+	_, err := db.pool.Exec(ctx, query,
+		node.ID, node.Name, node.Token, node.TenantName, node.SyncInterval, node.Status, node.CreatedAt, node.UpdatedAt)
+	return err
+}
+
+// UpdateEdgeNodeInterval updates the schedule on the cloud for an edge node
+func (db *DB) UpdateEdgeNodeInterval(ctx context.Context, id uuid.UUID, interval string) error {
+	query := `
+		UPDATE edge_nodes
+		SET sync_interval = $1, updated_at = NOW()
+		WHERE id = $2`
+	tag, err := db.pool.Exec(ctx, query, interval, id)
+	if err != nil {
+		return fmt.Errorf("updating edge node interval: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("edge node not found")
+	}
+	return nil
+}
+
+// UpdateEdgeNodeHeartbeat updates last_seen, ip, version and increments logs_forwarded
+func (db *DB) UpdateEdgeNodeHeartbeat(ctx context.Context, token, ip, ver string, addLogs int64) (*models.EdgeNode, error) {
+	query := `
+		UPDATE edge_nodes
+		SET last_seen_at = NOW(),
+		    last_ip = CASE WHEN $2 <> '' THEN $2 ELSE last_ip END,
+		    version = CASE WHEN $3 <> '' THEN $3 ELSE version END,
+		    status = 'online',
+		    logs_forwarded = logs_forwarded + $4,
+		    updated_at = NOW()
+		WHERE token = $1
+		RETURNING id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded, created_at, updated_at`
+	var n models.EdgeNode
+	err := db.pool.QueryRow(ctx, query, token, ip, ver, addLogs).Scan(
+		&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
+		&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
+		&n.CreatedAt, &n.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &n, nil
+}
+
+// DeleteEdgeNode removes an edge node
+func (db *DB) DeleteEdgeNode(ctx context.Context, id uuid.UUID) error {
+	query := `DELETE FROM edge_nodes WHERE id = $1`
+	_, err := db.pool.Exec(ctx, query, id)
+	return err
+}

@@ -85,6 +85,13 @@ func main() {
 		log.Println("[PostgreSQL] SIEM tables and out-of-the-box detection rules verified")
 	}
 
+	// Verify & auto-migrate Edge Proxy nodes schema
+	if err := pgDB.EnsureEdgeSchema(context.Background()); err != nil {
+		log.Printf("[PostgreSQL] Warning ensuring Edge schema: %v", err)
+	} else {
+		log.Println("[PostgreSQL] Edge proxy nodes schema verified")
+	}
+
 	// 2. Initialize in-memory Device Cache
 	deviceCache := postgres.NewDeviceCache(pgDB)
 	log.Println("[DeviceCache] Initialized active device lookup cache")

@@ -152,6 +152,7 @@ function switchTab(tab, targetSectionId = null) {
         if (tab === 'health') loadHealthTelemetry();
         if (tab === 'settings') {
             loadSettings();
+            if (typeof loadEdgeNodes === 'function') loadEdgeNodes();
             displaySettingsSection(targetSectionId || currentSettingsSection || 'setting-section-kamusm');
         }
         if (tab === 'users') loadUsers();
@@ -5158,3 +5159,265 @@ window.optimizeSIEMDeviceRules = async () => {
     }
 };
 
+/* ==============================================================================
+   EDGE PROXY & FORWARDER NODES GOVERNANCE (MSSP & REMOTE ARCHITECTURE)
+   ============================================================================== */
+
+let currentEdgeNodes = [];
+
+async function loadEdgeNodes() {
+    const tbody = document.getElementById('tbody-edge-nodes');
+    if (!tbody) return;
+
+    try {
+        const res = await fetch('/api/v1/settings/edge/nodes');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        currentEdgeNodes = data.nodes || [];
+
+        if (currentEdgeNodes.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px 16px;">
+                        <div style="font-size: 28px; margin-bottom: 8px;">🌐</div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">Henüz kayıtlı Edge Proxy düğümü bulunmuyor.</div>
+                        <div style="font-size: 0.82rem; margin-bottom: 12px;">Uzak ofis veya müşteri ağlarınızdan güvenli log aktarımı için yeni bir düğüm ekleyin.</div>
+                        <button class="btn btn-primary" onclick="openAddEdgeNodeModal()">+ Yeni Proxy Düğümü Ekle</button>
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        const intervals = [
+            { id: 'online', label: 'online (Anlık / Gerçek Zamanlı)' },
+            { id: 'every 60 second', label: 'every 60 second (60 saniyede bir)' },
+            { id: 'every 5 min', label: 'every 5 min (5 dakikada bir)' },
+            { id: 'every 15 min', label: 'every 15 min (15 dakikada bir)' },
+            { id: 'every 30 min', label: 'every 30 min (30 dakikada bir)' },
+            { id: 'every hour', label: 'every hour (Her saat başı)' }
+        ];
+
+        let html = '';
+        currentEdgeNodes.forEach(n => {
+            const isOnline = (n.status === 'online');
+            const isPending = (n.status === 'pending');
+            const statusBadge = isOnline
+                ? `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-weight: 600;">● Online</span>`
+                : (isPending
+                    ? `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);">⏳ Bekliyor</span>`
+                    : `<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3);">○ Çevrimdışı</span>`);
+
+            let lastSeenStr = 'Henüz bağlanmadı';
+            if (n.last_seen_at) {
+                const diffMs = Date.now() - new Date(n.last_seen_at).getTime();
+                const diffSec = Math.floor(diffMs / 1000);
+                if (diffSec < 60) lastSeenStr = `${diffSec} sn önce`;
+                else if (diffSec < 3600) lastSeenStr = `${Math.floor(diffSec / 60)} dk önce`;
+                else lastSeenStr = `${Math.floor(diffSec / 3600)} sa önce`;
+            }
+            if (n.last_ip) {
+                lastSeenStr += ` <span style="color: var(--text-muted); font-size: 0.75rem;">(${escapeHtml(n.last_ip)})</span>`;
+            }
+
+            const currentInterval = n.sync_interval || 'online';
+            let optionsHtml = '';
+            intervals.forEach(opt => {
+                const sel = (opt.id === currentInterval) ? 'selected' : '';
+                optionsHtml += `<option value="${opt.id}" ${sel}>${opt.label}</option>`;
+            });
+
+            const maskedToken = (n.token && n.token.length > 14)
+                ? `${n.token.substring(0, 10)}...${n.token.substring(n.token.length - 4)}`
+                : (n.token || '');
+
+            html += `
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 1.1rem;">🖥️</span>
+                            <div>
+                                <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(n.name)}</div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted);">v${escapeHtml(n.version || '1.5.12')}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge badge-outline" style="font-size: 0.78rem;">${escapeHtml(n.tenant_name || 'default')}</span></td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <select class="input" style="padding: 4px 8px; font-size: 0.78rem; width: auto; font-weight: 500; border-color: rgba(56, 189, 248, 0.4);"
+                                onchange="updateEdgeNodeInterval('${n.id}', this.value)">
+                            ${optionsHtml}
+                        </select>
+                    </td>
+                    <td style="font-size: 0.82rem;">${lastSeenStr}</td>
+                    <td style="font-family: monospace; font-weight: 600; font-size: 0.85rem;">
+                        ${(n.logs_forwarded || 0).toLocaleString()}
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <code style="font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">${escapeHtml(maskedToken)}</code>
+                            <button class="btn btn-outline" style="padding: 2px 6px; font-size: 0.72rem;" onclick="copyToClipboard('${n.token}', 'Token panoya kopyalandı!')" title="Tokenı Kopyala">
+                                📋
+                            </button>
+                        </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="copyNodeInstallCurl('${n.token}', '${escapeHtml(n.name)}')" title="Tek satırlık Linux kurulum komutu">
+                                💻 Kurulum Komutu
+                            </button>
+                            <button class="btn btn-outline text-danger" style="padding: 3px 8px; font-size: 0.75rem;" onclick="deleteEdgeNode('${n.id}', '${escapeHtml(n.name)}')" title="Düğümü Sil / Yetkisini Kaldır">
+                                🗑️
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
+        });
+
+        tbody.innerHTML = html;
+    } catch (err) {
+        console.error('Failed loading edge nodes:', err);
+        tbody.innerHTML = `<tr><td colspan="8" class="text-danger" style="text-align: center; padding: 16px;">Düğümler yüklenirken hata oluştu: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+async function updateEdgeNodeInterval(nodeId, newInterval) {
+    try {
+        const res = await fetch('/api/v1/settings/edge/nodes/interval', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: nodeId, sync_interval: newInterval })
+        });
+        if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || 'HTTP ' + res.status);
+        }
+
+        if (typeof showToast === 'function') {
+            showToast(`✓ Gönderim zamanlaması bulutta güncellendi: ${newInterval}`, 'success');
+        } else {
+            console.log(`[Edge Scheduler] Updated ${nodeId} interval to ${newInterval}`);
+        }
+    } catch (err) {
+        alert('Zamanlama güncellenemedi: ' + err.message);
+        loadEdgeNodes();
+    }
+}
+
+function openAddEdgeNodeModal() {
+    const modal = document.getElementById('modal-add-edge-node');
+    if (!modal) return;
+
+    document.getElementById('edge-new-node-name').value = '';
+    document.getElementById('edge-new-tenant-name').value = 'default';
+    document.getElementById('edge-new-sync-interval').value = 'online';
+
+    document.getElementById('edge-form-container').style.display = 'block';
+    document.getElementById('edge-create-success-box').style.display = 'none';
+
+    const saveBtn = document.getElementById('btn-save-edge-node');
+    if (saveBtn) {
+        saveBtn.style.display = 'inline-block';
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Oluştur ve Token Al';
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeAddEdgeNodeModal() {
+    const modal = document.getElementById('modal-add-edge-node');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitAddEdgeNode() {
+    const nameInput = document.getElementById('edge-new-node-name');
+    const tenantInput = document.getElementById('edge-new-tenant-name');
+    const intervalInput = document.getElementById('edge-new-sync-interval');
+    const saveBtn = document.getElementById('btn-save-edge-node');
+
+    const name = nameInput.value.trim();
+    if (!name) {
+        alert('Lütfen düğüm için bir isim girin!');
+        nameInput.focus();
+        return;
+    }
+
+    const tenant = tenantInput.value.trim() || 'default';
+    const interval = intervalInput.value || 'online';
+
+    try {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Oluşturuluyor...';
+
+        const res = await fetch('/api/v1/settings/edge/nodes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: name,
+                tenant_name: tenant,
+                sync_interval: interval
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+
+        // Display Success Box with generated token & 1-line curl command
+        document.getElementById('edge-form-container').style.display = 'none';
+        document.getElementById('edge-create-success-box').style.display = 'block';
+
+        const token = data.token;
+        document.getElementById('edge-result-token').value = token;
+
+        const endpoint = window.location.origin;
+        const installCmd = `curl -k -sSL ${endpoint}/api/v1/edge/install.sh | sudo bash -s -- --endpoint ${endpoint} --token ${token} --name "${data.name}"`;
+        document.getElementById('edge-result-curl').value = installCmd;
+
+        saveBtn.style.display = 'none';
+        loadEdgeNodes();
+    } catch (err) {
+        alert('Düğüm oluşturulamadı: ' + err.message);
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Oluştur ve Token Al';
+    }
+}
+
+function copyEdgeResultToken() {
+    const token = document.getElementById('edge-result-token').value;
+    copyToClipboard(token, 'Token panoya kopyalandı!');
+}
+
+function copyEdgeResultCurl() {
+    const cmd = document.getElementById('edge-result-curl').value;
+    copyToClipboard(cmd, 'Kurulum komutu panoya kopyalandı!');
+}
+
+function copyNodeInstallCurl(token, name) {
+    const endpoint = window.location.origin;
+    const cmd = `curl -k -sSL ${endpoint}/api/v1/edge/install.sh | sudo bash -s -- --endpoint ${endpoint} --token ${token} --name "${name}"`;
+    copyToClipboard(cmd, `'${name}' için kurulum komutu kopyalandı!`);
+}
+
+async function deleteEdgeNode(nodeId, nodeName) {
+    if (!confirm(`'${nodeName}' adlı edge proxy düğümünü silmek ve yetkisini iptal etmek istediğinize emin misiniz?\n\nBu düğümün log aktarımı durdurulacaktır.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/v1/settings/edge/nodes/delete?id=${nodeId}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || 'HTTP ' + res.status);
+        }
+
+        if (typeof showToast === 'function') {
+            showToast(`Düğüm silindi: ${nodeName}`, 'info');
+        }
+        loadEdgeNodes();
+    } catch (err) {
+        alert('Düğüm silinemedi: ' + err.message);
+    }
+}

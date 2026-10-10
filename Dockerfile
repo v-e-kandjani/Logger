@@ -13,8 +13,9 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build static Linux binary
+# Build static Linux binaries
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /app/bin/syslog-platform ./cmd/server/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /app/bin/logseal-proxy ./cmd/proxy/main.go
 
 # Stage 2: Minimal runtime image
 FROM alpine:3.20
@@ -31,12 +32,15 @@ RUN mkdir -p /opt/syslog-platform/bin \
              /opt/syslog-platform/archive \
              /opt/syslog-platform/timestamp-client \
              /opt/syslog-platform/web/templates \
-             /opt/syslog-platform/web/static
+             /opt/syslog-platform/web/static \
+             /opt/syslog-platform/scripts
 
-# Copy compiled Linux binary from builder stage
+# Copy compiled Linux binaries from builder stage
 COPY --from=builder /app/bin/syslog-platform /opt/syslog-platform/bin/syslog-platform
+COPY --from=builder /app/bin/logseal-proxy /opt/syslog-platform/bin/logseal-proxy
 
-# Copy web assets
+# Copy scripts & web assets
+COPY scripts/ /opt/syslog-platform/scripts/
 COPY web/templates/ /opt/syslog-platform/web/templates/
 COPY web/static/ /opt/syslog-platform/web/static/
 

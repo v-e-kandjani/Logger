@@ -201,6 +201,17 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/system/metrics", h.requireAuth(h.handleMetricsCurrent))
 	mux.HandleFunc("/api/v1/system/metrics/history", h.requireAuth(h.handleMetricsHistory))
 
+	// Edge Forwarder Proxy Endpoints (Token-based authentication)
+	mux.HandleFunc("/api/v1/edge/heartbeat", h.handleEdgeHeartbeat)
+	mux.HandleFunc("/api/v1/edge/ingest", h.handleEdgeIngest)
+	mux.HandleFunc("/api/v1/edge/install.sh", h.handleEdgeInstallScript)
+	mux.HandleFunc("/api/v1/edge/download-binary", h.handleEdgeDownloadBinary)
+
+	// Protected Edge Proxy Management (Requires valid UI session)
+	mux.HandleFunc("/api/v1/settings/edge/nodes", h.requireAuth(h.handleEdgeNodes))
+	mux.HandleFunc("/api/v1/settings/edge/nodes/interval", h.requireAuth(h.handleEdgeNodeInterval))
+	mux.HandleFunc("/api/v1/settings/edge/nodes/delete", h.requireAuth(h.handleEdgeNodeDelete))
+
 	// Protected SIEM & SOC Endpoints
 	mux.HandleFunc("/api/v1/siem/overview", h.requireAuth(h.handleSIEMOverview))
 	mux.HandleFunc("/api/v1/siem/alerts", h.requireAuth(h.handleSIEMAlerts))

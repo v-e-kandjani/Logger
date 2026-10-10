@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.11</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.12</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -109,6 +109,10 @@
                         <a class="nav-subitem" data-target="setting-section-smtp">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                             <span data-i18n="nav_sub_smtp">E-Posta Bildirimleri & SMTP</span>
+                        </a>
+                        <a class="nav-subitem" data-target="setting-section-edge">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                            <span data-i18n="nav_sub_edge">Edge Proxy Düğümleri</span>
                         </a>
                     </div>
                 </div>
@@ -745,6 +749,10 @@
                     <button class="settings-subnav-btn" data-target="setting-section-smtp">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                         <span data-i18n="nav_sub_smtp">E-Posta Bildirimleri & SMTP</span>
+                    </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-edge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                        <span data-i18n="nav_sub_edge">Edge Proxy Düğümleri</span>
                     </button>
                 </div>
 
@@ -1455,6 +1463,63 @@
                             </p>
                         </div>
                     </div>
+
+                    <!-- Edge Proxy Forwarder Nodes Governance Panel (MSSP & Multi-Tenant Remote Networks) -->
+                    <div class="panel" id="setting-section-edge">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <h3 data-i18n="edge_panel_title">Edge Proxy &amp; Forwarder Düğümleri (MSSP Bulut Bağlantısı)</h3>
+                                <p class="subtitle" style="margin: 4px 0 0 0;" data-i18n="edge_panel_subtitle">
+                                    Uzak veya yerel ağlardaki cihazların loglarını güvenli HTTPS tüneli üzerinden buluta aktaran hafif istemciler. Gönderim zamanlaması merkezi olarak buradan belirlenir.
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-outline" id="btn-refresh-edge-nodes" onclick="loadEdgeNodes()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" style="vertical-align: middle;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                                    <span data-i18n="btn_refresh">Yenile</span>
+                                </button>
+                                <button class="btn btn-primary" id="btn-open-add-edge-node" onclick="openAddEdgeNodeModal()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" style="vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    <span data-i18n="btn_add_edge_node">Yeni Proxy Düğümü Ekle</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Quick 1-liner info alert -->
+                            <div class="alert alert-info" style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px; background: rgba(56, 189, 248, 0.08); border-left: 4px solid var(--accent-primary); padding: 12px 16px; border-radius: 6px;">
+                                <div style="font-size: 20px;">🌐</div>
+                                <div style="font-size: 0.85rem; line-height: 1.4;">
+                                    <strong data-i18n="edge_info_title">Merkezi Zamanlama &amp; Kesintisiz Spooling:</strong>
+                                    <span data-i18n="edge_info_desc">Uzak proxy düğümleri bağlantı koptuğunda logları yerel diskte güvenle depolar. Proxy'nin logları buluta ne sıklıkla aktaracağı (Online, 60 sn, 5 dk, 15 dk, 30 dk, 1 saat) doğrudan bu tablodan değiştirilebilir; istemcide konfigürasyon değişikliği gerekmez.</span>
+                                </div>
+                            </div>
+
+                            <!-- Edge Nodes Table -->
+                            <div class="table-container" style="overflow-x: auto;">
+                                <table class="table" id="table-edge-nodes">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="th_node_name">Düğüm Adı</th>
+                                            <th data-i18n="th_tenant">Müşteri / Tenant</th>
+                                            <th data-i18n="th_status">Durum</th>
+                                            <th data-i18n="th_sync_interval">Gönderim Zamanlaması (Bulut Yönetimli)</th>
+                                            <th data-i18n="th_last_seen">Son İletişim / IP</th>
+                                            <th data-i18n="th_logs_forwarded">İletilen Log</th>
+                                            <th data-i18n="th_token">Erişim Tokenı</th>
+                                            <th style="text-align: right;" data-i18n="th_actions">İşlemler</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody-edge-nodes">
+                                        <tr>
+                                            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                                                Yükleniyor...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1514,7 +1579,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.11</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.12</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -2529,7 +2594,84 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.11"></script>
-    <script src="/static/js/app.js?v=1.5.11"></script>
+    <!-- Modal: Add New Edge Proxy Node -->
+    <div class="modal-backdrop" id="modal-add-edge-node" style="display: none;">
+        <div class="modal" style="max-width: 620px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="background: rgba(56, 189, 248, 0.1); padding: 8px; border-radius: 8px; font-size: 1.3rem;">🌐</div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_add_edge_title">Yeni Edge Proxy Düğümü Ekle</h3>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">MSSP &amp; Uzak Ağ Syslog Forwarder İstemcisi</div>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeAddEdgeNodeModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div id="edge-form-container">
+                    <p class="subtitle" style="margin-bottom: 16px; font-size: 0.85rem;" data-i18n="modal_add_edge_subtitle">
+                        Uzak ofis veya müşteri ağı için yeni bir forwarder kaydı oluşturun. Gönderim sıklığını buradan belirleyebilirsiniz.
+                    </p>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_edge_node_name">Düğüm Adı (Node Name)</span> <span class="text-danger">*</span></label>
+                        <input type="text" class="input" id="edge-new-node-name" placeholder="Örn: Istanbul-Merkez-FW veya Ankara-Sube" required>
+                        <small style="color: var(--text-muted); font-size: 0.75rem;">Uzak ağı veya sunucuyu tanımlayan benzersiz isim.</small>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_edge_tenant_name">Müşteri / Organizasyon (Tenant)</span></label>
+                        <input type="text" class="input" id="edge-new-tenant-name" placeholder="Örn: Acme Holding veya Musteri-01" value="default">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_edge_sync_interval">Log Gönderim Zamanlaması (Cloud Schedule)</span></label>
+                        <select class="input" id="edge-new-sync-interval">
+                            <option value="online" selected>online (Anlık / Gerçek Zamanlı - Varsayılan)</option>
+                            <option value="every 60 second">every 60 second (Her 60 saniyede bir)</option>
+                            <option value="every 5 min">every 5 min (Her 5 dakikada bir)</option>
+                            <option value="every 15 min">every 15 min (Her 15 dakikada bir)</option>
+                            <option value="every 30 min">every 30 min (Her 30 dakikada bir)</option>
+                            <option value="every hour">every hour (Her saat başı)</option>
+                        </select>
+                        <small style="color: var(--text-muted); font-size: 0.75rem;">İstemci bu ayarı buluttan otomatik alır. İleride doğrudan tablodan değiştirilebilir.</small>
+                    </div>
+                </div>
+
+                <!-- Success Box showing token and 1-line installation curl command -->
+                <div id="edge-create-success-box" style="display: none;">
+                    <div class="alert alert-success" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid var(--accent-green); padding: 12px; border-radius: 6px; margin-bottom: 16px;">
+                        <strong style="color: #4ade80;">✓ Düğüm Başarıyla Oluşturuldu!</strong>
+                        <div style="font-size: 0.82rem; margin-top: 4px; color: var(--text-muted);">Uzak Ubuntu sunucusunda aşağıdaki tek satırlık komutu çalıştırarak proxy'yi hemen başlatabilirsiniz.</div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label style="font-size: 0.82rem; font-weight: 600;">Oluşturulan Erişim Tokenı (Token)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" class="input mono-code" id="edge-result-token" readonly style="background: rgba(0,0,0,0.3); font-size: 0.8rem;">
+                            <button class="btn btn-outline" onclick="copyEdgeResultToken()" title="Kopyala">📋</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-size: 0.82rem; font-weight: 600;">Tek Satırda Otomatik Ubuntu Kurulum Komutu</label>
+                        <div style="position: relative;">
+                            <textarea class="input mono-code" id="edge-result-curl" readonly rows="3" style="background: rgba(0,0,0,0.3); font-size: 0.78rem; resize: none;"></textarea>
+                            <button class="btn btn-primary" onclick="copyEdgeResultCurl()" style="position: absolute; right: 8px; bottom: 8px; font-size: 0.75rem; padding: 4px 10px;">
+                                📋 Komutu Kopyala
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" id="modal-add-edge-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-outline" onclick="closeAddEdgeNodeModal()" data-i18n="btn_cancel">Kapat</button>
+                <button class="btn btn-primary" id="btn-save-edge-node" onclick="submitAddEdgeNode()" data-i18n="btn_create_node">Oluştur ve Token Al</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/translations.js?v=1.5.12"></script>
+    <script src="/static/js/app.js?v=1.5.12"></script>
 </body>
 </html>

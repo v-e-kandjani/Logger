@@ -249,6 +249,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.12** (Edge Proxy İstemci Programı (`logseal-proxy`), Buluttan Yönetilen Zamanlama ve Ubuntu Otomatik Kurulum Betiği (`proxy_install.sh`)):
+  - **Hafif Bağımsız Linux Forwarder İstemcisi (`logseal-proxy`)**: Docker gerektirmeyen, doğrudan Ubuntu (20.04/22.04/24.04/26.04 minimal) üzerine kurulabilen bağımsız Go derlemesi geliştirildi. Etkileşimli bağlantı sihirbazı (`-setup`), yerel UDP/TCP 514 syslog dinleyicileri, yerel disk spool tamponlama (`/var/spool/logseal`) ve GZIP sıkıştırmalı HTTPS toplu aktarım mimarisi içerir.
+  - **Merkezi Buluttan Yönetilen Log Gönderim Zamanlaması**: İstemcinin logları ne sıklıkla göndereceği doğrudan Bulut Ayarları üzerinden belirlenir (`"online"`, `"every 60 second"`, `"every 5 min"`, `"every 15 min"`, `"every 30 min"`, `"every hour"`). Varsayılan `"online"` modudur. İstemci kalp atışı (heartbeat) ile ayarı dinamik olarak alır ve kendi zamanlayıcısını yeniden başlatmaya gerek kalmadan günceller.
+  - **Otomatik Ubuntu Kurulum Betiği (`proxy_install.sh`)**: Tek satırlık curl komutuyla (`curl -k -sSL https://<host>:8443/api/v1/edge/install.sh | sudo bash`) bağımlılıkları yükleyen, istemci ikilisini çeken, `/etc/logseal/proxy.json` dosyasını yapılandıran ve `logseal-proxy.service` systemd servisini başlatan otomatik kurulum betiği eklendi.
+  - **Bulut Arayüzü Edge Düğüm Yönetimi**: Ayarlar sekmesine yeni "Edge Proxy Düğümleri" paneli eklendi; aktif düğüm durumları (Online/Çevrimdışı), anlık zamanlama seçimi, token yönetimi ve tek tıkla kopyalanabilir kurulum komutları entegre edildi.
+
 - **v1.5.11** (Çoklu Format Sertifika Yükleme (.crt, .pfx, .pem), Kullanıcı Rol Logoları ve Kompakt Başlık Optimizasyonu):
   - **Doğrudan Çoklu Format Sertifika Yükleme ve Parolalı PFX Desteği**: Metin alanı yerine doğrudan dosya yükleme (`.crt`, `.pfx`, `.pem`, `.p12`) mimarisine geçildi. Yerel PKCS#12 çözücü ile parolalı PFX arşivleri otomatik açılarak sertifika ve özel anahtar ayrıştırılır. Tek dosya PEM paketleri ve bağımsız sertifika + anahtar dosyaları sorunsuz işlenir.
   - **Aktif Kullanıcı Rolü Dinamik Vektör Logoları**: Sağ üst kullanıcı rozetine rol bazlı modern SVG ikonlar ve renk temaları entegre edildi (Süper Yönetici için Taç, Güvenlik Analisti için Tehdit Radarı, Denetçi için Adalet Terazisi, Operatör için Sunucu Terminali, Salt Okunur için Göz ikonu).

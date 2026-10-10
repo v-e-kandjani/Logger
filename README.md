@@ -260,6 +260,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.12** (Edge Proxy Forwarder Daemon (`logseal-proxy`), Cloud-Managed Schedules & Automated Ubuntu Installer (`proxy_install.sh`)):
+  - **Lightweight Standalone Linux Forwarder Daemon (`logseal-proxy`)**: Implemented a standalone, zero-dependency Go daemon installable directly on minimal Ubuntu Linux (20.04 / 22.04 / 24.04 / 26.04) without requiring Docker. Includes an interactive connection setup wizard (`-setup`), dual UDP/TCP 514 syslog listeners, local disk spool buffering (`/var/spool/logseal`), and GZIP-compressed HTTPS batch delivery.
+  - **Centrally Cloud-Controlled Transmission Scheduling**: Transmission frequency is configured strictly in Cloud Settings, not on the proxy itself. The proxy polls the cloud and dynamically adjusts its buffer flushing to the selected schedule: `"online"` (real-time stream), `"every 60 second"`, `"every 5 min"`, `"every 15 min"`, `"every 30 min"`, or `"every hour"` (defaults to `"online"`).
+  - **Automated Ubuntu Installer Script (`proxy_install.sh`)**: Created an automated installer deployed via 1-line curl (`curl -k -sSL https://<host>:8443/api/v1/edge/install.sh | sudo bash`) that configures directories, downloads the binary, writes `/etc/logseal/proxy.json`, and registers/starts the systemd unit `logseal-proxy.service`.
+  - **Cloud UI Edge Node Management**: Added a dedicated "Edge Proxy Düğümleri" panel in Settings with active node heartbeat tracking, inline transmission schedule dropdowns, token generation, and one-click copyable installation commands.
+
 - **v1.5.11** (Multi-Format Certificate File Upload (.crt, .pfx, .pem), Role Logo Badges & Header Layout Optimization):
   - **Direct Multi-Format Certificate Upload with PFX Password Support**: Replaced raw PEM textareas with direct file uploads (`.crt`, `.pfx`, `.pem`, `.p12`). Native PKCS#12 decoding automatically decrypts password-protected PFX archives into leaf certificates, intermediate chains, and private keys. Single-file PEM bundles and standalone cert + key pairs are parsed seamlessly.
   - **Active User Role Identity Badges**: Integrated dynamic role-specific SVG logos and color themes for the authenticated user in the top right header (Crown for Super Administrator, Threat Radar for Security Analyst, Scale of Justice for Auditor, Server Rack for Operator, and Eye for Read Only).
