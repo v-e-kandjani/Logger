@@ -1709,7 +1709,36 @@ async function loadHTTPSSettings() {
             }
         }
 
-        const cert = s.certificate;
+        const cert = s.certificate || s.active_cert;
+        const hasCert = !!(s.has_certificate || s.certificate || s.active_cert || cert);
+
+        const redEl = document.getElementById('setting-https-redirect');
+        const noteEl = document.getElementById('https-redirect-note');
+        if (redEl) {
+            redEl.checked = !!s.redirect_http;
+            redEl.disabled = !hasCert;
+            if (noteEl) {
+                if (hasCert) {
+                    noteEl.textContent = '✓ Active TLS certificate ready. Auto-redirect HTTP (8080) to HTTPS.';
+                    noteEl.style.color = '#4ade80';
+                } else {
+                    noteEl.textContent = 'Requires an active TLS certificate (generate or upload below first).';
+                    noteEl.style.color = 'var(--text-muted)';
+                }
+            }
+        }
+
+        const badge = document.getElementById('https-status-badge');
+        if (badge) {
+            if (s.enabled) {
+                badge.className = 'badge badge-success';
+                badge.textContent = `HTTPS Active (:${s.port || 8443})`;
+            } else {
+                badge.className = 'badge badge-secondary';
+                badge.textContent = 'HTTPS Disabled';
+            }
+        }
+
         const cnEl = document.getElementById('cert-cn-display');
         const issuerEl = document.getElementById('cert-issuer-display');
         const expiryEl = document.getElementById('cert-expiry-display');
@@ -1720,7 +1749,7 @@ async function loadHTTPSSettings() {
         const btnDl = document.getElementById('btn-download-cert');
 
         if (cert) {
-            if (cnEl) cnEl.textContent = cert.subject_cn || 'Configured TLS Certificate';
+            if (cnEl) cnEl.textContent = cert.subject_cn || cert.common_name || 'Configured TLS Certificate';
             if (issuerEl) issuerEl.textContent = cert.issuer || '-';
             if (expiryEl) expiryEl.textContent = cert.not_after ? cert.not_after.split('T')[0] : '-';
             if (daysBadge) {
@@ -1728,7 +1757,7 @@ async function loadHTTPSSettings() {
                 daysBadge.textContent = `${days} days left`;
                 daysBadge.className = days > 30 ? 'badge badge-success' : 'badge badge-warning';
             }
-            if (keyEl) keyEl.textContent = cert.key_type || 'RSA 2048-bit';
+            if (keyEl) keyEl.textContent = cert.key_type || `${cert.key_algorithm || 'RSA'} ${cert.key_bits || 2048}-bit`;
             const allSans = [...(cert.dns_names || []), ...(cert.ip_addresses || [])].join(', ');
             if (sansEl) sansEl.textContent = allSans || 'None';
             if (fpEl) fpEl.textContent = cert.fingerprint_sha256 || '-';
@@ -1847,7 +1876,7 @@ function initHTTPSAndFQDNManagement() {
                 const res = await fetch('/api/v1/settings/https/toggle', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ enabled, port, redirect_http: redirectHttp })
+                    body: JSON.stringify({ enabled, port, redirect: redirectHttp, redirect_http: redirectHttp })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to save HTTPS settings');
@@ -1891,6 +1920,15 @@ function initHTTPSAndFQDNManagement() {
 
                 alert('✓ Cryptographic TLS certificate generated and activated successfully!');
                 await loadHTTPSSettings();
+
+                const redEl = document.getElementById('setting-https-redirect');
+                if (redEl && !redEl.checked) {
+                    if (confirm('TLS Certificate is active!\n\nWould you like to automatically enable Auto-Redirect from plain HTTP (8080) to HTTPS (8443) now?')) {
+                        redEl.checked = true;
+                        const btnSave = document.getElementById('btn-save-https-settings');
+                        if (btnSave) btnSave.click();
+                    }
+                }
             } catch (e) {
                 alert('Failed generating certificate: ' + e.message);
             } finally {
@@ -1928,6 +1966,15 @@ function initHTTPSAndFQDNManagement() {
                 document.getElementById('cert-upload-cert').value = '';
                 document.getElementById('cert-upload-key').value = '';
                 await loadHTTPSSettings();
+
+                const redEl = document.getElementById('setting-https-redirect');
+                if (redEl && !redEl.checked) {
+                    if (confirm('Custom TLS Certificate is active!\n\nWould you like to automatically enable Auto-Redirect from plain HTTP (8080) to HTTPS (8443) now?')) {
+                        redEl.checked = true;
+                        const btnSave = document.getElementById('btn-save-https-settings');
+                        if (btnSave) btnSave.click();
+                    }
+                }
             } catch (e) {
                 alert('Failed uploading certificate: ' + e.message);
             } finally {
@@ -3814,6 +3861,11 @@ function initSIEMManagement() {
         btnOpenMitre.addEventListener('click', openSIEMMitreModal);
     }
 
+    const btnSocOpt = document.getElementById('btn-soc-optimize-devices');
+    if (btnSocOpt) {
+        btnSocOpt.addEventListener('click', optimizeSIEMDeviceRules);
+    }
+
     const btnOpenRules = document.getElementById('btn-open-siem-rules');
     if (btnOpenRules) {
         btnOpenRules.addEventListener('click', openSIEMRulesModal);
@@ -4467,6 +4519,9 @@ function wireSIEMMitreControls() {
     const btnInstallAll = document.getElementById('btn-install-all-mitre');
     if (btnInstallAll) btnInstallAll.addEventListener('click', installAllSIEMMitre);
 
+    const btnOpt = document.getElementById('btn-optimize-device-rules');
+    if (btnOpt) btnOpt.addEventListener('click', optimizeSIEMDeviceRules);
+
     const btnEnableAll = document.getElementById('btn-enable-all-mitre');
     if (btnEnableAll) btnEnableAll.addEventListener('click', () => toggleAllSIEMMitre(true));
 
@@ -4886,4 +4941,70 @@ async function checkSIEMMitreRelease() {
         if (btn) btn.disabled = false;
     }
 }
+
+window.optimizeSIEMDeviceRules = async () => {
+    const alertBox = document.getElementById('mitre-sync-alert');
+    const btn = document.getElementById('btn-optimize-device-rules');
+    const btnSoc = document.getElementById('btn-soc-optimize-devices');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳</span> <span>Optimizing...</span>';
+    }
+    if (btnSoc) {
+        btnSoc.disabled = true;
+        btnSoc.innerHTML = '<span>⏳</span> <span>Optimizing...</span>';
+    }
+
+    if (alertBox) {
+        alertBox.style.display = 'block';
+        alertBox.className = 'alert-box alert-info';
+        alertBox.textContent = '🎯 Analyzing registered inventory devices and mapping optimal MITRE ATT&CK correlation rules…';
+    }
+
+    try {
+        const res = await fetch('/api/v1/siem/mitre/optimize-devices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Optimization failed');
+
+        const vendors = (data.detected_vendors || []).join(', ') || 'Standard Infrastructure';
+        const profilesList = (data.profiles || []).map(p => `• ${p}`).join('\n');
+        const alertMsg = `✓ Inventory Device Rule Optimization Complete!\n\n` +
+            `Discovered Devices: ${data.devices_count} (${vendors})\n\n` +
+            `Active Protection Profiles:\n${profilesList}\n\n` +
+            `Activated Threat Rules: ${data.activated_rules} of ${data.total_rules} rules live in SIEM correlation engine.`;
+
+        if (alertBox) {
+            alertBox.className = 'alert-box alert-success';
+            alertBox.textContent = data.message || alertMsg;
+        }
+
+        alert(alertMsg);
+        if (typeof showToast === 'function') {
+            showToast(`Cihazlara göre optimize edildi: ${data.activated_rules} kural devrede!`, 'success');
+        }
+
+        if (typeof loadSIEMMitreMatrix === 'function') loadSIEMMitreMatrix();
+        if (typeof loadSIEMRules === 'function') loadSIEMRules();
+        if (typeof loadSIEMOverview === 'function') loadSIEMOverview();
+    } catch (e) {
+        if (alertBox) {
+            alertBox.className = 'alert-box alert-danger';
+            alertBox.textContent = `✗ Optimization Error: ${e.message}`;
+        }
+        alert('Optimization error: ' + e.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>🎯</span> <span data-i18n="btn_optimize_devices">Optimize for Devices</span>';
+        }
+        if (btnSoc) {
+            btnSoc.disabled = false;
+            btnSoc.innerHTML = '<span>🎯</span> <span data-i18n="btn_optimize_devices">Optimize Rules for Devices</span>';
+        }
+    }
+};
 

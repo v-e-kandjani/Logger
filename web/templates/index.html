@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.7</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.8</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -389,6 +389,9 @@
                     <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                         <button class="btn btn-outline" id="btn-open-mitre-matrix">
                             <span>🛡️</span> <span data-i18n="btn_mitre_matrix">MITRE ATT&CK Matrix</span>
+                        </button>
+                        <button class="btn btn-outline" id="btn-soc-optimize-devices" style="border-color: #38bdf8; color: #38bdf8;" title="Analyze registered devices and activate the optimal detection rule set tailored to your firewalls, servers, and network">
+                            <span>🎯</span> <span data-i18n="btn_optimize_devices">Optimize Rules for Devices</span>
                         </button>
                         <button class="btn btn-outline" id="btn-open-siem-rules">
                             <span>⚙️</span> <span data-i18n="btn_siem_rules">Detection Rules</span>
@@ -1134,11 +1137,16 @@
                                     <label>HTTPS Port</label>
                                     <input type="number" class="input mono-code" id="setting-https-port" value="8443" min="1" max="65535">
                                 </div>
-                                <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
-                                    <input type="checkbox" id="setting-https-redirect" style="width: 20px; height: 20px; cursor: pointer;">
-                                    <label for="setting-https-redirect" style="margin-bottom: 0; cursor: pointer;">
-                                        Auto-Redirect HTTP (8080) to HTTPS
-                                    </label>
+                                <div class="form-group" style="display: flex; flex-direction: column; justify-content: center; gap: 4px; margin-top: 4px;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <input type="checkbox" id="setting-https-redirect" style="width: 20px; height: 20px; cursor: pointer;">
+                                        <label for="setting-https-redirect" style="margin-bottom: 0; cursor: pointer; font-weight: 600;">
+                                            Auto-Redirect HTTP (8080) to HTTPS
+                                        </label>
+                                    </div>
+                                    <span id="https-redirect-note" style="font-size: 11px; color: var(--text-muted); margin-left: 30px;">
+                                        Requires an active TLS certificate
+                                    </span>
                                 </div>
                             </div>
 
@@ -1386,12 +1394,12 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.7</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.8</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">2f733b3</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">bad72d6</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-10</div>
                     </div>
                     <div class="stat-card">
@@ -2080,6 +2088,9 @@
                     <button class="btn btn-success" id="btn-install-all-mitre" style="font-size: 12px; padding: 6px 12px; background: #059669; border-color: #059669; color: #fff;" title="Install & enable SIEM detection rules for all MITRE ATT&CK techniques in the matrix">
                         <span>⚡</span> <span data-i18n="btn_install_all_mitre">Install All Rules</span>
                     </button>
+                    <button class="btn btn-outline" id="btn-optimize-device-rules" style="font-size: 12px; padding: 6px 12px; border-color: #38bdf8; color: #38bdf8;" title="Analyze registered devices and activate the optimal detection rule set tailored to your firewalls, servers, and network">
+                        <span>🎯</span> <span data-i18n="btn_optimize_devices">Optimize for Devices</span>
+                    </button>
                     <button class="close-btn" id="btn-close-siem-mitre">&times;</button>
                 </div>
             </div>
@@ -2398,7 +2409,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.7"></script>
-    <script src="/static/js/app.js?v=1.5.7"></script>
+    <script src="/static/js/translations.js?v=1.5.8"></script>
+    <script src="/static/js/app.js?v=1.5.8"></script>
 </body>
 </html>

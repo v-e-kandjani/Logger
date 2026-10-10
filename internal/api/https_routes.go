@@ -33,14 +33,17 @@ func (h *Handler) handleHTTPSToggle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Enabled  bool `json:"enabled"`
-		Port     int  `json:"port"`
-		Redirect bool `json:"redirect"`
+		Enabled      bool `json:"enabled"`
+		Port         int  `json:"port"`
+		Redirect     bool `json:"redirect"`
+		RedirectHTTP bool `json:"redirect_http"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
 		return
 	}
+
+	redirect := req.Redirect || req.RedirectHTTP
 
 	if req.Port <= 0 {
 		req.Port = https.DefaultHTTPSPort
@@ -50,7 +53,13 @@ func (h *Handler) handleHTTPSToggle(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if h.httpsMgr != nil {
-		if err := h.httpsMgr.ToggleHTTPS(ctx, req.Enabled, req.Port, req.Redirect); err != nil {
+		if redirect && !h.httpsMgr.HasCertificate() {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error": "Cannot enable HTTP to HTTPS redirect: No TLS certificate is available. Please generate or upload a certificate first.",
+			})
+			return
+		}
+		if err := h.httpsMgr.ToggleHTTPS(ctx, req.Enabled, req.Port, redirect); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Failed to apply HTTPS state: %v", err)})
 			return
 		}

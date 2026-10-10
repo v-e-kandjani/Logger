@@ -3,7 +3,7 @@ const translations = {
     tr: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.5.7",
+        app_version: "v1.5.8",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         view_title_dashboard: "Operasyon & Güvenlik Paneli",
@@ -38,6 +38,7 @@ const translations = {
         btn_mitre_matrix: "MITRE ATT&CK Matrisi",
         btn_sync_mitre: "Resmi Beslemeyi Güncelle",
         btn_check_mitre: "Yeni Sürümü Kontrol Et",
+        btn_optimize_devices: "Cihazlara Göre Kuralları Optimize Et",
         mitre_autosync_label: "Yeni ATT&CK sürümlerini otomatik etkinleştir",
         mitre_filter_all: "Tümü",
         mitre_filter_covered: "Kapsanan",
@@ -326,7 +327,7 @@ const translations = {
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.5.7",
+        app_version: "v1.5.8",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         view_title_dashboard: "Operations & Security Dashboard",
@@ -361,6 +362,7 @@ const translations = {
         btn_mitre_matrix: "MITRE ATT&CK Matrix",
         btn_sync_mitre: "Sync Official Feed",
         btn_check_mitre: "Check for New Release",
+        btn_optimize_devices: "Optimize Rules for Devices",
         mitre_autosync_label: "Auto-activate new ATT&CK releases",
         mitre_filter_all: "All",
         mitre_filter_covered: "Covered",

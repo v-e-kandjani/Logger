@@ -215,6 +215,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/siem/mitre/install-all", h.requireAuth(h.handleSIEMMitreInstallAll))
 	mux.HandleFunc("/api/v1/siem/mitre/toggle-technique", h.requireAuth(h.handleSIEMMitreToggleTechnique))
 	mux.HandleFunc("/api/v1/siem/mitre/toggle-all", h.requireAuth(h.handleSIEMMitreToggleAll))
+	mux.HandleFunc("/api/v1/siem/mitre/optimize-devices", h.requireAuth(h.handleSIEMMitreOptimizeDevices))
 
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))
@@ -520,7 +521,8 @@ func (h *Handler) WrapRootHandler(next http.Handler) http.Handler {
 			status := h.httpsMgr.GetStatus(r.Context())
 
 			// 1. HTTPS Redirect: If HTTPS is enabled with redirect, and connection is plain HTTP
-			if status.Enabled && status.RedirectHTTP && r.TLS == nil {
+			isHTTP := r.TLS == nil && r.Header.Get("X-Forwarded-Proto") != "https"
+			if status.Enabled && status.RedirectHTTP && isHTTP {
 				host := r.Host
 				if idx := strings.Index(host, ":"); idx != -1 {
 					host = host[:idx]
@@ -528,7 +530,11 @@ func (h *Handler) WrapRootHandler(next http.Handler) http.Handler {
 				if status.FQDNEnabled && status.FQDNHost != "" {
 					host = status.FQDNHost
 				}
-				target := fmt.Sprintf("https://%s:%d%s", host, status.Port, r.RequestURI)
+				portStr := ""
+				if status.Port != 443 {
+					portStr = fmt.Sprintf(":%d", status.Port)
+				}
+				target := fmt.Sprintf("https://%s%s%s", host, portStr, r.RequestURI)
 				http.Redirect(w, r, target, http.StatusMovedPermanently)
 				return
 			}

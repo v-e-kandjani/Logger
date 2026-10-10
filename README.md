@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.8** (Active Device SIEM Rule Optimizer & Certificate-Gated HTTP Redirection):
+  - **SIEM Rule Optimization for Active Inventory Devices**: Introduced 1-click intelligent threat detection rule optimization (`POST /api/v1/siem/mitre/optimize-devices`) both in the MITRE ATT&CK matrix modal and the SIEM operations header. Automatically maps registered network firewalls (Fortinet, WatchGuard, Cisco), servers, and directory controllers to relevant tactical threat objectives, activating tailored rules and silencing irrelevant false positives.
+  - **Certificate-Gated HTTP-to-HTTPS Redirection**: Fixed toggle payload parsing and enforced strict safety validation: HTTP-to-HTTPS redirection can only be enabled when a valid TLS certificate is active. Added automated prompt to enable redirection immediately upon self-signed certificate generation or custom certificate installation.
+  - **TLS Certificate Display Harmonization**: Fixed attribute serialization and UI binding so generated self-signed and uploaded certificates display their Common Name, Issuer, expiry date, key parameters, and SANs directly in the Active TLS Certificate Details card.
+
 - **v1.5.7** (Secure Web HTTPS, SSL/TLS Governance, FQDN Routing & 60% RAM Result Acceleration):
   - **Secure Web (HTTPS) & SSL/TLS Governance**: Native cryptographic HTTPS listener on port 8443 with atomic certificate hot-swapping (`tls.Config.GetCertificate`), dynamic toggle, and optional HTTP-to-HTTPS automatic redirection without interrupting log ingestion or health probes.
   - **1-Click Self-Signed Certificate Generator & Custom CA Upload**: Built-in 2048-bit RSA X.509 v3 certificate generator with automatic SAN inclusion (FQDN, host IPs, localhost) alongside enterprise CA / PEM certificate & private key upload and `.crt` download capability.

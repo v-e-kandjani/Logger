@@ -42,6 +42,7 @@ const (
 type CertMetadata struct {
 	Subject           string    `json:"subject"`
 	CommonName        string    `json:"common_name"`
+	SubjectCN         string    `json:"subject_cn"`
 	Issuer            string    `json:"issuer"`
 	NotBefore         time.Time `json:"not_before"`
 	NotAfter          time.Time `json:"not_after"`
@@ -53,6 +54,7 @@ type CertMetadata struct {
 	IsExpired         bool      `json:"is_expired"`
 	KeyAlgorithm      string    `json:"key_algorithm"`
 	KeyBits           int       `json:"key_bits"`
+	KeyType           string    `json:"key_type"`
 }
 
 // HTTPSStatus represents the full TLS and FQDN configuration state
@@ -65,6 +67,7 @@ type HTTPSStatus struct {
 	FQDNEnforce      bool          `json:"fqdn_enforce"`
 	FQDNRedirect     bool          `json:"fqdn_redirect"`
 	ActiveCert       *CertMetadata `json:"active_cert,omitempty"`
+	Certificate      *CertMetadata `json:"certificate,omitempty"`
 	HasCertificate   bool          `json:"has_certificate"`
 	ListeningAddress string        `json:"listening_address"`
 	WebURL           string        `json:"web_url"`
@@ -92,6 +95,11 @@ func NewManager(db *postgres.DB) *Manager {
 		pgDB: db,
 		port: DefaultHTTPSPort,
 	}
+}
+
+// HasCertificate returns true if a valid TLS certificate is currently active in memory
+func (m *Manager) HasCertificate() bool {
+	return m.currentCert.Load() != nil
 }
 
 // Initialize loads stored TLS settings and certificate from PostgreSQL, or auto-generates on first enable
@@ -454,6 +462,7 @@ func (m *Manager) GetStatus(ctx context.Context) HTTPSStatus {
 		FQDNEnforce:      settings[SettingFQDNEnforce] == "true",
 		FQDNRedirect:     settings[SettingFQDNRedirect] == "true",
 		ActiveCert:       meta,
+		Certificate:      meta,
 		HasCertificate:   meta != nil,
 		ListeningAddress: fmt.Sprintf("0.0.0.0:%d", port),
 		WebURL:           webURL,
@@ -490,6 +499,7 @@ func parseKeyPair(certPEM, keyPEM []byte) (*tls.Certificate, *CertMetadata, erro
 	meta := &CertMetadata{
 		Subject:           x509Cert.Subject.String(),
 		CommonName:        x509Cert.Subject.CommonName,
+		SubjectCN:         x509Cert.Subject.CommonName,
 		Issuer:            x509Cert.Issuer.String(),
 		NotBefore:         x509Cert.NotBefore,
 		NotAfter:          x509Cert.NotAfter,
@@ -504,6 +514,11 @@ func parseKeyPair(certPEM, keyPEM []byte) (*tls.Certificate, *CertMetadata, erro
 
 	if rsaKey, ok := x509Cert.PublicKey.(*rsa.PublicKey); ok {
 		meta.KeyBits = rsaKey.N.BitLen()
+	}
+	if meta.KeyBits > 0 {
+		meta.KeyType = fmt.Sprintf("%s %d-bit", meta.KeyAlgorithm, meta.KeyBits)
+	} else {
+		meta.KeyType = meta.KeyAlgorithm
 	}
 
 	return &tlsCert, meta, nil

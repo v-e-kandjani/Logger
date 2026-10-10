@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.8** (Aktif Cihazlara Göre SIEM Kural Optimizasyonu ve Sertifika Korumalı HTTPS Yönlendirmesi):
+  - **Kayıtlı Cihazlara Göre 1-Tıkla Akıllı Kural Optimizasyonu**: MITRE ATT&CK matrisi ve SIEM yönetim başlığına eklenen optimizasyon motoru (`POST /api/v1/siem/mitre/optimize-devices`) ile envanterdeki güvenlik duvarları (Fortinet, WatchGuard, Cisco), Linux/Windows sunucular ve etki alanı denetleyicileri otomatik analiz edilir; ilgili tehdit teknikleri aktif edilirken gereksiz kurallar devre dışı bırakılarak yanlış alarmlar engellenir.
+  - **Sertifika Korumalı HTTP'den HTTPS'e Yönlendirme**: Yönlendirme anahtarı veri iletişimi düzeltildi ve güvenlik doğrulaması eklendi; yalnızca geçerli bir TLS sertifikası devredeyken HTTP'den HTTPS'e yönlendirmeye izin verilir. Kendinden imzalı veya özel sertifika yüklendiğinde yönlendirmeyi otomatik açma onayı sunulur.
+  - **TLS Sertifika Bilgisi Görünüm İyileştirmesi**: Sertifika özniteliklerinin serileştirilmesi ve UI bağlama mantığı uyumlu hale getirilerek oluşturulan kendinden imzalı ve yüklenen sertifikaların Common Name, Yayıncı, Bitiş Tarihi, Kalan Gün ve SAN bilgileri kart üzerinde anında görüntülenir.
+
 - **v1.5.7** (Güvenli Web HTTPS, SSL/TLS Yönetimi, FQDN Yönlendirmesi ve %60 RAM Bellek İçi Sorgu Hızlandırma):
   - **Güvenli Web (HTTPS) ve SSL/TLS Yönetimi**: 8443 portunda çalışan yerel kriptografik HTTPS dinleyicisi, atomik sıfır-kesinti sertifika değişimi (`tls.Config.GetCertificate`), dinamik açma/kapama ve HTTP'den HTTPS'e otomatik yönlendirme desteği.
   - **Tek Tıkla Kendinden İmzalı Sertifika Üretici ve Özel CA Yükleme**: FQDN, sunucu IP'leri ve localhost SAN'larını içeren 2048-bit RSA X.509 v3 sertifika oluşturucu; kurumsal PEM sertifika ve özel anahtar yükleme ile `.crt` sertifika indirme imkanı.

@@ -855,3 +855,222 @@ func buildMitreRuleForTechnique(t mitre.Technique, enabled bool) models.SIEMRule
 	}
 }
 
+// handleSIEMMitreOptimizeDevices analyzes inventory devices and optimizes active SIEM correlation rules
+func (h *Handler) handleSIEMMitreOptimizeDevices(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r, 15*time.Second)
+	defer cancel()
+
+	devices, err := h.pgDB.ListDevices(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed listing devices: " + err.Error()})
+		return
+	}
+
+	// Also ensure full catalog is available
+	if h.mitreCatalog.TechniqueCount() == 0 {
+		_ = h.mitreCatalog.LoadFromStore(ctx)
+	}
+	// Make sure correlation rules are synced for known techniques
+	_, _ = h.AutoAddMitreCorrelationRules(ctx, h.mitreCatalog.GetAllTechniques())
+
+	// 1. Analyze device inventory: vendors, device types
+	vendorMap := make(map[string]int)
+	typeMap := make(map[string]int)
+	hasFirewall := false
+	hasActiveDirectory := false
+	hasLinuxServer := false
+	hasGenericNetwork := false
+
+	for _, d := range devices {
+		if !d.IsEnabled {
+			continue
+		}
+		v := strings.ToLower(strings.TrimSpace(d.Vendor))
+		dt := strings.ToLower(strings.TrimSpace(d.DeviceType))
+		name := strings.ToLower(strings.TrimSpace(d.Name))
+
+		if d.Vendor != "" {
+			vendorMap[strings.TrimSpace(d.Vendor)]++
+		}
+		if d.DeviceType != "" {
+			typeMap[strings.TrimSpace(d.DeviceType)]++
+		}
+
+		// Check profiles
+		if strings.Contains(v, "forti") || strings.Contains(v, "watchguard") || strings.Contains(v, "cisco") ||
+			strings.Contains(v, "palo") || strings.Contains(v, "pfsense") || strings.Contains(v, "sophos") ||
+			strings.Contains(v, "checkpoint") || strings.Contains(dt, "firewall") || strings.Contains(dt, "utm") ||
+			strings.Contains(dt, "router") || strings.Contains(name, "fgt") || strings.Contains(name, "firewall") {
+			hasFirewall = true
+		}
+
+		if strings.Contains(v, "windows") || strings.Contains(v, "microsoft") || strings.Contains(dt, "active directory") ||
+			strings.Contains(dt, "domain") || strings.Contains(dt, "ldap") || strings.Contains(name, "dc") ||
+			strings.Contains(name, "ad") {
+			hasActiveDirectory = true
+		}
+
+		if strings.Contains(v, "linux") || strings.Contains(v, "ubuntu") || strings.Contains(v, "debian") ||
+			strings.Contains(v, "centos") || strings.Contains(v, "redhat") || strings.Contains(dt, "server") ||
+			strings.Contains(name, "server") || strings.Contains(name, "linux") {
+			hasLinuxServer = true
+		}
+
+		if strings.Contains(v, "generic") || strings.Contains(dt, "switch") || strings.Contains(dt, "syslog") {
+			hasGenericNetwork = true
+		}
+	}
+
+	// Default fallback to perimeter + server defense if inventory is minimal
+	if len(devices) == 0 {
+		hasFirewall = true
+		hasLinuxServer = true
+		hasGenericNetwork = true
+	}
+
+	// 2. Build set of prioritized MITRE techniques & rule categories
+	relevantTechs := make(map[string]bool)
+	relevantCategories := make(map[string]bool)
+	var profiles []string
+
+	// Base Profile: Infrastructure Integrity & Log Protection (Always active)
+	profiles = append(profiles, "Log Integrity & Anti-Tampering (RFC 3164 / 5651)")
+	relevantTechs["T1562.001"] = true // Disable or Modify Tools
+	relevantTechs["T1070.002"] = true // Clear System Logs
+	relevantTechs["T1082"] = true     // System Information Discovery
+	relevantCategories["system"] = true
+	relevantCategories["compliance"] = true
+	relevantCategories["health"] = true
+
+	if hasFirewall {
+		profiles = append(profiles, "Next-Gen Firewall & Perimeter UTM (Fortinet, WatchGuard, Cisco)")
+		relevantCategories["perimeter"] = true
+		relevantCategories["network"] = true
+		relevantCategories["reconnaissance"] = true
+
+		firewallTechs := []string{
+			"T1046", "T1595", "T1595.001", "T1595.002", "T1190", "T1133",
+			"T1071", "T1071.001", "T1071.004", "T1048", "T1048.003",
+			"T1090", "T1090.001", "T1562.004", "T1498", "T1498.001",
+			"T1499", "T1041", "T1095", "T1571", "T1572", "T1573",
+			"T1021.001", "T1021.002", "T1021.004", "T1040", "T1210",
+		}
+		for _, t := range firewallTechs {
+			relevantTechs[t] = true
+		}
+	}
+
+	if hasActiveDirectory {
+		profiles = append(profiles, "Active Directory & Identity Defense (LDAP / Kerberos / SSO)")
+		relevantCategories["authentication"] = true
+		relevantCategories["identity"] = true
+
+		adTechs := []string{
+			"T1110", "T1110.001", "T1110.002", "T1110.003", "T1078", "T1078.002", "T1078.003",
+			"T1003", "T1003.001", "T1003.002", "T1558", "T1558.003",
+			"T1098", "T1075", "T1069", "T1069.002", "T1484", "T1207",
+		}
+		for _, t := range adTechs {
+			relevantTechs[t] = true
+		}
+	}
+
+	if hasLinuxServer {
+		profiles = append(profiles, "Linux / Unix Server & Remote Shell Auditing")
+		relevantCategories["authentication"] = true
+		relevantCategories["endpoint"] = true
+
+		serverTechs := []string{
+			"T1110.001", "T1548.003", "T1059.004", "T1070.003",
+			"T1053.003", "T1053", "T1543.002", "T1082", "T1057",
+		}
+		for _, t := range serverTechs {
+			relevantTechs[t] = true
+		}
+	}
+
+	if hasGenericNetwork {
+		profiles = append(profiles, "Network Infrastructure & Syslog Anomaly Detection")
+		relevantTechs["T1046"] = true
+		relevantTechs["T1071.001"] = true
+		relevantTechs["T1110.001"] = true
+		relevantTechs["T1562.001"] = true
+	}
+
+	// 3. Fetch all current rules from PostgreSQL
+	allRules, err := h.pgDB.ListSIEMRules(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed listing rules: " + err.Error()})
+		return
+	}
+
+	// 4. Determine enable/disable state for each rule
+	activatedCount := 0
+	deactivatedCount := 0
+	var rulesToUpdate []models.SIEMRule
+
+	for _, rule := range allRules {
+		tech := rule.MitreTechnique
+		baseTech := tech
+		if idx := strings.Index(tech, "."); idx != -1 {
+			baseTech = tech[:idx]
+		}
+
+		shouldEnable := relevantTechs[tech] || relevantTechs[baseTech] || relevantCategories[strings.ToLower(rule.Category)]
+
+		if shouldEnable {
+			if !rule.IsEnabled {
+				rule.IsEnabled = true
+				rulesToUpdate = append(rulesToUpdate, rule)
+			}
+			activatedCount++
+		} else {
+			if rule.IsEnabled {
+				rule.IsEnabled = false
+				rulesToUpdate = append(rulesToUpdate, rule)
+			}
+			deactivatedCount++
+		}
+	}
+
+	// 5. Batch update rules in PostgreSQL
+	if len(rulesToUpdate) > 0 {
+		if err := h.pgDB.BatchUpsertSIEMRules(ctx, rulesToUpdate); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed updating rules: " + err.Error()})
+			return
+		}
+	}
+
+	// 6. Hot-reload SIEM correlation engine
+	if engine := h.pipeline.GetSIEMEngine(); engine != nil {
+		_ = engine.LoadRulesFromDB(ctx)
+	}
+
+	var vendorList []string
+	for v := range vendorMap {
+		vendorList = append(vendorList, v)
+	}
+	var typeList []string
+	for t := range typeMap {
+		typeList = append(typeList, t)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success":           true,
+		"devices_count":     len(devices),
+		"detected_vendors":  vendorList,
+		"detected_types":    typeList,
+		"profiles":          profiles,
+		"activated_rules":   activatedCount,
+		"deactivated_rules": deactivatedCount,
+		"total_rules":       len(allRules),
+		"message": fmt.Sprintf("Optimized detection rule set applied for %d inventory devices (%s). %d relevant threat rules activated across %d security profiles.",
+			len(devices), strings.Join(vendorList, ", "), activatedCount, len(profiles)),
+	})
+}
+
