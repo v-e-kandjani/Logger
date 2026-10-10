@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadUpdateStatus();
     initSIEMManagement();
     initADAndMFAManagement();
+    initHTTPSAndFQDNManagement();
     if (window.i18n) {
         window.i18n.setLanguage(window.i18n.currentLang);
     }
@@ -979,6 +980,9 @@ async function loadSettings() {
         }
 
         updateStampingUI();
+        await loadHTTPSSettings();
+        await loadFQDNSettings();
+        await loadCacheStats();
     } catch (e) {
         console.error('Failed loading settings:', e);
     }
@@ -1673,6 +1677,338 @@ function initADAndMFAManagement() {
     const btnMyMFAModal = document.getElementById('btn-my-mfa-modal');
     if (btnMyMFAModal) {
         btnMyMFAModal.addEventListener('click', openMyMFASetupModal);
+    }
+}
+
+// ==========================================
+// HTTPS, SSL/TLS, FQDN & Result Cache
+// ==========================================
+async function loadHTTPSSettings() {
+    try {
+        const res = await fetch('/api/v1/settings/https/status');
+        if (!res.ok) return;
+        const s = await res.json();
+
+        const enEl = document.getElementById('setting-https-enabled');
+        if (enEl) enEl.checked = !!s.enabled;
+
+        const portEl = document.getElementById('setting-https-port');
+        if (portEl && s.port) portEl.value = s.port;
+
+        const redEl = document.getElementById('setting-https-redirect');
+        if (redEl) redEl.checked = !!s.redirect_http;
+
+        const badge = document.getElementById('https-status-badge');
+        if (badge) {
+            if (s.enabled) {
+                badge.className = 'badge badge-success';
+                badge.textContent = `HTTPS Active (:${s.port || 8443})`;
+            } else {
+                badge.className = 'badge badge-secondary';
+                badge.textContent = 'HTTPS Disabled';
+            }
+        }
+
+        const cert = s.certificate;
+        const cnEl = document.getElementById('cert-cn-display');
+        const issuerEl = document.getElementById('cert-issuer-display');
+        const expiryEl = document.getElementById('cert-expiry-display');
+        const daysBadge = document.getElementById('cert-days-badge');
+        const keyEl = document.getElementById('cert-key-display');
+        const sansEl = document.getElementById('cert-sans-display');
+        const fpEl = document.getElementById('cert-fp-display');
+        const btnDl = document.getElementById('btn-download-cert');
+
+        if (cert) {
+            if (cnEl) cnEl.textContent = cert.subject_cn || 'Configured TLS Certificate';
+            if (issuerEl) issuerEl.textContent = cert.issuer || '-';
+            if (expiryEl) expiryEl.textContent = cert.not_after ? cert.not_after.split('T')[0] : '-';
+            if (daysBadge) {
+                const days = cert.days_remaining != null ? cert.days_remaining : 0;
+                daysBadge.textContent = `${days} days left`;
+                daysBadge.className = days > 30 ? 'badge badge-success' : 'badge badge-warning';
+            }
+            if (keyEl) keyEl.textContent = cert.key_type || 'RSA 2048-bit';
+            const allSans = [...(cert.dns_names || []), ...(cert.ip_addresses || [])].join(', ');
+            if (sansEl) sansEl.textContent = allSans || 'None';
+            if (fpEl) fpEl.textContent = cert.fingerprint_sha256 || '-';
+            if (btnDl) btnDl.style.display = 'inline-block';
+        } else {
+            if (cnEl) cnEl.textContent = 'No Certificate Configured';
+            if (issuerEl) issuerEl.textContent = '-';
+            if (expiryEl) expiryEl.textContent = '-';
+            if (daysBadge) {
+                daysBadge.textContent = 'None';
+                daysBadge.className = 'badge badge-secondary';
+            }
+            if (keyEl) keyEl.textContent = '-';
+            if (sansEl) sansEl.textContent = '-';
+            if (fpEl) fpEl.textContent = '-';
+            if (btnDl) btnDl.style.display = 'none';
+        }
+    } catch (e) {
+        console.error('Failed loading HTTPS settings:', e);
+    }
+}
+
+async function loadFQDNSettings() {
+    try {
+        const res = await fetch('/api/v1/settings/fqdn');
+        if (!res.ok) return;
+        const s = await res.json();
+
+        const enEl = document.getElementById('setting-fqdn-enabled');
+        if (enEl) enEl.checked = !!s.enabled;
+
+        const hostEl = document.getElementById('setting-fqdn-host');
+        if (hostEl) hostEl.value = s.host || '';
+
+        const redEl = document.getElementById('setting-fqdn-redirect');
+        if (redEl) redEl.checked = !!s.redirect_raw_ip;
+
+        const canonEl = document.getElementById('fqdn-canonical-url');
+        if (canonEl) canonEl.textContent = s.canonical_url || window.location.origin;
+
+        const badge = document.getElementById('fqdn-status-badge');
+        if (badge) {
+            if (s.enabled && s.host) {
+                badge.className = 'badge badge-success';
+                badge.textContent = `FQDN Active: ${s.host}`;
+            } else {
+                badge.className = 'badge badge-secondary';
+                badge.textContent = 'FQDN Optional';
+            }
+        }
+    } catch (e) {
+        console.error('Failed loading FQDN settings:', e);
+    }
+}
+
+async function loadCacheStats() {
+    try {
+        const res = await fetch('/api/v1/settings/cache/stats');
+        if (!res.ok) return;
+        const s = await res.json();
+
+        const enEl = document.getElementById('setting-cache-enabled');
+        if (enEl) enEl.checked = !!s.enabled;
+
+        const totEl = document.getElementById('cache-total-ram');
+        if (totEl) totEl.textContent = s.total_ram_mb > 0 ? `${(s.total_ram_mb / 1024).toFixed(2)} GB` : '-';
+
+        const availEl = document.getElementById('cache-avail-ram');
+        if (availEl) availEl.textContent = s.avail_ram_mb > 0 ? `${(s.avail_ram_mb / 1024).toFixed(2)} GB` : '-';
+
+        const budgetEl = document.getElementById('cache-budget-ram');
+        if (budgetEl) budgetEl.textContent = s.max_memory_mb > 0 ? `${(s.max_memory_mb / 1024).toFixed(2)} GB (60%)` : '-';
+
+        const usageEl = document.getElementById('cache-usage-ram');
+        if (usageEl) usageEl.textContent = `${(s.used_memory_mb || 0).toFixed(2)} MB`;
+
+        const itemsEl = document.getElementById('cache-items-count');
+        if (itemsEl) itemsEl.textContent = (s.cached_items || 0).toLocaleString();
+
+        const hitRatioEl = document.getElementById('cache-hit-ratio');
+        if (hitRatioEl) hitRatioEl.textContent = `${(s.hit_ratio_pct || 0).toFixed(1)}%`;
+
+        const hitsEl = document.getElementById('cache-hits-count');
+        if (hitsEl) hitsEl.textContent = (s.hits || 0).toLocaleString();
+
+        const missesEl = document.getElementById('cache-misses-count');
+        if (missesEl) missesEl.textContent = (s.misses || 0).toLocaleString();
+
+        const badge = document.getElementById('cache-status-badge');
+        if (badge) {
+            if (s.enabled) {
+                badge.className = 'badge badge-success';
+                badge.textContent = 'Active (Up to 60% RAM)';
+            } else {
+                badge.className = 'badge badge-secondary';
+                badge.textContent = 'Disabled';
+            }
+        }
+    } catch (e) {
+        console.error('Failed loading cache telemetry:', e);
+    }
+}
+
+function initHTTPSAndFQDNManagement() {
+    // 1. HTTPS Settings Save
+    const btnSaveHTTPS = document.getElementById('btn-save-https-settings');
+    if (btnSaveHTTPS) {
+        btnSaveHTTPS.addEventListener('click', async () => {
+            btnSaveHTTPS.disabled = true;
+            btnSaveHTTPS.textContent = 'Saving HTTPS...';
+            try {
+                const enabled = document.getElementById('setting-https-enabled').checked;
+                const port = parseInt(document.getElementById('setting-https-port').value, 10) || 8443;
+                const redirectHttp = document.getElementById('setting-https-redirect').checked;
+
+                const res = await fetch('/api/v1/settings/https/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled, port, redirect_http: redirectHttp })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to save HTTPS settings');
+
+                alert(`HTTPS Configuration Saved!\nStatus: ${enabled ? 'Enabled on port :' + port : 'Disabled'}\n${data.message || ''}`);
+                await loadHTTPSSettings();
+            } catch (e) {
+                alert('Failed saving HTTPS settings: ' + e.message);
+            } finally {
+                btnSaveHTTPS.disabled = false;
+                btnSaveHTTPS.textContent = 'Save HTTPS Settings';
+            }
+        });
+    }
+
+    // 2. Self-Signed Certificate Generation
+    const btnGenCert = document.getElementById('btn-generate-cert');
+    if (btnGenCert) {
+        btnGenCert.addEventListener('click', async () => {
+            const cn = document.getElementById('cert-gen-cn').value.trim();
+            const sansRaw = document.getElementById('cert-gen-sans').value.trim();
+            const days = parseInt(document.getElementById('cert-gen-days').value, 10) || 365;
+
+            const sans = sansRaw ? sansRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+            btnGenCert.disabled = true;
+            btnGenCert.textContent = 'Generating 2048-bit RSA Certificate...';
+
+            try {
+                const res = await fetch('/api/v1/settings/https/certificate/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        common_name: cn,
+                        sans: sans,
+                        validity_days: days
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed generating certificate');
+
+                alert('✓ Cryptographic TLS certificate generated and activated successfully!');
+                await loadHTTPSSettings();
+            } catch (e) {
+                alert('Failed generating certificate: ' + e.message);
+            } finally {
+                btnGenCert.disabled = false;
+                btnGenCert.textContent = '⚡ Generate & Activate Certificate';
+            }
+        });
+    }
+
+    // 3. Custom Certificate Upload
+    const btnUploadCert = document.getElementById('btn-upload-cert');
+    if (btnUploadCert) {
+        btnUploadCert.addEventListener('click', async () => {
+            const certPem = document.getElementById('cert-upload-cert').value.trim();
+            const keyPem = document.getElementById('cert-upload-key').value.trim();
+
+            if (!certPem || !keyPem) {
+                alert('Please paste both Certificate PEM and Private Key PEM.');
+                return;
+            }
+
+            btnUploadCert.disabled = true;
+            btnUploadCert.textContent = 'Installing & Hot-Swapping Certificate...';
+
+            try {
+                const res = await fetch('/api/v1/settings/https/certificate/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cert_pem: certPem, key_pem: keyPem })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed uploading certificate');
+
+                alert('✓ Enterprise TLS certificate uploaded, validated, and hot-swapped successfully!');
+                document.getElementById('cert-upload-cert').value = '';
+                document.getElementById('cert-upload-key').value = '';
+                await loadHTTPSSettings();
+            } catch (e) {
+                alert('Failed uploading certificate: ' + e.message);
+            } finally {
+                btnUploadCert.disabled = false;
+                btnUploadCert.textContent = '📤 Install & Hot-Swap Certificate';
+            }
+        });
+    }
+
+    // 4. Download Active Certificate
+    const btnDlCert = document.getElementById('btn-download-cert');
+    if (btnDlCert) {
+        btnDlCert.addEventListener('click', () => {
+            window.location.href = '/api/v1/settings/https/certificate/download';
+        });
+    }
+
+    // 5. FQDN Settings Save
+    const btnSaveFQDN = document.getElementById('btn-save-fqdn-settings');
+    if (btnSaveFQDN) {
+        btnSaveFQDN.addEventListener('click', async () => {
+            btnSaveFQDN.disabled = true;
+            btnSaveFQDN.textContent = 'Saving FQDN...';
+            try {
+                const enabled = document.getElementById('setting-fqdn-enabled').checked;
+                const host = document.getElementById('setting-fqdn-host').value.trim();
+                const redirectRawIp = document.getElementById('setting-fqdn-redirect').checked;
+
+                const res = await fetch('/api/v1/settings/fqdn', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled, host, redirect_raw_ip: redirectRawIp })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed saving FQDN');
+
+                alert(`FQDN Settings Saved!\n${data.message || ''}`);
+                await loadFQDNSettings();
+            } catch (e) {
+                alert('Failed saving FQDN settings: ' + e.message);
+            } finally {
+                btnSaveFQDN.disabled = false;
+                btnSaveFQDN.textContent = 'Save FQDN Settings';
+            }
+        });
+    }
+
+    // 6. Cache Flush & Toggle
+    const btnClearCache = document.getElementById('btn-clear-cache');
+    if (btnClearCache) {
+        btnClearCache.addEventListener('click', async () => {
+            btnClearCache.disabled = true;
+            try {
+                const res = await fetch('/api/v1/settings/cache/clear', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed flushing cache');
+                alert('✓ In-memory query result cache flushed successfully.');
+                await loadCacheStats();
+            } catch (e) {
+                alert('Failed flushing cache: ' + e.message);
+            } finally {
+                btnClearCache.disabled = false;
+            }
+        });
+    }
+
+    const toggleCacheEl = document.getElementById('setting-cache-enabled');
+    if (toggleCacheEl) {
+        toggleCacheEl.addEventListener('change', async () => {
+            try {
+                const res = await fetch('/api/v1/settings/cache/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: toggleCacheEl.checked })
+                });
+                if (!res.ok) throw new Error('Failed to toggle cache');
+                await loadCacheStats();
+            } catch (e) {
+                console.error('Failed toggling cache:', e);
+            }
+        });
     }
 }
 

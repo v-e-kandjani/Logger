@@ -260,6 +260,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.7** (Secure Web HTTPS, SSL/TLS Governance, FQDN Routing & 60% RAM Result Acceleration):
+  - **Secure Web (HTTPS) & SSL/TLS Governance**: Native cryptographic HTTPS listener on port 8443 with atomic certificate hot-swapping (`tls.Config.GetCertificate`), dynamic toggle, and optional HTTP-to-HTTPS automatic redirection without interrupting log ingestion or health probes.
+  - **1-Click Self-Signed Certificate Generator & Custom CA Upload**: Built-in 2048-bit RSA X.509 v3 certificate generator with automatic SAN inclusion (FQDN, host IPs, localhost) alongside enterprise CA / PEM certificate & private key upload and `.crt` download capability.
+  - **Fully Qualified Domain Name (FQDN) Access Control**: Host header enforcement and automatic raw IP-to-FQDN redirection for enterprise SOC URL canonicalization.
+  - **In-Memory Query Acceleration (Up to 60% Available RAM)**: Dynamic RAM budget detection and thread-safe LRU/TTL result cache utilizing up to 60% of available host memory, integrated with Go runtime `debug.SetMemoryLimit` for sub-millisecond repeated search queries with zero ClickHouse disk I/O.
+
 - **v1.5.6** (Automated SIEM Correlation & Detection Catalog Rule Synchronization on Matrix Updates):
   - **Automated Rule Synchronization Pipeline**: Extended the MITRE ATT&CK update pipeline (`AutoAddMitreCorrelationRules`) to automatically map and inject related SIEM Correlation & Detection Catalog Rules directly into the active rule set on every matrix update (manual feed sync, air-gapped STIX import, automatic background release checks, and server startup self-healing).
   - **Curated Catalog & Dynamic Generator Hybrid Integration**: Automatically matches techniques against curated rules from `internal/siem/catalog` (e.g. AUTH-001, SSH-002, HEALTH-006) and falls back to dynamic tactical objective generation for newly discovered techniques, ensuring immediate active detection coverage without manual administrator intervention.

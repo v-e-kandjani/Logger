@@ -249,6 +249,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.7** (Güvenli Web HTTPS, SSL/TLS Yönetimi, FQDN Yönlendirmesi ve %60 RAM Bellek İçi Sorgu Hızlandırma):
+  - **Güvenli Web (HTTPS) ve SSL/TLS Yönetimi**: 8443 portunda çalışan yerel kriptografik HTTPS dinleyicisi, atomik sıfır-kesinti sertifika değişimi (`tls.Config.GetCertificate`), dinamik açma/kapama ve HTTP'den HTTPS'e otomatik yönlendirme desteği.
+  - **Tek Tıkla Kendinden İmzalı Sertifika Üretici ve Özel CA Yükleme**: FQDN, sunucu IP'leri ve localhost SAN'larını içeren 2048-bit RSA X.509 v3 sertifika oluşturucu; kurumsal PEM sertifika ve özel anahtar yükleme ile `.crt` sertifika indirme imkanı.
+  - **Tam Nitelikli Alan Adı (FQDN) Erişimi**: Kurumsal SOC ortamları için Host başlığı denetimi ve ham IP adresinden FQDN alan adına otomatik yönlendirme.
+  - **Bellek İçi Sorgu Hızlandırma (%60 Kullanılabilir RAM)**: Sistem boş RAM miktarını dinamik tespit eden, %60'a kadar RAM bütçesi kullanan thread-safe LRU/TTL sonuç önbelleği ve Go `debug.SetMemoryLimit` optimizasyonu sayesinde tekrarlayan log aramalarında milisaniye altı yanıt süreleri.
+
 - **v1.5.6** (Her Matris Güncellemesinde İlgili SIEM Korelasyon ve Tespit Kataloğu Kurallarının Otomatik Eklenmesi):
   - **Otomatik Kural Senkronizasyon Hattı**: MITRE ATT&CK güncelleme mekanizması (`AutoAddMitreCorrelationRules`) genişletilerek her matris güncellemesinde (manuel besleme senkronizasyonu, internete kapalı STIX içe aktarma, otomatik arka plan sürüm taramaları ve sunucu başlangıç kontrolleri) ilgili SIEM Korelasyon & Tespit Kataloğu Kurallarının kural setine otomatik eklenmesi sağlandı.
   - **Küratörlü Katalog ve Dinamik Üretici Hibrit Entegrasyonu**: Matristeki teknikler `internal/siem/catalog` altındaki küratörlü kurallarla (örn. AUTH-001, SSH-002, HEALTH-006) eşleştirildi; küratörlü karşılığı bulunmayan yeni teknikler için otomatik kural üretilerek yönetici müdahalesine gerek kalmadan %100 kapsama garanti altına alındı.

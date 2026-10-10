@@ -16,9 +16,11 @@ import (
 
 	"github.com/syslog-platform/logger/internal/api"
 	"github.com/syslog-platform/logger/internal/archive"
+	"github.com/syslog-platform/logger/internal/cache"
 	"github.com/syslog-platform/logger/internal/config"
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
+	"github.com/syslog-platform/logger/internal/https"
 	"github.com/syslog-platform/logger/internal/metrics"
 	"github.com/syslog-platform/logger/internal/notification/smtp"
 	"github.com/syslog-platform/logger/internal/siem/correlation"
@@ -227,18 +229,33 @@ func main() {
 	defer metricsCollector.Stop()
 	log.Println("[Telemetry] Real-time CPU, RAM, EPS & Network I/O metrics collector running")
 
-	// 10. Initialize REST & WebSocket HTTP Server
+	// 10. Initialize REST & WebSocket HTTP Server, In-Memory Cache (Up to 60% RAM), and Secure HTTPS
+	resultCache := cache.GetResultCache() // Uses up to 60% of available RAM
+	httpsMgr := https.NewManager(pgDB)
+
 	apiHandler := api.NewHandler(pipe, chClient, pgDB, deviceCache, archEngine, tsProvider, metricsCollector, cfg.Server.CollectorNode)
 	apiHandler.SetSyslogServer(syslogServer)
+	apiHandler.SetHTTPSManager(httpsMgr)
+	apiHandler.SetResultCache(resultCache)
 	apiHandler.StartMitreAutoSync(appCtx)
 	mux := http.NewServeMux()
 	apiHandler.RegisterRoutes(mux)
 
+	rootHandler := apiHandler.WrapRootHandler(mux)
+
 	httpServer := &http.Server{
 		Addr:         cfg.Server.ListenAddr,
-		Handler:      mux,
+		Handler:      rootHandler,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
+	}
+
+	// Initialize and launch Secure HTTPS Server if configured
+	if err := httpsMgr.Initialize(appCtx, rootHandler); err != nil {
+		log.Printf("[HTTPS] Initialization notice: %v", err)
+	}
+	if err := httpsMgr.Start(); err != nil {
+		log.Printf("[HTTPS] Startup notice: %v", err)
 	}
 
 	go func() {
@@ -248,7 +265,7 @@ func main() {
 		}
 	}()
 
-	// 9. Graceful Shutdown on SIGINT / SIGTERM
+	// 11. Graceful Shutdown on SIGINT / SIGTERM
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	sig := <-sigCh
@@ -258,6 +275,7 @@ func main() {
 	defer cancel()
 
 	_ = httpServer.Shutdown(shutdownCtx)
+	_ = httpsMgr.Stop(shutdownCtx)
 	fmt.Println("[Syslog Platform] Graceful shutdown completed safely.")
 }
 

@@ -3,7 +3,7 @@ const translations = {
     tr: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.5.6",
+        app_version: "v1.5.7",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         view_title_dashboard: "Operasyon & Güvenlik Paneli",
@@ -24,6 +24,9 @@ const translations = {
         view_subtitle_health: "Çekirdek soketler, kuyruk derinlikleri ve veritabanı performans metrikleri",
         view_title_settings: "Sistem Ayarları & TÜBİTAK Yapılandırması",
         view_subtitle_settings: "Zaman damgası sağlayıcıları, arşivleme sıklığı ve ağ erişim ilkeleri",
+        https_panel_title: "Güvenli Web (HTTPS) & SSL/TLS Yönetimi",
+        fqdn_panel_title: "Tam Nitelikli Alan Adı (FQDN) Erişimi",
+        cache_panel_title: "Bellek İçi Sorgu Hızlandırma (%60 Kullanılabilir RAM)",
         view_title_users: "Kullanıcı Hesapları & Erişim Denetimi",
         view_subtitle_users: "Operatör rolleri, güvenlik profilleri ve kullanıcı yönetimi",
         view_title_updates: "Sistem Güncelleme & Sürüm Yönetimi",
@@ -323,7 +326,7 @@ const translations = {
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
-        app_version: "v1.5.6",
+        app_version: "v1.5.7",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         view_title_dashboard: "Operations & Security Dashboard",
@@ -344,6 +347,9 @@ const translations = {
         view_subtitle_health: "Kernel socket health, batch queue depths, and analytical store telemetry",
         view_title_settings: "System Configuration & KamuSM Setup",
         view_subtitle_settings: "Timestamping providers, archival schedules, and network access policies",
+        https_panel_title: "Secure Web (HTTPS) & SSL/TLS Governance",
+        fqdn_panel_title: "Fully Qualified Domain Name (FQDN) Access",
+        cache_panel_title: "In-Memory Query Acceleration (Up to 60% Available RAM)",
         view_title_users: "User Accounts & Access Control",
         view_subtitle_users: "Operator roles, security profiles, and credential governance",
         view_title_updates: "System Upgrade & Version Control",

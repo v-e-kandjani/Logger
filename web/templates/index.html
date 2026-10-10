@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.6</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.7</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -1109,6 +1109,224 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Secure Web (HTTPS) & SSL/TLS Certificate Governance Panel -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.3rem;">🔒</span>
+                                <div>
+                                    <h3 data-i18n="https_panel_title">Secure Web (HTTPS) &amp; SSL/TLS Governance</h3>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">Cryptographic transport security with custom cert upload or 1-click self-generation</div>
+                                </div>
+                            </div>
+                            <span class="badge badge-secondary" id="https-status-badge">Checking...</span>
+                        </div>
+                        <div class="panel-body">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                                    <input type="checkbox" id="setting-https-enabled" style="width: 20px; height: 20px; cursor: pointer;">
+                                    <label for="setting-https-enabled" style="margin-bottom: 0; cursor: pointer; font-weight: 600;">
+                                        Enable Secure HTTPS Listener
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label>HTTPS Port</label>
+                                    <input type="number" class="input mono-code" id="setting-https-port" value="8443" min="1" max="65535">
+                                </div>
+                                <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                                    <input type="checkbox" id="setting-https-redirect" style="width: 20px; height: 20px; cursor: pointer;">
+                                    <label for="setting-https-redirect" style="margin-bottom: 0; cursor: pointer;">
+                                        Auto-Redirect HTTP (8080) to HTTPS
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Active Certificate Status Card -->
+                            <div id="https-cert-info-box" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; background-color: var(--bg-surface-elevated); margin-bottom: 18px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <strong style="font-size: 0.85rem; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.05em;">
+                                        📜 Active TLS Certificate Details
+                                    </strong>
+                                    <button class="btn btn-outline" id="btn-download-cert" style="padding: 3px 10px; font-size: 11px;">
+                                        ⬇️ Download .crt Certificate
+                                    </button>
+                                </div>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; font-size: 0.82rem;">
+                                    <div><span style="color: var(--text-muted);">Common Name (CN):</span> <strong id="cert-cn-display" class="mono-code text-cyan">-</strong></div>
+                                    <div><span style="color: var(--text-muted);">Issuer:</span> <span id="cert-issuer-display" class="mono-code">-</span></div>
+                                    <div><span style="color: var(--text-muted);">Expires:</span> <span id="cert-expiry-display">-</span> <span class="badge badge-success" id="cert-days-badge" style="font-size: 10px;">-</span></div>
+                                    <div><span style="color: var(--text-muted);">Key Size / Type:</span> <span id="cert-key-display" class="mono-code">-</span></div>
+                                </div>
+                                <div style="margin-top: 8px; font-size: 0.8rem;">
+                                    <span style="color: var(--text-muted);">SANs:</span> <span id="cert-sans-display" class="mono-code text-muted" style="word-break: break-all;">-</span>
+                                </div>
+                                <div style="margin-top: 4px; font-size: 0.75rem; color: var(--text-muted);">
+                                    SHA-256 Fingerprint: <span id="cert-fp-display" class="mono-code" style="letter-spacing: 0.5px;">-</span>
+                                </div>
+                            </div>
+
+                            <!-- Certificate Management: Self-Generate & Custom Upload Tabs/Grids -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px;">
+                                <!-- Option A: 1-Click Self-Signed Generator -->
+                                <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; background: rgba(99, 102, 241, 0.04);">
+                                    <h4 style="margin: 0 0 10px 0; font-size: 0.9rem; color: var(--accent); display: flex; align-items: center; gap: 6px;">
+                                        <span>⚡</span> 1-Click Self-Signed Certificate Generator
+                                    </h4>
+                                    <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">
+                                        Generates an X.509 v3 TLS certificate embedded with your FQDN and server IP addresses. Zero external dependency.
+                                    </p>
+                                    <div class="form-group">
+                                        <label>Common Name (CN / Domain / IP)</label>
+                                        <input type="text" class="input mono-code" id="cert-gen-cn" placeholder="e.g. logger.corp.local or server IP">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Additional SANs (DNS names &amp; IPs, comma-separated)</label>
+                                        <input type="text" class="input mono-code" id="cert-gen-sans" placeholder="e.g. 168.231.106.208, localhost, logger.lan">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Validity Period (Days)</label>
+                                        <input type="number" class="input" id="cert-gen-days" value="365" min="30" max="3650">
+                                    </div>
+                                    <button class="btn btn-outline" id="btn-generate-cert" style="width: 100%; margin-top: 6px;">
+                                        ⚡ Generate &amp; Activate Certificate
+                                    </button>
+                                </div>
+
+                                <!-- Option B: Upload Custom Certificate & Key -->
+                                <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; background: rgba(34, 197, 94, 0.04);">
+                                    <h4 style="margin: 0 0 10px 0; font-size: 0.9rem; color: #4ade80; display: flex; align-items: center; gap: 6px;">
+                                        <span>📤</span> Upload Custom Enterprise / CA Certificate
+                                    </h4>
+                                    <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">
+                                        Upload official certificates issued by your enterprise CA, Let's Encrypt, DigiCert, or Sectigo.
+                                    </p>
+                                    <div class="form-group">
+                                        <label>Certificate PEM (.crt / .pem)</label>
+                                        <textarea class="input mono-code" id="cert-upload-cert" rows="3" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Private Key PEM (.key / .pem)</label>
+                                        <textarea class="input mono-code" id="cert-upload-key" rows="3" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>
+                                    </div>
+                                    <button class="btn btn-outline" id="btn-upload-cert" style="width: 100%; margin-top: 6px;">
+                                        📤 Install &amp; Hot-Swap Certificate
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 10px; margin-top: 16px;">
+                                <button class="btn btn-primary" id="btn-save-https-settings">Save HTTPS Settings</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FQDN (Fully Qualified Domain Name) Panel -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.3rem;">🌐</span>
+                                <div>
+                                    <h3 data-i18n="fqdn_panel_title">Fully Qualified Domain Name (FQDN) Access</h3>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">Hostname resolution, Host header verification, and automatic IP redirection</div>
+                                </div>
+                            </div>
+                            <span class="badge badge-secondary" id="fqdn-status-badge">FQDN Optional</span>
+                        </div>
+                        <div class="panel-body">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 14px;">
+                                <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                                    <input type="checkbox" id="setting-fqdn-enabled" style="width: 20px; height: 20px; cursor: pointer;">
+                                    <label for="setting-fqdn-enabled" style="margin-bottom: 0; cursor: pointer; font-weight: 600;">
+                                        Enable FQDN WebApp Access
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label>Domain Name / Hostname (FQDN)</label>
+                                    <input type="text" class="input mono-code" id="setting-fqdn-host" placeholder="e.g. logger.corp.local or siem.mycompany.com">
+                                </div>
+                                <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                                    <input type="checkbox" id="setting-fqdn-redirect" style="width: 20px; height: 20px; cursor: pointer;">
+                                    <label for="setting-fqdn-redirect" style="margin-bottom: 0; cursor: pointer;">
+                                        Auto-Redirect Raw IP Access to FQDN
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="alert-box alert-info" style="margin: 12px 0;">
+                                <div>
+                                    <strong>Canonical WebApp URL:</strong> <code id="fqdn-canonical-url" style="color: #818cf8; font-weight: 700; font-size: 0.95rem;">http://localhost:8080</code>
+                                    <div style="font-size: 0.78rem; margin-top: 4px; color: var(--text-muted);">
+                                        When FQDN is enabled, all hyperlinks in notification emails, SOC alerts, and export reports are automatically routed through this domain.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 10px; margin-top: 16px;">
+                                <button class="btn btn-primary" id="btn-save-fqdn-settings">Save FQDN Settings</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- In-Memory Query Acceleration (Up to 60% Available RAM) Panel -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.3rem;">⚡</span>
+                                <div>
+                                    <h3 data-i18n="cache_panel_title">In-Memory Query Acceleration (Up to 60% Available RAM)</h3>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">Ultra-low latency in-memory result caching and Go runtime memory optimization</div>
+                                </div>
+                            </div>
+                            <span class="badge badge-success" id="cache-status-badge">Active (Up to 60% RAM)</span>
+                        </div>
+                        <div class="panel-body">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="checkbox" id="setting-cache-enabled" checked style="width: 20px; height: 20px; cursor: pointer;">
+                                    <label for="setting-cache-enabled" style="margin-bottom: 0; cursor: pointer; font-weight: 600;">
+                                        Enable In-Memory Result Acceleration
+                                    </label>
+                                </div>
+                                <button class="btn btn-outline" id="btn-clear-cache" style="font-size: 11px; padding: 4px 12px;">
+                                    🔄 Flush In-Memory Cache
+                                </button>
+                            </div>
+
+                            <!-- Live Memory Telemetry Grid -->
+                            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px;">
+                                <div class="stat-card">
+                                    <div class="stat-header">Total System RAM</div>
+                                    <div class="stat-value mono-code" id="cache-total-ram" style="font-size: 1.3rem;">-</div>
+                                    <div class="stat-sub">Host hardware capacity</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-header">Available Host RAM</div>
+                                    <div class="stat-value mono-code text-cyan" id="cache-avail-ram" style="font-size: 1.3rem;">-</div>
+                                    <div class="stat-sub">Unreserved system memory</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-header">Max Cache Budget (60%)</div>
+                                    <div class="stat-value mono-code text-green" id="cache-budget-ram" style="font-size: 1.3rem;">-</div>
+                                    <div class="stat-sub">GOMEMLIMIT ceiling target</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-header">Current Cache Usage</div>
+                                    <div class="stat-value mono-code" id="cache-usage-ram" style="font-size: 1.3rem;">0.00 MB</div>
+                                    <div class="stat-sub"><span id="cache-items-count">0</span> items in RAM</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-header">Cache Hit Ratio</div>
+                                    <div class="stat-value mono-code text-green" id="cache-hit-ratio" style="font-size: 1.3rem;">0.0%</div>
+                                    <div class="stat-sub"><span id="cache-hits-count">0</span> hits / <span id="cache-misses-count">0</span> misses</div>
+                                </div>
+                            </div>
+
+                            <p class="subtitle" style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">
+                                💡 <strong>Performance Advantage:</strong> Log search queries, forensic filtering, and dashboard aggregations are dynamically cached in memory up to 60% of available RAM. Cached query responses return in sub-milliseconds (&lt; 1ms) with zero ClickHouse disk I/O.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1168,12 +1386,12 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.6</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.7</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">94f3fbf</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">2f733b3</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-10</div>
                     </div>
                     <div class="stat-card">
@@ -2180,7 +2398,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.6"></script>
-    <script src="/static/js/app.js?v=1.5.6"></script>
+    <script src="/static/js/translations.js?v=1.5.7"></script>
+    <script src="/static/js/app.js?v=1.5.7"></script>
 </body>
 </html>

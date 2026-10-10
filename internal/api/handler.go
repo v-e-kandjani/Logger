@@ -19,8 +19,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/syslog-platform/logger/internal/archive"
+	"github.com/syslog-platform/logger/internal/cache"
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
+	"github.com/syslog-platform/logger/internal/https"
 	"github.com/syslog-platform/logger/internal/metrics"
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/siem/mitre"
@@ -49,6 +51,8 @@ type Handler struct {
 	nodeName         string
 	sessions         *SessionManager
 	mfaTickets       *MFATicketManager
+	httpsMgr         *https.Manager
+	resultCache      *cache.ResultCache
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
@@ -62,6 +66,14 @@ type Handler struct {
 
 func (h *Handler) SetSyslogServer(s *listener.Server) {
 	h.syslogServer = s
+}
+
+func (h *Handler) SetHTTPSManager(m *https.Manager) {
+	h.httpsMgr = m
+}
+
+func (h *Handler) SetResultCache(c *cache.ResultCache) {
+	h.resultCache = c
 }
 
 func NewHandler(
@@ -87,6 +99,7 @@ func NewHandler(
 		nodeName:         node,
 		sessions:         NewSessionManager(),
 		mfaTickets:       NewMFATicketManager(),
+		resultCache:      cache.GetResultCache(),
 	}
 }
 
@@ -168,6 +181,15 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/system/storage", h.requireAuth(h.handleStorageStats))
 	mux.HandleFunc("/api/v1/system/storage/prune", h.requireAuth(h.handleStoragePrune))
 	mux.HandleFunc("/api/v1/settings", h.requireAuth(h.handleSettings))
+	mux.HandleFunc("/api/v1/settings/https/status", h.requireAuth(h.handleHTTPSStatus))
+	mux.HandleFunc("/api/v1/settings/https/toggle", h.requireAuth(h.handleHTTPSToggle))
+	mux.HandleFunc("/api/v1/settings/https/certificate/generate", h.requireAuth(h.handleHTTPSGenerateCert))
+	mux.HandleFunc("/api/v1/settings/https/certificate/upload", h.requireAuth(h.handleHTTPSUploadCert))
+	mux.HandleFunc("/api/v1/settings/https/certificate/download", h.requireAuth(h.handleHTTPSDownloadCert))
+	mux.HandleFunc("/api/v1/settings/fqdn", h.requireAuth(h.handleFQDNSettings))
+	mux.HandleFunc("/api/v1/settings/cache/stats", h.requireAuth(h.handleCacheStats))
+	mux.HandleFunc("/api/v1/settings/cache/clear", h.requireAuth(h.handleCacheClear))
+	mux.HandleFunc("/api/v1/settings/cache/toggle", h.requireAuth(h.handleCacheToggle))
 	mux.HandleFunc("/api/v1/timestamp/credit", h.requireAuth(h.handleTimestampCredit))
 	mux.HandleFunc("/api/v1/users", h.requireAuth(h.handleUsersAPI))
 	mux.HandleFunc("/api/v1/users/toggle", h.requireAuth(h.handleToggleUserAPI))
@@ -399,6 +421,17 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 	if len(conditions) > 0 {
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
+	cacheKey := cache.MakeKey("search_logs", whereClause, fmt.Sprint(args), strconv.Itoa(limit))
+	if h.resultCache != nil {
+		if cached, hit := h.resultCache.Get(cacheKey); hit {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Cache", "HIT")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(cached)
+			return
+		}
+	}
+
 	sql := fmt.Sprintf(`
 		SELECT internal_id, event_timestamp, source_ip, source_port, transport_protocol,
 		       device_name, vendor, severity, facility, hostname, application_name, message, raw_message
@@ -451,9 +484,78 @@ func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	respData := map[string]any{
 		"count": len(results),
 		"logs":  results,
+	}
+	encoded, err := json.Marshal(respData)
+	if err == nil && h.resultCache != nil {
+		ttl := 15 * time.Second
+		if timeRange == "7d" || timeRange == "30d" || timeRange == "all" {
+			ttl = 2 * time.Minute
+		}
+		h.resultCache.Set(cacheKey, encoded, ttl)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Cache", "MISS")
+	w.WriteHeader(http.StatusOK)
+	if err == nil {
+		_, _ = w.Write(encoded)
+	} else {
+		_ = json.NewEncoder(w).Encode(respData)
+	}
+}
+
+// WrapRootHandler provides HTTPS redirection, FQDN canonical host routing, and security headers
+func (h *Handler) WrapRootHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Never redirect internal container health check endpoints
+		if r.URL.Path == "/api/v1/system/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if h.httpsMgr != nil {
+			status := h.httpsMgr.GetStatus(r.Context())
+
+			// 1. HTTPS Redirect: If HTTPS is enabled with redirect, and connection is plain HTTP
+			if status.Enabled && status.RedirectHTTP && r.TLS == nil {
+				host := r.Host
+				if idx := strings.Index(host, ":"); idx != -1 {
+					host = host[:idx]
+				}
+				if status.FQDNEnabled && status.FQDNHost != "" {
+					host = status.FQDNHost
+				}
+				target := fmt.Sprintf("https://%s:%d%s", host, status.Port, r.RequestURI)
+				http.Redirect(w, r, target, http.StatusMovedPermanently)
+				return
+			}
+
+			// 2. FQDN Canonical Redirect: If accessed via raw IP address and FQDN redirect is requested
+			if status.FQDNEnabled && status.FQDNRedirect && status.FQDNHost != "" {
+				reqHost := r.Host
+				if idx := strings.Index(reqHost, ":"); idx != -1 {
+					reqHost = reqHost[:idx]
+				}
+				if net.ParseIP(reqHost) != nil && reqHost != "127.0.0.1" && reqHost != "::1" && reqHost != status.FQDNHost {
+					scheme := "http"
+					portStr := ""
+					if r.TLS != nil || status.Enabled {
+						scheme = "https"
+						if status.Port != 443 {
+							portStr = fmt.Sprintf(":%d", status.Port)
+						}
+					}
+					target := fmt.Sprintf("%s://%s%s%s", scheme, status.FQDNHost, portStr, r.RequestURI)
+					http.Redirect(w, r, target, http.StatusMovedPermanently)
+					return
+				}
+			}
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }
 
