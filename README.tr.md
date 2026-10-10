@@ -249,6 +249,21 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.3** (Yönetici MFA Sıfırlama Parametre ve Yük Uyumlaştırması):
+  - **MFA Sıfırlama Çoklu Yük Ayrıştırıcısı**: `handleMFAAdminResetAPI` uç noktası hedef kullanıcı kimliğini hem URL sorgu parametrelerinden (`?id=...` ve `?user_id=...`) hem de JSON istek gövdesinden (`{"user_id": ...}` ve `{"id": ...}`) alacak şekilde genişletildi. İstemci tarafındaki `resetUserMFA` fonksiyonu ön denetim eklenerek her iki parametreyi eş zamanlı gönderecek şekilde güncellendi; böylece operatör hesaplarının MFA sıfırlama işlemlerindeki `user id required` hatası giderildi.
+
+- **v1.5.2** (MFA Doğrulama Rota Hizalaması ve İstek Yükü Optimizasyonu):
+  - **MFA Etkinleştirme Uç Nokta ve Veri Uyumu**: 404 yanıtlarını önlemek için `/api/v1/auth/mfa/verify-enable` rotası `/api/v1/auth/mfa/verify` yanında tescil edildi. İstemci tarafı aktivasyon isteğinde Base32 gizli anahtarı, doğrulama kodu ve kurtarma kodları paketi eksiksiz iletilecek biçimde güncellendi, güvenli JSON yanıt ayrıştırıcısı eklendi.
+
+- **v1.5.1** (MFA Kayıt QR Kod Görsel Çizim Düzeltmesi):
+  - **MFA QR Kod Çift Anahtar Uyumluluğu**: Backend JSON serileştirmesindeki `qr_code_base64` ile ön yüz modalındaki `qr_png_base64` anahtar uyumsuzluğu giderildi. Kurulum paketi artık her iki alanı da sağlar ve UI sorunsuz biçimde QR kodunu Microsoft Authenticator, Google Authenticator, WatchGuard AuthPoint ve FortiAuthenticator taramaları için net ve anında görüntüler.
+
+- **v1.5.0** (Active Directory / LDAP Entegrasyonu, Evrensel Çok Faktörlü Kimlik Doğrulama (MFA) ve SMTP Bildirim Dağıtıcısı):
+  - **Active Directory / LDAP Dizin Entegrasyonu**: Microsoft Active Directory ve OpenLDAP destekleyen yerel LDAP/LDAPS istemcisi (`internal/auth/ad`). Otomatik alan kullanıcı keşfi, önizleme tarayıcısı (`POST /api/v1/auth/ad/preview`), PostgreSQL'e tek tıkla toplu kullanıcı senkronizasyonu (`POST /api/v1/auth/ad/sync`), doğrudan LDAP kimlik doğrulama ile otomatik hesap açma, StartTLS, LDAPS (port 636) ve esnek LDAP öznitelik eşleme (`sAMAccountName`, `mail`).
+  - **Evrensel RFC 6238 Çok Faktörlü Kimlik Doğrulama (MFA)**: **Microsoft Authenticator**, **Google Authenticator**, **WatchGuard AuthPoint** ve **FortiAuthenticator / FortiToken** ile test edilmiş ve uyumlu Zaman Tabanlı Tek Kullanımlık Parola (TOTP) motoru (`internal/auth/mfa`). Base64 QR kodu, manuel gizli anahtar, 8 acil durum kurtarma kodu, 5 dakikalık MFA giriş meydan okuma biletleri ve yönetici sıfırlama mekanizması.
+  - **SMTP E-posta Sunucusu ve Alarm Görev Dağıtıcısı**: Düz metin (port 25), STARTTLS (port 587) ve SSL/TLS (port 465) destekli kurumsal e-posta istemcisi (`internal/notification/smtp`). SIEM alarmları/görevleri analistlere atandığında anında asenkron e-posta bildirimi (`POST /api/v1/siem/alerts/:id/status`), KRİTİK alarmlarda SOC ekiplerine acil durum yayını, karanlık mod uyumlu HTML e-posta şablonları ve e-posta tanı test aracı (`POST /api/v1/smtp/test`).
+  - **Gelişmiş Operatör Yönetimi Arayüzü**: Operatör hesapları tablosunda Kimlik Doğrulama Kaynağı (`🏢 Active Directory` / `👤 Yerel DB`) ve MFA Durumu (`🔐 Aktif (TOTP)` / `Devre Dışı`) rozetleri, tek tıkla AD Senkronizasyon modalı, kullanıcı MFA kayıt modalı ve olay görev atamalarında etkileşimli analist otomatik tamamlama.
+
 - **v1.4.3** (Telemetri Kartları Olay Dinleyici & Tuş Uyumluluğu Optimizasyonu):
   - **Evrensel Olay Bağlama**: Doğrudan DOM olay dinleyicileri (`addEventListener`), küresel pencere dışa aktarımları (`window.openCPUDetailsModal`) ve klavye kısayolu (`Escape` tuşu ile kapatma) eklenerek CPU ve Ağ detay pencerelerinin tüm tarayıcılarda %100 sorunsuz çalışması sağlandı.
   - **Grafik Tıklama Geçirgenliği**: Grafik çizim alanlarına (`canvas`) `pointer-events: none` uygulanarak grafik üzerine tıklamalarda olayların doğrudan kart kapsayıcısına iletilmesi ve modalın tetiklenmesi garanti altına alındı.
