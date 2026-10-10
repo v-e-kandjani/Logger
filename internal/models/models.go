@@ -132,23 +132,48 @@ type User struct {
 	MFARecoveryCodes []string   `json:"-"`
 	MFAEnrolledAt    *time.Time `json:"mfa_enrolled_at,omitempty"`
 	MFAProvider      string     `json:"mfa_provider"` // "totp", "ms_authenticator", "google_authenticator", "watchguard_authpoint", "forti_authenticator"
+	TenantSlug       string     `json:"tenant_slug"` // "default" or tenant slug
+	IsTenantAdmin    bool       `json:"is_tenant_admin"`
 	LastLoginAt      *time.Time `json:"last_login_at,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
+// Tenant represents an enterprise customer organization (multi-tenant MSSP)
+type Tenant struct {
+	ID            uuid.UUID `json:"id"`
+	Slug          string    `json:"slug"` // "acme", "fintech"
+	Name          string    `json:"name"` // "Acme Corporation"
+	Description   string    `json:"description"`
+	AdminName     string    `json:"admin_name"`
+	AdminEmail    string    `json:"admin_email"`
+	AdminUsername string    `json:"admin_username"`
+	Status        string    `json:"status"` // "active", "suspended", "pending_activation"
+	MaxNodes      int       `json:"max_nodes"`
+	MaxEPS        int       `json:"max_eps"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
 // EdgeNode represents a remote proxy forwarder node
 type EdgeNode struct {
-	ID            uuid.UUID  `json:"id"`
-	Name          string     `json:"name"`
-	Token         string     `json:"token"`
-	TenantName    string     `json:"tenant_name"`
-	SyncInterval  string     `json:"sync_interval"` // "online", "every 60 second", "every 5 min", "every 15 min", "every 30 min", "every hour"
-	LastSeenAt    *time.Time `json:"last_seen_at,omitempty"`
-	LastIP        string     `json:"last_ip"`
-	Version       string     `json:"version"`
-	Status        string     `json:"status"` // "online", "offline", "pending"
-	LogsForwarded int64      `json:"logs_forwarded"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID               uuid.UUID              `json:"id"`
+	Name             string                 `json:"name"`
+	Token            string                 `json:"token"`
+	TenantName       string                 `json:"tenant_name"`
+	SyncInterval     string                 `json:"sync_interval"` // "online", "every 60 second", "every 5 min", "every 15 min", "every 30 min", "every hour"
+	LastSeenAt       *time.Time             `json:"last_seen_at,omitempty"`
+	LastIP           string                 `json:"last_ip"`
+	Version          string                 `json:"version"`
+	Status           string                 `json:"status"` // "online", "offline", "pending"
+	LogsForwarded    int64                  `json:"logs_forwarded"`
+	AdminName        string                 `json:"admin_name"`
+	AdminEmail       string                 `json:"admin_email"`
+	AdminUsername    string                 `json:"admin_username"`
+	AdminInitialPass string                 `json:"admin_initial_pass,omitempty"`
+	ActivationStatus string                 `json:"activation_status"` // "active", "pending_activation", "suspended"
+	LDAPConfig       map[string]interface{} `json:"ldap_config,omitempty"`
+	MinSpecs         map[string]string      `json:"min_specs,omitempty"`
+	CreatedAt        time.Time              `json:"created_at"`
+	UpdatedAt        time.Time              `json:"updated_at"`
 }

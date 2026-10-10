@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.12</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.13</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -114,6 +114,10 @@
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                             <span data-i18n="nav_sub_edge">Edge Proxy Düğümleri</span>
                         </a>
+                        <a class="nav-subitem" data-target="setting-section-tenants">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
+                            <span data-i18n="nav_sub_tenants">Kiracı Yönetimi (Tenants)</span>
+                        </a>
                     </div>
                 </div>
 
@@ -150,6 +154,15 @@
                     <p class="subtitle" id="view-subtitle">High-throughput ingestion & cryptographic verification</p>
                 </div>
                 <div class="top-actions">
+                    <!-- Tenant Context Selector (Multi-Tenant MSSP) -->
+                    <div class="tenant-selector-box" id="tenant-context-wrapper" style="display: flex; align-items: center; gap: 6px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 2px 8px;" title="Aktif Kiracı / Müşteri Görünümü (Tenant Context)">
+                        <span style="font-size: 13px;">🏢</span>
+                        <select id="tenant-context-selector" style="background: transparent; border: none; color: var(--text-main); font-size: 0.78rem; font-weight: 600; cursor: pointer; outline: none; padding: 3px 0;">
+                            <option value="all" style="background: var(--bg-surface); color: var(--text-main);">🏢 Tüm Kiracılar (Global Görünüm)</option>
+                            <option value="default" style="background: var(--bg-surface); color: var(--text-main);">🏢 default (Ana Sistem)</option>
+                        </select>
+                    </div>
+
                     <!-- Multilingual Switcher -->
                     <div class="lang-switcher">
                         <button class="lang-btn active" id="lang-btn-tr" onclick="i18n.setLanguage('tr')">🇹🇷 TR</button>
@@ -754,6 +767,10 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                         <span data-i18n="nav_sub_edge">Edge Proxy Düğümleri</span>
                     </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-tenants">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
+                        <span data-i18n="nav_sub_tenants">Kiracı Yönetimi (Tenants)</span>
+                    </button>
                 </div>
 
                 <div class="dashboard-panels">
@@ -1322,29 +1339,42 @@
                                     </button>
                                 </div>
 
-                                <!-- Option B: Upload Custom Certificate & Key (.crt, .pfx, .pem, .p12) -->
+                                <!-- Option B: Upload Custom Certificate & Key (.pfx, .p12, .crt, .pem) -->
                                 <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; background: rgba(34, 197, 94, 0.04);">
                                     <h4 style="margin: 0 0 10px 0; font-size: 0.9rem; color: #4ade80; display: flex; align-items: center; gap: 6px;">
-                                        <span>📤</span> Upload Custom Enterprise / CA Certificate
+                                        <span>📤</span> <span data-i18n="cert_upload_title">Özel Kurumsal TLS Sertifikası Yükle</span>
                                     </h4>
-                                    <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">
-                                        Upload official certificates (.crt, .pfx, .pem, .p12). Bundles and PFX containers are unpacked automatically.
+                                    <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;" data-i18n="cert_upload_subtitle">
+                                        PFX/P12 arşivleri tek dosya olarak şifresiyle yüklenir; ayrı anahtar gerekmez. Standart PEM/CRT için sertifika ve özel anahtar birlikte verilir.
                                     </p>
-                                    <div class="form-group">
-                                        <label>Certificate File (.crt, .pfx, .pem, .p12)</label>
-                                        <input type="file" class="input" id="cert-upload-file" accept=".crt,.pem,.pfx,.p12,.cer" style="padding: 7px 10px; cursor: pointer;">
+
+                                    <!-- Certificate Format Selector -->
+                                    <div class="form-group" style="margin-bottom: 12px;">
+                                        <label style="font-weight: 600; font-size: 0.85rem;" data-i18n="lbl_cert_type">Sertifika Türü / Format</label>
+                                        <select class="input" id="cert-upload-type" style="font-weight: 500;">
+                                            <option value="pfx" selected>PKCS#12 / PFX Arşivi (.pfx, .p12 - Tek Dosya + Şifre)</option>
+                                            <option value="pem">Standart X.509 PEM / CRT (.crt, .pem + Özel Anahtar)</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group" id="cert-file-group">
+                                        <label id="cert-file-label" style="font-weight: 600; font-size: 0.85rem;">PFX / P12 Arşiv Dosyası (.pfx, .p12)</label>
+                                        <input type="file" class="input" id="cert-upload-file" accept=".pfx,.p12" style="padding: 7px 10px; cursor: pointer;">
                                         <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;" id="cert-file-help">
-                                            Select your certificate file (.crt/.pem) or PFX/P12 container
+                                            PFX/P12 arşivi sertifika ve özel anahtarı birlikte içerir.
                                         </span>
                                     </div>
-                                    <div class="form-group" id="cert-pfx-pass-group" style="display: none;">
-                                        <label>PFX / P12 Password <span style="font-weight: 400; color: var(--text-muted);">(Leave blank if none)</span></label>
-                                        <input type="password" class="input" id="cert-upload-pfx-pass" placeholder="Password (leave empty if not encrypted)">
+
+                                    <div class="form-group" id="cert-pfx-pass-group">
+                                        <label style="font-weight: 600; font-size: 0.85rem;"><span data-i18n="lbl_pfx_pass">PFX / P12 Şifresi</span> <span style="font-weight: 400; color: var(--text-muted);">(Şifresiz ise boş bırakın)</span></label>
+                                        <input type="password" class="input" id="cert-upload-pfx-pass" placeholder="PFX şifresi (varsa)">
                                     </div>
-                                    <div class="form-group" id="cert-key-file-group">
-                                        <label>Private Key File (.key, .pem) <span style="font-weight: 400; color: var(--text-muted);">(Optional if included in bundle/PFX)</span></label>
+
+                                    <div class="form-group" id="cert-key-file-group" style="display: none;">
+                                        <label style="font-weight: 600; font-size: 0.85rem;"><span data-i18n="lbl_private_key">Özel Anahtar Dosyası (.key, .pem)</span></label>
                                         <input type="file" class="input" id="cert-upload-key-file" accept=".key,.pem" style="padding: 7px 10px; cursor: pointer;">
                                     </div>
+
                                     <button class="btn btn-outline" id="btn-upload-cert" style="width: 100%; margin-top: 6px;">
                                         📤 Upload &amp; Activate Certificate
                                     </button>
@@ -1501,8 +1531,9 @@
                                         <tr>
                                             <th data-i18n="th_node_name">Düğüm Adı</th>
                                             <th data-i18n="th_tenant">Müşteri / Tenant</th>
-                                            <th data-i18n="th_status">Durum</th>
-                                            <th data-i18n="th_sync_interval">Gönderim Zamanlaması (Bulut Yönetimli)</th>
+                                            <th data-i18n="th_node_admin">Düğüm Yöneticisi</th>
+                                            <th data-i18n="th_status">Durum &amp; Aktivasyon</th>
+                                            <th data-i18n="th_sync_interval">Gönderim Zamanlaması</th>
                                             <th data-i18n="th_last_seen">Son İletişim / IP</th>
                                             <th data-i18n="th_logs_forwarded">İletilen Log</th>
                                             <th data-i18n="th_token">Erişim Tokenı</th>
@@ -1511,7 +1542,87 @@
                                     </thead>
                                     <tbody id="tbody-edge-nodes">
                                         <tr>
-                                            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                                            <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                                                Yükleniyor...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Hardware Specs & Minimum Requirements Box -->
+                            <div style="margin-top: 24px; background: rgba(56, 189, 248, 0.04); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.92rem; display: flex; align-items: center; gap: 8px; color: var(--accent-primary);">
+                                    <span>💻</span> <span data-i18n="edge_specs_title">Proxy / Forwarder Kurulumu Donanım Gereksinimleri (Minimum &amp; Önerilen)</span>
+                                </h4>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+                                    <div style="background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 6px; border-left: 3px solid #eab308;">
+                                        <div style="font-weight: 600; font-size: 0.85rem; color: #facc15; display: flex; align-items: center; gap: 6px;">
+                                            <span>⚠️</span> <span>Minimum Sistem Gereksinimi (Temel Seviye)</span>
+                                        </div>
+                                        <ul style="font-size: 0.8rem; margin: 8px 0 0 16px; padding: 0; color: var(--text-color); line-height: 1.55;">
+                                            <li><strong>İşlemci (CPU):</strong> 1 vCPU (x86_64 veya arm64)</li>
+                                            <li><strong>Bellek (RAM):</strong> 512 MB RAM (minimum boş alan)</li>
+                                            <li><strong>Disk Alanı:</strong> 2 GB boş disk (Yerel SQLite spool kuyruğu)</li>
+                                            <li><strong>Ağ Bağlantısı:</strong> Giden HTTPS (Port 8443 / 443) erişimi</li>
+                                            <li><strong>İşletim Sistemi:</strong> Ubuntu 22.04 LTS / 24.04 LTS / 26.04 Minimal</li>
+                                        </ul>
+                                    </div>
+                                    <div style="background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 6px; border-left: 3px solid #22c55e;">
+                                        <div style="font-weight: 600; font-size: 0.85rem; color: #4ade80; display: flex; align-items: center; gap: 6px;">
+                                            <span>🚀</span> <span>Önerilen Prodüksiyon Konfigürasyonu (&gt; 5.000 EPS)</span>
+                                        </div>
+                                        <ul style="font-size: 0.8rem; margin: 8px 0 0 16px; padding: 0; color: var(--text-color); line-height: 1.55;">
+                                            <li><strong>İşlemci (CPU):</strong> 2 - 4 vCPU</li>
+                                            <li><strong>Bellek (RAM):</strong> 1 GB - 2 GB RAM</li>
+                                            <li><strong>Disk Alanı:</strong> 10 GB - 20 GB NVMe / SSD (Geniş spool tamponu)</li>
+                                            <li><strong>Ağ Bant Genişliği:</strong> 100 Mbps+ yerel ağ, 10 Mbps+ İnternet</li>
+                                            <li><strong>Kapasite:</strong> 10.000+ EPS sürekli aktarım kapasitesi</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Tenant Organizations Management Panel (MSSP Multi-Tenancy) -->
+                    <div class="panel" id="setting-section-tenants">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <h3 data-i18n="tenants_panel_title">Çoklu Kiracı &amp; Müşteri Yönetimi (Multi-Tenant MSSP)</h3>
+                                <p class="subtitle" style="margin: 4px 0 0 0;" data-i18n="tenants_panel_subtitle">
+                                    Her müşteri ve organizasyon için izole veri görünümü, kullanıcı hesapları ve kaynak limitleri.
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-outline" id="btn-refresh-tenants" onclick="loadTenants()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" style="vertical-align: middle;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                                    <span data-i18n="btn_refresh">Yenile</span>
+                                </button>
+                                <button class="btn btn-primary" id="btn-open-add-tenant" onclick="openAddTenantModal()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" style="vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    <span data-i18n="btn_add_tenant">Yeni Kiracı / Müşteri Ekle</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Tenants Table -->
+                            <div class="table-container" style="overflow-x: auto;">
+                                <table class="table" id="table-tenants">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="th_tenant_slug">Kiracı Kodu (Slug)</th>
+                                            <th data-i18n="th_tenant_name">Organizasyon / Müşteri Adı</th>
+                                            <th data-i18n="th_tenant_admin">Yönetici Bilgileri</th>
+                                            <th data-i18n="th_status">Durum</th>
+                                            <th data-i18n="th_tenant_limits">Kaynak Limitleri</th>
+                                            <th data-i18n="th_created_at">Kayıt Tarihi</th>
+                                            <th style="text-align: right;" data-i18n="th_actions">İşlemler</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody-tenants">
+                                        <tr>
+                                            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">
                                                 Yükleniyor...
                                             </td>
                                         </tr>
@@ -1579,13 +1690,13 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.12</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.13</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">b3fdde2</div>
-                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-10</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">a242e75</div>
+                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-11</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">GitHub Repository</div>
@@ -2619,9 +2730,43 @@
                         <small style="color: var(--text-muted); font-size: 0.75rem;">Uzak ağı veya sunucuyu tanımlayan benzersiz isim.</small>
                     </div>
 
-                    <div class="form-group" style="margin-bottom: 12px;">
-                        <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_edge_tenant_name">Müşteri / Organizasyon (Tenant)</span></label>
-                        <input type="text" class="input" id="edge-new-tenant-name" placeholder="Örn: Acme Holding veya Musteri-01" value="default">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div class="form-group">
+                            <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_edge_tenant_name">Müşteri / Organizasyon (Tenant)</span></label>
+                            <input type="text" class="input" id="edge-new-tenant-name" placeholder="Örn: default veya acme-corp" value="default">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.85rem; font-weight: 600;"><span data-i18n="lbl_edge_act_status">Aktivasyon Durumu</span></label>
+                            <select class="input" id="edge-new-act-status">
+                                <option value="active" selected>Aktif (Hemen Kullanıma Açık)</option>
+                                <option value="pending_activation">Etkinleştirme Bekliyor (Web Siparişi / Beklemede)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Optional Node Administrator fields for preconfiguration -->
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                        <div style="font-weight: 600; font-size: 0.82rem; color: var(--accent-primary); margin-bottom: 8px;">👤 Düğüm Yöneticisi Bilgileri (İsteğe Bağlı)</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                            <div class="form-group">
+                                <label style="font-size: 0.78rem;">Yönetici Adı</label>
+                                <input type="text" class="input" id="edge-new-admin-name" placeholder="Örn: Ali Veli">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size: 0.78rem;">E-Posta</label>
+                                <input type="email" class="input" id="edge-new-admin-email" placeholder="ali@musteri.com">
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div class="form-group">
+                                <label style="font-size: 0.78rem;">Kullanıcı Adı</label>
+                                <input type="text" class="input" id="edge-new-admin-username" placeholder="ali_admin">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size: 0.78rem;">Başlangıç Şifresi</label>
+                                <input type="password" class="input" id="edge-new-admin-pass" placeholder="••••••••">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group" style="margin-bottom: 14px;">
@@ -2671,7 +2816,194 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.12"></script>
-    <script src="/static/js/app.js?v=1.5.12"></script>
+    <!-- Modal: Activate & Preconfigure Edge Proxy Node -->
+    <div class="modal-backdrop" id="modal-activate-edge-node" style="display: none;">
+        <div class="modal" style="max-width: 680px; width: 95%; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="background: rgba(34, 197, 94, 0.1); padding: 8px; border-radius: 8px; font-size: 1.3rem;">⚡</div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_act_edge_title">Düğüm Etkinleştirme &amp; Ön-Konfigürasyon</h3>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);" id="act-edge-node-subtitle">Uzak Proxy Yönetici Hesabı ve LDAP Ayarları</div>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeActivateEdgeNodeModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <input type="hidden" id="act-edge-node-id">
+                
+                <div class="alert alert-info" style="margin-bottom: 16px; font-size: 0.82rem; background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--accent-primary); padding: 10px 14px; border-radius: 6px;">
+                    <strong>Düğüm Adı:</strong> <span id="act-edge-node-name-disp" style="font-weight: 600;">-</span> | 
+                    <strong>Kiracı:</strong> <span id="act-edge-tenant-disp" style="font-weight: 600;">-</span>
+                </div>
+
+                <!-- 1. Node Admin User Preconfiguration -->
+                <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px; background: rgba(255,255,255,0.02);">
+                    <h4 style="margin: 0 0 10px 0; font-size: 0.9rem; color: var(--accent-primary); display: flex; align-items: center; gap: 6px;">
+                        <span>👤</span> <span>Düğüm Yöneticisi Hesabı (Node Admin Preconfiguration)</span>
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                        <div class="form-group">
+                            <label style="font-size: 0.82rem; font-weight: 600;">Yönetici Adı Soyadı</label>
+                            <input type="text" class="input" id="act-edge-admin-name" placeholder="Örn: Ahmet Yılmaz">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.82rem; font-weight: 600;">Yönetici E-Posta</label>
+                            <input type="email" class="input" id="act-edge-admin-email" placeholder="admin@node.local">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label style="font-size: 0.82rem; font-weight: 600;">Kullanıcı Adı (Username)</label>
+                            <input type="text" class="input" id="act-edge-admin-username" placeholder="Örn: node_admin">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.82rem; font-weight: 600;">Şifre (Password)</label>
+                            <input type="password" class="input" id="act-edge-admin-pass" placeholder="Yeni veya mevcut şifre">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. LDAP / Active Directory Routing through this Proxy -->
+                <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px; background: rgba(255,255,255,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h4 style="margin: 0; font-size: 0.9rem; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+                            <span>🏢</span> <span>Proxy Üzerinden LDAP / AD Entegrasyonu (Cloud Configured)</span>
+                        </h4>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;">
+                            <input type="checkbox" id="act-edge-ldap-enabled">
+                            <span>Etkin</span>
+                        </label>
+                    </div>
+                    <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">
+                        Proxy aktif olduğunda, uzak ağdaki Active Directory / LDAP sunucusu bu proxy üzerinden tünellenir. Ayarları buradan bulut üzerinden yapılandırın.
+                    </p>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 10px;">
+                        <div class="form-group">
+                            <label style="font-size: 0.82rem; font-weight: 600;">Yerel LDAP / AD Sunucu IP / Host</label>
+                            <input type="text" class="input mono-code" id="act-edge-ldap-host" placeholder="Örn: 192.168.1.10 veya dc01.corp.local">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.82rem; font-weight: 600;">Port</label>
+                            <input type="number" class="input mono-code" id="act-edge-ldap-port" value="389">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                        <div class="form-group">
+                            <label style="font-size: 0.82rem; font-weight: 600;">Base DN</label>
+                            <input type="text" class="input mono-code" id="act-edge-ldap-basedn" placeholder="DC=corp,DC=local">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.82rem; font-weight: 600;">Bind DN</label>
+                            <input type="text" class="input mono-code" id="act-edge-ldap-binddn" placeholder="CN=svc_logger,OU=Services,DC=corp,DC=local">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label style="font-size: 0.82rem; font-weight: 600;">Bind Şifresi</label>
+                            <input type="password" class="input" id="act-edge-ldap-bindpass" placeholder="••••••••">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.82rem; font-weight: 600;">Kullanıcı Arama Filtresi</label>
+                            <input type="text" class="input mono-code" id="act-edge-ldap-filter" placeholder="(&(objectClass=user)(sAMAccountName={username}))">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Cloud Schedule -->
+                <div class="form-group">
+                    <label style="font-size: 0.85rem; font-weight: 600;">Log Gönderim Sıklığı (Cloud Schedule)</label>
+                    <select class="input" id="act-edge-sync-interval">
+                        <option value="online">online (Anlık / Gerçek Zamanlı)</option>
+                        <option value="every 60 second">every 60 second (60 saniyede bir)</option>
+                        <option value="every 5 min">every 5 min (5 dakikada bir)</option>
+                        <option value="every 15 min">every 15 min (15 dakikada bir)</option>
+                        <option value="every 30 min">every 30 min (30 dakikada bir)</option>
+                        <option value="every hour">every hour (Her saat başı)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-outline" onclick="closeActivateEdgeNodeModal()" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" id="btn-save-act-edge" onclick="submitActivateEdgeNode()">⚡ Düğümü Etkinleştir &amp; Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add New Tenant (MSSP Multi-Tenancy) -->
+    <div class="modal-backdrop" id="modal-add-tenant" style="display: none;">
+        <div class="modal" style="max-width: 600px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="background: rgba(56, 189, 248, 0.1); padding: 8px; border-radius: 8px; font-size: 1.3rem;">🏢</div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_add_tenant_title">Yeni Kiracı / Müşteri Ekle</h3>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Çoklu Kiracı (MSSP) Organizasyon ve Süper Admin Tanımlama</div>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeAddTenantModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label style="font-size: 0.85rem; font-weight: 600;">Kiracı Kodu (Slug) <span class="text-danger">*</span></label>
+                        <input type="text" class="input mono-code" id="tenant-new-slug" placeholder="Örn: acme-corp" required>
+                        <small style="color: var(--text-muted); font-size: 0.72rem;">Küçük harf ve tire, benzersiz kod.</small>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size: 0.85rem; font-weight: 600;">Müşteri / Kurum Adı <span class="text-danger">*</span></label>
+                        <input type="text" class="input" id="tenant-new-name" placeholder="Örn: Acme Holding A.Ş." required>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 0.85rem; font-weight: 600;">Açıklama</label>
+                    <input type="text" class="input" id="tenant-new-desc" placeholder="Örn: Finans Grubu ve Şubeler">
+                </div>
+
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                    <div style="font-weight: 600; font-size: 0.85rem; color: var(--accent-primary); margin-bottom: 8px;">👤 Kiracı Süper Yöneticisi (Tenant Super Admin)</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem; font-weight: 600;">Yönetici Adı</label>
+                            <input type="text" class="input" id="tenant-new-admin-name" placeholder="Örn: Can Demir">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem; font-weight: 600;">E-Posta</label>
+                            <input type="email" class="input" id="tenant-new-admin-email" placeholder="can@acme.com">
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem; font-weight: 600;">Kullanıcı Adı <span class="text-danger">*</span></label>
+                            <input type="text" class="input" id="tenant-new-admin-username" placeholder="acme_admin">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem; font-weight: 600;">Başlangıç Şifresi <span class="text-danger">*</span></label>
+                            <input type="password" class="input" id="tenant-new-admin-pass" placeholder="••••••••">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label style="font-size: 0.85rem; font-weight: 600;">Maksimum Proxy Node</label>
+                        <input type="number" class="input" id="tenant-new-max-nodes" value="10" min="1" max="500">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size: 0.85rem; font-weight: 600;">Maksimum EPS Limiti</label>
+                        <input type="number" class="input" id="tenant-new-max-eps" value="5000" min="100" max="100000">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-outline" onclick="closeAddTenantModal()" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" id="btn-save-tenant" onclick="submitAddTenant()" data-i18n="btn_save_tenant">✓ Kiracıyı Oluştur</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/translations.js?v=1.5.13"></script>
+    <script src="/static/js/app.js?v=1.5.13"></script>
 </body>
 </html>

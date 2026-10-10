@@ -119,20 +119,48 @@ if [ -z "$NODE_NAME" ]; then
     NODE_NAME="$(hostname -s 2>/dev/null || echo 'edge-node')"
 fi
 
-echo -e "\n${BLUE}[1/5] Checking prerequisites...${NC}"
+echo -e "\n${BLUE}[1/6] Checking prerequisites...${NC}"
 if ! command -v curl &> /dev/null; then
     echo "Installing curl..."
     apt-get update -qq && apt-get install -y -qq curl ca-certificates
 fi
 
-echo -e "${BLUE}[2/5] Creating directory layout...${NC}"
+echo -e "\n${BLUE}[2/6] Hardware Pre-flight Inspection & Minimum Specifications...${NC}"
+# Minimum specifications for Valtrivo LogSeal Edge Proxy:
+# CPU: 1 vCPU (2.0 GHz)
+# RAM: 512 MB (Proxy footprint ~35MB, OS headroom)
+# Disk: 2 GB (2048 MB) free space for /var/spool/logseal buffer
+
+CPU_CORES=$(nproc 2>/dev/null || echo 1)
+MEM_TOTAL_KB=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo 1048576)
+MEM_TOTAL_MB=$((MEM_TOTAL_KB / 1024))
+DISK_FREE_MB=$(df -m / 2>/dev/null | tail -1 | awk '{print $4}' || echo 5000)
+
+echo -e "  • CPU Cores     : ${BOLD}${CPU_CORES} core(s)${NC} (Minimum: 1 vCPU)"
+echo -e "  • System Memory : ${BOLD}${MEM_TOTAL_MB} MB RAM${NC} (Minimum: 512 MB, Recommended: 1024 MB)"
+echo -e "  • Free Disk     : ${BOLD}${DISK_FREE_MB} MB free${NC} (Minimum: 2048 MB for local spool buffer)"
+
+SPEC_WARNING=false
+if [ "$MEM_TOTAL_MB" -lt 480 ]; then
+    echo -e "  ${YELLOW}⚠️  Notice: Host memory (${MEM_TOTAL_MB} MB) is below recommended 512 MB.${NC}"
+    SPEC_WARNING=true
+fi
+if [ "$DISK_FREE_MB" -lt 1800 ]; then
+    echo -e "  ${YELLOW}⚠️  Notice: Available disk space (${DISK_FREE_MB} MB) is below recommended 2048 MB.${NC}"
+    SPEC_WARNING=true
+fi
+if [ "$SPEC_WARNING" = false ]; then
+    echo -e "  ${GREEN}✓ All hardware pre-flight checks PASSED successfully.${NC}"
+fi
+
+echo -e "${BLUE}[3/6] Creating directory layout...${NC}"
 mkdir -p /etc/logseal
 mkdir -p /var/spool/logseal
 mkdir -p /var/log/logseal
 chmod 700 /etc/logseal
 chmod 750 /var/spool/logseal
 
-echo -e "${BLUE}[3/5] Fetching logseal-proxy binary from Cloud (${ENDPOINT})...${NC}"
+echo -e "${BLUE}[4/6] Fetching logseal-proxy binary from Cloud (${ENDPOINT})...${NC}"
 BINARY_INSTALLED=false
 
 # Method A: Download compiled binary from Cloud

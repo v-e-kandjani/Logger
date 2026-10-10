@@ -111,12 +111,13 @@ func (h *Handler) handleEdgeHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"status":                "ok",
+		"status":                updatedNode.ActivationStatus, // "active", "pending_activation"
 		"node_id":               updatedNode.ID.String(),
 		"node_name":             updatedNode.Name,
 		"tenant_name":           updatedNode.TenantName,
 		"sync_interval":         syncInterval,
 		"sync_interval_seconds": getIntervalSeconds(syncInterval),
+		"ldap_config":           updatedNode.LDAPConfig,
 		"server_time":           time.Now().UTC().Format(time.RFC3339),
 	})
 }
@@ -246,14 +247,15 @@ func (h *Handler) handleEdgeIngest(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleEdgeNodesList handles GET and POST for edge proxy nodes in Settings
+// handleEdgeNodes handles GET and POST for edge proxy nodes in Settings
 func (h *Handler) handleEdgeNodes(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		ctx, cancel := contextWithTimeout(r, 3*time.Second)
 		defer cancel()
 
-		nodes, err := h.pgDB.ListEdgeNodes(ctx)
+		tenantFilter := r.URL.Query().Get("tenant")
+		nodes, err := h.pgDB.ListEdgeNodes(ctx, tenantFilter)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
@@ -275,9 +277,15 @@ func (h *Handler) handleEdgeNodes(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPost:
 		var req struct {
-			Name         string `json:"name"`
-			TenantName   string `json:"tenant_name"`
-			SyncInterval string `json:"sync_interval"`
+			Name             string                 `json:"name"`
+			TenantName       string                 `json:"tenant_name"`
+			SyncInterval     string                 `json:"sync_interval"`
+			AdminName        string                 `json:"admin_name"`
+			AdminEmail       string                 `json:"admin_email"`
+			AdminUsername    string                 `json:"admin_username"`
+			AdminInitialPass string                 `json:"admin_initial_pass"`
+			ActivationStatus string                 `json:"activation_status"`
+			LDAPConfig       map[string]interface{} `json:"ldap_config"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
@@ -300,12 +308,23 @@ func (h *Handler) handleEdgeNodes(w http.ResponseWriter, r *http.Request) {
 			interval = "online"
 		}
 
+		actStatus := strings.TrimSpace(req.ActivationStatus)
+		if actStatus == "" {
+			actStatus = "active"
+		}
+
 		node := &models.EdgeNode{
-			ID:           uuid.New(),
-			Name:         name,
-			Token:        generateEdgeToken(),
-			TenantName:   tenant,
-			SyncInterval: interval,
+			ID:               uuid.New(),
+			Name:             name,
+			Token:            generateEdgeToken(),
+			TenantName:       tenant,
+			SyncInterval:     interval,
+			AdminName:        strings.TrimSpace(req.AdminName),
+			AdminEmail:       strings.TrimSpace(req.AdminEmail),
+			AdminUsername:    strings.TrimSpace(req.AdminUsername),
+			AdminInitialPass: strings.TrimSpace(req.AdminInitialPass),
+			ActivationStatus: actStatus,
+			LDAPConfig:       req.LDAPConfig,
 		}
 
 		ctx, cancel := contextWithTimeout(r, 4*time.Second)
@@ -452,4 +471,150 @@ func (h *Handler) handleEdgeDownloadBinary(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"logseal-proxy\"")
 	http.ServeFile(w, r, foundPath)
+}
+
+// handleEdgeNodeActivate enables a pending edge node and provisions its user & cloud LDAP settings
+func (h *Handler) handleEdgeNodeActivate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodPut {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ID            string                 `json:"id"`
+		AdminName     string                 `json:"admin_name"`
+		AdminEmail    string                 `json:"admin_email"`
+		AdminUsername string                 `json:"admin_username"`
+		AdminPass     string                 `json:"admin_pass"`
+		SyncInterval  string                 `json:"sync_interval"`
+		LDAPConfig    map[string]interface{} `json:"ldap_config"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	nodeID, err := uuid.Parse(strings.TrimSpace(req.ID))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid node id"})
+		return
+	}
+
+	interval := strings.TrimSpace(req.SyncInterval)
+	if _, ok := validSyncIntervals[interval]; !ok {
+		interval = "online"
+	}
+
+	ctx, cancel := contextWithTimeout(r, 5*time.Second)
+	defer cancel()
+
+	if err := h.pgDB.ActivateEdgeNode(
+		ctx,
+		nodeID,
+		strings.TrimSpace(req.AdminName),
+		strings.TrimSpace(req.AdminEmail),
+		strings.TrimSpace(req.AdminUsername),
+		strings.TrimSpace(req.AdminPass),
+		interval,
+		req.LDAPConfig,
+	); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "activating node: " + err.Error()})
+		return
+	}
+
+	updated, _ := h.pgDB.GetEdgeNodeByID(ctx, nodeID)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "ok",
+		"message": "Edge proxy node successfully activated and preconfigured",
+		"node":    updated,
+	})
+}
+
+// handleTenants handles GET, POST, and DELETE for multi-tenant organizations
+func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := contextWithTimeout(r, 4*time.Second)
+	defer cancel()
+
+	switch r.Method {
+	case http.MethodGet:
+		tenants, err := h.pgDB.ListTenants(ctx)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if tenants == nil {
+			tenants = []*models.Tenant{}
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenants": tenants,
+		})
+
+	case http.MethodPost:
+		var req struct {
+			Slug             string `json:"slug"`
+			Name             string `json:"name"`
+			Description      string `json:"description"`
+			AdminName        string `json:"admin_name"`
+			AdminEmail       string `json:"admin_email"`
+			AdminUsername    string `json:"admin_username"`
+			AdminInitialPass string `json:"admin_initial_pass"`
+			MaxNodes         int    `json:"max_nodes"`
+			MaxEPS           int    `json:"max_eps"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+			return
+		}
+
+		name := strings.TrimSpace(req.Name)
+		if name == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "tenant name is required"})
+			return
+		}
+
+		slug := strings.TrimSpace(req.Slug)
+		if slug == "" {
+			slug = strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+		}
+
+		t := &models.Tenant{
+			Slug:          slug,
+			Name:          name,
+			Description:   strings.TrimSpace(req.Description),
+			AdminName:     strings.TrimSpace(req.AdminName),
+			AdminEmail:    strings.TrimSpace(req.AdminEmail),
+			AdminUsername: strings.TrimSpace(req.AdminUsername),
+			Status:        "active",
+			MaxNodes:      req.MaxNodes,
+			MaxEPS:        req.MaxEPS,
+		}
+
+		if err := h.pgDB.CreateTenant(ctx, t, strings.TrimSpace(req.AdminInitialPass)); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "creating tenant: " + err.Error()})
+			return
+		}
+
+		writeJSON(w, http.StatusCreated, t)
+
+	case http.MethodDelete:
+		slug := strings.TrimSpace(r.URL.Query().Get("slug"))
+		if slug == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "slug is required"})
+			return
+		}
+		if slug == "default" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cannot delete default root tenant"})
+			return
+		}
+
+		if err := h.pgDB.DeleteTenant(ctx, slug); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
 }

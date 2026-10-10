@@ -52,12 +52,14 @@ type LogPacket struct {
 
 // HeartbeatResponse from Cloud
 type HeartbeatResponse struct {
-	Status              string `json:"status"`
-	NodeID              string `json:"node_id"`
-	NodeName            string `json:"node_name"`
-	TenantName          string `json:"tenant_name"`
-	SyncInterval        string `json:"sync_interval"`
-	SyncIntervalSeconds int    `json:"sync_interval_seconds"`
+	Status              string                 `json:"status"`
+	Message             string                 `json:"message"`
+	NodeID              string                 `json:"node_id"`
+	NodeName            string                 `json:"node_name"`
+	TenantName          string                 `json:"tenant_name"`
+	SyncInterval        string                 `json:"sync_interval"`
+	SyncIntervalSeconds int                    `json:"sync_interval_seconds"`
+	LDAPConfig          map[string]interface{} `json:"ldap_config,omitempty"`
 }
 
 type IngestResponse struct {

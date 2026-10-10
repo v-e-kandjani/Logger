@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSIEMManagement();
     initADAndMFAManagement();
     initHTTPSAndFQDNManagement();
+    initTenantManagement();
     if (window.i18n) {
         window.i18n.setLanguage(window.i18n.currentLang);
     }
@@ -153,6 +154,7 @@ function switchTab(tab, targetSectionId = null) {
         if (tab === 'settings') {
             loadSettings();
             if (typeof loadEdgeNodes === 'function') loadEdgeNodes();
+            if (typeof loadTenants === 'function') loadTenants();
             displaySettingsSection(targetSectionId || currentSettingsSection || 'setting-section-kamusm');
         }
         if (tab === 'users') loadUsers();
@@ -2053,23 +2055,50 @@ function initHTTPSAndFQDNManagement() {
         });
     }
 
-    // 3. Custom Certificate Upload (.crt, .pfx, .pem, .p12)
+    // 3. Custom Certificate Upload (.pfx, .p12, .crt, .pem)
+    const certTypeSelect = document.getElementById('cert-upload-type');
     const certFileInput = document.getElementById('cert-upload-file');
     const keyFileInput = document.getElementById('cert-upload-key-file');
     const pfxPassGroup = document.getElementById('cert-pfx-pass-group');
     const keyFileGroup = document.getElementById('cert-key-file-group');
+    const certFileLabel = document.getElementById('cert-file-label');
+    const certFileHelp = document.getElementById('cert-file-help');
+
+    function syncCertTypeUI(type) {
+        if (type === 'pfx') {
+            if (certFileLabel) certFileLabel.textContent = 'PFX / P12 Arşiv Dosyası (.pfx, .p12)';
+            if (certFileInput) certFileInput.accept = '.pfx,.p12';
+            if (certFileHelp) certFileHelp.textContent = 'PFX veya P12 sertifika arşivinizi seçin (Sertifika ve Özel Anahtarı birlikte içerir).';
+            if (pfxPassGroup) pfxPassGroup.style.display = 'block';
+            if (keyFileGroup) keyFileGroup.style.display = 'none';
+        } else {
+            if (certFileLabel) certFileLabel.textContent = 'Sertifika Dosyası (.crt, .pem, .cer)';
+            if (certFileInput) certFileInput.accept = '.crt,.pem,.cer';
+            if (certFileHelp) certFileHelp.textContent = 'X.509 formatındaki sertifika dosyanızı (.crt, .pem) ve özel anahtarınızı seçin.';
+            if (pfxPassGroup) pfxPassGroup.style.display = 'none';
+            if (keyFileGroup) keyFileGroup.style.display = 'block';
+        }
+    }
+
+    if (certTypeSelect) {
+        certTypeSelect.addEventListener('change', () => {
+            syncCertTypeUI(certTypeSelect.value);
+        });
+        // Initial sync
+        syncCertTypeUI(certTypeSelect.value);
+    }
 
     if (certFileInput) {
         certFileInput.addEventListener('change', () => {
             const file = certFileInput.files[0];
             if (file) {
                 const ext = file.name.split('.').pop().toLowerCase();
-                if (ext === 'pfx' || ext === 'p12') {
-                    if (pfxPassGroup) pfxPassGroup.style.display = 'block';
-                    if (keyFileGroup) keyFileGroup.style.display = 'none';
-                } else {
-                    if (pfxPassGroup) pfxPassGroup.style.display = 'none';
-                    if (keyFileGroup) keyFileGroup.style.display = 'block';
+                if ((ext === 'pfx' || ext === 'p12') && certTypeSelect && certTypeSelect.value !== 'pfx') {
+                    certTypeSelect.value = 'pfx';
+                    syncCertTypeUI('pfx');
+                } else if ((ext === 'crt' || ext === 'cer') && certTypeSelect && certTypeSelect.value !== 'pem') {
+                    certTypeSelect.value = 'pem';
+                    syncCertTypeUI('pem');
                 }
             }
         });
@@ -2078,9 +2107,13 @@ function initHTTPSAndFQDNManagement() {
     const btnUploadCert = document.getElementById('btn-upload-cert');
     if (btnUploadCert) {
         btnUploadCert.addEventListener('click', async () => {
+            const certType = certTypeSelect ? certTypeSelect.value : 'pfx';
             const certFile = certFileInput?.files[0];
             if (!certFile) {
-                alert('Please select a certificate file (.crt, .pem, .pfx, or .p12) to upload.');
+                const reqMsg = (certType === 'pfx')
+                    ? 'Lütfen yüklenecek PFX / P12 sertifika dosyasını (.pfx, .p12) seçin.'
+                    : 'Lütfen yüklenecek sertifika dosyasını (.crt, .pem) seçin.';
+                alert(reqMsg);
                 return;
             }
 
@@ -2091,14 +2124,18 @@ function initHTTPSAndFQDNManagement() {
                 const formData = new FormData();
                 formData.append('certificate', certFile);
 
-                const keyFile = keyFileInput?.files[0];
-                if (keyFile) {
-                    formData.append('private_key', keyFile);
+                if (certType === 'pem') {
+                    const keyFile = keyFileInput?.files[0];
+                    if (keyFile) {
+                        formData.append('private_key', keyFile);
+                    }
                 }
 
-                const pfxPass = document.getElementById('cert-upload-pfx-pass')?.value || '';
-                if (pfxPass) {
-                    formData.append('pfx_password', pfxPass);
+                if (certType === 'pfx') {
+                    const pfxPass = document.getElementById('cert-upload-pfx-pass')?.value || '';
+                    if (pfxPass) {
+                        formData.append('pfx_password', pfxPass);
+                    }
                 }
 
                 const res = await fetch('/api/v1/settings/https/certificate/upload', {
@@ -2113,8 +2150,6 @@ function initHTTPSAndFQDNManagement() {
                 if (keyFileInput) keyFileInput.value = '';
                 const pfxPassEl = document.getElementById('cert-upload-pfx-pass');
                 if (pfxPassEl) pfxPassEl.value = '';
-                if (pfxPassGroup) pfxPassGroup.style.display = 'none';
-                if (keyFileGroup) keyFileGroup.style.display = 'block';
 
                 await loadHTTPSSettings();
 
@@ -5160,17 +5195,222 @@ window.optimizeSIEMDeviceRules = async () => {
 };
 
 /* ==============================================================================
-   EDGE PROXY & FORWARDER NODES GOVERNANCE (MSSP & REMOTE ARCHITECTURE)
+   MULTI-TENANT & EDGE PROXY GOVERNANCE (MSSP & REMOTE ARCHITECTURE)
    ============================================================================== */
 
+let currentTenants = [];
+let currentTenantContext = localStorage.getItem('active_tenant_slug') || 'all';
 let currentEdgeNodes = [];
+
+function initTenantManagement() {
+    const sel = document.getElementById('tenant-context-selector');
+    if (sel) {
+        sel.addEventListener('change', (e) => {
+            currentTenantContext = e.target.value;
+            localStorage.setItem('active_tenant_slug', currentTenantContext);
+            if (typeof showToast === 'function') {
+                showToast(`Kiracı bağlamı güncellendi: ${currentTenantContext}`, 'info');
+            }
+            loadEdgeNodes();
+            if (typeof loadDevices === 'function') loadDevices();
+        });
+    }
+    loadTenants();
+}
+
+async function loadTenants() {
+    const sel = document.getElementById('tenant-context-selector');
+    const tbody = document.getElementById('tbody-tenants');
+
+    try {
+        const res = await fetch('/api/v1/tenants');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        currentTenants = data.tenants || [];
+
+        // 1. Populate topbar tenant context selector
+        if (sel) {
+            let options = `<option value="all">🏢 Tüm Kiracılar (Global Görünüm)</option>`;
+            currentTenants.forEach(t => {
+                const s = (t.slug === currentTenantContext) ? 'selected' : '';
+                options += `<option value="${escapeHtml(t.slug)}" ${s}>🏢 ${escapeHtml(t.name)} (${escapeHtml(t.slug)})</option>`;
+            });
+            sel.innerHTML = options;
+            sel.value = currentTenantContext;
+        }
+
+        // 2. Populate Settings > Tenants table
+        if (tbody) {
+            if (currentTenants.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Henüz kiracı bulunmuyor.</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            currentTenants.forEach(t => {
+                const isDefault = (t.slug === 'default');
+                const createdDate = t.created_at ? new Date(t.created_at).toLocaleDateString() : '-';
+                const adminInfo = t.admin_name || t.admin_username
+                    ? `<div><strong>${escapeHtml(t.admin_name || t.admin_username)}</strong> <span style="font-size: 0.72rem; color: var(--text-muted);">(@${escapeHtml(t.admin_username || '')})</span></div><div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(t.admin_email || '')}</div>`
+                    : `<span style="color: var(--text-muted); font-size: 0.78rem;">Sistem Yöneticisi</span>`;
+
+                const statusBadge = (t.status === 'active')
+                    ? `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3);">✓ Aktif</span>`
+                    : `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);">${escapeHtml(t.status)}</span>`;
+
+                const limitsStr = `<span style="font-size: 0.78rem;">Node: <strong>${t.max_nodes || 'Sınırsız'}</strong> | EPS: <strong>${(t.max_eps || 0).toLocaleString()}</strong></span>`;
+
+                html += `
+                    <tr>
+                        <td><code style="background: rgba(0,0,0,0.3); padding: 3px 6px; border-radius: 4px; font-size: 0.8rem;">${escapeHtml(t.slug)}</code></td>
+                        <td>
+                            <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(t.name)}</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(t.description || '')}</div>
+                        </td>
+                        <td>${adminInfo}</td>
+                        <td>${statusBadge}</td>
+                        <td>${limitsStr}</td>
+                        <td style="font-size: 0.8rem;">${createdDate}</td>
+                        <td style="text-align: right;">
+                            <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                                <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="switchTenantContext('${escapeHtml(t.slug)}')">
+                                    🔍 Seç &amp; Görüntüle
+                                </button>
+                                ${!isDefault ? `
+                                <button class="btn btn-outline text-danger" style="padding: 3px 8px; font-size: 0.75rem;" onclick="deleteTenant('${escapeHtml(t.slug)}', '${escapeHtml(t.name)}')" title="Kiracıyı Sil">
+                                    🗑️
+                                </button>` : ''}
+                            </div>
+                        </td>
+                    </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+    } catch (err) {
+        console.error('Failed loading tenants:', err);
+    }
+}
+
+function switchTenantContext(slug) {
+    currentTenantContext = slug;
+    localStorage.setItem('active_tenant_slug', slug);
+    const sel = document.getElementById('tenant-context-selector');
+    if (sel) sel.value = slug;
+    if (typeof showToast === 'function') {
+        showToast(`Kiracı bağlamına geçildi: ${slug}`, 'success');
+    }
+    loadEdgeNodes();
+    if (typeof loadDevices === 'function') loadDevices();
+}
+
+function openAddTenantModal() {
+    const modal = document.getElementById('modal-add-tenant');
+    if (!modal) return;
+    document.getElementById('tenant-new-slug').value = '';
+    document.getElementById('tenant-new-name').value = '';
+    document.getElementById('tenant-new-desc').value = '';
+    document.getElementById('tenant-new-admin-name').value = '';
+    document.getElementById('tenant-new-admin-email').value = '';
+    document.getElementById('tenant-new-admin-username').value = '';
+    document.getElementById('tenant-new-admin-pass').value = '';
+    document.getElementById('tenant-new-max-nodes').value = '10';
+    document.getElementById('tenant-new-max-eps').value = '5000';
+    modal.style.display = 'flex';
+}
+
+function closeAddTenantModal() {
+    const modal = document.getElementById('modal-add-tenant');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitAddTenant() {
+    const slug = document.getElementById('tenant-new-slug').value.trim();
+    const name = document.getElementById('tenant-new-name').value.trim();
+    const desc = document.getElementById('tenant-new-desc').value.trim();
+    const adminName = document.getElementById('tenant-new-admin-name').value.trim();
+    const adminEmail = document.getElementById('tenant-new-admin-email').value.trim();
+    const adminUsername = document.getElementById('tenant-new-admin-username').value.trim();
+    const adminPass = document.getElementById('tenant-new-admin-pass').value.trim();
+    const maxNodes = parseInt(document.getElementById('tenant-new-max-nodes').value, 10) || 10;
+    const maxEps = parseInt(document.getElementById('tenant-new-max-eps').value, 10) || 5000;
+
+    if (!name) {
+        alert('Lütfen kiracı / müşteri adını girin!');
+        return;
+    }
+
+    const btn = document.getElementById('btn-save-tenant');
+    try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Oluşturuluyor...'; }
+
+        const res = await fetch('/api/v1/tenants', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                slug: slug,
+                name: name,
+                description: desc,
+                admin_name: adminName,
+                admin_email: adminEmail,
+                admin_username: adminUsername,
+                admin_initial_pass: adminPass,
+                max_nodes: maxNodes,
+                max_eps: maxEps
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+
+        if (typeof showToast === 'function') {
+            showToast(`✓ Kiracı ve yönetici hesabı başarıyla oluşturuldu: ${name}`, 'success');
+        }
+        closeAddTenantModal();
+        loadTenants();
+    } catch (err) {
+        alert('Kiracı oluşturulamadı: ' + err.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✓ Kiracıyı Oluştur'; }
+    }
+}
+
+async function deleteTenant(slug, name) {
+    if (!confirm(`'${name}' (${slug}) kiracısını ve ilişkili verileri silmek istediğinize emin misiniz?`)) return;
+
+    try {
+        const res = await fetch(`/api/v1/tenants?slug=${encodeURIComponent(slug)}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+
+        if (typeof showToast === 'function') {
+            showToast(`Kiracı silindi: ${name}`, 'info');
+        }
+        if (currentTenantContext === slug) {
+            switchTenantContext('all');
+        }
+        loadTenants();
+    } catch (err) {
+        alert('Kiracı silinemedi: ' + err.message);
+    }
+}
+
+/* ==============================================================================
+   EDGE PROXY NODES (ADMIN & CLOUD PRECONFIGURATION)
+   ============================================================================== */
 
 async function loadEdgeNodes() {
     const tbody = document.getElementById('tbody-edge-nodes');
     if (!tbody) return;
 
     try {
-        const res = await fetch('/api/v1/settings/edge/nodes');
+        let url = '/api/v1/settings/edge/nodes';
+        if (currentTenantContext && currentTenantContext !== 'all') {
+            url += `?tenant=${encodeURIComponent(currentTenantContext)}`;
+        }
+
+        const res = await fetch(url);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         currentEdgeNodes = data.nodes || [];
@@ -5178,9 +5418,9 @@ async function loadEdgeNodes() {
         if (currentEdgeNodes.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px 16px;">
+                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 32px 16px;">
                         <div style="font-size: 28px; margin-bottom: 8px;">🌐</div>
-                        <div style="font-weight: 600; margin-bottom: 4px;">Henüz kayıtlı Edge Proxy düğümü bulunmuyor.</div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">Seçili bağlamda kayıtlı Edge Proxy düğümü bulunmuyor.</div>
                         <div style="font-size: 0.82rem; margin-bottom: 12px;">Uzak ofis veya müşteri ağlarınızdan güvenli log aktarımı için yeni bir düğüm ekleyin.</div>
                         <button class="btn btn-primary" onclick="openAddEdgeNodeModal()">+ Yeni Proxy Düğümü Ekle</button>
                     </td>
@@ -5207,6 +5447,11 @@ async function loadEdgeNodes() {
                     ? `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);">⏳ Bekliyor</span>`
                     : `<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3);">○ Çevrimdışı</span>`);
 
+            const isActPending = (n.activation_status === 'pending_activation');
+            const actBadge = isActPending
+                ? `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); font-size: 0.72rem;">⏳ Etkinleştirme Bekliyor</span></div>`
+                : `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-size: 0.72rem;">✓ Aktif</span></div>`;
+
             let lastSeenStr = 'Henüz bağlanmadı';
             if (n.last_seen_at) {
                 const diffMs = Date.now() - new Date(n.last_seen_at).getTime();
@@ -5230,6 +5475,10 @@ async function loadEdgeNodes() {
                 ? `${n.token.substring(0, 10)}...${n.token.substring(n.token.length - 4)}`
                 : (n.token || '');
 
+            const adminInfo = (n.admin_name || n.admin_username)
+                ? `<div><strong>${escapeHtml(n.admin_name || n.admin_username)}</strong> <span style="font-size: 0.72rem; color: var(--text-muted);">(@${escapeHtml(n.admin_username || '')})</span></div><div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(n.admin_email || '')}</div>`
+                : `<span style="color: var(--text-muted); font-size: 0.75rem;">Atanmadı</span>`;
+
             html += `
                 <tr>
                     <td>
@@ -5237,12 +5486,13 @@ async function loadEdgeNodes() {
                             <span style="font-size: 1.1rem;">🖥️</span>
                             <div>
                                 <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(n.name)}</div>
-                                <div style="font-size: 0.72rem; color: var(--text-muted);">v${escapeHtml(n.version || '1.5.12')}</div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted);">v${escapeHtml(n.version || '1.5.13')}</div>
                             </div>
                         </div>
                     </td>
                     <td><span class="badge badge-outline" style="font-size: 0.78rem;">${escapeHtml(n.tenant_name || 'default')}</span></td>
-                    <td>${statusBadge}</td>
+                    <td>${adminInfo}</td>
+                    <td>${statusBadge}${actBadge}</td>
                     <td>
                         <select class="input" style="padding: 4px 8px; font-size: 0.78rem; width: auto; font-weight: 500; border-color: rgba(56, 189, 248, 0.4);"
                                 onchange="updateEdgeNodeInterval('${n.id}', this.value)">
@@ -5263,10 +5513,17 @@ async function loadEdgeNodes() {
                     </td>
                     <td style="text-align: right;">
                         <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                            ${isActPending ? `
+                            <button class="btn btn-primary" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openActivateEdgeNodeModal('${n.id}')" title="Düğümü Etkinleştir &amp; Ön-Yapılandır">
+                                ⚡ Etkinleştir
+                            </button>` : `
+                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openActivateEdgeNodeModal('${n.id}')" title="Düğüm Yöneticisi ve LDAP Ayarları">
+                                ⚙️ Ayarlar
+                            </button>`}
                             <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="copyNodeInstallCurl('${n.token}', '${escapeHtml(n.name)}')" title="Tek satırlık Linux kurulum komutu">
-                                💻 Kurulum Komutu
+                                💻 Kurulum
                             </button>
-                            <button class="btn btn-outline text-danger" style="padding: 3px 8px; font-size: 0.75rem;" onclick="deleteEdgeNode('${n.id}', '${escapeHtml(n.name)}')" title="Düğümü Sil / Yetkisini Kaldır">
+                            <button class="btn btn-outline text-danger" style="padding: 3px 8px; font-size: 0.75rem;" onclick="deleteEdgeNode('${n.id}', '${escapeHtml(n.name)}')" title="Düğümü Sil">
                                 🗑️
                             </button>
                         </div>
@@ -5277,7 +5534,7 @@ async function loadEdgeNodes() {
         tbody.innerHTML = html;
     } catch (err) {
         console.error('Failed loading edge nodes:', err);
-        tbody.innerHTML = `<tr><td colspan="8" class="text-danger" style="text-align: center; padding: 16px;">Düğümler yüklenirken hata oluştu: ${escapeHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-danger" style="text-align: center; padding: 16px;">Düğümler yüklenirken hata oluştu: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
 
@@ -5295,8 +5552,6 @@ async function updateEdgeNodeInterval(nodeId, newInterval) {
 
         if (typeof showToast === 'function') {
             showToast(`✓ Gönderim zamanlaması bulutta güncellendi: ${newInterval}`, 'success');
-        } else {
-            console.log(`[Edge Scheduler] Updated ${nodeId} interval to ${newInterval}`);
         }
     } catch (err) {
         alert('Zamanlama güncellenemedi: ' + err.message);
@@ -5309,7 +5564,12 @@ function openAddEdgeNodeModal() {
     if (!modal) return;
 
     document.getElementById('edge-new-node-name').value = '';
-    document.getElementById('edge-new-tenant-name').value = 'default';
+    document.getElementById('edge-new-tenant-name').value = (currentTenantContext && currentTenantContext !== 'all') ? currentTenantContext : 'default';
+    document.getElementById('edge-new-act-status').value = 'active';
+    document.getElementById('edge-new-admin-name').value = '';
+    document.getElementById('edge-new-admin-email').value = '';
+    document.getElementById('edge-new-admin-username').value = '';
+    document.getElementById('edge-new-admin-pass').value = '';
     document.getElementById('edge-new-sync-interval').value = 'online';
 
     document.getElementById('edge-form-container').style.display = 'block';
@@ -5333,6 +5593,11 @@ function closeAddEdgeNodeModal() {
 async function submitAddEdgeNode() {
     const nameInput = document.getElementById('edge-new-node-name');
     const tenantInput = document.getElementById('edge-new-tenant-name');
+    const actStatusInput = document.getElementById('edge-new-act-status');
+    const adminNameInput = document.getElementById('edge-new-admin-name');
+    const adminEmailInput = document.getElementById('edge-new-admin-email');
+    const adminUsernameInput = document.getElementById('edge-new-admin-username');
+    const adminPassInput = document.getElementById('edge-new-admin-pass');
     const intervalInput = document.getElementById('edge-new-sync-interval');
     const saveBtn = document.getElementById('btn-save-edge-node');
 
@@ -5344,6 +5609,7 @@ async function submitAddEdgeNode() {
     }
 
     const tenant = tenantInput.value.trim() || 'default';
+    const actStatus = actStatusInput.value || 'active';
     const interval = intervalInput.value || 'online';
 
     try {
@@ -5356,6 +5622,11 @@ async function submitAddEdgeNode() {
             body: JSON.stringify({
                 name: name,
                 tenant_name: tenant,
+                activation_status: actStatus,
+                admin_name: adminNameInput.value.trim(),
+                admin_email: adminEmailInput.value.trim(),
+                admin_username: adminUsernameInput.value.trim(),
+                admin_initial_pass: adminPassInput.value.trim(),
                 sync_interval: interval
             })
         });
@@ -5380,6 +5651,94 @@ async function submitAddEdgeNode() {
         alert('Düğüm oluşturulamadı: ' + err.message);
         saveBtn.disabled = false;
         saveBtn.textContent = 'Oluştur ve Token Al';
+    }
+}
+
+function openActivateEdgeNodeModal(nodeId) {
+    const node = currentEdgeNodes.find(n => n.id === nodeId);
+    if (!node) {
+        alert('Düğüm bulunamadı!');
+        return;
+    }
+
+    const modal = document.getElementById('modal-activate-edge-node');
+    if (!modal) return;
+
+    document.getElementById('act-edge-node-id').value = node.id;
+    document.getElementById('act-edge-node-name-disp').textContent = node.name || '-';
+    document.getElementById('act-edge-tenant-disp').textContent = node.tenant_name || 'default';
+
+    document.getElementById('act-edge-admin-name').value = node.admin_name || '';
+    document.getElementById('act-edge-admin-email').value = node.admin_email || '';
+    document.getElementById('act-edge-admin-username').value = node.admin_username || '';
+    document.getElementById('act-edge-admin-pass').value = node.admin_initial_pass || '';
+    document.getElementById('act-edge-sync-interval').value = node.sync_interval || 'online';
+
+    const ldap = node.ldap_config || {};
+    document.getElementById('act-edge-ldap-enabled').checked = !!ldap.enabled;
+    document.getElementById('act-edge-ldap-host').value = ldap.host || '';
+    document.getElementById('act-edge-ldap-port').value = ldap.port || 389;
+    document.getElementById('act-edge-ldap-basedn').value = ldap.base_dn || '';
+    document.getElementById('act-edge-ldap-binddn').value = ldap.bind_dn || '';
+    document.getElementById('act-edge-ldap-bindpass').value = ldap.bind_password || '';
+    document.getElementById('act-edge-ldap-filter').value = ldap.user_filter || '(&(objectClass=user)(sAMAccountName={username}))';
+
+    modal.style.display = 'flex';
+}
+
+function closeActivateEdgeNodeModal() {
+    const modal = document.getElementById('modal-activate-edge-node');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitActivateEdgeNode() {
+    const nodeId = document.getElementById('act-edge-node-id').value;
+    const adminName = document.getElementById('act-edge-admin-name').value.trim();
+    const adminEmail = document.getElementById('act-edge-admin-email').value.trim();
+    const adminUsername = document.getElementById('act-edge-admin-username').value.trim();
+    const adminPass = document.getElementById('act-edge-admin-pass').value.trim();
+    const syncInterval = document.getElementById('act-edge-sync-interval').value;
+
+    const ldapConfig = {
+        enabled: document.getElementById('act-edge-ldap-enabled').checked,
+        host: document.getElementById('act-edge-ldap-host').value.trim(),
+        port: parseInt(document.getElementById('act-edge-ldap-port').value, 10) || 389,
+        base_dn: document.getElementById('act-edge-ldap-basedn').value.trim(),
+        bind_dn: document.getElementById('act-edge-ldap-binddn').value.trim(),
+        bind_password: document.getElementById('act-edge-ldap-bindpass').value.trim(),
+        user_filter: document.getElementById('act-edge-ldap-filter').value.trim() || '(&(objectClass=user)(sAMAccountName={username}))'
+    };
+
+    const btn = document.getElementById('btn-save-act-edge');
+    try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor...'; }
+
+        const res = await fetch('/api/v1/settings/edge/nodes/activate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: nodeId,
+                admin_name: adminName,
+                admin_email: adminEmail,
+                admin_username: adminUsername,
+                admin_pass: adminPass,
+                sync_interval: syncInterval,
+                ldap_config: ldapConfig
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+
+        if (typeof showToast === 'function') {
+            showToast('✓ Düğüm etkinleştirildi ve bulut ayarları güncellendi!', 'success');
+        }
+        closeActivateEdgeNodeModal();
+        loadEdgeNodes();
+    } catch (err) {
+        alert('Düğüm etkinleştirilemedi: ' + err.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '⚡ Düğümü Etkinleştir & Kaydet'; }
     }
 }
 
@@ -5421,3 +5780,4 @@ async function deleteEdgeNode(nodeId, nodeName) {
         alert('Düğüm silinemedi: ' + err.message);
     }
 }
+

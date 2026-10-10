@@ -1330,9 +1330,31 @@ func joinWithAND(clauses []string) string {
 	return res
 }
 
-// EnsureEdgeSchema ensures the edge_nodes table exists for remote proxy nodes
+// EnsureEdgeSchema ensures edge_nodes and tenants tables exist for remote proxy nodes and multi-tenancy
 func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 	schema := `
+	CREATE TABLE IF NOT EXISTS tenants (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		slug VARCHAR(64) NOT NULL UNIQUE,
+		name VARCHAR(128) NOT NULL,
+		description TEXT DEFAULT '',
+		admin_name VARCHAR(128) DEFAULT '',
+		admin_email VARCHAR(128) DEFAULT '',
+		admin_username VARCHAR(128) DEFAULT '',
+		status VARCHAR(32) NOT NULL DEFAULT 'active',
+		max_nodes INT NOT NULL DEFAULT 5,
+		max_eps INT NOT NULL DEFAULT 5000,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+
+	INSERT INTO tenants (slug, name, description, admin_name, admin_email, admin_username, status)
+	VALUES ('default', 'Default Organization (Root)', 'Primary root tenant', 'Root Super Admin', 'admin@syslog.local', 'admin', 'active')
+	ON CONFLICT (slug) DO NOTHING;
+
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) DEFAULT 'default';
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS is_tenant_admin BOOLEAN DEFAULT FALSE;
+
 	CREATE TABLE IF NOT EXISTS edge_nodes (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		name VARCHAR(128) NOT NULL,
@@ -1344,9 +1366,24 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 		version VARCHAR(32) DEFAULT '',
 		status VARCHAR(32) NOT NULL DEFAULT 'offline',
 		logs_forwarded BIGINT NOT NULL DEFAULT 0,
+		admin_name VARCHAR(128) DEFAULT '',
+		admin_email VARCHAR(128) DEFAULT '',
+		admin_username VARCHAR(128) DEFAULT '',
+		admin_initial_pass VARCHAR(128) DEFAULT '',
+		activation_status VARCHAR(32) DEFAULT 'active',
+		ldap_config JSONB DEFAULT '{}'::jsonb,
+		min_specs JSONB DEFAULT '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	);
+
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS admin_name VARCHAR(128) DEFAULT '';
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS admin_email VARCHAR(128) DEFAULT '';
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS admin_username VARCHAR(128) DEFAULT '';
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS admin_initial_pass VARCHAR(128) DEFAULT '';
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS activation_status VARCHAR(32) DEFAULT 'active';
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS ldap_config JSONB DEFAULT '{}'::jsonb;
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS min_specs JSONB DEFAULT '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb;
 
 	CREATE INDEX IF NOT EXISTS idx_edge_nodes_token ON edge_nodes(token);
 	CREATE INDEX IF NOT EXISTS idx_edge_nodes_tenant ON edge_nodes(tenant_name);
@@ -1355,13 +1392,145 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 	return err
 }
 
-// ListEdgeNodes retrieves all registered edge proxy nodes
-func (db *DB) ListEdgeNodes(ctx context.Context) ([]*models.EdgeNode, error) {
+// ListTenants returns all customer tenant organizations
+func (db *DB) ListTenants(ctx context.Context) ([]*models.Tenant, error) {
 	query := `
-		SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded, created_at, updated_at
-		FROM edge_nodes
-		ORDER BY created_at DESC`
+		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, max_nodes, max_eps, created_at, updated_at
+		FROM tenants
+		ORDER BY created_at ASC`
 	rows, err := db.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("listing tenants: %w", err)
+	}
+	defer rows.Close()
+
+	var list []*models.Tenant
+	for rows.Next() {
+		var t models.Tenant
+		if err := rows.Scan(
+			&t.ID, &t.Slug, &t.Name, &t.Description,
+			&t.AdminName, &t.AdminEmail, &t.AdminUsername,
+			&t.Status, &t.MaxNodes, &t.MaxEPS, &t.CreatedAt, &t.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, &t)
+	}
+	return list, rows.Err()
+}
+
+// GetTenantBySlug returns a tenant by its unique slug identifier
+func (db *DB) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
+	query := `
+		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, max_nodes, max_eps, created_at, updated_at
+		FROM tenants
+		WHERE slug = $1`
+	var t models.Tenant
+	err := db.pool.QueryRow(ctx, query, slug).Scan(
+		&t.ID, &t.Slug, &t.Name, &t.Description,
+		&t.AdminName, &t.AdminEmail, &t.AdminUsername,
+		&t.Status, &t.MaxNodes, &t.MaxEPS, &t.CreatedAt, &t.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &t, nil
+}
+
+// CreateTenant inserts a new customer organization and provisions its admin user
+func (db *DB) CreateTenant(ctx context.Context, t *models.Tenant, initialAdminPass string) error {
+	if t.ID == uuid.Nil {
+		t.ID = uuid.New()
+	}
+	if t.Slug == "" {
+		t.Slug = strings.ToLower(strings.ReplaceAll(t.Name, " ", "-"))
+	}
+	if t.Status == "" {
+		t.Status = "active"
+	}
+	if t.MaxNodes <= 0 {
+		t.MaxNodes = 5
+	}
+	if t.MaxEPS <= 0 {
+		t.MaxEPS = 5000
+	}
+	t.CreatedAt = time.Now()
+	t.UpdatedAt = time.Now()
+
+	query := `
+		INSERT INTO tenants (id, slug, name, description, admin_name, admin_email, admin_username, status, max_nodes, max_eps, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+	_, err := db.pool.Exec(ctx, query,
+		t.ID, t.Slug, t.Name, t.Description,
+		t.AdminName, t.AdminEmail, t.AdminUsername,
+		t.Status, t.MaxNodes, t.MaxEPS, t.CreatedAt, t.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Auto-provision Tenant Admin user if credentials provided
+	if t.AdminUsername != "" && initialAdminPass != "" {
+		u := &models.User{
+			Username:      t.AdminUsername,
+			FullName:      t.AdminName,
+			Email:         t.AdminEmail,
+			Role:          "Administrator",
+			IsEnabled:     true,
+			AuthSource:    "local",
+			TenantSlug:    t.Slug,
+			IsTenantAdmin: true,
+		}
+		if u.FullName == "" {
+			u.FullName = t.Name + " Admin"
+		}
+		_ = db.CreateUser(ctx, u, initialAdminPass)
+	}
+
+	return nil
+}
+
+// DeleteTenant deletes a tenant and cascades
+func (db *DB) DeleteTenant(ctx context.Context, slug string) error {
+	if slug == "default" {
+		return fmt.Errorf("cannot delete default root tenant")
+	}
+	query := `DELETE FROM tenants WHERE slug = $1`
+	_, err := db.pool.Exec(ctx, query, slug)
+	return err
+}
+
+// ListEdgeNodes retrieves registered edge proxy nodes, optionally filtered by tenant
+func (db *DB) ListEdgeNodes(ctx context.Context, tenantFilter string) ([]*models.EdgeNode, error) {
+	var query string
+	var args []any
+
+	if tenantFilter != "" && tenantFilter != "all" {
+		query = `
+			SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded,
+			       COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
+			       COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
+			       COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+			       created_at, updated_at
+			FROM edge_nodes
+			WHERE tenant_name = $1
+			ORDER BY created_at DESC`
+		args = append(args, tenantFilter)
+	} else {
+		query = `
+			SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded,
+			       COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
+			       COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
+			       COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+			       created_at, updated_at
+			FROM edge_nodes
+			ORDER BY created_at DESC`
+	}
+
+	rows, err := db.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("listing edge nodes: %w", err)
 	}
@@ -1370,14 +1539,32 @@ func (db *DB) ListEdgeNodes(ctx context.Context) ([]*models.EdgeNode, error) {
 	var nodes []*models.EdgeNode
 	for rows.Next() {
 		var n models.EdgeNode
+		var ldapJSON []byte
+		var minSpecsJSON []byte
 		err := rows.Scan(
 			&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
 			&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
+			&n.AdminName, &n.AdminEmail, &n.AdminUsername,
+			&n.ActivationStatus, &ldapJSON, &minSpecsJSON,
 			&n.CreatedAt, &n.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scanning edge node: %w", err)
 		}
+		if len(ldapJSON) > 0 {
+			_ = json.Unmarshal(ldapJSON, &n.LDAPConfig)
+		}
+		if len(minSpecsJSON) > 0 {
+			_ = json.Unmarshal(minSpecsJSON, &n.MinSpecs)
+		}
+		if n.MinSpecs == nil {
+			n.MinSpecs = map[string]string{
+				"min_cpu":  "1 vCPU",
+				"min_ram":  "512 MB",
+				"min_disk": "2 GB",
+			}
+		}
+
 		// Dynamically compute online status if last_seen_at was within 90 seconds
 		if n.LastSeenAt != nil && time.Since(*n.LastSeenAt) < 90*time.Second {
 			n.Status = "online"
@@ -1394,13 +1581,21 @@ func (db *DB) ListEdgeNodes(ctx context.Context) ([]*models.EdgeNode, error) {
 // GetEdgeNodeByID retrieves a single edge node by UUID
 func (db *DB) GetEdgeNodeByID(ctx context.Context, id uuid.UUID) (*models.EdgeNode, error) {
 	query := `
-		SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded, created_at, updated_at
+		SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded,
+		       COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
+		       COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
+		       COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+		       created_at, updated_at
 		FROM edge_nodes
 		WHERE id = $1`
 	var n models.EdgeNode
+	var ldapJSON []byte
+	var minSpecsJSON []byte
 	err := db.pool.QueryRow(ctx, query, id).Scan(
 		&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
 		&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
+		&n.AdminName, &n.AdminEmail, &n.AdminUsername,
+		&n.ActivationStatus, &ldapJSON, &minSpecsJSON,
 		&n.CreatedAt, &n.UpdatedAt,
 	)
 	if err != nil {
@@ -1408,6 +1603,12 @@ func (db *DB) GetEdgeNodeByID(ctx context.Context, id uuid.UUID) (*models.EdgeNo
 			return nil, nil
 		}
 		return nil, fmt.Errorf("querying edge node by id: %w", err)
+	}
+	if len(ldapJSON) > 0 {
+		_ = json.Unmarshal(ldapJSON, &n.LDAPConfig)
+	}
+	if len(minSpecsJSON) > 0 {
+		_ = json.Unmarshal(minSpecsJSON, &n.MinSpecs)
 	}
 	if n.LastSeenAt != nil && time.Since(*n.LastSeenAt) < 90*time.Second {
 		n.Status = "online"
@@ -1422,13 +1623,21 @@ func (db *DB) GetEdgeNodeByID(ctx context.Context, id uuid.UUID) (*models.EdgeNo
 // GetEdgeNodeByToken retrieves an edge node by its secret token
 func (db *DB) GetEdgeNodeByToken(ctx context.Context, token string) (*models.EdgeNode, error) {
 	query := `
-		SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded, created_at, updated_at
+		SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded,
+		       COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
+		       COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
+		       COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+		       created_at, updated_at
 		FROM edge_nodes
 		WHERE token = $1`
 	var n models.EdgeNode
+	var ldapJSON []byte
+	var minSpecsJSON []byte
 	err := db.pool.QueryRow(ctx, query, token).Scan(
 		&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
 		&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
+		&n.AdminName, &n.AdminEmail, &n.AdminUsername,
+		&n.ActivationStatus, &ldapJSON, &minSpecsJSON,
 		&n.CreatedAt, &n.UpdatedAt,
 	)
 	if err != nil {
@@ -1436,6 +1645,12 @@ func (db *DB) GetEdgeNodeByToken(ctx context.Context, token string) (*models.Edg
 			return nil, nil
 		}
 		return nil, fmt.Errorf("querying edge node by token: %w", err)
+	}
+	if len(ldapJSON) > 0 {
+		_ = json.Unmarshal(ldapJSON, &n.LDAPConfig)
+	}
+	if len(minSpecsJSON) > 0 {
+		_ = json.Unmarshal(minSpecsJSON, &n.MinSpecs)
 	}
 	return &n, nil
 }
@@ -1451,16 +1666,109 @@ func (db *DB) CreateEdgeNode(ctx context.Context, node *models.EdgeNode) error {
 	if node.TenantName == "" {
 		node.TenantName = "default"
 	}
+	if node.ActivationStatus == "" {
+		node.ActivationStatus = "active"
+	}
 	node.Status = "pending"
 	node.CreatedAt = time.Now()
 	node.UpdatedAt = time.Now()
 
+	ldapBytes, _ := json.Marshal(node.LDAPConfig)
+	if len(ldapBytes) == 0 {
+		ldapBytes = []byte("{}")
+	}
+
+	specsBytes, _ := json.Marshal(map[string]string{
+		"min_cpu":  "1 vCPU",
+		"min_ram":  "512 MB",
+		"min_disk": "2 GB",
+	})
+
 	query := `
-		INSERT INTO edge_nodes (id, name, token, tenant_name, sync_interval, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+		INSERT INTO edge_nodes (
+			id, name, token, tenant_name, sync_interval, status,
+			admin_name, admin_email, admin_username, admin_initial_pass,
+			activation_status, ldap_config, min_specs, created_at, updated_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`
 	_, err := db.pool.Exec(ctx, query,
-		node.ID, node.Name, node.Token, node.TenantName, node.SyncInterval, node.Status, node.CreatedAt, node.UpdatedAt)
-	return err
+		node.ID, node.Name, node.Token, node.TenantName, node.SyncInterval, node.Status,
+		node.AdminName, node.AdminEmail, node.AdminUsername, node.AdminInitialPass,
+		node.ActivationStatus, ldapBytes, specsBytes, node.CreatedAt, node.UpdatedAt)
+	if err != nil {
+		return err
+	}
+
+	// If node admin credentials were provided and active, preconfigure operator user
+	if node.AdminUsername != "" && node.AdminInitialPass != "" && node.ActivationStatus == "active" {
+		u := &models.User{
+			Username:      node.AdminUsername,
+			FullName:      node.AdminName,
+			Email:         node.AdminEmail,
+			Role:          "Administrator",
+			IsEnabled:     true,
+			AuthSource:    "local",
+			TenantSlug:    node.TenantName,
+			IsTenantAdmin: false,
+		}
+		if u.FullName == "" {
+			u.FullName = node.Name + " Admin"
+		}
+		_ = db.CreateUser(ctx, u, node.AdminInitialPass)
+	}
+
+	return nil
+}
+
+// ActivateEdgeNode enables a pending edge node and configures its admin user and LDAP settings
+func (db *DB) ActivateEdgeNode(
+	ctx context.Context,
+	id uuid.UUID,
+	adminName, adminEmail, adminUsername, adminPass, syncInterval string,
+	ldapConfig map[string]interface{},
+) error {
+	ldapBytes, _ := json.Marshal(ldapConfig)
+	if len(ldapBytes) == 0 {
+		ldapBytes = []byte("{}")
+	}
+
+	query := `
+		UPDATE edge_nodes
+		SET activation_status = 'active',
+		    admin_name = CASE WHEN $2 <> '' THEN $2 ELSE admin_name END,
+		    admin_email = CASE WHEN $3 <> '' THEN $3 ELSE admin_email END,
+		    admin_username = CASE WHEN $4 <> '' THEN $4 ELSE admin_username END,
+		    sync_interval = CASE WHEN $5 <> '' THEN $5 ELSE sync_interval END,
+		    ldap_config = $6,
+		    updated_at = NOW()
+		WHERE id = $1
+		RETURNING tenant_name, name`
+
+	var tenantName, nodeName string
+	err := db.pool.QueryRow(ctx, query, id, adminName, adminEmail, adminUsername, syncInterval, ldapBytes).Scan(&tenantName, &nodeName)
+	if err != nil {
+		return fmt.Errorf("activating edge node: %w", err)
+	}
+
+	// Preconfigure user in users table if username and password provided
+	if adminUsername != "" && adminPass != "" {
+		u := &models.User{
+			Username:      adminUsername,
+			FullName:      adminName,
+			Email:         adminEmail,
+			Role:          "Administrator",
+			IsEnabled:     true,
+			AuthSource:    "local",
+			TenantSlug:    tenantName,
+			IsTenantAdmin: false,
+		}
+		if u.FullName == "" {
+			u.FullName = nodeName + " Admin"
+		}
+		_ = db.CreateUser(ctx, u, adminPass)
+	}
+
+	return nil
 }
 
 // UpdateEdgeNodeInterval updates the schedule on the cloud for an edge node
@@ -1490,15 +1798,24 @@ func (db *DB) UpdateEdgeNodeHeartbeat(ctx context.Context, token, ip, ver string
 		    logs_forwarded = logs_forwarded + $4,
 		    updated_at = NOW()
 		WHERE token = $1
-		RETURNING id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded, created_at, updated_at`
+		RETURNING id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded,
+		          COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
+		          COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
+		          created_at, updated_at`
 	var n models.EdgeNode
+	var ldapJSON []byte
 	err := db.pool.QueryRow(ctx, query, token, ip, ver, addLogs).Scan(
 		&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
 		&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
+		&n.AdminName, &n.AdminEmail, &n.AdminUsername,
+		&n.ActivationStatus, &ldapJSON,
 		&n.CreatedAt, &n.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	if len(ldapJSON) > 0 {
+		_ = json.Unmarshal(ldapJSON, &n.LDAPConfig)
 	}
 	return &n, nil
 }

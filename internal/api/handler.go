@@ -210,7 +210,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Protected Edge Proxy Management (Requires valid UI session)
 	mux.HandleFunc("/api/v1/settings/edge/nodes", h.requireAuth(h.handleEdgeNodes))
 	mux.HandleFunc("/api/v1/settings/edge/nodes/interval", h.requireAuth(h.handleEdgeNodeInterval))
+	mux.HandleFunc("/api/v1/settings/edge/nodes/activate", h.requireAuth(h.handleEdgeNodeActivate))
 	mux.HandleFunc("/api/v1/settings/edge/nodes/delete", h.requireAuth(h.handleEdgeNodeDelete))
+
+	// Multi-Tenant Governance Endpoints
+	mux.HandleFunc("/api/v1/tenants", h.requireAuth(h.handleTenants))
 
 	// Protected SIEM & SOC Endpoints
 	mux.HandleFunc("/api/v1/siem/overview", h.requireAuth(h.handleSIEMOverview))
