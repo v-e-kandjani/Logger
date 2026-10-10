@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.16</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.17</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -630,21 +630,21 @@
             <!-- TAB: Devices -->
             <section class="tab-pane" id="pane-devices">
                 <div class="section-actions">
-                    <h3>Registered Network & Security Assets</h3>
-                    <button class="btn btn-primary" id="btn-add-device-modal">+ Add Syslog Device</button>
+                    <h3 data-i18n="devices_table_title">Registered Network & Security Assets</h3>
+                    <button class="btn btn-primary" id="btn-add-device-modal" data-i18n="btn_add_device">+ Add Syslog Device</button>
                 </div>
                 <div class="table-container">
                     <table class="data-table" id="devices-table">
                         <thead>
                             <tr>
-                                <th>Device Name</th>
-                                <th>IP Address</th>
-                                <th>Vendor</th>
-                                <th>Type</th>
-                                <th>Activity Status</th>
-                                <th>Last Seen</th>
-                                <th>Timestamp Policy</th>
-                                <th>Actions</th>
+                                <th data-i18n="th_device_name">Device Name</th>
+                                <th data-i18n="th_ip_address">IP Address</th>
+                                <th data-i18n="th_vendor">Vendor</th>
+                                <th data-i18n="th_type">Type</th>
+                                <th data-i18n="th_activity_status">Activity Status</th>
+                                <th data-i18n="th_last_seen">Last Seen</th>
+                                <th data-i18n="th_timestamp_policy">Timestamp Policy</th>
+                                <th data-i18n="th_actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="devices-body">
@@ -669,14 +669,14 @@
                     <table class="data-table" id="unreg-table">
                         <thead>
                             <tr>
-                                <th>Sender IP</th>
-                                <th>Hostname / Asset</th>
-                                <th>Discovered Type</th>
-                                <th>Detected Vendor</th>
-                                <th>Confidence</th>
-                                <th>Packets</th>
-                                <th>Last Seen</th>
-                                <th>Action</th>
+                                <th data-i18n="th_sender_ip">Sender IP</th>
+                                <th data-i18n="th_hostname_asset">Hostname / Asset</th>
+                                <th data-i18n="th_discovered_type">Discovered Type</th>
+                                <th data-i18n="th_detected_vendor">Detected Vendor</th>
+                                <th data-i18n="th_confidence">Confidence</th>
+                                <th data-i18n="th_packets">Packets</th>
+                                <th data-i18n="th_last_seen">Last Seen</th>
+                                <th data-i18n="th_actions">Action</th>
                             </tr>
                         </thead>
                         <tbody id="unreg-body">
@@ -1698,7 +1698,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.16</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.17</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -1788,16 +1788,16 @@
     <div class="modal-backdrop" id="device-modal" style="display: none;">
         <div class="modal">
             <div class="modal-header">
-                <h3>Register Syslog Source</h3>
+                <h3 data-i18n="modal_register_source">Register Syslog Source</h3>
                 <button class="btn-close" id="btn-close-modal">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Device Name</label>
+                    <label data-i18n="lbl_device_name">Device Name</label>
                     <input type="text" class="input" id="dev-name" placeholder="Core-Firewall-01">
                 </div>
                 <div class="form-group">
-                    <label>IP Address</label>
+                    <label data-i18n="lbl_ip_address">IP Address</label>
                     <input type="text" class="input" id="dev-ip" placeholder="192.168.1.1">
                 </div>
                 <div id="modal-auto-discovery-badge" style="display: none; margin-bottom: 12px; padding: 10px 14px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; font-size: 12px;">
@@ -1807,7 +1807,7 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Vendor</label>
+                    <label data-i18n="lbl_vendor">Vendor</label>
                     <select class="input" id="dev-vendor">
                         <option value="Fortinet">Fortinet (FortiGate / FortiSwitch)</option>
                         <option value="WatchGuard">WatchGuard (Firebox / Fireware)</option>
@@ -1828,7 +1828,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Device Type</label>
+                    <label data-i18n="lbl_device_type">Device Type</label>
                     <select class="input" id="dev-type">
                         <option value="Firewall">Firewall</option>
                         <option value="Switch">Switch</option>
@@ -1841,7 +1841,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Device Group / Tier</label>
+                    <label data-i18n="lbl_device_group">Device Group / Tier</label>
                     <select class="input" id="dev-group">
                         <option value="Perimeter Firewalls">Perimeter Firewalls</option>
                         <option value="Core Switches &amp; Routers">Core Switches &amp; Routers</option>
@@ -1851,15 +1851,15 @@
                     </select>
                 </div>
                 <div class="form-group" id="dev-tenant-group">
-                    <label>🏢 Kiracı / Tenant</label>
+                    <label data-i18n="lbl_device_tenant">🏢 Kiracı / Tenant</label>
                     <select class="input" id="dev-tenant">
                         <option value="default">Default Organization (Root)</option>
                     </select>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" id="btn-cancel-modal">Cancel</button>
-                <button class="btn btn-primary" id="btn-save-device">Save Asset</button>
+                <button class="btn btn-outline" id="btn-cancel-modal" data-i18n="btn_cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-save-device" data-i18n="btn_save_asset">Save Asset</button>
             </div>
         </div>
     </div>
@@ -1868,28 +1868,28 @@
     <div class="modal-backdrop" id="user-modal" style="display: none;">
         <div class="modal">
             <div class="modal-header">
-                <h3>Add Operator Account</h3>
+                <h3 data-i18n="modal_add_user">Add Operator Account</h3>
                 <button class="btn-close" id="btn-close-user-modal">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Username</label>
+                    <label data-i18n="lbl_username">Username</label>
                     <input type="text" class="input" id="new-user-username" placeholder="analyst_sec" required>
                 </div>
                 <div class="form-group">
-                    <label>Full Name</label>
+                    <label data-i18n="lbl_fullname">Full Name</label>
                     <input type="text" class="input" id="new-user-fullname" placeholder="Security Operations Analyst">
                 </div>
                 <div class="form-group">
-                    <label>Email Address</label>
+                    <label data-i18n="lbl_email">Email Address</label>
                     <input type="email" class="input" id="new-user-email" placeholder="operator@corp.local">
                 </div>
                 <div class="form-group">
-                    <label>Password (Min 8 Characters)</label>
+                    <label data-i18n="lbl_password">Password (Min 8 Characters)</label>
                     <input type="password" class="input" id="new-user-password" placeholder="••••••••••••" required>
                 </div>
                 <div class="form-group">
-                    <label>Security Profile / Role</label>
+                    <label data-i18n="lbl_role">Security Profile / Role</label>
                     <select class="input" id="new-user-role">
                         <option value="Super Administrator">Super Administrator (Full System & User Control)</option>
                         <option value="Security Analyst" selected>Security Analyst (Live Threat Hunting & Queries)</option>
@@ -1903,12 +1903,12 @@
                 </div>
                 <div class="form-group" style="margin-top: 14px; display: flex; align-items: center; gap: 8px;">
                     <input type="checkbox" id="new-user-enabled" checked style="width: 18px; height: 18px; cursor: pointer;">
-                    <label for="new-user-enabled" style="margin-bottom: 0; cursor: pointer;">Enable Account for Immediate Login</label>
+                    <label for="new-user-enabled" style="margin-bottom: 0; cursor: pointer;" data-i18n="lbl_enable_account">Enable Account for Immediate Login</label>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" id="btn-cancel-user-modal">Cancel</button>
-                <button class="btn btn-primary" id="btn-save-user">Create Operator</button>
+                <button class="btn btn-outline" id="btn-cancel-user-modal" data-i18n="btn_cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-save-user" data-i18n="btn_create_operator">Create Operator</button>
             </div>
         </div>
     </div>
@@ -1917,28 +1917,28 @@
     <div class="modal-backdrop" id="reset-password-modal" style="display: none;">
         <div class="modal">
             <div class="modal-header">
-                <h3>Reset Operator Password</h3>
+                <h3 data-i18n="modal_reset_password">Reset Operator Password</h3>
                 <button class="btn-close" id="btn-close-reset-modal">&times;</button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="reset-user-id">
                 <div class="form-group">
-                    <label>Operator Account</label>
+                    <label data-i18n="lbl_operator_account">Operator Account</label>
                     <input type="text" class="input" id="reset-username-display" readonly style="background: var(--bg-surface-elevated); cursor: not-allowed; opacity: 0.85;">
                 </div>
                 <div class="form-group">
-                    <label>New Password (Min 8 Characters)</label>
+                    <label data-i18n="lbl_new_password">New Password (Min 8 Characters)</label>
                     <input type="password" class="input" id="reset-new-password" placeholder="••••••••••••" required>
                 </div>
                 <div class="form-group">
-                    <label>Confirm New Password</label>
+                    <label data-i18n="lbl_confirm_password">Confirm New Password</label>
                     <input type="password" class="input" id="reset-confirm-password" placeholder="••••••••••••" required>
                 </div>
                 <div id="reset-password-error" class="alert-box alert-danger" style="display: none; margin-top: 8px; font-size: 0.85rem;"></div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" id="btn-cancel-reset-modal">Cancel</button>
-                <button class="btn btn-primary" id="btn-save-reset-password">Update Password</button>
+                <button class="btn btn-outline" id="btn-cancel-reset-modal" data-i18n="btn_cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-save-reset-password" data-i18n="btn_update_password">Update Password</button>
             </div>
         </div>
     </div>
@@ -1970,14 +1970,14 @@
                             <input type="radio" name="export_time_field" value="event_timestamp" checked>
                             <div class="radio-card-content">
                                 <strong data-i18n="export_field_event">Olay Zamanı (Cihazın Ürettiği Log Zamanı - event_timestamp)</strong>
-                                <small>Firewall/sunucu cihazının log mesajı içine yazdığı asıl oluşma saati</small>
+                                <small data-i18n="export_help_event">Firewall/sunucu cihazının log mesajı içine yazdığı asıl oluşma saati</small>
                             </div>
                         </label>
                         <label class="radio-card">
                             <input type="radio" name="export_time_field" value="received_at">
                             <div class="radio-card-content">
                                 <strong data-i18n="export_field_received">Alınma Zamanı (Sunucuya Geliş Zamanı - received_at)</strong>
-                                <small>Syslog daemonunun paketi ağ üzerinden teslim aldığı varış saati</small>
+                                <small data-i18n="export_help_received">Syslog daemonunun paketi ağ üzerinden teslim aldığı varış saati</small>
                             </div>
                         </label>
                     </div>
@@ -1994,21 +1994,21 @@
                             <input type="radio" name="export_format" value="bundle" checked>
                             <div class="radio-card-content">
                                 <strong data-i18n="export_format_bundle">5651 Uyum Paketi (.zip: Log + .zd + .sha256 + Resmi Sertifika)</strong>
-                                <small>Mahkemeler ve denetim organları için hazır tam uyumluluk arşivi</small>
+                                <small data-i18n="export_help_bundle">Mahkemeler ve denetim organları için hazır tam uyumluluk arşivi</small>
                             </div>
                         </label>
                         <label class="radio-card">
                             <input type="radio" name="export_format" value="archive">
                             <div class="radio-card-content">
                                 <strong data-i18n="export_format_archive">Sıkıştırılmış JSONL (.jsonl.gz ve .sha256)</strong>
-                                <small>Büyük veri analitiği ve SIEM aktarımları için deterministik gzip</small>
+                                <small data-i18n="export_help_archive">Büyük veri analitiği ve SIEM aktarımları için deterministik gzip</small>
                             </div>
                         </label>
                         <label class="radio-card">
                             <input type="radio" name="export_format" value="csv">
                             <div class="radio-card-content">
                                 <strong data-i18n="export_format_csv">CSV Tablo Dosyası (.csv)</strong>
-                                <small>Excel veya tablolama araçlarında kolay inceleme için virgülle ayrılmış veri</small>
+                                <small data-i18n="export_help_csv">Excel veya tablolama araçlarında kolay inceleme için virgülle ayrılmış veri</small>
                             </div>
                         </label>
                     </div>
@@ -2167,39 +2167,39 @@
                         </div>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; font-size: 12px;">
                             <div>
-                                <span class="text-muted">Severity:</span>
+                                <span class="text-muted" data-i18n="siem_inv_severity">Severity:</span>
                                 <span id="siem-inv-severity" class="badge badge-danger">CRITICAL</span>
                             </div>
                             <div>
-                                <span class="text-muted">Risk Score:</span>
+                                <span class="text-muted" data-i18n="siem_inv_risk">Risk Score:</span>
                                 <span id="siem-inv-risk" style="font-weight: 600; color: var(--accent);">85 / 100</span>
                             </div>
                             <div>
-                                <span class="text-muted">Attacker IP:</span>
+                                <span class="text-muted" data-i18n="siem_inv_attacker_ip">Attacker IP:</span>
                                 <span id="siem-inv-src-ip" class="mono-code" style="font-weight: 600;">-</span>
                             </div>
                             <div>
-                                <span class="text-muted">Target User:</span>
+                                <span class="text-muted" data-i18n="siem_inv_target_user">Target User:</span>
                                 <span id="siem-inv-user" style="font-weight: 600;">-</span>
                             </div>
                             <div>
-                                <span class="text-muted">Target Device:</span>
+                                <span class="text-muted" data-i18n="siem_inv_target_device">Target Device:</span>
                                 <span id="siem-inv-device" style="font-weight: 600;">-</span>
                             </div>
                             <div>
-                                <span class="text-muted">MITRE Technique:</span>
+                                <span class="text-muted" data-i18n="siem_inv_mitre">MITRE Technique:</span>
                                 <span id="siem-inv-mitre" class="badge badge-outline">-</span>
                             </div>
                             <div>
-                                <span class="text-muted">Event Count:</span>
+                                <span class="text-muted" data-i18n="siem_inv_event_count">Event Count:</span>
                                 <span id="siem-inv-count" style="font-weight: 600;">-</span>
                             </div>
                             <div>
-                                <span class="text-muted">Timeline:</span>
+                                <span class="text-muted" data-i18n="siem_inv_timeline">Timeline:</span>
                                 <span id="siem-inv-timeline" class="text-muted">-</span>
                             </div>
                             <div>
-                                <span class="text-muted">Tenant:</span>
+                                <span class="text-muted" data-i18n="siem_inv_tenant">Tenant:</span>
                                 <span id="siem-inv-tenant" class="badge badge-outline" style="font-weight: 600;">🏢 default</span>
                             </div>
                         </div>
@@ -2209,11 +2209,11 @@
                 <!-- Triage Toolbar -->
                 <div class="panel" style="margin-bottom: 16px;">
                     <div class="panel-header">
-                        <h4 style="margin: 0; font-size: 13px;">🎯 Incident Triage & Case Status</h4>
+                        <h4 style="margin: 0; font-size: 13px;" data-i18n="siem_triage_title">🎯 Incident Triage & Case Status</h4>
                     </div>
                     <div class="panel-body" style="padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <label style="font-size: 12px; font-weight: 600;">Status:</label>
+                            <label style="font-size: 12px; font-weight: 600;" data-i18n="siem_lbl_status">Status:</label>
                             <select id="siem-inv-status-select" class="form-input" style="padding: 4px 10px; font-size: 13px;">
                                 <option value="NEW">NEW</option>
                                 <option value="INVESTIGATING">INVESTIGATING</option>
@@ -2222,17 +2222,17 @@
                             </select>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <label style="font-size: 12px; font-weight: 600;">Assigned To:</label>
+                            <label style="font-size: 12px; font-weight: 600;" data-i18n="siem_lbl_assigned">Assigned To:</label>
                             <input type="text" id="siem-inv-assigned-input" class="form-input" style="padding: 4px 10px; font-size: 13px; width: 140px;" value="admin">
                         </div>
-                        <button class="btn btn-primary btn-sm" id="btn-save-siem-status">Save Status & Assignment</button>
+                        <button class="btn btn-primary btn-sm" id="btn-save-siem-status" data-i18n="btn_save_siem_status">Save Status & Assignment</button>
                     </div>
                 </div>
 
                 <!-- Forensic Evidence Logs -->
                 <div class="panel" style="margin-bottom: 16px;">
                     <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-                        <h4 style="margin: 0; font-size: 13px;">🔍 Forensic Evidence Logs (Triggering Syslog Events)</h4>
+                        <h4 style="margin: 0; font-size: 13px;" data-i18n="siem_forensic_title">🔍 Forensic Evidence Logs (Triggering Syslog Events)</h4>
                         <span class="badge badge-outline" id="siem-inv-evidence-count">0 events</span>
                     </div>
                     <div class="panel-body" style="padding: 0;">
@@ -2243,7 +2243,7 @@
                 <!-- Analyst Investigation Notes -->
                 <div class="panel">
                     <div class="panel-header">
-                        <h4 style="margin: 0; font-size: 13px;">📝 Analyst Investigation Notes</h4>
+                        <h4 style="margin: 0; font-size: 13px;" data-i18n="siem_notes_title">📝 Analyst Investigation Notes</h4>
                     </div>
                     <div class="panel-body" style="padding: 14px;">
                         <div id="siem-inv-notes-stream" style="max-height: 180px; overflow-y: auto; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
@@ -2251,8 +2251,8 @@
                         </div>
 
                         <div style="display: flex; gap: 8px;">
-                            <textarea id="siem-inv-new-note" class="form-input" rows="2" placeholder="Add forensic observation, mitigation steps, or IOC analysis..." style="font-size: 12px; flex: 1; resize: none;"></textarea>
-                            <button class="btn btn-primary" id="btn-add-siem-note" style="align-self: flex-end; white-space: nowrap;">Add Note</button>
+                            <textarea id="siem-inv-new-note" class="form-input" rows="2" data-i18n-placeholder="ph_siem_new_note" placeholder="Add forensic observation, mitigation steps, or IOC analysis..." style="font-size: 12px; flex: 1; resize: none;"></textarea>
+                            <button class="btn btn-primary" id="btn-add-siem-note" style="align-self: flex-end; white-space: nowrap;" data-i18n="btn_add_note">Add Note</button>
                         </div>
                     </div>
                 </div>
@@ -2497,26 +2497,26 @@
                 <!-- Summary Header Stats -->
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; background: rgba(0, 0, 0, 0.2); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color);">
                     <div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total Host Load</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;" data-i18n="cpu_host_load">Total Host Load</div>
                         <div style="font-size: 1.4rem; font-weight: 700;" class="text-cyan" id="cpu-modal-total-pct">0.0%</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">CPU Cores</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;" data-i18n="cpu_cores_label">CPU Cores</div>
                         <div style="font-size: 1.4rem; font-weight: 700;" id="cpu-modal-core-count">0</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Go Worker Threads</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;" data-i18n="cpu_worker_threads">Go Worker Threads</div>
                         <div style="font-size: 1.4rem; font-weight: 700; color: #3b82f6;" id="cpu-modal-maxprocs">0</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Core Reservation</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;" data-i18n="cpu_reservation">Core Reservation</div>
                         <div style="font-size: 0.85rem; font-weight: 600; margin-top: 4px;" id="cpu-modal-res-status">-</div>
                     </div>
                 </div>
 
                 <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-                    <span>Logical Processor Cores Breakdown</span>
-                    <span class="badge badge-secondary" style="font-weight: normal; font-size: 0.75rem;">Refreshed live every 2s</span>
+                    <span data-i18n="cpu_breakdown_title">Logical Processor Cores Breakdown</span>
+                    <span class="badge badge-secondary" style="font-weight: normal; font-size: 0.75rem;" data-i18n="cpu_live_badge">Refreshed live every 2s</span>
                 </div>
 
                 <!-- Cores Grid -->
@@ -2525,7 +2525,7 @@
                 </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="cpu_footer_note">
                     🛡️ 1 CPU Core automatically reserved for Host OS & SSH Management Interface
                 </div>
                 <button class="btn btn-secondary" onclick="closeCPUDetailsModal()" data-i18n="btn_close">Close</button>
@@ -2550,11 +2550,11 @@
                 <!-- Summary Header Stats -->
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; background: rgba(0, 0, 0, 0.2); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color);">
                     <div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Inbound Bandwidth</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;" data-i18n="net_in_bw">Inbound Bandwidth</div>
                         <div style="font-size: 1.4rem; font-weight: 700; color: #22c55e;" id="net-modal-in-rate">↓ 0 KB/s</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Outbound Bandwidth</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;" data-i18n="net_out_bw">Outbound Bandwidth</div>
                         <div style="font-size: 1.4rem; font-weight: 700; color: #eab308;" id="net-modal-out-rate">↑ 0 KB/s</div>
                     </div>
                     <div>
@@ -2602,12 +2602,12 @@
             <div class="modal-body" style="padding: 20px; max-height: 75vh; overflow-y: auto;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px;">
                     <div>
-                        <div style="font-size: 0.82rem; color: var(--text-muted);">Configured DC / Search Base:</div>
+                        <div style="font-size: 0.82rem; color: var(--text-muted);" data-i18n="ad_sync_dc_label">Configured DC / Search Base:</div>
                         <div style="font-size: 0.95rem; font-weight: 600; font-family: monospace;" id="ad-sync-dc-info">Loading AD status...</div>
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <button class="btn btn-outline" id="btn-ad-preview-users" onclick="loadADPreviewUsers()">🔍 Scan / Preview Users</button>
-                        <button class="btn btn-primary" id="btn-ad-run-sync" onclick="executeADSync()">📥 Import All to SIEM</button>
+                        <button class="btn btn-outline" id="btn-ad-preview-users" onclick="loadADPreviewUsers()" data-i18n="btn_ad_scan">🔍 Scan / Preview Users</button>
+                        <button class="btn btn-primary" id="btn-ad-run-sync" onclick="executeADSync()" data-i18n="btn_ad_import">📥 Import All to SIEM</button>
                     </div>
                 </div>
 
@@ -2632,7 +2632,7 @@
                 </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="ad_footer_note">
                     Domain users will authenticate directly against Active Directory via Kerberos/LDAP bind.
                 </div>
                 <button class="btn btn-secondary" onclick="closeADSyncModal()" data-i18n="btn_close">Close</button>
@@ -2656,7 +2656,7 @@
             <div class="modal-body" style="padding: 20px;">
                 <!-- Compatible apps banner -->
                 <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.8rem; text-align: center;">
-                    <span style="color: var(--text-muted);">Compatible Apps:</span>
+                    <span style="color: var(--text-muted);" data-i18n="lbl_compatible_apps">Compatible Apps:</span>
                     <strong>MS Authenticator</strong> &bull;
                     <strong>Google Auth</strong> &bull;
                     <strong>WatchGuard AuthPoint</strong> &bull;
@@ -2665,8 +2665,8 @@
 
                 <div id="mfa-setup-step1">
                     <div style="text-align: center; margin-bottom: 16px;">
-                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
-                            <strong>Step 1:</strong> Scan this QR code using any of the authenticator apps above:
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;" data-i18n="lbl_mfa_step1">
+                            Step 1: Scan this QR code using any of the authenticator apps above:
                         </p>
                         <div style="display: inline-block; padding: 12px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">
                             <img id="mfa-qr-img" src="" width="180" height="180" alt="MFA QR Code" style="display: block;">
@@ -2674,10 +2674,10 @@
                     </div>
 
                     <div style="background: var(--bg-surface-elevated); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 16px;">
-                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Or enter secret key manually:</div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);" data-i18n="lbl_mfa_manual">Or enter secret key manually:</div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
                             <code style="font-size: 0.95rem; font-weight: 700; color: #818cf8; letter-spacing: 1.5px;" id="mfa-secret-display">--------</code>
-                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="copyMFASecret()">Copy Key</button>
+                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="copyMFASecret()" data-i18n="btn_copy_key">Copy Key</button>
                         </div>
                     </div>
 
@@ -3021,7 +3021,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.16"></script>
-    <script src="/static/js/app.js?v=1.5.16"></script>
+    <script src="/static/js/translations.js?v=1.5.17"></script>
+    <script src="/static/js/app.js?v=1.5.17"></script>
 </body>
 </html>

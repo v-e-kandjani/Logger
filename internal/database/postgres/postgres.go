@@ -247,6 +247,42 @@ func (db *DB) CreateDevice(ctx context.Context, d *models.Device) error {
 	return nil
 }
 
+// UpdateDevice updates an existing registered device, including reassigning its tenant
+func (db *DB) UpdateDevice(ctx context.Context, d *models.Device) error {
+	if d.GroupID == nil && d.GroupName != "" {
+		var gid uuid.UUID
+		err := db.pool.QueryRow(ctx, `
+			INSERT INTO device_groups (name, description)
+			VALUES ($1, 'Auto-created group')
+			ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+			RETURNING id`, d.GroupName).Scan(&gid)
+		if err == nil {
+			d.GroupID = &gid
+		}
+	}
+	if d.TenantSlug == "" {
+		d.TenantSlug = "default"
+	}
+
+	query := `
+		UPDATE devices
+		SET name = COALESCE(NULLIF($1, ''), name),
+		    vendor = COALESCE(NULLIF($2, ''), vendor),
+		    device_type = COALESCE(NULLIF($3, ''), device_type),
+		    group_id = COALESCE($4, group_id),
+		    tenant_slug = $5,
+		    updated_at = NOW()
+		WHERE id = $6
+		RETURNING ip_address`
+	var ip string
+	err := db.pool.QueryRow(ctx, query, d.Name, d.Vendor, d.DeviceType, d.GroupID, d.TenantSlug, d.ID).Scan(&ip)
+	if err != nil {
+		return err
+	}
+	d.IPAddress = ip
+	return nil
+}
+
 func (db *DB) UpdateDeviceLastSeen(ctx context.Context, ipStr string, seenTime time.Time) error {
 	query := `UPDATE devices SET last_seen_at = $1 WHERE ip_address = $2::inet`
 	_, err := db.pool.Exec(ctx, query, seenTime, ipStr)

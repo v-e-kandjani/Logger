@@ -13,8 +13,10 @@
 ## 🌐 Language / Dil
 - 🇬🇧 **[English Documentation (Current)](README.md)**
 - 🇹🇷 **[Türkçe Dokümantasyon için Tıklayın](README.tr.md)**
-- 📖 **[Installation Guide (HOW_TO_INSTALL.md)](HOW_TO_INSTALL.md)**
-- ⚡ **[Ubuntu Installer Script (install.sh)](install.sh)**
+- 📖 **[Docker Installation Guide (HOW_TO_INSTALL.md)](HOW_TO_INSTALL.md)**
+- ⚡ **[Docker Ubuntu Installer Script (install.sh)](install.sh)**
+- 🖥️ **[Standalone Bare-Metal (No Docker) Guide (STANDALONE_INSTALL.md)](STANDALONE_INSTALL.md)**
+- 🚀 **[Standalone Linux Installer (install_standalone.sh)](install_standalone.sh)**
 
 ---
 
@@ -259,6 +261,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
 ---
+
+- **v1.5.17** (Standalone Bare-Metal Installer without Docker, Tenant Device Assignment & Full UI Localization):
+  - **Standalone Bare-Metal Linux Installer (`install_standalone.sh` & `STANDALONE_INSTALL.md`)**: Complete support for installing and running the entire platform directly on Ubuntu 20.04, 22.04, 24.04, and 26.04 LTS (and Debian 11/12) without Docker. Automatically installs native PostgreSQL, official ClickHouse Server, OpenJDK 17 JRE Headless, builds Go binaries, provisions schemas, and configures `syslog-platform.service` under systemd.
+  - **Device Tenant Assignment & Reassignment**: Enabled assigning registered devices and auto-discovered network sources to specific tenants (e.g., `1ware`). Added `PUT /api/v1/devices` and `UpdateDevice` to reassign tenants, change groups, and update device metadata with atomic cache refresh.
+  - **Device Editing & Onboarding UX**: Added `✏️ Edit` action button on the devices table with prefilled modal and tenant selector; single-device and bulk onboarding (`⚡ Auto-Onboard All`) automatically tag devices with the active tenant scope.
+  - **Comprehensive Multi-Modal Localization (TR / EN)**: Audited and localized all remaining modals and panels: Device Registration/Edit, User Creation, Password Reset, Custom 5651 Export, SIEM Incident Investigation, CPU & Network Telemetry, and Active Directory Sync.
 
 - **v1.5.16** (Multi-Tenant Log Archive Isolation & Comprehensive Page Document Localization):
   - **Multi-Tenant 5651 Log Archive Isolation**: Extended legal log archives (`log_archives.tenant_slug`) and ClickHouse extraction queries to strictly isolate archive records per customer/tenant. Hourly auto-archiving automatically generates discrete archives for each active tenant in that time slice.

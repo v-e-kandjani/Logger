@@ -17,9 +17,11 @@
 ## 📌 Hızlı Bağlantılar
 
 - 🇬🇧 **[English Documentation (İngilizce Dokümantasyon)](README.md)**
-- 📖 **[Ayrıntılı Kurulum Kılavuzu (HOW_TO_INSTALL.md)](HOW_TO_INSTALL.md)**
+- 📖 **[Docker Kurulum Kılavuzu (HOW_TO_INSTALL.md)](HOW_TO_INSTALL.md)**
+- ⚡ **[Docker Kurulum Betiği (install.sh)](install.sh)**
+- 🖥️ **[Standalone (Docker'sız) Kurulum Kılavuzu (STANDALONE_INSTALL.md)](STANDALONE_INSTALL.md)**
+- 🚀 **[Standalone Linux Kurulum Betiği (install_standalone.sh)](install_standalone.sh)**
 - 🔄 **[Sistem Güncelleme & Bakım Kılavuzu (UPGRADE.md)](UPGRADE.md)**
-- ⚡ **[Otomatik Kurulum Betiği (install.sh)](install.sh)**
 
 ---
 
@@ -248,6 +250,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
 ---
+
+- **v1.5.17** (Docker Olmadan Doğrudan Standalone Linux Kurulumu, Cihaz Kiracı Atama & Tam Arayüz Yerelleştirmesi):
+  - **Standalone (Docker Olmadan) Linux Kurulum Betiği (`install_standalone.sh` & `STANDALONE_INSTALL.md`)**: Ubuntu 20.04, 22.04, 24.04 ve 26.04 LTS (ile Debian 11/12) üzerinde Docker çalıştırmadan platformun yerel servis olarak kurulması sağlandı. Yerel PostgreSQL, ClickHouse Server, OpenJDK 17 JRE Headless ve Go servislerini otomatik kurar; şemaları uygular ve `syslog-platform.service` systemd servisini yapılandırır.
+  - **Cihaz Kiracı Atama ve Güncelleme**: Kayıtlı ve keşfedilen/bilinmeyen ağ cihazlarının istenen kiracıya (örn. `1ware`) atanabilmesi sağlandı. Cihaz grubu, üretici ve kiracı taşımalarını destekleyen `PUT /api/v1/devices` uç noktası ve `UpdateDevice` metodu geliştirildi.
+  - **Cihaz Düzenleme & Otomatik Ekleme**: Kayıtlı cihazlar tablosuna `✏️ Düzenle` butonu eklendi; tekli ve toplu cihaz ekleme (`⚡ Otomatik Ekle`) işlemlerinde cihazlar aktif kiracı bağlamına otomatik atanır.
+  - **Kapsamlı Tüm Modallar İçin Çok Dilli Destek (TR / EN)**: Cihaz Ekleme/Düzenleme, Kullanıcı Ekleme, Parola Sıfırlama, Özel 5651 Dışa Aktarma, SIEM Olay İnceleme, CPU & Ağ Telemetri ve Active Directory pencereleri dahil tüm arayüz bileşenleri için eksiksiz yerelleştirme sağlandı.
 
 - **v1.5.16** (Çoklu Kiracı Log Arşiv İzolasyonu ve Kapsamlı Sayfa İçi Doküman Yerelleştirmesi):
   - **Çoklu Kiracı 5651 Log Arşiv İzolasyonu**: Yasal log arşivleri (`log_archives.tenant_slug`) ve ClickHouse veri çekme sorguları kiracı bazında tamamen izole edildi. Saatlik otomatik arşivleme işçisi her dilimde etkinlik üreten kiracıları tespit ederek bağımsız kiracı arşivleri üretir.

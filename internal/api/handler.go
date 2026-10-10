@@ -720,6 +720,34 @@ func (h *Handler) handleDevices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Method == http.MethodPut {
+		var d models.Device
+		if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if d.ID == uuid.Nil {
+			http.Error(w, "invalid or missing device id", http.StatusBadRequest)
+			return
+		}
+		// If non-root tenant user tries to update, enforce tenant ownership
+		if sess, ok := h.getSession(r); ok && !sess.IsRootOperator() {
+			if sess.TenantSlug != "" {
+				d.TenantSlug = sess.TenantSlug
+			}
+		}
+		if d.TenantSlug == "" {
+			d.TenantSlug = "default"
+		}
+		if err := h.pgDB.UpdateDevice(ctx, &d); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = h.deviceCache.Refresh(ctx)
+		writeJSON(w, http.StatusOK, d)
+		return
+	}
+
 	if r.Method == http.MethodDelete {
 		idStr := r.URL.Query().Get("id")
 		devID, err := uuid.Parse(idStr)
@@ -1072,6 +1100,22 @@ func (h *Handler) handleAutoOnboardAll(w http.ResponseWriter, r *http.Request) {
 	onboardedCount := 0
 	var registeredList []models.Device
 
+	targetTenant := h.tenantScope(r)
+	var bodyReq struct {
+		Tenant string `json:"tenant"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&bodyReq)
+		if bodyReq.Tenant != "" {
+			if sess, ok := h.getSession(r); ok && sess.IsRootOperator() {
+				targetTenant = bodyReq.Tenant
+			}
+		}
+	}
+	if targetTenant == "" || targetTenant == "all" || targetTenant == "*" {
+		targetTenant = "default"
+	}
+
 	for _, s := range sources {
 		detection := detector.Detect(s.LastRawSample, s.Hostname, "")
 		vendor := s.DetectedVendor
@@ -1099,7 +1143,7 @@ func (h *Handler) handleAutoOnboardAll(w http.ResponseWriter, r *http.Request) {
 			IsEnabled:        true,
 			RetentionDays:    365,
 			TimestampPolicy:  "HOURLY",
-			TenantSlug:       h.tenantScope(r),
+			TenantSlug:       targetTenant,
 		}
 
 		if err := h.pgDB.CreateDevice(ctx, &d); err == nil {

@@ -480,6 +480,7 @@ async function loadDevices() {
             return;
         }
 
+        window._registeredDevices = devices;
         tbody.innerHTML = devices.map(d => `
             <tr>
                 <td><strong>${escapeHtml(d.name)}</strong>${d.tenant_slug && d.tenant_slug !== 'default' ? ` <span class="tenant-chip" title="Kiracı / Tenant">🏢 ${escapeHtml(d.tenant_slug)}</span>` : ''}</td>
@@ -494,6 +495,7 @@ async function loadDevices() {
                 <td>${d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : 'Never'}</td>
                 <td><span class="badge badge-primary">${d.timestamp_policy}</span></td>
                 <td>
+                    <button class="btn btn-outline" style="padding: 4px 8px; margin-right: 4px;" onclick="editDevice('${d.id}')" title="Edit Device & Assign Tenant">✏️ Edit</button>
                     <button class="btn btn-outline" style="padding: 4px 8px; margin-right: 4px;" onclick="autoDetectDevice('${d.id}', '${d.ip_address}')" title="Auto-Detect Vendor & Type from Log Stream">🔍 Detect</button>
                     <button class="btn btn-outline text-red" style="padding: 4px 8px;" onclick="deleteDevice('${d.id}')">Delete</button>
                 </td>
@@ -503,6 +505,41 @@ async function loadDevices() {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center text-red">Failed to load devices: ${e.message}</td></tr>`;
     }
 }
+
+window.editDevice = (id) => {
+    const d = (window._registeredDevices || []).find(x => x.id === id);
+    if (!d) return;
+    const modal = document.getElementById('device-modal');
+    const badge = document.getElementById('modal-auto-discovery-badge');
+    if (badge) badge.style.display = 'none';
+
+    const nameInp = document.getElementById('dev-name');
+    const ipInp = document.getElementById('dev-ip');
+    const vendorSel = document.getElementById('dev-vendor');
+    const typeSel = document.getElementById('dev-type');
+    const groupSel = document.getElementById('dev-group');
+    const tenantSel = document.getElementById('dev-tenant');
+
+    if (nameInp) nameInp.value = d.name || '';
+    if (ipInp) {
+        ipInp.value = d.ip_address || '';
+        ipInp.disabled = true;
+    }
+    if (vendorSel && d.vendor) vendorSel.value = d.vendor;
+    if (typeSel && d.device_type) typeSel.value = d.device_type;
+    if (groupSel && d.group_name) groupSel.value = d.group_name;
+
+    populateDeviceTenantSelect();
+    if (tenantSel) tenantSel.value = d.tenant_slug || 'default';
+
+    window._editingDeviceId = d.id;
+    const title = modal.querySelector('.modal-header h3');
+    if (title) title.textContent = window.i18n ? window.i18n.t('modal_edit_device_title', 'Edit Device & Assign Tenant') : 'Edit Device & Assign Tenant';
+    const saveBtn = document.getElementById('btn-save-device');
+    if (saveBtn) saveBtn.textContent = window.i18n ? window.i18n.t('btn_save_changes', 'Save Changes') : 'Save Changes';
+
+    if (modal) modal.style.display = 'flex';
+};
 
 window.deleteDevice = async (id) => {
     if (!confirm('Are you sure you want to delete this registered device?')) return;
@@ -608,6 +645,7 @@ async function loadUnregisteredSources() {
 }
 
 window.onboardDevice = (ip, sample = '', sourceObj = null) => {
+    window._editingDeviceId = null;
     const ipInput = document.getElementById('dev-ip');
     const nameInput = document.getElementById('dev-name');
     const vendorSelect = document.getElementById('dev-vendor');
@@ -617,7 +655,10 @@ window.onboardDevice = (ip, sample = '', sourceObj = null) => {
     const badgeText = document.getElementById('auto-discovery-badge-text');
     const confBadge = document.getElementById('auto-discovery-confidence-badge');
 
-    if (ipInput) ipInput.value = ip;
+    if (ipInput) {
+        ipInput.value = ip;
+        ipInput.disabled = false;
+    }
 
     let detectedVendor = (sourceObj && sourceObj.detected_vendor) || '';
     let detectedType = (sourceObj && sourceObj.detected_type) || '';
@@ -671,6 +712,12 @@ window.onboardDevice = (ip, sample = '', sourceObj = null) => {
         else groupSelect.value = 'Default';
     }
 
+    populateDeviceTenantSelect();
+    const tenantSel = document.getElementById('dev-tenant');
+    if (tenantSel && currentTenantContext && currentTenantContext !== 'all' && currentTenantContext !== '*') {
+        tenantSel.value = currentTenantContext;
+    }
+
     if (modalBadge) {
         if (detectedVendor || detectedType) {
             modalBadge.style.display = 'block';
@@ -686,6 +733,10 @@ window.onboardDevice = (ip, sample = '', sourceObj = null) => {
 
     const modal = document.getElementById('device-modal');
     if (modal) {
+        const title = modal.querySelector('.modal-header h3');
+        if (title) title.textContent = window.i18n ? window.i18n.t('modal_register_source', 'Register Syslog Source') : 'Register Syslog Source';
+        const saveBtn = document.getElementById('btn-save-device');
+        if (saveBtn) saveBtn.textContent = window.i18n ? window.i18n.t('btn_save_asset', 'Save Asset') : 'Save Asset';
         modal.style.display = 'flex';
     }
 };
@@ -803,32 +854,45 @@ function initDeviceModal() {
     const addBtn = document.getElementById('btn-add-device-modal');
     if (addBtn) {
         addBtn.addEventListener('click', () => {
+            window._editingDeviceId = null;
             const badge = document.getElementById('modal-auto-discovery-badge');
             if (badge) badge.style.display = 'none';
             const nameInp = document.getElementById('dev-name');
             const ipInp = document.getElementById('dev-ip');
             if (nameInp) nameInp.value = '';
-            if (ipInp) ipInp.value = '';
+            if (ipInp) {
+                ipInp.value = '';
+                ipInp.disabled = false;
+            }
+            const title = modal.querySelector('.modal-header h3');
+            if (title) title.textContent = window.i18n ? window.i18n.t('modal_register_source', 'Register Syslog Source') : 'Register Syslog Source';
+            const saveBtn = document.getElementById('btn-save-device');
+            if (saveBtn) saveBtn.textContent = window.i18n ? window.i18n.t('btn_save_asset', 'Save Asset') : 'Save Asset';
             populateDeviceTenantSelect();
             modal.style.display = 'flex';
         });
     }
     const closeBtn = document.getElementById('btn-close-modal');
-    if (closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+    if (closeBtn) closeBtn.addEventListener('click', () => { window._editingDeviceId = null; modal.style.display = 'none'; });
     const cancelBtn = document.getElementById('btn-cancel-modal');
-    if (cancelBtn) cancelBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { window._editingDeviceId = null; modal.style.display = 'none'; });
 
     const btnOnboardAll = document.getElementById('btn-onboard-all-unreg');
     if (btnOnboardAll) {
         btnOnboardAll.addEventListener('click', async () => {
-            if (!confirm('Automatically onboard and register all auto-discovered network assets?')) return;
+            const targetTenant = (currentTenantContext && currentTenantContext !== 'all' && currentTenantContext !== '*') ? currentTenantContext : 'default';
+            if (!confirm(`Automatically onboard and register all auto-discovered network assets into tenant '${targetTenant}'?`)) return;
             btnOnboardAll.disabled = true;
             btnOnboardAll.innerHTML = '<span>⏳</span> Onboarding Assets...';
             try {
-                const res = await fetch('/api/v1/unregistered/onboard-all', { method: 'POST' });
+                const res = await fetch('/api/v1/unregistered/onboard-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tenant: targetTenant })
+                });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed onboarding assets');
-                showToast(`✓ Successfully auto-onboarded ${data.onboarded_count || 0} discovered device(s)!`, 'success');
+                showToast(`✓ Successfully auto-onboarded ${data.onboarded || 0} discovered device(s) into '${targetTenant}'!`, 'success');
                 loadUnregisteredSources();
                 loadDevices();
             } catch (e) {
@@ -841,6 +905,7 @@ function initDeviceModal() {
     }
 
     document.getElementById('btn-save-device').addEventListener('click', async () => {
+        const isEdit = !!window._editingDeviceId;
         const payload = {
             name: document.getElementById('dev-name').value.trim(),
             ip_address: document.getElementById('dev-ip').value.trim(),
@@ -848,17 +913,21 @@ function initDeviceModal() {
             device_type: document.getElementById('dev-type').value,
             group_name: document.getElementById('dev-group') ? document.getElementById('dev-group').value : 'Default',
         };
+        if (isEdit) {
+            payload.id = window._editingDeviceId;
+        }
         const tenantSel = document.getElementById('dev-tenant');
         if (tenantSel && tenantSel.value) payload.tenant_slug = tenantSel.value;
         try {
             const res = await fetch('/api/v1/devices', {
-                method: 'POST',
+                method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
             if (!res.ok) throw new Error(await res.text());
             modal.style.display = 'none';
-            showToast('✓ Device asset registered successfully', 'success');
+            window._editingDeviceId = null;
+            showToast(isEdit ? '✓ Device & Tenant assignment updated successfully' : '✓ Device asset registered successfully', 'success');
             loadDevices();
             loadUnregisteredSources();
         } catch (e) {
@@ -2584,6 +2653,8 @@ window.onLanguageChanged = (lang) => {
         if (typeof loadSIEMAlerts === 'function') loadSIEMAlerts();
     } else if (activeTab === 'devices') {
         if (typeof loadDevices === 'function') loadDevices();
+    } else if (activeTab === 'unregistered') {
+        if (typeof loadUnregisteredSources === 'function') loadUnregisteredSources();
     }
 };
 
