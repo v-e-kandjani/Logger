@@ -273,7 +273,7 @@ func (db *DB) UpdateDevice(ctx context.Context, d *models.Device) error {
 		    tenant_slug = $5,
 		    updated_at = NOW()
 		WHERE id = $6
-		RETURNING ip_address`
+		RETURNING ip_address::text`
 	var ip string
 	err := db.pool.QueryRow(ctx, query, d.Name, d.Vendor, d.DeviceType, d.GroupID, d.TenantSlug, d.ID).Scan(&ip)
 	if err != nil {
