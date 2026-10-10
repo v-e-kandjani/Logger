@@ -249,6 +249,14 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.15** (Çoklu Kiracı SIEM & SOC İzolasyonu, Kiracıya Özel Güvenlik Alarmları ve Canlı Tehdit Akışı):
+  - **Çoklu Kiracı SIEM Alarm İzolasyonu**: SIEM alarmları (`siem_alerts.tenant_slug`) ve normalize edilmiş olaylar kiracı sahipliği taşır. Alarmlar, vaka sayıları, SOC metrikleri ve adli kanıt logları kiracılara göre tamamen izole edilmiştir.
+  - **Kiracıya Özel Korelasyon Havuzları**: Kayan pencereli korelasyon motoru kova anahtarlarını `tenant::rule_id::group_val` olarak ayrıştırır. Kayan pencere eşikleri ve parola püskürtme sayaçları kiracı bazında çalışır; farklı kiracılar arasında eşik sızıntısı veya alarm tetiklenmesi kesin olarak önlenir.
+  - **Kiracı Filtreli SOC Genel Bakış ve Telemetri**: `/api/v1/siem/overview`, `/api/v1/siem/alerts` ve MITRE ATT&CK kapsam raporları aktif kiracı bağlamına (`X-Tenant` başlığı / `?tenant=`) göre sunucu tarafında filtrelenir. Root yöneticiler tüm alarmları küresel görebilir veya belirli bir kiracıya odaklanabilir.
+  - **Canlı WebSocket Alarm Filtresi**: Gerçek zamanlı SOC alarm WebSocket akışı (`/api/v1/siem/live?tenant=...`) alarmları kiracıya göre anlık filtreler; analistler yalnızca kendi kiracılarına ait tehdit bildirimlerini alır.
+  - **Arayüzde SOC Çoklu Kiracı Deneyimi**: SIEM alarmları tablosunda kiracı çipleri (`🏢 {tenant}`) görüntülenir, adli inceleme penceresinde kiracı bilgisi yer alır ve kenar çubuğundan kiracı değiştirildiğinde tüm SOC telemetrisi, alarmlar ve aktif vaka rozetleri anında yenilenir.
+  - **Vaka Erişim Güvenliği**: `/api/v1/siem/alerts/{id}` detay, durum güncelleme ve inceleme notu uç noktaları emniyete alınarak kiracı kullanıcılarının diğer kurumlara ait alarmlara erişimi engellenir (HTTP 403 Forbidden).
+
 - **v1.5.14** (Gerçek Kiracı Veri İzolasyonu, Kenar Çubuğunda Kiracı Seçici, Sınırsız Root Kiracı, Çalışan Kural Optimizasyonu ve Sorgu Önbelleği Telemetrisi):
   - **Gerçek Çoklu Kiracı Veri İzolasyonu**: Loglar (ClickHouse `syslog_events.tenant`) ve cihazlar (`devices.tenant_slug`) artık kiracı sahipliği taşır. Edge proxy logları düğümün kiracısını, doğrudan syslog ise kayıtlı cihazın kiracısını alır. Arama, dashboard sayaçları, cihazlar, edge düğümleri, canlı akış ve EPS seçili kiracıya göre sunucu tarafında filtrelenir (`X-Tenant` başlığı / `?tenant=`). Kiracı kullanıcıları her zaman kendi kiracılarına kilitlidir.
   - **Kenar Çubuğunda Kiracı Seçici**: Kiracı bağlam seçici üst başlıktan kenar çubuğuna taşındı; seçili kiracının kullanımını (node · cihaz · EPS) ve kotasını gösterir, değiştirildiğinde tüm görünümler anında yenilenir. Kiracı yöneticileri için kilitlidir (🔒).

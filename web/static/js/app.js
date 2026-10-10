@@ -4296,13 +4296,19 @@ async function loadSIEMAlerts() {
             const mitreBadge = alert.mitre_technique ? `<span class="badge badge-mitre" title="${escapeHtml(alert.mitre_tactic || '')}">${escapeHtml(alert.mitre_technique)}</span>` : '<span class="text-muted">-</span>';
             const threatVector = `${escapeHtml(alert.source_ip || 'unknown')} &rarr; ${escapeHtml(alert.username || alert.device_name || alert.destination_ip || 'host')}`;
             const timeStr = formatRelativeTime(alert.created_at);
+            const tenantBadge = (alert.tenant && (currentTenantContext === 'all' || alert.tenant !== 'default'))
+                ? ` <span class="tenant-chip" title="Kiracı / Tenant" style="font-size: 11px; margin-left: 6px;">🏢 ${escapeHtml(alert.tenant)}</span>`
+                : '';
 
             return `
                 <tr>
                     <td>${sevBadge}</td>
                     <td style="font-size: 12px; color: var(--text-muted);">${timeStr}</td>
                     <td>
-                        <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(alert.rule_name)}</div>
+                        <div style="font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                            <span>${escapeHtml(alert.rule_name)}</span>
+                            ${tenantBadge}
+                        </div>
                         <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(alert.category)}</div>
                     </td>
                     <td>${mitreBadge}</td>
@@ -4377,6 +4383,10 @@ async function openSIEMInvestigate(alertID) {
         document.getElementById('siem-inv-mitre').textContent = `${alert.mitre_technique || 'N/A'} (${alert.mitre_tactic || 'General'})`;
         document.getElementById('siem-inv-count').textContent = `${alert.event_count || 1} logs matched`;
         document.getElementById('siem-inv-timeline').textContent = `${new Date(alert.first_seen).toLocaleTimeString()} - ${new Date(alert.last_seen).toLocaleTimeString()}`;
+        const tenantEl = document.getElementById('siem-inv-tenant');
+        if (tenantEl) {
+            tenantEl.textContent = `🏢 ${alert.tenant || 'default'}`;
+        }
 
         // Triage Controls
         document.getElementById('siem-inv-status-select').value = alert.status || 'NEW';
@@ -4647,7 +4657,7 @@ async function runSIEMSimulation(scenario) {
 
 function connectSIEMLiveStream() {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${proto}//${window.location.host}/api/v1/siem/live`;
+    const wsUrl = `${proto}//${window.location.host}/api/v1/siem/live${tenantQuerySuffix()}`;
 
     try {
         siemLiveSocket = new WebSocket(wsUrl);
@@ -5301,6 +5311,13 @@ function refreshTenantScopedViews() {
     const activeNav = document.querySelector('.nav-item.active');
     if (activeNav && activeNav.getAttribute('data-tab') === 'search') {
         document.getElementById('btn-search-exec')?.click();
+    }
+    // SIEM overview, alerts, MITRE matrix, and live alert websocket
+    if (typeof loadSIEMOverview === 'function') { try { loadSIEMOverview(); } catch (e) { /* noop */ } }
+    if (typeof loadSIEMAlerts === 'function') { try { loadSIEMAlerts(); } catch (e) { /* noop */ } }
+    if (typeof loadSIEMMitreMatrix === 'function') { try { loadSIEMMitreMatrix(); } catch (e) { /* noop */ } }
+    if (siemLiveSocket && siemLiveSocket.readyState <= 1) {
+        try { siemLiveSocket.close(); } catch (e) { /* noop */ }
     }
     populateDeviceTenantSelect();
 }

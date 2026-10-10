@@ -31,13 +31,15 @@ func (m *mockPersister) CreateOrUpdateSIEMAlert(ctx context.Context, alert *mode
 	return alert, nil
 }
 
-func (m *mockPersister) GetActiveSIEMAlertByRuleAndGroup(ctx context.Context, ruleID, groupKey string) (*models.SIEMAlert, error) {
+func (m *mockPersister) GetActiveSIEMAlertByRuleAndGroup(ctx context.Context, ruleID, groupKey, tenant string) (*models.SIEMAlert, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, a := range m.alerts {
 		if a.RuleID == ruleID && (a.SourceIP == groupKey || a.Username == groupKey || a.DeviceName == groupKey || groupKey == "global") {
-			if a.Status == "NEW" || a.Status == "IN_PROGRESS" {
-				return a, nil
+			if tenant == "" || tenant == "all" || a.Tenant == tenant || (a.Tenant == "" && tenant == "default") {
+				if a.Status == "NEW" || a.Status == "IN_PROGRESS" {
+					return a, nil
+				}
 			}
 		}
 	}
@@ -223,3 +225,94 @@ func TestCorrelationEngine_AlertDeduplicationAndAggregation(t *testing.T) {
 		t.Errorf("expected aggregated event count to be 20, got %d", lastCount)
 	}
 }
+
+func TestCorrelationEngine_MultiTenantIsolation(t *testing.T) {
+	norm := normalizer.NewNormalizer()
+	mock := &mockPersister{}
+	engine := NewEngine(norm, mock)
+	defer engine.Stop()
+
+	alertCh := engine.SubscribeAlerts()
+	defer engine.UnsubscribeAlerts(alertCh)
+
+	now := time.Now().UTC()
+	sameIP := "192.168.10.50"
+
+	// Tenant A sends 3 events (threshold is 5 for AUTH-001)
+	for i := 0; i < 3; i++ {
+		engine.Evaluate(&models.NormalizedEvent{
+			EventID:        uuid.New(),
+			Timestamp:      now.Add(time.Duration(i) * time.Second),
+			SourceIP:       sameIP,
+			EventCategory:  "authentication",
+			EventAction:    "login-failed",
+			EventOutcome:   "failure",
+			Username:       "admin",
+			Tenant:         "tenant-a",
+			Severity:       "HIGH",
+			RiskScore:      70,
+			MitreTactic:    "Credential Access",
+			MitreTechnique: "T1110",
+			RawMessage:     "Failed password for admin",
+		})
+	}
+
+	// Tenant B sends 3 events with the EXACT same IP
+	for i := 0; i < 3; i++ {
+		engine.Evaluate(&models.NormalizedEvent{
+			EventID:        uuid.New(),
+			Timestamp:      now.Add(time.Duration(i) * time.Second),
+			SourceIP:       sameIP,
+			EventCategory:  "authentication",
+			EventAction:    "login-failed",
+			EventOutcome:   "failure",
+			Username:       "admin",
+			Tenant:         "tenant-b",
+			Severity:       "HIGH",
+			RiskScore:      70,
+			MitreTactic:    "Credential Access",
+			MitreTechnique: "T1110",
+			RawMessage:     "Failed password for admin",
+		})
+	}
+
+	// Neither tenant should have triggered an alert yet (both at 3 < 5)
+	select {
+	case a := <-alertCh:
+		t.Fatalf("unexpected alert triggered early across tenant boundary: %+v", a)
+	case <-time.After(150 * time.Millisecond):
+		// Expected: no cross-tenant threshold leak
+	}
+
+	// Now Tenant A sends 2 more events -> reaches 5 -> should trigger alert for tenant-a only
+	for i := 3; i < 5; i++ {
+		engine.Evaluate(&models.NormalizedEvent{
+			EventID:        uuid.New(),
+			Timestamp:      now.Add(time.Duration(i) * time.Second),
+			SourceIP:       sameIP,
+			EventCategory:  "authentication",
+			EventAction:    "login-failed",
+			EventOutcome:   "failure",
+			Username:       "admin",
+			Tenant:         "tenant-a",
+			Severity:       "HIGH",
+			RiskScore:      70,
+			MitreTactic:    "Credential Access",
+			MitreTechnique: "T1110",
+			RawMessage:     "Failed password for admin",
+		})
+	}
+
+	select {
+	case alert := <-alertCh:
+		if alert.Tenant != "tenant-a" {
+			t.Errorf("expected alert tenant to be tenant-a, got %s", alert.Tenant)
+		}
+		if alert.EventCount != 5 {
+			t.Errorf("expected event count 5, got %d", alert.EventCount)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for tenant-a alert")
+	}
+}
+

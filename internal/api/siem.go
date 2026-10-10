@@ -50,7 +50,8 @@ func (h *Handler) handleSIEMOverview(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := contextWithTimeout(r, 5*time.Second)
 	defer cancel()
 
-	stats, err := h.pgDB.GetSIEMOverviewStats(ctx)
+	scope := h.tenantScope(r)
+	stats, err := h.pgDB.GetSIEMOverviewStats(ctx, scope)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -79,7 +80,8 @@ func (h *Handler) handleSIEMAlerts(w http.ResponseWriter, r *http.Request) {
 		limit = 50
 	}
 
-	alerts, total, err := h.pgDB.ListSIEMAlerts(ctx, status, severity, search, limit, offset)
+	scope := h.tenantScope(r)
+	alerts, total, err := h.pgDB.ListSIEMAlerts(ctx, scope, status, severity, search, limit, offset)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -120,6 +122,17 @@ func (h *Handler) handleSIEMAlertDetail(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Alert not found"})
 		return
+	}
+
+	if scope := h.tenantScope(r); scope != "" {
+		alertTenant := alert.Tenant
+		if alertTenant == "" {
+			alertTenant = "default"
+		}
+		if alertTenant != scope {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
 	}
 
 	if notes == nil {
@@ -171,6 +184,22 @@ func (h *Handler) handleSIEMAlertStatus(w http.ResponseWriter, r *http.Request) 
 
 	ctx, cancel := contextWithTimeout(r, 5*time.Second)
 	defer cancel()
+
+	if scope := h.tenantScope(r); scope != "" {
+		existingAlert, _, err := h.pgDB.GetSIEMAlert(ctx, alertID)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "Alert not found"})
+			return
+		}
+		alertTenant := existingAlert.Tenant
+		if alertTenant == "" {
+			alertTenant = "default"
+		}
+		if alertTenant != scope {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	}
 
 	if err := h.pgDB.UpdateSIEMAlertStatus(ctx, alertID, req.Status, req.AssignedTo); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -278,6 +307,22 @@ func (h *Handler) handleSIEMAlertNotes(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := contextWithTimeout(r, 5*time.Second)
 	defer cancel()
 
+	if scope := h.tenantScope(r); scope != "" {
+		existingAlert, _, err := h.pgDB.GetSIEMAlert(ctx, alertID)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "Alert not found"})
+			return
+		}
+		alertTenant := existingAlert.Tenant
+		if alertTenant == "" {
+			alertTenant = "default"
+		}
+		if alertTenant != scope {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	}
+
 	if err := h.pgDB.AddSIEMIncidentNote(ctx, alertID, req.Author, req.Note); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -373,7 +418,8 @@ func (h *Handler) handleSIEMSimulate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := engine.SimulateScenario(req.Scenario); err != nil {
+	scope := h.tenantScope(r)
+	if _, err := engine.SimulateScenario(req.Scenario, scope); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
@@ -381,6 +427,7 @@ func (h *Handler) handleSIEMSimulate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message":  "Security scenario simulated successfully",
 		"scenario": req.Scenario,
+		"tenant":   scope,
 	})
 }
 
@@ -419,6 +466,18 @@ func (h *Handler) handleSIEMLiveStream(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
+
+			// Tenant-isolation filter on live WebSocket stream
+			if scope := h.tenantScope(r); scope != "" {
+				alertTenant := alert.Tenant
+				if alertTenant == "" {
+					alertTenant = "default"
+				}
+				if alertTenant != scope {
+					continue
+				}
+			}
+
 			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			if err := conn.WriteJSON(alert); err != nil {
 				return
@@ -443,8 +502,9 @@ func (h *Handler) handleSIEMMitreMatrix(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	scope := h.tenantScope(r)
 	stats := make(map[string]mitre.AlertStat)
-	if rows, err := h.pgDB.ListMitreAlertStats(ctx); err == nil {
+	if rows, err := h.pgDB.ListMitreAlertStats(ctx, scope); err == nil {
 		for _, s := range rows {
 			stats[s.Technique] = mitre.AlertStat{Count: s.Count, LastSeen: s.LastSeen}
 		}
@@ -650,8 +710,9 @@ func (h *Handler) handleSIEMMitreInstallAll(w http.ResponseWriter, r *http.Reque
 
 	// Generate updated report
 	allRules, _ := h.pgDB.ListSIEMRules(ctx)
+	scope := h.tenantScope(r)
 	stats := make(map[string]mitre.AlertStat)
-	if rows, err := h.pgDB.ListMitreAlertStats(ctx); err == nil {
+	if rows, err := h.pgDB.ListMitreAlertStats(ctx, scope); err == nil {
 		for _, s := range rows {
 			stats[s.Technique] = mitre.AlertStat{Count: s.Count, LastSeen: s.LastSeen}
 		}

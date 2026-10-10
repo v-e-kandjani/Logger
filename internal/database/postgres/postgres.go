@@ -829,6 +829,8 @@ func (db *DB) EnsureSIEMSchema(ctx context.Context) error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_siem_alerts_technique ON siem_alerts(mitre_technique);
 	CREATE INDEX IF NOT EXISTS idx_siem_alerts_rule_status ON siem_alerts(rule_id, status);
+	ALTER TABLE siem_alerts ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
+	CREATE INDEX IF NOT EXISTS idx_siem_alerts_tenant ON siem_alerts(tenant_slug);
 
 	-- Multi-Factor Authentication (MFA) & Active Directory (AD) Schema Migrations
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_source VARCHAR(32) DEFAULT 'local';
@@ -909,12 +911,22 @@ type MitreTechniqueAlertStat struct {
 }
 
 // ListMitreAlertStats returns alert counters for every technique across all stored alerts
-func (db *DB) ListMitreAlertStats(ctx context.Context) ([]MitreTechniqueAlertStat, error) {
-	rows, err := db.pool.Query(ctx, `
-		SELECT mitre_technique, COUNT(*), MAX(last_seen)
-		FROM siem_alerts
-		WHERE mitre_technique <> ''
-		GROUP BY mitre_technique`)
+func (db *DB) ListMitreAlertStats(ctx context.Context, tenant string) ([]MitreTechniqueAlertStat, error) {
+	var rows pgx.Rows
+	var err error
+	if tenant != "" && tenant != "all" {
+		rows, err = db.pool.Query(ctx, `
+			SELECT mitre_technique, COUNT(*), MAX(last_seen)
+			FROM siem_alerts
+			WHERE mitre_technique <> '' AND COALESCE(tenant_slug, 'default') = $1
+			GROUP BY mitre_technique`, tenant)
+	} else {
+		rows, err = db.pool.Query(ctx, `
+			SELECT mitre_technique, COUNT(*), MAX(last_seen)
+			FROM siem_alerts
+			WHERE mitre_technique <> ''
+			GROUP BY mitre_technique`)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1058,14 +1070,18 @@ func (db *DB) BatchUpsertSIEMRules(ctx context.Context, rules []models.SIEMRule)
 // CreateOrUpdateSIEMAlert inserts a new alert or updates an existing alert in the database
 func (db *DB) CreateOrUpdateSIEMAlert(ctx context.Context, alert *models.SIEMAlert) (*models.SIEMAlert, error) {
 	evidenceJSON, _ := json.Marshal(alert.EvidenceLogs)
+	tenant := alert.Tenant
+	if tenant == "" {
+		tenant = "default"
+	}
 
 	query := `
 		INSERT INTO siem_alerts (
 			id, rule_id, rule_name, severity, risk_score, category, status,
 			source_ip, destination_ip, username, device_name, event_count,
 			first_seen, last_seen, mitre_tactic, mitre_technique, summary,
-			evidence_logs, assigned_to, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+			evidence_logs, assigned_to, tenant_slug, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
 		ON CONFLICT (id) DO UPDATE SET
 			event_count = EXCLUDED.event_count,
 			last_seen = EXCLUDED.last_seen,
@@ -1078,35 +1094,41 @@ func (db *DB) CreateOrUpdateSIEMAlert(ctx context.Context, alert *models.SIEMAle
 		alert.ID, alert.RuleID, alert.RuleName, alert.Severity, alert.RiskScore, alert.Category, alert.Status,
 		alert.SourceIP, alert.DestinationIP, alert.Username, alert.DeviceName, alert.EventCount,
 		alert.FirstSeen, alert.LastSeen, alert.MitreTactic, alert.MitreTechnique, alert.Summary,
-		evidenceJSON, alert.AssignedTo, alert.CreatedAt, alert.UpdatedAt,
+		evidenceJSON, alert.AssignedTo, tenant, alert.CreatedAt, alert.UpdatedAt,
 	).Scan(&alert.ID, &alert.CreatedAt, &alert.UpdatedAt)
 
 	return alert, err
 }
 
-// GetActiveSIEMAlertByRuleAndGroup finds the most recent non-resolved alert for a rule and entity
-func (db *DB) GetActiveSIEMAlertByRuleAndGroup(ctx context.Context, ruleID, groupKey string) (*models.SIEMAlert, error) {
+// GetActiveSIEMAlertByRuleAndGroup finds the most recent non-resolved alert for a rule, entity, and tenant
+func (db *DB) GetActiveSIEMAlertByRuleAndGroup(ctx context.Context, ruleID, groupKey, tenant string) (*models.SIEMAlert, error) {
 	query := `
 		SELECT id, rule_id, rule_name, severity, risk_score, category, status,
 		       source_ip, destination_ip, username, device_name, event_count,
 		       first_seen, last_seen, mitre_tactic, mitre_technique, summary,
-		       evidence_logs, assigned_to, created_at, updated_at
+		       evidence_logs, assigned_to, COALESCE(tenant_slug, 'default'), created_at, updated_at
 		FROM siem_alerts
 		WHERE rule_id = $1
 		  AND (source_ip = $2 OR username = $2 OR device_name = $2 OR $2 = 'global')
 		  AND status IN ('NEW', 'IN_PROGRESS')
-		  AND last_seen > NOW() - INTERVAL '1 hour'
-		ORDER BY last_seen DESC
-		LIMIT 1`
+		  AND last_seen > NOW() - INTERVAL '1 hour'`
 
-	row := db.pool.QueryRow(ctx, query, ruleID, groupKey)
+	var args []interface{}
+	args = append(args, ruleID, groupKey)
+	if tenant != "" && tenant != "all" {
+		query += " AND COALESCE(tenant_slug, 'default') = $3"
+		args = append(args, tenant)
+	}
+	query += " ORDER BY last_seen DESC LIMIT 1"
+
+	row := db.pool.QueryRow(ctx, query, args...)
 	var a models.SIEMAlert
 	var evidenceJSON []byte
 	err := row.Scan(
 		&a.ID, &a.RuleID, &a.RuleName, &a.Severity, &a.RiskScore, &a.Category, &a.Status,
 		&a.SourceIP, &a.DestinationIP, &a.Username, &a.DeviceName, &a.EventCount,
 		&a.FirstSeen, &a.LastSeen, &a.MitreTactic, &a.MitreTechnique, &a.Summary,
-		&evidenceJSON, &a.AssignedTo, &a.CreatedAt, &a.UpdatedAt,
+		&evidenceJSON, &a.AssignedTo, &a.Tenant, &a.CreatedAt, &a.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1121,7 +1143,7 @@ func (db *DB) GetActiveSIEMAlertByRuleAndGroup(ctx context.Context, ruleID, grou
 }
 
 // ListSIEMAlerts lists alerts with optional filtering and pagination
-func (db *DB) ListSIEMAlerts(ctx context.Context, status, severity, search string, limit, offset int) ([]models.SIEMAlert, int, error) {
+func (db *DB) ListSIEMAlerts(ctx context.Context, tenant, status, severity, search string, limit, offset int) ([]models.SIEMAlert, int, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -1132,6 +1154,12 @@ func (db *DB) ListSIEMAlerts(ctx context.Context, status, severity, search strin
 	whereClauses := []string{"1=1"}
 	args := []interface{}{}
 	argIdx := 1
+
+	if tenant != "" && tenant != "all" {
+		whereClauses = append(whereClauses, fmt.Sprintf("COALESCE(tenant_slug, 'default') = $%d", argIdx))
+		args = append(args, tenant)
+		argIdx++
+	}
 
 	if status != "" && status != "ALL" {
 		whereClauses = append(whereClauses, fmt.Sprintf("status = $%d", argIdx))
@@ -1166,7 +1194,7 @@ func (db *DB) ListSIEMAlerts(ctx context.Context, status, severity, search strin
 		SELECT id, rule_id, rule_name, severity, risk_score, category, status,
 		       source_ip, destination_ip, username, device_name, event_count,
 		       first_seen, last_seen, mitre_tactic, mitre_technique, summary,
-		       evidence_logs, assigned_to, created_at, updated_at
+		       evidence_logs, assigned_to, COALESCE(tenant_slug, 'default'), created_at, updated_at
 		FROM siem_alerts
 		%s
 		ORDER BY created_at DESC
@@ -1188,7 +1216,7 @@ func (db *DB) ListSIEMAlerts(ctx context.Context, status, severity, search strin
 			&a.ID, &a.RuleID, &a.RuleName, &a.Severity, &a.RiskScore, &a.Category, &a.Status,
 			&a.SourceIP, &a.DestinationIP, &a.Username, &a.DeviceName, &a.EventCount,
 			&a.FirstSeen, &a.LastSeen, &a.MitreTactic, &a.MitreTechnique, &a.Summary,
-			&evidenceJSON, &a.AssignedTo, &a.CreatedAt, &a.UpdatedAt,
+			&evidenceJSON, &a.AssignedTo, &a.Tenant, &a.CreatedAt, &a.UpdatedAt,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -1207,7 +1235,7 @@ func (db *DB) GetSIEMAlert(ctx context.Context, id uuid.UUID) (*models.SIEMAlert
 		SELECT id, rule_id, rule_name, severity, risk_score, category, status,
 		       source_ip, destination_ip, username, device_name, event_count,
 		       first_seen, last_seen, mitre_tactic, mitre_technique, summary,
-		       evidence_logs, assigned_to, created_at, updated_at
+		       evidence_logs, assigned_to, COALESCE(tenant_slug, 'default'), created_at, updated_at
 		FROM siem_alerts
 		WHERE id = $1`
 
@@ -1218,7 +1246,7 @@ func (db *DB) GetSIEMAlert(ctx context.Context, id uuid.UUID) (*models.SIEMAlert
 		&a.ID, &a.RuleID, &a.RuleName, &a.Severity, &a.RiskScore, &a.Category, &a.Status,
 		&a.SourceIP, &a.DestinationIP, &a.Username, &a.DeviceName, &a.EventCount,
 		&a.FirstSeen, &a.LastSeen, &a.MitreTactic, &a.MitreTechnique, &a.Summary,
-		&evidenceJSON, &a.AssignedTo, &a.CreatedAt, &a.UpdatedAt,
+		&evidenceJSON, &a.AssignedTo, &a.Tenant, &a.CreatedAt, &a.UpdatedAt,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -1266,13 +1294,15 @@ func (db *DB) AddSIEMIncidentNote(ctx context.Context, alertID uuid.UUID, author
 }
 
 // GetSIEMOverviewStats computes high-level SOC dashboard metrics
-func (db *DB) GetSIEMOverviewStats(ctx context.Context) (*models.SIEMOverviewStats, error) {
+func (db *DB) GetSIEMOverviewStats(ctx context.Context, tenant string) (*models.SIEMOverviewStats, error) {
 	stats := &models.SIEMOverviewStats{
 		TopAttackers:            []models.KeyValueCount{},
 		TopTargetUsers:          []models.KeyValueCount{},
 		TopTargetDevices:        []models.KeyValueCount{},
 		MitreTacticDistribution: []models.KeyValueCount{},
 	}
+
+	filterByTenant := tenant != "" && tenant != "all"
 
 	// 1. Overall counts
 	countsQuery := `
@@ -1287,82 +1317,139 @@ func (db *DB) GetSIEMOverviewStats(ctx context.Context) (*models.SIEMOverviewSta
 			COALESCE(AVG(risk_score), 0)::int AS avg_risk
 		FROM siem_alerts`
 
-	_ = db.pool.QueryRow(ctx, countsQuery).Scan(
-		&stats.TotalAlerts, &stats.CriticalAlerts, &stats.HighAlerts,
-		&stats.MediumAlerts, &stats.LowAlerts, &stats.ActiveIncidents,
-		&stats.ResolvedIncidents, &stats.MeanRiskScore,
-	)
+	if filterByTenant {
+		countsQuery += ` WHERE COALESCE(tenant_slug, 'default') = $1`
+		_ = db.pool.QueryRow(ctx, countsQuery, tenant).Scan(
+			&stats.TotalAlerts, &stats.CriticalAlerts, &stats.HighAlerts,
+			&stats.MediumAlerts, &stats.LowAlerts, &stats.ActiveIncidents,
+			&stats.ResolvedIncidents, &stats.MeanRiskScore,
+		)
+	} else {
+		_ = db.pool.QueryRow(ctx, countsQuery).Scan(
+			&stats.TotalAlerts, &stats.CriticalAlerts, &stats.HighAlerts,
+			&stats.MediumAlerts, &stats.LowAlerts, &stats.ActiveIncidents,
+			&stats.ResolvedIncidents, &stats.MeanRiskScore,
+		)
+	}
 
 	// 2. Top Attackers (Source IP)
 	attackersQuery := `
 		SELECT source_ip, COUNT(*) AS cnt
 		FROM siem_alerts
-		WHERE source_ip <> '' AND source_ip IS NOT NULL
+		WHERE source_ip <> '' AND source_ip IS NOT NULL`
+	if filterByTenant {
+		attackersQuery += ` AND COALESCE(tenant_slug, 'default') = $1`
+	}
+	attackersQuery += `
 		GROUP BY source_ip
 		ORDER BY cnt DESC
 		LIMIT 5`
-	if rows, err := db.pool.Query(ctx, attackersQuery); err == nil {
-		for rows.Next() {
+
+	var aRows pgx.Rows
+	var aErr error
+	if filterByTenant {
+		aRows, aErr = db.pool.Query(ctx, attackersQuery, tenant)
+	} else {
+		aRows, aErr = db.pool.Query(ctx, attackersQuery)
+	}
+	if aErr == nil {
+		for aRows.Next() {
 			var pair models.KeyValueCount
-			if err := rows.Scan(&pair.Key, &pair.Count); err == nil {
+			if err := aRows.Scan(&pair.Key, &pair.Count); err == nil {
 				stats.TopAttackers = append(stats.TopAttackers, pair)
 			}
 		}
-		rows.Close()
+		aRows.Close()
 	}
 
 	// 3. Top Targeted Users
 	usersQuery := `
 		SELECT username, COUNT(*) AS cnt
 		FROM siem_alerts
-		WHERE username <> '' AND username IS NOT NULL
+		WHERE username <> '' AND username IS NOT NULL`
+	if filterByTenant {
+		usersQuery += ` AND COALESCE(tenant_slug, 'default') = $1`
+	}
+	usersQuery += `
 		GROUP BY username
 		ORDER BY cnt DESC
 		LIMIT 5`
-	if rows, err := db.pool.Query(ctx, usersQuery); err == nil {
-		for rows.Next() {
+
+	var uRows pgx.Rows
+	var uErr error
+	if filterByTenant {
+		uRows, uErr = db.pool.Query(ctx, usersQuery, tenant)
+	} else {
+		uRows, uErr = db.pool.Query(ctx, usersQuery)
+	}
+	if uErr == nil {
+		for uRows.Next() {
 			var pair models.KeyValueCount
-			if err := rows.Scan(&pair.Key, &pair.Count); err == nil {
+			if err := uRows.Scan(&pair.Key, &pair.Count); err == nil {
 				stats.TopTargetUsers = append(stats.TopTargetUsers, pair)
 			}
 		}
-		rows.Close()
+		uRows.Close()
 	}
 
 	// 4. Top Targeted Devices
 	devicesQuery := `
 		SELECT device_name, COUNT(*) AS cnt
 		FROM siem_alerts
-		WHERE device_name <> '' AND device_name IS NOT NULL
+		WHERE device_name <> '' AND device_name IS NOT NULL`
+	if filterByTenant {
+		devicesQuery += ` AND COALESCE(tenant_slug, 'default') = $1`
+	}
+	devicesQuery += `
 		GROUP BY device_name
 		ORDER BY cnt DESC
 		LIMIT 5`
-	if rows, err := db.pool.Query(ctx, devicesQuery); err == nil {
-		for rows.Next() {
+
+	var dRows pgx.Rows
+	var dErr error
+	if filterByTenant {
+		dRows, dErr = db.pool.Query(ctx, devicesQuery, tenant)
+	} else {
+		dRows, dErr = db.pool.Query(ctx, devicesQuery)
+	}
+	if dErr == nil {
+		for dRows.Next() {
 			var pair models.KeyValueCount
-			if err := rows.Scan(&pair.Key, &pair.Count); err == nil {
+			if err := dRows.Scan(&pair.Key, &pair.Count); err == nil {
 				stats.TopTargetDevices = append(stats.TopTargetDevices, pair)
 			}
 		}
-		rows.Close()
+		dRows.Close()
 	}
 
 	// 5. MITRE Tactic Distribution
 	mitreQuery := `
 		SELECT mitre_tactic, COUNT(*) AS cnt
 		FROM siem_alerts
-		WHERE mitre_tactic <> '' AND mitre_tactic IS NOT NULL
+		WHERE mitre_tactic <> '' AND mitre_tactic IS NOT NULL`
+	if filterByTenant {
+		mitreQuery += ` AND COALESCE(tenant_slug, 'default') = $1`
+	}
+	mitreQuery += `
 		GROUP BY mitre_tactic
 		ORDER BY cnt DESC
 		LIMIT 6`
-	if rows, err := db.pool.Query(ctx, mitreQuery); err == nil {
-		for rows.Next() {
+
+	var mRows pgx.Rows
+	var mErr error
+	if filterByTenant {
+		mRows, mErr = db.pool.Query(ctx, mitreQuery, tenant)
+	} else {
+		mRows, mErr = db.pool.Query(ctx, mitreQuery)
+	}
+	if mErr == nil {
+		for mRows.Next() {
 			var pair models.KeyValueCount
-			if err := rows.Scan(&pair.Key, &pair.Count); err == nil {
+			if err := mRows.Scan(&pair.Key, &pair.Count); err == nil {
 				stats.MitreTacticDistribution = append(stats.MitreTacticDistribution, pair)
 			}
 		}
-		rows.Close()
+		mRows.Close()
 	}
 
 	return stats, nil

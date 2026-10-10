@@ -29,6 +29,7 @@ type NormalizedEvent struct {
 	MitreTechnique    string            `json:"mitre_technique"`// e.g. T1110, T1046, T1548
 	Message           string            `json:"message"`
 	RawMessage        string            `json:"raw_message"`
+	Tenant            string            `json:"tenant"` // owning tenant slug ("default" = root)
 	Extra             map[string]string `json:"extra,omitempty"`
 }
 
@@ -76,6 +77,7 @@ type SIEMAlert struct {
 	Summary         string    `json:"summary"`
 	EvidenceLogs    []string  `json:"evidence_logs"`
 	AssignedTo      string    `json:"assigned_to"`
+	Tenant          string    `json:"tenant"` // owning tenant slug ("default" = root)
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }

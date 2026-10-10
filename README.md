@@ -260,6 +260,14 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.15** (Multi-Tenant SIEM & SOC Isolation, Tenant-Scoped Security Alerts & Live Threat Streams):
+  - **Multi-Tenant SIEM Alert Isolation**: Extended SIEM alerts (`siem_alerts.tenant_slug`) and normalized events to carry tenant ownership. Alerts, incident counts, SOC metrics, and forensic evidence are strictly segregated by tenant.
+  - **Tenant-Scoped Correlation Buckets**: Updated the sliding-window correlation engine to key evaluation buckets by `tenant::rule_id::group_val`. Sliding window thresholds and password-spraying counters are strictly isolated per tenant, preventing cross-tenant threshold leaks or cross-tenant alert triggers.
+  - **Tenant-Filtered SOC Overview & Telemetry**: `/api/v1/siem/overview`, `/api/v1/siem/alerts`, and MITRE ATT&CK coverage reports filter metrics and incident lists server-side according to the active tenant scope (`X-Tenant` header / `?tenant=`). Root administrators can view all aggregated alerts or scope down to any individual tenant.
+  - **Live WebSocket Alert Filtering**: The real-time SOC alert WebSocket stream (`/api/v1/siem/live?tenant=...`) filters incoming alerts in real-time by tenant, ensuring analysts only receive incidents belonging to their tenant scope.
+  - **Frontend SOC Multi-Tenant UX**: The SIEM alerts table displays tenant chips (`🏢 {tenant}`) on incident rows, the investigation modal shows tenant attribution, and switching tenants in the sidebar instantly refreshes all SOC telemetry, incident tables, and active incident badges.
+  - **Incident Access Control**: Secured `/api/v1/siem/alerts/{id}` detail, triage status updates, and case notes endpoints so tenant users cannot inspect or alter alerts belonging to other organizations (HTTP 403 Forbidden).
+
 - **v1.5.14** (Real Tenant Data Isolation, Sidebar Tenant Selector, Unlimited Root Tenant, Working Rule Optimizer & Query Cache Telemetry):
   - **True Multi-Tenant Data Isolation**: Logs (`syslog_events.tenant` ClickHouse column) and devices (`devices.tenant_slug`) now carry tenant ownership. Edge-proxy logs inherit their node's tenant; direct syslog inherits the registered device's tenant. Search, dashboard counters, devices, edge nodes, live stream and EPS are filtered server-side by the selected tenant (`X-Tenant` header / `?tenant=`). Tenant users are always locked to their own tenant.
   - **Sidebar Tenant Selector**: The tenant context switcher moved from the header into the sidebar, showing usage (nodes · devices · EPS) and quota for the selected tenant; switching instantly refreshes all scoped views. Locked (🔒) for tenant admins.

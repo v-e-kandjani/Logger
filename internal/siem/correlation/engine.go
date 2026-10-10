@@ -16,7 +16,7 @@ import (
 // AlertPersister abstracts database persistence for SIEM alerts
 type AlertPersister interface {
 	CreateOrUpdateSIEMAlert(ctx context.Context, alert *models.SIEMAlert) (*models.SIEMAlert, error)
-	GetActiveSIEMAlertByRuleAndGroup(ctx context.Context, ruleID, groupKey string) (*models.SIEMAlert, error)
+	GetActiveSIEMAlertByRuleAndGroup(ctx context.Context, ruleID, groupKey, tenant string) (*models.SIEMAlert, error)
 	ListSIEMRules(ctx context.Context) ([]models.SIEMRule, error)
 	ToggleSIEMRule(ctx context.Context, ruleID string, enabled bool) error
 }
@@ -33,6 +33,7 @@ type WindowEvent struct {
 type WindowBucket struct {
 	RuleID      string
 	GroupKey    string
+	Tenant      string
 	Events      []WindowEvent
 	ActiveAlert *models.SIEMAlert
 	LastFired   time.Time
@@ -162,23 +163,29 @@ func (e *Engine) Evaluate(event *models.NormalizedEvent) {
 			return
 		}
 
+		tenant := event.Tenant
+		if tenant == "" {
+			tenant = "default"
+		}
+
 		groupVal := e.extractGroupValue(rule, event)
 		if groupVal == "" {
 			groupVal = "global"
 		}
 
-		bucketKey := fmt.Sprintf("%s::%s", rule.ID, groupVal)
+		bucketKey := fmt.Sprintf("%s::%s::%s", tenant, rule.ID, groupVal)
 		bucket, exists := e.buckets[bucketKey]
 		if !exists {
 			bucket = &WindowBucket{
 				RuleID:   rule.ID,
 				GroupKey: groupVal,
+				Tenant:   tenant,
 				Events:   make([]WindowEvent, 0, rule.Threshold*2),
 			}
 			// Attempt to restore active alert from database if engine just initialized or restarted
 			if e.persister != nil {
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-				if activeAlert, err := e.persister.GetActiveSIEMAlertByRuleAndGroup(ctx, rule.ID, groupVal); err == nil && activeAlert != nil {
+				if activeAlert, err := e.persister.GetActiveSIEMAlertByRuleAndGroup(ctx, rule.ID, groupVal, tenant); err == nil && activeAlert != nil {
 					bucket.ActiveAlert = activeAlert
 					bucket.LastFired = activeAlert.LastSeen
 				}
@@ -341,6 +348,14 @@ func (e *Engine) triggerAlert(rule *models.SIEMRule, bucket *WindowBucket, event
 	summary := fmt.Sprintf("[%s] %s triggered by %s (%d events in %ds)",
 		rule.Severity, rule.Name, bucket.GroupKey, len(bucket.Events), rule.TimeframeSeconds)
 
+	tenant := bucket.Tenant
+	if tenant == "" {
+		tenant = event.Tenant
+	}
+	if tenant == "" {
+		tenant = "default"
+	}
+
 	alert := &models.SIEMAlert{
 		ID:             uuid.New(),
 		RuleID:         rule.ID,
@@ -353,6 +368,7 @@ func (e *Engine) triggerAlert(rule *models.SIEMRule, bucket *WindowBucket, event
 		DestinationIP:  event.DestinationIP,
 		Username:       event.Username,
 		DeviceName:     event.DeviceName,
+		Tenant:         tenant,
 		EventCount:     len(bucket.Events),
 		FirstSeen:      bucket.Events[0].Timestamp,
 		LastSeen:       now,
@@ -527,8 +543,12 @@ func (e *Engine) GetRules() []models.SIEMRule {
 }
 
 // SimulateScenario generates synthetic normalized logs to trigger a security alert for testing/demo
-func (e *Engine) SimulateScenario(scenario string) (*models.SIEMAlert, error) {
+func (e *Engine) SimulateScenario(scenario string, tenantParam ...string) (*models.SIEMAlert, error) {
 	now := time.Now().UTC()
+	tenant := "default"
+	if len(tenantParam) > 0 && tenantParam[0] != "" {
+		tenant = tenantParam[0]
+	}
 
 	switch scenario {
 	case "brute-force", "ssh-brute-force":
@@ -551,6 +571,7 @@ func (e *Engine) SimulateScenario(scenario string) (*models.SIEMAlert, error) {
 				EventAction:     "login-failed",
 				EventOutcome:    "failure",
 				Username:        targetUser,
+				Tenant:          tenant,
 				Severity:        "HIGH",
 				RiskScore:       75,
 				MitreTactic:     "Credential Access",
@@ -578,6 +599,7 @@ func (e *Engine) SimulateScenario(scenario string) (*models.SIEMAlert, error) {
 				EventCategory:   "network",
 				EventAction:     "connection-denied",
 				EventOutcome:    "blocked",
+				Tenant:          tenant,
 				Severity:        "MEDIUM",
 				RiskScore:       55,
 				MitreTactic:     "Discovery",
@@ -602,6 +624,7 @@ func (e *Engine) SimulateScenario(scenario string) (*models.SIEMAlert, error) {
 			EventAction:    "sudoers-nopasswd-added",
 			EventOutcome:   "success",
 			Username:       targetUser,
+			Tenant:         tenant,
 			Severity:       "HIGH",
 			RiskScore:      85,
 			MitreTactic:    "Privilege Escalation",
@@ -627,6 +650,7 @@ func (e *Engine) SimulateScenario(scenario string) (*models.SIEMAlert, error) {
 			EventCategory:   "threat",
 			EventAction:     "malware-blocked",
 			EventOutcome:    "blocked",
+			Tenant:          tenant,
 			Severity:        "CRITICAL",
 			RiskScore:       95,
 			MitreTactic:     "Initial Access",

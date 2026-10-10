@@ -44,7 +44,11 @@ func (n *Normalizer) Normalize(event *models.LogEvent) *models.NormalizedEvent {
 		EventOutcome:    "unknown",
 		Message:         event.Message,
 		RawMessage:      event.RawMessage,
+		Tenant:          event.Tenant,
 		Extra:           make(map[string]string),
+	}
+	if norm.Tenant == "" {
+		norm.Tenant = "default"
 	}
 
 	if event.SourceIP != nil {
