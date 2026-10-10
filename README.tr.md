@@ -249,6 +249,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.9** (Yan Menü Gezinme Düzeltmesi, Minimal Modern SVG İkonlar, Ayarlar Alt Menüsü ve Dashboard Telemetri İyileştirmesi):
+  - **Sözdizimi Hatası Giderimi ve Yan Menü Gezinme Onarımı**: `loadHTTPSSettings()` içerisindeki mükerrer `redEl` ve `badge` değişken tanımları kaldırılarak istemci tarafı betik ayrıştırma hatası giderildi; paneller arası pürüzsüz sekme geçişleri yeniden sağlandı.
+  - **Minimal Modern SVG İkon Mimarisi**: Yan menüdeki emojiler yerine kurumsal standartlarda, temiz ve ölçeklenebilir minimal modern SVG vektör ikonlar entegre edildi.
+  - **Ayarlar Genişletilebilir Alt Menüsü ve Yapışkan Alt Gezinme Çubuğu**: Ayarlar sekmesi için yan menüye açılır-kapanır alt menü (KamuSM, Syslog Dinleyicileri, HTTPS & TLS, FQDN, Bellek Önbelleği, Active Directory, Saklama ve SMTP) ve sayfa içine yapışkan pürüzsüz kaydırma butonları (`.settings-subnav`) eklendi.
+  - **Kalıcı Log Telemetrisi ve İstatistik Uyumu**: `handleDashboard` servisi ClickHouse tablosundaki gerçek satır sayısını `total_inserted` sayacına dahil edecek şekilde güncellendi; böylece yeniden başlatmalarda toplam işlenen log telemetrisi sıfırlanmadan doğru gösterilir.
+
 - **v1.5.8** (Aktif Cihazlara Göre SIEM Kural Optimizasyonu ve Sertifika Korumalı HTTPS Yönlendirmesi):
   - **Kayıtlı Cihazlara Göre 1-Tıkla Akıllı Kural Optimizasyonu**: MITRE ATT&CK matrisi ve SIEM yönetim başlığına eklenen optimizasyon motoru (`POST /api/v1/siem/mitre/optimize-devices`) ile envanterdeki güvenlik duvarları (Fortinet, WatchGuard, Cisco), Linux/Windows sunucular ve etki alanı denetleyicileri otomatik analiz edilir; ilgili tehdit teknikleri aktif edilirken gereksiz kurallar devre dışı bırakılarak yanlış alarmlar engellenir.
   - **Sertifika Korumalı HTTP'den HTTPS'e Yönlendirme**: Yönlendirme anahtarı veri iletişimi düzeltildi ve güvenlik doğrulaması eklendi; yalnızca geçerli bir TLS sertifikası devredeyken HTTP'den HTTPS'e yönlendirmeye izin verilir. Kendinden imzalı veya özel sertifika yüklendiğinde yönlendirmeyi otomatik açma onayı sunulur.

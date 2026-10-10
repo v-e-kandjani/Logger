@@ -74,42 +74,118 @@ async function initAuthSession() {
     }
 }
 
-// Navigation Tab Switcher
+// Navigation Tab Switcher & Submenu Controller
+function switchTab(tab, targetSectionId = null) {
+    const navItems = document.querySelectorAll('.nav-item');
+    const targetItem = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+
+    // Gate access to users and updates tab for non-admins
+    if ((tab === 'users' || tab === 'updates') && window.currentUser && window.currentUser.role !== 'Super Administrator') {
+        showToast('Erişim Reddedildi: Yalnızca Süper Yöneticiler bu bölüme erişebilir.', 'error');
+        return;
+    }
+
+    navItems.forEach(i => i.classList.remove('active'));
+    if (targetItem) targetItem.classList.add('active');
+
+    // Manage settings nav group open state
+    const settingsGroup = document.getElementById('nav-group-settings');
+    if (settingsGroup) {
+        if (tab === 'settings') {
+            settingsGroup.classList.add('open');
+        } else {
+            settingsGroup.classList.remove('open');
+        }
+    }
+
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    const targetPane = document.getElementById(`pane-${tab}`);
+    if (targetPane) targetPane.classList.add('active');
+
+    updateViewHeader(tab);
+
+    // Refresh tab-specific views with exception guard
+    try {
+        if (tab === 'dashboard') fetchAndRenderTelemetryCharts();
+        if (tab === 'search') document.getElementById('btn-search-exec')?.click();
+        if (tab === 'siem') loadSIEMData();
+        if (tab === 'devices') loadDevices();
+        if (tab === 'unregistered') loadUnregisteredSources();
+        if (tab === 'archives') loadArchives();
+        if (tab === 'health') loadHealthTelemetry();
+        if (tab === 'settings') loadSettings();
+        if (tab === 'users') loadUsers();
+        if (tab === 'updates') loadUpdateStatus();
+    } catch (err) {
+        console.error('Tab refresh error for', tab, err);
+    }
+
+    if (targetSectionId) {
+        setTimeout(() => scrollToSettingsSection(targetSectionId), 100);
+    }
+}
+
+function scrollToSettingsSection(targetId) {
+    if (!targetId) return;
+    const el = document.getElementById(targetId);
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.style.transition = 'box-shadow 0.4s ease, border-color 0.4s ease';
+        el.style.boxShadow = '0 0 24px rgba(56, 189, 248, 0.4)';
+        el.style.borderColor = 'rgba(56, 189, 248, 0.7)';
+        setTimeout(() => {
+            el.style.boxShadow = '';
+            el.style.borderColor = '';
+        }, 1800);
+    }
+
+    // Sync active classes on sidebar subitems and settings pill buttons
+    document.querySelectorAll('.nav-subitem').forEach(sub => {
+        sub.classList.toggle('active', sub.getAttribute('data-target') === targetId);
+    });
+    document.querySelectorAll('.settings-subnav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-target') === targetId);
+    });
+}
+
 function initNavigation() {
+    // 1. Primary Nav Items
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const tab = item.getAttribute('data-tab');
-
-            // Gate access to users and updates tab for non-admins
-            if ((tab === 'users' || tab === 'updates') && window.currentUser && window.currentUser.role !== 'Super Administrator') {
-                showToast('Erişim Reddedildi: Yalnızca Süper Yöneticiler bu bölüme erişebilir.', 'error');
-                return;
+            if (tab === 'settings') {
+                const group = document.getElementById('nav-group-settings');
+                if (group && item.classList.contains('active')) {
+                    group.classList.toggle('open');
+                    return;
+                }
             }
-
-            navItems.forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
-
-            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-            const targetPane = document.getElementById(`pane-${tab}`);
-            if (targetPane) targetPane.classList.add('active');
-
-            updateViewHeader(tab);
-
-            // Refresh tab-specific views
-            if (tab === 'dashboard') fetchAndRenderTelemetryCharts();
-            if (tab === 'search') document.getElementById('btn-search-exec').click();
-            if (tab === 'siem') loadSIEMData();
-            if (tab === 'devices') loadDevices();
-            if (tab === 'unregistered') loadUnregisteredSources();
-            if (tab === 'archives') loadArchives();
-            if (tab === 'health') loadHealthTelemetry();
-            if (tab === 'settings') loadSettings();
-            if (tab === 'users') loadUsers();
-            if (tab === 'updates') loadUpdateStatus();
+            switchTab(tab);
         });
     });
+
+    // 2. Sidebar Submenu Items
+    const subItems = document.querySelectorAll('.nav-subitem');
+    subItems.forEach(sub => {
+        sub.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = sub.getAttribute('data-target');
+            switchTab('settings', targetId);
+        });
+    });
+
+    // 3. Settings In-Pane Subnav Buttons
+    const subnavBtns = document.querySelectorAll('.settings-subnav-btn');
+    subnavBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = btn.getAttribute('data-target');
+            scrollToSettingsSection(targetId);
+        });
+    });
+
     updateViewHeader('dashboard');
 }
 
@@ -1694,20 +1770,6 @@ async function loadHTTPSSettings() {
 
         const portEl = document.getElementById('setting-https-port');
         if (portEl && s.port) portEl.value = s.port;
-
-        const redEl = document.getElementById('setting-https-redirect');
-        if (redEl) redEl.checked = !!s.redirect_http;
-
-        const badge = document.getElementById('https-status-badge');
-        if (badge) {
-            if (s.enabled) {
-                badge.className = 'badge badge-success';
-                badge.textContent = `HTTPS Active (:${s.port || 8443})`;
-            } else {
-                badge.className = 'badge badge-secondary';
-                badge.textContent = 'HTTPS Disabled';
-            }
-        }
 
         const cert = s.certificate || s.active_cert;
         const hasCert = !!(s.has_certificate || s.certificate || s.active_cert || cert);

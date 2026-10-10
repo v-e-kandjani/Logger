@@ -260,6 +260,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.9** (Sidebar Navigation Fix, Minimal Modern SVG Icons, Settings Sub-Menu Navigation & Dashboard Ingestion Telemetry):
+  - **Syntax Error Fix & Sidebar Navigation Restoration**: Resolved duplicate `redEl` and `badge` variable declarations in `loadHTTPSSettings()`, eliminating client-side script parse exceptions and restoring smooth navigation tab switching across all dashboard panes.
+  - **Minimal Modern SVG Iconography**: Replaced generic emoji icons in the sidebar navigation with crisp, scalable, minimal SVG vector icons (Dashboard, Live Stream, Log Search, SIEM & SOC, Registered Devices, Unknown Sources, Archives, System Health, Settings, Users, and Upgrades).
+  - **Settings Expandable Submenu & Sticky Subnav Bar**: Introduced a nested collapsible submenu in the sidebar for Settings (KamuSM, Syslog Ingestion, HTTPS & TLS, FQDN, Memory Cache, Active Directory, Storage Retention, and SMTP) coupled with an in-pane sticky glassmorphic pill bar (`.settings-subnav`) with smooth section scrolling.
+  - **Persistent Ingested Logs Telemetry**: Updated `handleDashboard` to incorporate stored ClickHouse table rows into `total_inserted`, ensuring Total Inserted logs telemetry accurately reflects all persisted records even across daemon restarts.
+
 - **v1.5.8** (Active Device SIEM Rule Optimizer & Certificate-Gated HTTP Redirection):
   - **SIEM Rule Optimization for Active Inventory Devices**: Introduced 1-click intelligent threat detection rule optimization (`POST /api/v1/siem/mitre/optimize-devices`) both in the MITRE ATT&CK matrix modal and the SIEM operations header. Automatically maps registered network firewalls (Fortinet, WatchGuard, Cisco), servers, and directory controllers to relevant tactical threat objectives, activating tailored rules and silencing irrelevant false positives.
   - **Certificate-Gated HTTP-to-HTTPS Redirection**: Fixed toggle payload parsing and enforced strict safety validation: HTTP-to-HTTPS redirection can only be enabled when a valid TLS certificate is active. Added automated prompt to enable redirection immediately upon self-signed certificate generation or custom certificate installation.

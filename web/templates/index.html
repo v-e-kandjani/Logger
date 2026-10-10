@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.8</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.9</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -27,40 +27,91 @@
 
             <nav class="nav-menu">
                 <a href="#dashboard" class="nav-item active" data-tab="dashboard">
-                    <span class="icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span>
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                    <span data-i18n="nav_dashboard">Dashboard</span>
                 </a>
                 <a href="#live" class="nav-item" data-tab="live">
-                    <span class="icon">⚡</span> <span data-i18n="nav_live">Live Stream</span>
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <span data-i18n="nav_live">Live Stream</span>
                     <span class="live-dot"></span>
                 </a>
                 <a href="#search" class="nav-item" data-tab="search">
-                    <span class="icon">🔍</span> <span data-i18n="nav_search">Log Search</span>
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <span data-i18n="nav_search">Log Search</span>
                 </a>
                 <a href="#siem" class="nav-item" data-tab="siem" id="nav-tab-siem">
-                    <span class="icon">🛡️</span> <span data-i18n="nav_siem">SIEM & SOC</span>
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span data-i18n="nav_siem">SIEM & SOC</span>
                     <span class="badge badge-danger" id="siem-active-badge" style="display: none; font-size: 10px; margin-left: auto;">0</span>
                 </a>
                 <a href="#devices" class="nav-item" data-tab="devices">
-                    <span class="icon">🖥️</span> <span data-i18n="nav_devices">Registered Devices</span>
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                    <span data-i18n="nav_devices">Registered Devices</span>
                 </a>
                 <a href="#unregistered" class="nav-item" data-tab="unregistered">
-                    <span class="icon">⚠️</span> <span data-i18n="nav_unknown">Unknown Sources</span>
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <span data-i18n="nav_unknown">Unknown Sources</span>
                     <span class="badge badge-warning" id="unknown-count-badge">0</span>
                 </a>
                 <a href="#archives" class="nav-item" data-tab="archives">
-                    <span class="icon">📦</span> <span data-i18n="nav_archives">Archives & Evidence</span>
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                    <span data-i18n="nav_archives">Archives & Evidence</span>
                 </a>
                 <a href="#health" class="nav-item" data-tab="health">
-                    <span class="icon">💓</span> <span data-i18n="nav_health">System Health</span>
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <span data-i18n="nav_health">System Health</span>
                 </a>
-                <a href="#settings" class="nav-item" data-tab="settings">
-                    <span class="icon">⚙️</span> <span data-i18n="nav_settings">Settings & KamuSM</span>
-                </a>
+
+                <!-- Settings Group with Submenu -->
+                <div class="nav-group" id="nav-group-settings">
+                    <a href="#settings" class="nav-item" data-tab="settings" id="nav-tab-settings">
+                        <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        <span data-i18n="nav_settings">Settings & KamuSM</span>
+                        <svg class="menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
+                    <div class="nav-submenu" id="nav-submenu-settings">
+                        <a class="nav-subitem" data-target="setting-section-kamusm">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span data-i18n="nav_sub_kamusm">TÜBİTAK KamuSM & E-İmza</span>
+                        </a>
+                        <a class="nav-subitem" data-target="setting-section-ingestion">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <span data-i18n="nav_sub_ingestion">Syslog Dinleyicileri & Filtre</span>
+                        </a>
+                        <a class="nav-subitem" data-target="setting-section-https">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                            <span data-i18n="nav_sub_https">HTTPS & TLS Sertifikaları</span>
+                        </a>
+                        <a class="nav-subitem" data-target="setting-section-fqdn">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                            <span data-i18n="nav_sub_fqdn">FQDN Alan Adı Erişimi</span>
+                        </a>
+                        <a class="nav-subitem" data-target="setting-section-cache">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            <span data-i18n="nav_sub_cache">Sorgu Önbelleği (%60 RAM)</span>
+                        </a>
+                        <a class="nav-subitem" data-target="setting-section-ad">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            <span data-i18n="nav_sub_ad">Active Directory & LDAP</span>
+                        </a>
+                        <a class="nav-subitem" data-target="setting-section-retention">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                            <span data-i18n="nav_sub_retention">Depolama & Saklama İlkesi</span>
+                        </a>
+                        <a class="nav-subitem" data-target="setting-section-smtp">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                            <span data-i18n="nav_sub_smtp">E-Posta Bildirimleri & SMTP</span>
+                        </a>
+                    </div>
+                </div>
+
                 <a href="#users" class="nav-item" data-tab="users" id="nav-tab-users">
-                    <span class="icon">👥</span> <span data-i18n="nav_users">Users & Access</span>
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span data-i18n="nav_users">Users & Access</span>
                 </a>
                 <a href="#updates" class="nav-item" data-tab="updates" id="nav-tab-updates">
-                    <span class="icon">🔄</span> <span data-i18n="nav_updates">System Upgrade</span>
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                    <span data-i18n="nav_updates">System Upgrade</span>
                     <span class="badge badge-primary" id="update-indicator-badge" style="display: none; font-size: 10px; margin-left: auto;">New</span>
                 </a>
             </nav>
@@ -635,9 +686,45 @@
 
             <!-- TAB: Settings & KamuSM Configuration -->
             <section class="tab-pane" id="pane-settings">
+                <!-- Settings Subnav Navigation Bar -->
+                <div class="settings-subnav" id="settings-subnav-bar">
+                    <button class="settings-subnav-btn active" data-target="setting-section-kamusm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <span data-i18n="nav_sub_kamusm">TÜBİTAK KamuSM & E-İmza</span>
+                    </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-ingestion">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span data-i18n="nav_sub_ingestion">Syslog Dinleyicileri & Filtre</span>
+                    </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-https">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                        <span data-i18n="nav_sub_https">HTTPS & TLS Sertifikaları</span>
+                    </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-fqdn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
+                        <span data-i18n="nav_sub_fqdn">FQDN Alan Adı Erişimi</span>
+                    </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-cache">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        <span data-i18n="nav_sub_cache">Sorgu Önbelleği (%60 RAM)</span>
+                    </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-ad">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span data-i18n="nav_sub_ad">Active Directory & LDAP</span>
+                    </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-retention">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                        <span data-i18n="nav_sub_retention">Depolama & Saklama İlkesi</span>
+                    </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-smtp">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        <span data-i18n="nav_sub_smtp">E-Posta Bildirimleri & SMTP</span>
+                    </button>
+                </div>
+
                 <div class="dashboard-panels">
                     <!-- Law No. 5651 & TÜBİTAK Stamping Panel -->
-                    <div class="panel">
+                    <div class="panel" id="setting-section-kamusm">
                         <div class="panel-header">
                             <h3>Law No. 5651 & TÜBİTAK Timestamping Configuration</h3>
                             <span class="badge badge-primary">Turkish Law No. 5651 / 5070</span>
@@ -723,7 +810,7 @@
                     </div>
 
                     <!-- Archival & System Retention Policies -->
-                    <div class="panel">
+                    <div class="panel" id="setting-section-retention">
                         <div class="panel-header">
                             <h3>Archival & Retention Policies</h3>
                             <span class="badge badge-success">Automated Slices</span>
@@ -766,7 +853,7 @@
                     </div>
 
                     <!-- Network Listeners & Port Configuration -->
-                    <div class="panel" style="grid-column: 1 / -1;">
+                    <div class="panel" id="setting-section-ingestion" style="grid-column: 1 / -1;">
                         <div class="panel-header">
                             <h3 data-i18n="panel_listeners_title">Syslog Network Listeners & Port Configuration</h3>
                             <span class="badge badge-primary" data-i18n="badge_dynamic_reload">Dynamic Hot-Reload</span>
@@ -869,7 +956,7 @@
                     </div>
 
                     <!-- Active Directory / LDAP Directory Integration Panel -->
-                    <div class="panel" style="grid-column: 1 / -1;">
+                    <div class="panel" id="setting-section-ad" style="grid-column: 1 / -1;">
                         <div class="panel-header">
                             <h3 data-i18n="ad_panel_title">Active Directory & LDAP Directory Integration</h3>
                             <span class="badge badge-primary">Enterprise Identity</span>
@@ -963,7 +1050,7 @@
                     </div>
 
                     <!-- Multi-Factor Authentication (MFA) Policy Panel -->
-                    <div class="panel">
+                    <div class="panel" id="setting-section-mfa">
                         <div class="panel-header">
                             <h3 data-i18n="mfa_panel_title">Multi-Factor Authentication (MFA) Governance</h3>
                             <span class="badge badge-success">RFC 6238 TOTP</span>
@@ -1009,7 +1096,7 @@
                     </div>
 
                     <!-- SMTP Mail Server & Alert/Task Notification Panel -->
-                    <div class="panel">
+                    <div class="panel" id="setting-section-smtp">
                         <div class="panel-header">
                             <h3 data-i18n="smtp_panel_title">SMTP Mail Server &amp; Alert Notifications</h3>
                             <span class="badge badge-warning">Task Dispatcher</span>
@@ -1114,7 +1201,7 @@
                     </div>
 
                     <!-- Secure Web (HTTPS) & SSL/TLS Certificate Governance Panel -->
-                    <div class="panel">
+                    <div class="panel" id="setting-section-https">
                         <div class="panel-header">
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="font-size: 1.3rem;">🔒</span>
@@ -1230,7 +1317,7 @@
                     </div>
 
                     <!-- FQDN (Fully Qualified Domain Name) Panel -->
-                    <div class="panel">
+                    <div class="panel" id="setting-section-fqdn">
                         <div class="panel-header">
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="font-size: 1.3rem;">🌐</span>
@@ -1277,7 +1364,7 @@
                     </div>
 
                     <!-- In-Memory Query Acceleration (Up to 60% Available RAM) Panel -->
-                    <div class="panel">
+                    <div class="panel" id="setting-section-cache">
                         <div class="panel-header">
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="font-size: 1.3rem;">⚡</span>
@@ -1394,7 +1481,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.8</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.9</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -2409,7 +2496,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.8"></script>
-    <script src="/static/js/app.js?v=1.5.8"></script>
+    <script src="/static/js/translations.js?v=1.5.9"></script>
+    <script src="/static/js/app.js?v=1.5.9"></script>
 </body>
 </html>

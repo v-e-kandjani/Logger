@@ -319,11 +319,17 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		h.statsCacheMu.Unlock()
 	}
 
+	var totalIngested uint64
+	if storageStats != nil && storageStats.TotalRows > 0 {
+		totalIngested = storageStats.TotalRows
+	}
+	totalIngested += h.chClient.TotalInserted.Load()
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"logs_today":              countToday,
 		"queue_depth":             h.pipeline.QueueDepth(),
 		"packets_rx":              h.pipeline.PacketsReceived.Load(),
-		"total_inserted":          h.chClient.TotalInserted.Load(),
+		"total_inserted":          totalIngested,
 		"total_devices":           len(devices),
 		"active_devices":          activeCount,
 		"warning_devices":         warningCount,
