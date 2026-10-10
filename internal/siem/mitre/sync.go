@@ -181,6 +181,7 @@ func (c *Catalog) syncFromURL(ctx context.Context, rawURL string, conditional bo
 	if perr := c.persist(ctx); perr != nil {
 		log.Printf("[MITRE] catalog parsed but could not be persisted: %v", perr)
 	}
+	c.NotifyUpdate()
 	return n, false, nil
 }
 
@@ -202,6 +203,7 @@ func (c *Catalog) SyncFromFile(filePath string) (int, error) {
 	if perr := c.persist(ctx); perr != nil {
 		log.Printf("[MITRE] catalog parsed but could not be persisted: %v", perr)
 	}
+	c.NotifyUpdate()
 	return n, nil
 }
 

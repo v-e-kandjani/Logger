@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.6** (Her Matris Güncellemesinde İlgili SIEM Korelasyon ve Tespit Kataloğu Kurallarının Otomatik Eklenmesi):
+  - **Otomatik Kural Senkronizasyon Hattı**: MITRE ATT&CK güncelleme mekanizması (`AutoAddMitreCorrelationRules`) genişletilerek her matris güncellemesinde (manuel besleme senkronizasyonu, internete kapalı STIX içe aktarma, otomatik arka plan sürüm taramaları ve sunucu başlangıç kontrolleri) ilgili SIEM Korelasyon & Tespit Kataloğu Kurallarının kural setine otomatik eklenmesi sağlandı.
+  - **Küratörlü Katalog ve Dinamik Üretici Hibrit Entegrasyonu**: Matristeki teknikler `internal/siem/catalog` altındaki küratörlü kurallarla (örn. AUTH-001, SSH-002, HEALTH-006) eşleştirildi; küratörlü karşılığı bulunmayan yeni teknikler için otomatik kural üretilerek yönetici müdahalesine gerek kalmadan %100 kapsama garanti altına alındı.
+  - **Canlı Korelasyon Motoru Sıcak Yenileme**: Yeni eklenen ve güncellenen tüm kurallar gelen log akışını kesintiye uğratmadan PostgreSQL'e atomik olarak yazılır ve çalışan bellek içi korelasyon motoruna (`h.pipeline.GetSIEMEngine()`) anında aktarılır.
+
 - **v1.5.5** (Resmi MITRE ATT&CK Matrisi 697 Teknik Kurulumu ve İnteraktif Kural Seçimi):
   - **Tüm MITRE ATT&CK Enterprise Kataloğu Kural Üreteci**: Resmi STIX akışındaki (`https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json`) 697 tekniğin tamamı için otomatik SIEM tespit kuralları, taktik hedefleri, esnek eşik değerleri ve risk puanlamaları oluşturuldu.
   - **İnteraktif Matris Teknik Seçimi ve Açma/Kapatma**: ATT&CK matrisi ekranında herhangi bir tekniğe tıklandığında anında ilgili tespit kuralı aktifleştirilip pasifleştirilebilir hale getirildi; kural durumu eş zamanlı bellek içi korelasyon motoruna ve PostgreSQL veritabanına yansıtıldı.

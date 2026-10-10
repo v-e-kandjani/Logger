@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -24,12 +25,34 @@ const settingMitreAutoSync = "mitre_auto_sync"
 func (h *Handler) StartMitreAutoSync(ctx context.Context) {
 	h.mitreCatalog.SetStore(h.pgDB)
 
+	// Hook into matrix updates to automatically add related SIEM correlation rules
+	h.mitreCatalog.SetOnUpdateHook(func(techs []mitre.Technique) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer cancel()
+		added, err := h.AutoAddMitreCorrelationRules(bgCtx, techs)
+		if err != nil {
+			log.Printf("[MITRE] Error auto-adding correlation rules on matrix update: %v", err)
+		} else if added > 0 {
+			log.Printf("[MITRE] Matrix update: automatically added %d new SIEM correlation rules", added)
+		}
+	})
+
 	loadCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	if err := h.mitreCatalog.LoadFromStore(loadCtx); err != nil {
 		log.Printf("[MITRE] could not restore persisted catalog: %v (using embedded baseline)", err)
 	}
 	cancel()
 	log.Printf("[MITRE] catalog ready with %d techniques", h.mitreCatalog.TechniqueCount())
+
+	// Ensure any loaded techniques have their correlation rules in the rule set
+	go func() {
+		initCtx, cancelInit := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancelInit()
+		added, _ := h.AutoAddMitreCorrelationRules(initCtx, nil)
+		if added > 0 {
+			log.Printf("[MITRE] Startup check: added %d missing correlation rules for loaded techniques", added)
+		}
+	}()
 
 	enabled := true
 	if v := strings.TrimSpace(os.Getenv("MITRE_AUTO_SYNC")); v != "" {
@@ -92,6 +115,12 @@ func (h *Handler) handleSIEMMitreAutoSync(w http.ResponseWriter, r *http.Request
 	if req.CheckNow {
 		ctx, cancel := contextWithTimeout(r, 6*time.Minute)
 		result, err := h.mitreCatalog.CheckForUpdate(ctx)
+		if err == nil {
+			added, _ := h.AutoAddMitreCorrelationRules(ctx, h.mitreCatalog.GetAllTechniques())
+			if added > 0 {
+				result = fmt.Sprintf("%s (%d correlation rules automatically added)", result, added)
+			}
+		}
 		cancel()
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]interface{}{

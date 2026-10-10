@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.6** (Automated SIEM Correlation & Detection Catalog Rule Synchronization on Matrix Updates):
+  - **Automated Rule Synchronization Pipeline**: Extended the MITRE ATT&CK update pipeline (`AutoAddMitreCorrelationRules`) to automatically map and inject related SIEM Correlation & Detection Catalog Rules directly into the active rule set on every matrix update (manual feed sync, air-gapped STIX import, automatic background release checks, and server startup self-healing).
+  - **Curated Catalog & Dynamic Generator Hybrid Integration**: Automatically matches techniques against curated rules from `internal/siem/catalog` (e.g. AUTH-001, SSH-002, HEALTH-006) and falls back to dynamic tactical objective generation for newly discovered techniques, ensuring immediate active detection coverage without manual administrator intervention.
+  - **Live Correlation Engine Hot-Reload**: Automatically hot-reloads the active in-memory correlation engine (`h.pipeline.GetSIEMEngine()`) and commits rules to PostgreSQL atomically without interrupting incoming log ingestion streams.
+
 - **v1.5.5** (Official MITRE ATT&CK Matrix 697-Technique Installation & Interactive Matrix Rule Toggling):
   - **Full MITRE ATT&CK Enterprise Catalog Rule Generator**: Auto-generates high-fidelity SIEM detection rules for all 697 techniques in the official MITRE Enterprise ATT&CK catalog (`https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json`), automatically mapping tactical objectives, custom thresholds, severity levels, and risk scoring.
   - **Interactive Matrix Technique Toggling**: Clicking any technique card within the ATT&CK matrix modal directly activates or deactivates its corresponding detection rule in real time, updating the in-memory correlation engine and PostgreSQL state without disrupting event ingestion.

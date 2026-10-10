@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/notification/smtp"
+	siemcatalog "github.com/syslog-platform/logger/internal/siem/catalog"
 	"github.com/syslog-platform/logger/internal/siem/mitre"
 )
 
@@ -491,6 +493,12 @@ func (h *Handler) handleSIEMMitreSync(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Automatically add/update related SIEM Correlation & Detection Catalog Rules for all matrix techniques
+	addedRules, addErr := h.AutoAddMitreCorrelationRules(ctx, h.mitreCatalog.GetAllTechniques())
+	if addErr != nil {
+		log.Printf("[MITRE] Warning: auto-adding correlation rules failed during sync: %v", addErr)
+	}
+
 	_ = h.pgDB.InsertAuditLog(ctx, &models.AuditLog{
 		Username: username,
 		SourceIP: r.RemoteAddr,
@@ -499,6 +507,7 @@ func (h *Handler) handleSIEMMitreSync(w http.ResponseWriter, r *http.Request) {
 		Result:   "SUCCESS",
 		Details: map[string]interface{}{
 			"synced_techniques": count,
+			"added_rules":       addedRules,
 			"source":            req.URL,
 			"file_path":         req.FilePath,
 		},
@@ -509,12 +518,94 @@ func (h *Handler) handleSIEMMitreSync(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"success":           true,
 		"synced_techniques": count,
+		"added_rules":       addedRules,
 		"attack_version":    status.AttackVersion,
 		"total_techniques":  status.TotalTechniques,
 		"new_techniques":    status.NewTechniques,
-		"message": fmt.Sprintf("%s loaded: %d techniques (%d parent / %d sub-techniques), %d new since previous release. Saved to database.",
-			status.Version, status.TotalTechniques, status.TotalParent, status.TotalSub, status.NewTechniques),
+		"message": fmt.Sprintf("%s loaded: %d techniques (%d parent / %d sub-techniques), %d new since previous release. %d related SIEM correlation rules automatically added/updated.",
+			status.Version, status.TotalTechniques, status.TotalParent, status.TotalSub, status.NewTechniques, addedRules),
 	})
+}
+
+// AutoAddMitreCorrelationRules automatically adds related SIEM Correlation & Detection Catalog Rules
+// for techniques in the MITRE ATT&CK matrix to the active rule set (PostgreSQL and correlation engine).
+func (h *Handler) AutoAddMitreCorrelationRules(ctx context.Context, techs []mitre.Technique) (int, error) {
+	if len(techs) == 0 {
+		techs = h.mitreCatalog.GetAllTechniques()
+	}
+	if len(techs) == 0 {
+		return 0, nil
+	}
+
+	existingRules, err := h.pgDB.ListSIEMRules(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("listing existing rules: %w", err)
+	}
+
+	coveredMap := make(map[string]bool)
+	existingRuleIDs := make(map[string]bool)
+	for _, rule := range existingRules {
+		existingRuleIDs[rule.ID] = true
+		if rule.MitreTechnique != "" {
+			coveredMap[rule.MitreTechnique] = true
+		}
+	}
+
+	// Index curated detection catalog rules by technique ID
+	curatedRules := siemcatalog.Rules()
+	curatedByTech := make(map[string][]models.SIEMRule)
+	for _, cr := range curatedRules {
+		if cr.MitreTechnique != "" {
+			curatedByTech[cr.MitreTechnique] = append(curatedByTech[cr.MitreTechnique], cr)
+		}
+	}
+
+	var rulesToInsert []models.SIEMRule
+	for _, t := range techs {
+		if coveredMap[t.ID] {
+			continue
+		}
+
+		// 1. Check if curated catalog has a matching rule for this technique
+		if curated, found := curatedByTech[t.ID]; found && len(curated) > 0 {
+			addedCurated := false
+			for _, cr := range curated {
+				if !existingRuleIDs[cr.ID] {
+					rulesToInsert = append(rulesToInsert, cr)
+					existingRuleIDs[cr.ID] = true
+					addedCurated = true
+				}
+			}
+			if addedCurated {
+				coveredMap[t.ID] = true
+				continue
+			}
+		}
+
+		// 2. Otherwise generate dynamic MITRE correlation detection rule
+		rule := buildMitreRuleForTechnique(t, true)
+		if !existingRuleIDs[rule.ID] {
+			rulesToInsert = append(rulesToInsert, rule)
+			existingRuleIDs[rule.ID] = true
+			coveredMap[t.ID] = true
+		}
+	}
+
+	if len(rulesToInsert) == 0 {
+		return 0, nil
+	}
+
+	if err := h.pgDB.BatchUpsertSIEMRules(ctx, rulesToInsert); err != nil {
+		return 0, fmt.Errorf("batch upserting correlation rules: %w", err)
+	}
+
+	// Synchronize in-memory correlation engine
+	if engine := h.pipeline.GetSIEMEngine(); engine != nil {
+		engine.AddOrUpdateRules(rulesToInsert)
+	}
+
+	log.Printf("[SIEM] Automatically added %d related SIEM correlation & detection rules for MITRE ATT&CK update", len(rulesToInsert))
+	return len(rulesToInsert), nil
 }
 
 // handleSIEMMitreInstallAll installs and enables correlation detection rules for all MITRE ATT&CK techniques
@@ -540,36 +631,12 @@ func (h *Handler) handleSIEMMitreInstallAll(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	existingRules, err := h.pgDB.ListSIEMRules(ctx)
+	rulesAdded, err := h.AutoAddMitreCorrelationRules(ctx, techs)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{
-			"error": "Failed listing existing rules: " + err.Error(),
+			"error": "Failed auto-adding correlation rules: " + err.Error(),
 		})
 		return
-	}
-
-	coveredMap := make(map[string]bool)
-	for _, rule := range existingRules {
-		if rule.MitreTechnique != "" {
-			coveredMap[rule.MitreTechnique] = true
-		}
-	}
-
-	var rulesToInsert []models.SIEMRule
-	for _, t := range techs {
-		if !coveredMap[t.ID] {
-			rule := buildMitreRuleForTechnique(t, true)
-			rulesToInsert = append(rulesToInsert, rule)
-		}
-	}
-
-	if len(rulesToInsert) > 0 {
-		if err := h.pgDB.BatchUpsertSIEMRules(ctx, rulesToInsert); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{
-				"error": "Failed batch upserting rules: " + err.Error(),
-			})
-			return
-		}
 	}
 
 	// Enable all existing MITRE rules as well
@@ -593,7 +660,7 @@ func (h *Handler) handleSIEMMitreInstallAll(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"success":            true,
 		"total_techniques":   len(techs),
-		"new_rules_created":  len(rulesToInsert),
+		"new_rules_created":  rulesAdded,
 		"covered_techniques": report.CoveredTechniques,
 		"coverage_percent":   float64(report.CoveredTechniques) / float64(report.TotalTechniques) * 100.0,
 		"message": fmt.Sprintf("Successfully installed & enabled rules for all %d MITRE ATT&CK techniques. Matrix is now 100%% covered.", len(techs)),

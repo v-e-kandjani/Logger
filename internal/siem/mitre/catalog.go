@@ -103,6 +103,9 @@ type AlertStat struct {
 	LastSeen time.Time
 }
 
+// UpdateHook is invoked whenever the MITRE ATT&CK catalog techniques are refreshed or updated
+type UpdateHook func(techniques []Technique)
+
 // Catalog maintains the in-memory registry of MITRE ATT&CK tactics & techniques
 type Catalog struct {
 	mu              sync.RWMutex
@@ -117,8 +120,31 @@ type Catalog struct {
 	etag            string
 	newTechIDs      map[string]bool
 
-	store    Store
-	autoSync AutoSyncStatus
+	store        Store
+	autoSync     AutoSyncStatus
+	onUpdateHook UpdateHook
+}
+
+// SetOnUpdateHook registers a callback that is notified whenever matrix techniques are updated
+func (c *Catalog) SetOnUpdateHook(hook UpdateHook) {
+	c.mu.Lock()
+	c.onUpdateHook = hook
+	c.mu.Unlock()
+}
+
+// NotifyUpdate executes the registered update hook with the current set of techniques
+func (c *Catalog) NotifyUpdate() {
+	c.mu.RLock()
+	hook := c.onUpdateHook
+	techs := make([]Technique, 0, len(c.techniques))
+	for _, t := range c.techniques {
+		techs = append(techs, t)
+	}
+	c.mu.RUnlock()
+
+	if hook != nil {
+		go hook(techs)
+	}
 }
 
 // Official MITRE Enterprise ATT&CK STIX 2.1 JSON endpoint
