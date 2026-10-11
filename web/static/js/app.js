@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initResetPasswordModal();
     initChangePasswordModal();
     initArchiveTrigger();
+    initManualArchiveModal();
     initCustomExportModal();
     initStorageManagement();
     initUpdatesManagement();
@@ -813,7 +814,25 @@ async function loadArchives() {
             return;
         }
 
-        tbody.innerHTML = list.map(a => `
+        tbody.innerHTML = list.map(a => {
+            let badgeClass = 'badge-warning';
+            let badgeText = a.timestamp_status || 'PENDING';
+            if (badgeText === 'VERIFIED' || badgeText === 'STAMPED' || badgeText === 'COMMITTED') {
+                badgeClass = 'badge-success';
+                badgeText = '🛡️ ' + badgeText;
+            } else if (badgeText === 'FAILED') {
+                badgeClass = 'badge-danger';
+                badgeText = '❌ FAILED';
+            } else if (badgeText === 'TSA_PENDING' || badgeText === 'IN_PROGRESS') {
+                badgeClass = 'badge-warning';
+                badgeText = '⏳ ' + badgeText;
+            } else if (badgeText === 'SEALED') {
+                badgeClass = 'badge-secondary';
+                badgeText = '🔒 SEALED';
+            }
+            const isStamped = (a.timestamp_status === 'STAMPED' || a.timestamp_status === 'VERIFIED' || a.timestamp_status === 'COMMITTED');
+
+            return `
             <tr>
                 <td><strong>${escapeHtml(a.archive_name)}</strong></td>
                 <td><span class="badge badge-outline" style="font-size: 0.78rem;">🏢 ${escapeHtml(a.tenant || 'default')}</span></td>
@@ -823,8 +842,8 @@ async function loadArchives() {
                 <td>${(a.archive_size / 1024).toFixed(1)} KB</td>
                 <td class="mono-code" title="${a.hash_value}">${a.hash_value.substring(0, 16)}...</td>
                 <td>
-                    <span class="badge ${a.timestamp_status === 'STAMPED' ? 'badge-success' : a.timestamp_status === 'FAILED' ? 'badge-danger' : 'badge-warning'}">
-                        ${a.timestamp_status}
+                    <span class="badge ${badgeClass}">
+                        ${badgeText}
                     </span>
                 </td>
                 <td class="mono-code">${a.timestamp_evidence_path ? a.timestamp_evidence_path.split('/').pop() : 'Pending'}</td>
@@ -836,14 +855,14 @@ async function loadArchives() {
                         <a href="/api/v1/archives/download?id=${a.id}&type=archive" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download raw compressed logs (.jsonl.gz)" download>
                             ${t('btn_logs_dl', '📄 Logs (.gz)')}
                         </a>
-                        ${a.timestamp_status === 'STAMPED' && a.timestamp_evidence_path ? `
+                        ${isStamped && a.timestamp_evidence_path ? `
                         <a href="/api/v1/archives/download?id=${a.id}&type=evidence" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download legal proof / KamuSM timestamp (.zd)" download>
                             ${t('btn_evidence_dl', '🛡️ Evidence (.zd)')}
                         </a>` : ''}
                     </div>
                 </td>
             </tr>
-        `).join('');
+        `}).join('');
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="10" class="text-center text-red">${t('archives_failed', 'Failed to load archives')}: ${e.message}</td></tr>`;
     }
@@ -944,6 +963,134 @@ function initArchiveTrigger() {
             }, 5000);
         }
     });
+}
+
+function initManualArchiveModal() {
+    const modal = document.getElementById('modal-manual-archive');
+    const openBtn = document.getElementById('btn-manual-archive-sealing');
+    const closeBtn = document.getElementById('btn-close-manual-archive');
+    const cancelBtn = document.getElementById('btn-cancel-manual-archive');
+    const submitBtn = document.getElementById('btn-submit-manual-archive');
+
+    const fromInp = document.getElementById('manual-archive-from');
+    const toInp = document.getElementById('manual-archive-to');
+    const basisInp = document.getElementById('manual-archive-basis');
+    const reasonInp = document.getElementById('manual-archive-reason');
+    const errBox = document.getElementById('manual-archive-error');
+    const succBox = document.getElementById('manual-archive-success');
+
+    if (!modal || !openBtn) return;
+
+    const hideModal = () => {
+        modal.style.display = 'none';
+        if (errBox) errBox.style.display = 'none';
+        if (succBox) succBox.style.display = 'none';
+    };
+
+    const showModal = () => {
+        const now = new Date();
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const formatLocalDT = (d) => {
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+        if (fromInp) fromInp.value = formatLocalDT(oneHourAgo);
+        if (toInp) toInp.value = formatLocalDT(now);
+        if (reasonInp) reasonInp.value = '';
+        if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
+        if (succBox) { succBox.style.display = 'none'; succBox.textContent = ''; }
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = window.i18n ? window.i18n.t('btn_seal_now', 'Mühürlemeyi Başlat') : 'Mühürlemeyi Başlat';
+        }
+        modal.style.display = 'flex';
+    };
+
+    openBtn.addEventListener('click', showModal);
+    if (closeBtn) closeBtn.addEventListener('click', hideModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', hideModal);
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) hideModal();
+    });
+
+    if (submitBtn) {
+        submitBtn.addEventListener('click', async () => {
+            if (errBox) errBox.style.display = 'none';
+            if (succBox) succBox.style.display = 'none';
+
+            const fromVal = fromInp ? fromInp.value : '';
+            const toVal = toInp ? toInp.value : '';
+            const basisVal = basisInp ? basisInp.value : 'receipt_time';
+            const reasonVal = reasonInp ? reasonInp.value.trim() : '';
+
+            if (!fromVal || !toVal) {
+                if (errBox) {
+                    errBox.textContent = window.i18n ? window.i18n.t('err_archive_times_required', 'Başlangıç ve bitiş zamanları zorunludur.') : 'Başlangıç ve bitiş zamanları zorunludur.';
+                    errBox.style.display = 'block';
+                }
+                return;
+            }
+
+            const fromDate = new Date(fromVal);
+            const toDate = new Date(toVal);
+            if (toDate <= fromDate) {
+                if (errBox) {
+                    errBox.textContent = window.i18n ? window.i18n.t('err_archive_time_order', 'Bitiş zamanı başlangıç zamanından sonra olmalıdır.') : 'Bitiş zamanı başlangıç zamanından sonra olmalıdır.';
+                    errBox.style.display = 'block';
+                }
+                return;
+            }
+
+            if (!reasonVal) {
+                if (errBox) {
+                    errBox.textContent = window.i18n ? window.i18n.t('err_archive_reason_required', 'Lütfen talep nedeni / soruşturma referansı girin.') : 'Lütfen talep nedeni / soruşturma referansı girin.';
+                    errBox.style.display = 'block';
+                }
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Mühürleniyor / Sealing...';
+
+            try {
+                const res = await fetch('/api/v1/archives/manual', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        from: fromDate.toISOString(),
+                        to: toDate.toISOString(),
+                        time_basis: basisVal,
+                        reason: reasonVal
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || 'Manuel mühürleme başlatılamadı');
+                }
+
+                if (succBox) {
+                    succBox.textContent = `✓ Mühürleme görevi başarıyla başlatıldı (İş No: ${data.job_id || data.id || 'OK'}). Kanıtlar hazırlanıyor.`;
+                    succBox.style.display = 'block';
+                }
+                showToast('✓ 5651 RFC 3161 Evidence sealing job submitted!', 'success');
+                setTimeout(() => {
+                    hideModal();
+                    if (typeof loadArchives === 'function') loadArchives();
+                }, 1500);
+            } catch (err) {
+                if (errBox) {
+                    errBox.textContent = err.message;
+                    errBox.style.display = 'block';
+                }
+                showToast('Hata: ' + err.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = window.i18n ? window.i18n.t('btn_seal_now', 'Mühürlemeyi Başlat') : 'Mühürlemeyi Başlat';
+            }
+        });
+    }
 }
 
 function initDeviceModal() {

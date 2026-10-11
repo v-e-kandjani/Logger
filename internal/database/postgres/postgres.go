@@ -489,6 +489,125 @@ func (db *DB) GetArchive(ctx context.Context, id uuid.UUID) (*models.LogArchive,
 	return &a, nil
 }
 
+// ArchiveJob & Evidence methods (Law 5651 & TÜBİTAK Zamane KS Pipeline)
+func (db *DB) CreateArchiveJob(ctx context.Context, job *models.ArchiveJob) error {
+	tenant := job.TenantSlug
+	if tenant == "" {
+		tenant = "default"
+	}
+	query := `
+		INSERT INTO archive_jobs (tenant_slug, request_type, period_start, period_end, time_basis,
+		                          idempotency_key, requester, reason, state, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+		ON CONFLICT (idempotency_key) DO UPDATE
+		SET updated_at = NOW()
+		RETURNING id, created_at, updated_at`
+
+	return db.pool.QueryRow(ctx, query,
+		tenant, job.RequestType, job.PeriodStart, job.PeriodEnd, job.TimeBasis,
+		job.IdempotencyKey, job.Requester, job.Reason, job.State,
+	).Scan(&job.ID, &job.CreatedAt, &job.UpdatedAt)
+}
+
+func (db *DB) GetArchiveJob(ctx context.Context, id uuid.UUID) (*models.ArchiveJob, error) {
+	query := `
+		SELECT id, tenant_slug, request_type, period_start, period_end, time_basis,
+		       idempotency_key, requester, reason, lease_until, attempts, state, error_message,
+		       created_at, updated_at
+		FROM archive_jobs
+		WHERE id = $1`
+
+	var j models.ArchiveJob
+	err := db.pool.QueryRow(ctx, query, id).Scan(
+		&j.ID, &j.TenantSlug, &j.RequestType, &j.PeriodStart, &j.PeriodEnd, &j.TimeBasis,
+		&j.IdempotencyKey, &j.Requester, &j.Reason, &j.LeaseUntil, &j.Attempts, &j.State, &j.ErrorMessage,
+		&j.CreatedAt, &j.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &j, nil
+}
+
+func (db *DB) UpdateArchiveJobState(ctx context.Context, id uuid.UUID, state, errorMsg string) error {
+	query := `
+		UPDATE archive_jobs
+		SET state = $1, error_message = $2, updated_at = NOW()
+		WHERE id = $3`
+	_, err := db.pool.Exec(ctx, query, state, errorMsg, id)
+	return err
+}
+
+func (db *DB) ListArchiveJobs(ctx context.Context, tenant string, limit int) ([]models.ArchiveJob, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	var query string
+	var rows pgx.Rows
+	var err error
+
+	if tenant == "" || tenant == "all" {
+		query = `
+			SELECT id, tenant_slug, request_type, period_start, period_end, time_basis,
+			       idempotency_key, requester, reason, lease_until, attempts, state, error_message,
+			       created_at, updated_at
+			FROM archive_jobs
+			ORDER BY created_at DESC
+			LIMIT $1`
+		rows, err = db.pool.Query(ctx, query, limit)
+	} else {
+		query = `
+			SELECT id, tenant_slug, request_type, period_start, period_end, time_basis,
+			       idempotency_key, requester, reason, lease_until, attempts, state, error_message,
+			       created_at, updated_at
+			FROM archive_jobs
+			WHERE tenant_slug = $1
+			ORDER BY created_at DESC
+			LIMIT $2`
+		rows, err = db.pool.Query(ctx, query, tenant, limit)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.ArchiveJob
+	for rows.Next() {
+		var j models.ArchiveJob
+		if err := rows.Scan(
+			&j.ID, &j.TenantSlug, &j.RequestType, &j.PeriodStart, &j.PeriodEnd, &j.TimeBasis,
+			&j.IdempotencyKey, &j.Requester, &j.Reason, &j.LeaseUntil, &j.Attempts, &j.State, &j.ErrorMessage,
+			&j.CreatedAt, &j.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, j)
+	}
+	return list, nil
+}
+
+func (db *DB) SaveArchiveManifest(ctx context.Context, m *models.ArchiveManifest) error {
+	query := `
+		INSERT INTO archive_manifests (archive_id, manifest_content, manifest_sha256, payload_sha256, schema_version, prior_manifest_sha256, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+		RETURNING id, created_at`
+	return db.pool.QueryRow(ctx, query,
+		m.ArchiveID, m.ManifestContent, m.ManifestSHA256, m.PayloadSHA256, m.SchemaVersion, m.PriorManifestSHA256,
+	).Scan(&m.ID, &m.CreatedAt)
+}
+
+func (db *DB) SaveArchiveTimestamp(ctx context.Context, ts *models.ArchiveTimestamp) error {
+	query := `
+		INSERT INTO archive_timestamps (manifest_id, request_id, token_bytes, tsa_identity, tsa_policy, tsa_serial, tsa_time,
+		                                imprint_algorithm, signature_algorithm, verification_outcome, verification_details, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+		RETURNING id, created_at`
+	return db.pool.QueryRow(ctx, query,
+		ts.ManifestID, ts.RequestID, ts.TokenBytes, ts.TSAIdentity, ts.TSAPolicy, ts.TSASerial, ts.TSATime,
+		ts.ImprintAlgorithm, ts.SignatureAlgorithm, ts.VerificationOutcome, ts.VerificationDetails,
+	).Scan(&ts.ID, &ts.CreatedAt)
+}
+
 // AuditLog recording
 func (db *DB) InsertAuditLog(ctx context.Context, a *models.AuditLog) error {
 	ipStr := strings.TrimSpace(a.SourceIP)
@@ -1684,6 +1803,68 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) DEFAULT 'default';
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS is_tenant_admin BOOLEAN DEFAULT FALSE;
+
+	-- Evidence Archive Tables (Law 5651 & TÜBİTAK Zamane KS Pipeline)
+	CREATE TABLE IF NOT EXISTS archive_jobs (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default',
+		request_type VARCHAR(32) NOT NULL DEFAULT 'HOURLY_SCHEDULED',
+		period_start TIMESTAMPTZ NOT NULL,
+		period_end TIMESTAMPTZ NOT NULL,
+		time_basis VARCHAR(32) NOT NULL DEFAULT 'receipt_time',
+		idempotency_key VARCHAR(128) NOT NULL UNIQUE,
+		requester VARCHAR(64) NOT NULL DEFAULT 'system',
+		reason TEXT DEFAULT '',
+		lease_until TIMESTAMPTZ,
+		attempts INT NOT NULL DEFAULT 0,
+		state VARCHAR(32) NOT NULL DEFAULT 'QUEUED',
+		error_message TEXT DEFAULT '',
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_archive_jobs_state ON archive_jobs(state, lease_until);
+	CREATE INDEX IF NOT EXISTS idx_archive_jobs_tenant ON archive_jobs(tenant_slug, period_start);
+
+	CREATE TABLE IF NOT EXISTS archive_manifests (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		archive_id UUID NOT NULL,
+		manifest_content BYTEA NOT NULL,
+		manifest_sha256 VARCHAR(64) NOT NULL,
+		payload_sha256 VARCHAR(64) NOT NULL,
+		schema_version VARCHAR(16) NOT NULL DEFAULT '1.0',
+		prior_manifest_sha256 VARCHAR(64) DEFAULT '',
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_manifest_archive ON archive_manifests(archive_id);
+	CREATE INDEX IF NOT EXISTS idx_manifest_hash ON archive_manifests(manifest_sha256);
+
+	CREATE TABLE IF NOT EXISTS archive_timestamps (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		manifest_id UUID NOT NULL REFERENCES archive_manifests(id) ON DELETE CASCADE,
+		request_id VARCHAR(64) NOT NULL DEFAULT '',
+		token_bytes BYTEA NOT NULL,
+		tsa_identity VARCHAR(128) NOT NULL DEFAULT 'TÜBİTAK KamuSM / Zamane KS',
+		tsa_policy VARCHAR(64) NOT NULL DEFAULT '',
+		tsa_serial VARCHAR(64) NOT NULL DEFAULT '',
+		tsa_time TIMESTAMPTZ,
+		imprint_algorithm VARCHAR(32) NOT NULL DEFAULT 'SHA-256',
+		signature_algorithm VARCHAR(32) NOT NULL DEFAULT 'SHA256withRSA',
+		verification_outcome VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+		verification_details TEXT DEFAULT '',
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_ts_manifest ON archive_timestamps(manifest_id);
+
+	CREATE TABLE IF NOT EXISTS archive_audit (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		archive_id UUID,
+		tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default',
+		action VARCHAR(64) NOT NULL,
+		operator VARCHAR(64) NOT NULL DEFAULT 'system',
+		details JSONB DEFAULT '{}',
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_archive_audit_tenant ON archive_audit(tenant_slug, created_at);
 
 	-- Backfill: tenant admins provisioned before tenant_slug was persisted (never touches Super Administrators)
 	UPDATE users u SET tenant_slug = t.slug, is_tenant_admin = TRUE

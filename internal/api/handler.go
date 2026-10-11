@@ -54,6 +54,7 @@ type Handler struct {
 	mfaTickets       *MFATicketManager
 	httpsMgr         *https.Manager
 	resultCache      *cache.ResultCache
+	evidenceSealer   *archive.EvidenceSealer
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
@@ -87,7 +88,7 @@ func NewHandler(
 	mc *metrics.Collector,
 	node string,
 ) *Handler {
-	return &Handler{
+	h := &Handler{
 		pipeline:         pipe,
 		chClient:         ch,
 		pgDB:             pg,
@@ -102,6 +103,13 @@ func NewHandler(
 		mfaTickets:       NewMFATicketManager(),
 		resultCache:      cache.GetResultCache(),
 	}
+
+	if ae != nil {
+		h.evidenceSealer = archive.NewEvidenceSealer(ch, pg, ts, ae.BaseDir())
+		h.evidenceSealer.StartHourlyScheduler(context.Background())
+	}
+
+	return h
 }
 
 func (h *Handler) requireAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -174,6 +182,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/archives", h.requireAuth(h.handleArchives))
 	mux.HandleFunc("/api/v1/archives/create", h.requireAuth(h.handleCreateArchiveNow))
 	mux.HandleFunc("/api/v1/archives/download", h.requireAuth(h.handleDownloadArchive))
+	mux.HandleFunc("/api/v1/archives/manual", h.requireAuth(h.handleManualArchiveAPI))
+	mux.HandleFunc("/api/v1/archives/jobs", h.requireAuth(h.handleListArchiveJobsAPI))
 	mux.HandleFunc("/api/v1/archives/export-custom", h.requireAuth(h.handleExportCustomRange))
 	mux.HandleFunc("/api/v1/archives/export-custom/start", h.requireAuth(h.handleExportCustomStart))
 	mux.HandleFunc("/api/v1/archives/export-custom/progress", h.requireAuth(h.handleExportCustomProgress))

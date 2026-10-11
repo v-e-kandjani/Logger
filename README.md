@@ -260,6 +260,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.6.1** (Hourly SHA-256 Evidence Pipeline & TÜBİTAK Zamane KS Law 5651 Integration):
+  - **Deterministic 6-Stage Sealing Engine (`internal/archive/sealer.go`)**: Built an immutable evidence pipeline (`QUEUED` ➔ `BUILDING` ➔ `SEALED` ➔ `TSA_PENDING` ➔ `VERIFIED` ➔ `COMMITTED`) with atomic SHA-256 tree hashing, canonical manifests, and background hourly reconciler (`StartHourlyScheduler`).
+  - **TÜBİTAK Zamane KS Adapter (`internal/timestamp/zamane.go`)**: Implemented unprivileged subprocess runner with memory limits (`-Xmx256m`), timeouts, and RFC 3161 DER verification for Law 5651 legal compliance.
+  - **Relational Evidence Catalog**: Migrated PostgreSQL schema to store archive jobs, manifests, timestamp proofs, and audit logs.
+  - **Manual Sealing API & Dashboard Modal**: Added `/api/v1/archives/manual` and `/api/v1/archives/jobs` REST endpoints with a dedicated dashboard modal (`#modal-manual-archive`) for on-demand forensic sealing and instant status tracking.
+
 - **v1.6.0** (Web-Based SIEM Architecture: CPU/RAM Resource Governor & Cgroups v2 Slice Isolation):
   - **Linux Cgroups v2 & Systemd Slice Hierarchy**: Introduced three-tier cgroup slices (`siem.slice`, `siem-control.slice`, `siem-data.slice`) with strict CPU quotas and memory boundaries (`AllowedCPUs`, `CPUQuota`, `MemoryHigh`, `MemoryMax`, `MemoryLow`), separating management access from worker load.
   - **Dynamic Resource Governor (`internal/governor`)**: Implemented automated host and cgroup metric probe with 4-phase state machine (`Normal`, `Pressure`, `Critical`, `Recovery`) to dynamically arbitrate query admission, report execution, and memory pressure.

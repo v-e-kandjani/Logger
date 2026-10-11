@@ -107,6 +107,65 @@ type LogArchive struct {
 	CreatedAt               time.Time  `json:"created_at"`
 }
 
+// ArchiveJob represents an asynchronous sealing task in the deterministic state machine
+type ArchiveJob struct {
+	ID             uuid.UUID  `json:"id"`
+	TenantSlug     string     `json:"tenant_slug"`
+	RequestType    string     `json:"request_type"` // HOURLY_SCHEDULED, MANUAL_PERIOD
+	PeriodStart    time.Time  `json:"period_start"`
+	PeriodEnd      time.Time  `json:"period_end"`
+	TimeBasis      string     `json:"time_basis"` // receipt_time, event_time
+	IdempotencyKey string     `json:"idempotency_key"`
+	Requester      string     `json:"requester"`
+	Reason         string     `json:"reason,omitempty"`
+	LeaseUntil     *time.Time `json:"lease_until,omitempty"`
+	Attempts       int        `json:"attempts"`
+	State          string     `json:"state"` // QUEUED, BUILDING, SEALED, TSA_PENDING, VERIFIED, COMMITTED, FAILED
+	ErrorMessage   string     `json:"error_message,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// ArchiveManifest records exact canonical manifest bytes and SHA-256 payload digests
+type ArchiveManifest struct {
+	ID                   uuid.UUID `json:"id"`
+	ArchiveID            uuid.UUID `json:"archive_id"`
+	ManifestContent      []byte    `json:"manifest_content,omitempty"`
+	ManifestSHA256       string    `json:"manifest_sha256"`
+	PayloadSHA256        string    `json:"payload_sha256"`
+	SchemaVersion        string    `json:"schema_version"`
+	PriorManifestSHA256  string    `json:"prior_manifest_sha256,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+}
+
+// ArchiveTimestamp records verified RFC 3161 / TÜBİTAK Zamane KS evidence tokens
+type ArchiveTimestamp struct {
+	ID                  uuid.UUID  `json:"id"`
+	ManifestID          uuid.UUID  `json:"manifest_id"`
+	RequestID           string     `json:"request_id"`
+	TokenBytes          []byte     `json:"token_bytes,omitempty"`
+	TSAIdentity         string     `json:"tsa_identity"`
+	TSAPolicy           string     `json:"tsa_policy"`
+	TSASerial           string     `json:"tsa_serial"`
+	TSATime             *time.Time `json:"tsa_time,omitempty"`
+	ImprintAlgorithm    string     `json:"imprint_algorithm"`
+	SignatureAlgorithm  string     `json:"signature_algorithm"`
+	VerificationOutcome string     `json:"verification_outcome"` // VERIFIED, FAILED, PENDING
+	VerificationDetails string     `json:"verification_details,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+}
+
+// ArchiveAudit tracks append-only evidence preservation, verification, and retrieval events
+type ArchiveAudit struct {
+	ID         uuid.UUID              `json:"id"`
+	ArchiveID  *uuid.UUID             `json:"archive_id,omitempty"`
+	TenantSlug string                 `json:"tenant_slug"`
+	Action     string                 `json:"action"` // SEAL_STARTED, SEAL_COMPLETED, TSA_STAMPED, VERIFIED, EXPORTED, LEGAL_HOLD_APPLIED
+	Operator   string                 `json:"operator"`
+	Details    map[string]interface{} `json:"details,omitempty"`
+	CreatedAt  time.Time              `json:"created_at"`
+}
+
 // AuditLog tracks administrative actions
 type AuditLog struct {
 	ID         uuid.UUID              `json:"id"`

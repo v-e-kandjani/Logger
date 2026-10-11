@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.6.0</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.6.1</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -727,8 +727,9 @@
 
             <!-- TAB: Archives -->
             <section class="tab-pane" id="pane-archives">
-                <div class="section-actions">
-                    <h3 data-i18n="archives_header">Immutable Log Archives & KamuSM Zaman Damgası Evidence</h3>
+                <div class="section-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <h3 data-i18n="archives_header" style="margin-right: auto;">Immutable Log Archives & KamuSM Zaman Damgası Evidence</h3>
+                    <button class="btn btn-outline" id="btn-manual-archive-sealing" data-i18n="btn_manual_archive">+ 5651 Manuel Mühürleme (RFC 3161)</button>
                     <button class="btn btn-primary" id="btn-archives-custom-export" data-i18n="btn_custom_export">+ Özel Aralık Mühürle & İndir</button>
                 </div>
                 <div class="table-container">
@@ -1824,7 +1825,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.6.0</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.6.1</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -2199,6 +2200,46 @@
             <div class="modal-footer">
                 <button class="btn btn-outline" id="btn-cancel-reset-modal" data-i18n="btn_cancel">Cancel</button>
                 <button class="btn btn-primary" id="btn-save-reset-password" data-i18n="btn_update_password">Update Password</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Evidence Archive Modal (RFC 3161 / Law 5651) -->
+    <div class="modal-backdrop" id="modal-manual-archive" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 data-i18n="modal_manual_archive_title">5651 Manuel Zaman Damgası Mühürleme Talebi</h3>
+                <button class="btn-close" id="btn-close-manual-archive">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;" data-i18n="modal_manual_archive_desc">
+                    Belirlenen tarih aralığındaki ham log kayıtları SHA-256 özeti çıkarılarak TÜBİTAK Zamane KS / RFC 3161 zaman damgasıyla mühürlenir ve kanıt paketine işlenir.
+                </p>
+                <div class="form-group">
+                    <label data-i18n="lbl_archive_start_time">Başlangıç Zamanı</label>
+                    <input type="datetime-local" class="input" id="manual-archive-from" required>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="lbl_archive_end_time">Bitiş Zamanı</label>
+                    <input type="datetime-local" class="input" id="manual-archive-to" required>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="lbl_time_basis">Zaman Referansı</label>
+                    <select class="input" id="manual-archive-basis">
+                        <option value="receipt_time">Alınma Zamanı (Receipt Time - UTC / Önerilen)</option>
+                        <option value="event_time">Olay Zamanı (Event Time - Cihaz Kaydı)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="lbl_archive_reason">Talep Nedeni / Soruşturma Referansı</label>
+                    <input type="text" class="input" id="manual-archive-reason" placeholder="Örn: 5651 Denetimi veya Güvenlik İncelemesi" required>
+                </div>
+                <div id="manual-archive-error" class="alert-box alert-danger" style="display: none; margin-top: 8px; font-size: 0.85rem;"></div>
+                <div id="manual-archive-success" class="alert-box alert-success" style="display: none; margin-top: 8px; font-size: 0.85rem; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 8px 12px; border-radius: 6px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-manual-archive" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" id="btn-submit-manual-archive" data-i18n="btn_seal_now">Mühürlemeyi Başlat</button>
             </div>
         </div>
     </div>
@@ -3312,7 +3353,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.6.0"></script>
-    <script src="/static/js/app.js?v=1.6.0"></script>
+    <script src="/static/js/translations.js?v=1.6.1"></script>
+    <script src="/static/js/app.js?v=1.6.1"></script>
 </body>
 </html>

@@ -249,6 +249,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.6.1** (Saatlik SHA-256 Kanıt Hattı ve TÜBİTAK Zamane KS 5651 Entegrasyonu):
+  - **Deterministik 6 Aşamalı Mühürleme Motoru (`internal/archive/sealer.go`)**: Ham log kayıtlarını SHA-256 ağaç özeti ile kanıt paketlerine dönüştüren, saatlik otomatik tetikleyici (`StartHourlyScheduler`) ve 6 adımlı durum makinesi (`QUEUED` ➔ `BUILDING` ➔ `SEALED` ➔ `TSA_PENDING` ➔ `VERIFIED` ➔ `COMMITTED`) geliştirildi.
+  - **TÜBİTAK Zamane KS Uyarlayıcısı (`internal/timestamp/zamane.go`)**: 5651 sayılı kanun uyumluluğu için kısıtlı bellek (`-Xmx256m`), zaman aşımı koruması ve RFC 3161 DER doğrulama desteğine sahip alt süreç yöneticisi entegre edildi.
+  - **İlişkisel Kanıt Kataloğu**: Arşiv görevleri, manifestolar, zaman damgaları ve denetim kayıtları için PostgreSQL şeması ve havuz katmanı genişletildi.
+  - **Manuel Mühürleme API'si ve Arayüz Modalı**: İsteğe bağlı adli mühürleme için `/api/v1/archives/manual` ve `/api/v1/archives/jobs` uç noktaları ile web arayüzüne 5651 manuel mühürleme modalı (`#modal-manual-archive`) eklendi.
+
 - **v1.6.0** (Web Tabanlı SIEM Mimarisi: CPU/RAM Kaynak Yöneticisi & Cgroups v2 Slice İzolasyonu):
   - **Linux Cgroups v2 & Systemd Slice Hiyerarşisi**: Yönetim erişimi ile veri düzlemini birbirinden izole eden üç katmanlı cgroup dilimi (`siem.slice`, `siem-control.slice`, `siem-data.slice`) ve katı CPU/bellek kotaları (`AllowedCPUs`, `CPUQuota`, `MemoryHigh`, `MemoryMax`, `MemoryLow`) eklendi.
   - **Dinamik Kaynak Yöneticisi (`internal/governor`)**: 4 aşamalı durum makinesi (`Normal`, `Pressure`, `Critical`, `Recovery`) ile cgroup ve sistem yükünü izleyen, sorgu kabulünü ve raporları otomatik frenleyen denetçi çekirdeği geliştirildi.

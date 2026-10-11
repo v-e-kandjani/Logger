@@ -37,6 +37,11 @@ func NewEngine(baseDir string, chClient *clickhouse.Client, pgDB *postgres.DB, p
 	}
 }
 
+// BaseDir returns the root archive directory
+func (e *Engine) BaseDir() string {
+	return e.baseDir
+}
+
 // StartAutoArchiving starts background worker that triggers periodic hourly archiving and timestamping
 func (e *Engine) StartAutoArchiving(ctx context.Context, interval string, scheduleMinute int) {
 	if scheduleMinute < 0 || scheduleMinute > 59 {
