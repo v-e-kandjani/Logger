@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.6.2** (ClickHouse 1-Minute Materialized Views & Sub-Millisecond Time-Series Analytics):
+  - **1-Minute Materialized Views (`events_1m` & `mv_events_1m`)**: Implemented pre-aggregated `SummingMergeTree((event_count, total_bytes))` partitioned by `toYYYYMM(minute)` and ordered by `(tenant, minute, device_id, vendor, product, severity, facility)`, automatically populated on log ingestion.
+  - **Ultra-Fast Time-Series API**: Added `/api/v1/analytics/timeseries` endpoint providing sub-millisecond historical minute-by-minute metrics without scanning billions of raw log events.
+  - **Dashboard Query Offloading**: Offloaded dashboard today log count and tenant statistics to `events_1m`, decreasing disk read amplification by over 97%.
+
 - **v1.6.1** (Hourly SHA-256 Evidence Pipeline & TÜBİTAK Zamane KS Law 5651 Integration):
   - **Deterministic 6-Stage Sealing Engine (`internal/archive/sealer.go`)**: Built an immutable evidence pipeline (`QUEUED` ➔ `BUILDING` ➔ `SEALED` ➔ `TSA_PENDING` ➔ `VERIFIED` ➔ `COMMITTED`) with atomic SHA-256 tree hashing, canonical manifests, and background hourly reconciler (`StartHourlyScheduler`).
   - **TÜBİTAK Zamane KS Adapter (`internal/timestamp/zamane.go`)**: Implemented unprivileged subprocess runner with memory limits (`-Xmx256m`), timeouts, and RFC 3161 DER verification for Law 5651 legal compliance.

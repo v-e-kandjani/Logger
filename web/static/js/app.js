@@ -3754,6 +3754,22 @@ function initUpdatesManagement() {
 let telemetryChartTimer = null;
 let telemetryHistoryData = null;
 
+async function fetchTimeseriesAnalytics(hours = 24) {
+    try {
+        let url = `/api/v1/analytics/timeseries?hours=${hours}`;
+        if (typeof currentTenantContext !== 'undefined' && currentTenantContext && currentTenantContext !== 'all' && currentTenantContext !== '*') {
+            url += `&tenant=${encodeURIComponent(currentTenantContext)}`;
+        }
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (e) {
+        console.error('Failed to fetch timeseries analytics:', e);
+        return null;
+    }
+}
+window.fetchTimeseriesAnalytics = fetchTimeseriesAnalytics;
+
 function initTelemetryCharts() {
     const canvasCPU = document.getElementById('chart-canvas-cpu');
     const canvasRAM = document.getElementById('chart-canvas-ram');

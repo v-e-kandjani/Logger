@@ -81,6 +81,58 @@ func NewClient(cfg config.ClickHouseConfig) (*Client, error) {
 		log.Printf("[ClickHouse] tenant column migration warning: %v", err)
 	}
 
+	// Phase 3: 1-Minute Materialized View table & view initialization
+	events1mSQL := fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s.events_1m
+		(
+			minute DateTime CODEC(DoubleDelta, ZSTD(1)),
+			tenant LowCardinality(String) DEFAULT 'default',
+			device_id UUID,
+			device_name LowCardinality(String),
+			vendor LowCardinality(String),
+			product LowCardinality(String),
+			severity LowCardinality(String),
+			facility LowCardinality(String),
+			event_count UInt64,
+			total_bytes UInt64
+		)
+		ENGINE = SummingMergeTree((event_count, total_bytes))
+		PARTITION BY toYYYYMM(minute)
+		ORDER BY (tenant, minute, device_id, vendor, product, severity, facility)
+		SETTINGS index_granularity = 8192
+	`, c.Database())
+	if err := conn.Exec(ctx, events1mSQL); err != nil {
+		log.Printf("[ClickHouse] events_1m table init warning: %v", err)
+	}
+
+	mv1mSQL := fmt.Sprintf(`
+		CREATE MATERIALIZED VIEW IF NOT EXISTS %s.mv_events_1m TO %s.events_1m AS
+		SELECT
+			toStartOfMinute(received_at) AS minute,
+			tenant,
+			device_id,
+			device_name,
+			vendor,
+			product,
+			severity,
+			facility,
+			count() AS event_count,
+			sum(length(raw_message)) AS total_bytes
+		FROM %s.syslog_events
+		GROUP BY
+			minute,
+			tenant,
+			device_id,
+			device_name,
+			vendor,
+			product,
+			severity,
+			facility
+	`, c.Database(), c.Database(), c.Database())
+	if err := conn.Exec(ctx, mv1mSQL); err != nil {
+		log.Printf("[ClickHouse] mv_events_1m materialized view init warning: %v", err)
+	}
+
 	c.insertQuery = fmt.Sprintf(`
 		INSERT INTO %s.syslog_events (
 			internal_id, event_timestamp, received_at, source_ip, source_port,
@@ -363,4 +415,92 @@ func (c *Client) GetTenantStorageBreakdown(ctx context.Context) (map[string]uint
 	}
 	return res, nil
 }
+
+// MinuteMetric represents a 1-minute aggregated metrics bucket
+type MinuteMetric struct {
+	Minute     time.Time `json:"minute"`
+	Tenant     string    `json:"tenant"`
+	DeviceID   string    `json:"device_id,omitempty"`
+	DeviceName string    `json:"device_name,omitempty"`
+	Vendor     string    `json:"vendor,omitempty"`
+	Product    string    `json:"product,omitempty"`
+	Severity   string    `json:"severity,omitempty"`
+	Facility   string    `json:"facility,omitempty"`
+	EventCount uint64    `json:"event_count"`
+	TotalBytes uint64    `json:"total_bytes"`
+}
+
+// GetTimeseries1m returns minute-by-minute aggregated event counts and byte volumes
+func (c *Client) GetTimeseries1m(ctx context.Context, tenant string, from, to time.Time) ([]MinuteMetric, error) {
+	whereClauses := "minute >= ? AND minute <= ?"
+	args := []interface{}{from, to}
+
+	if tenant != "" && tenant != "all" && tenant != "*" {
+		whereClauses += " AND tenant = ?"
+		args = append(args, tenant)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			minute,
+			tenant,
+			sum(event_count) AS event_count,
+			sum(total_bytes) AS total_bytes
+		FROM %s.events_1m
+		WHERE %s
+		GROUP BY minute, tenant
+		ORDER BY minute ASC
+	`, c.Database(), whereClauses)
+
+	rows, err := c.conn.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var metrics []MinuteMetric
+	for rows.Next() {
+		var m MinuteMetric
+		if err := rows.Scan(&m.Minute, &m.Tenant, &m.EventCount, &m.TotalBytes); err == nil {
+			metrics = append(metrics, m)
+		}
+	}
+	return metrics, nil
+}
+
+// GetAggregatedCounts1m retrieves today's count and all-time total count using events_1m summing table
+func (c *Client) GetAggregatedCounts1m(ctx context.Context, tenant string, todayStart time.Time) (todayCount uint64, totalCount uint64, err error) {
+	var query string
+	var rows driver.Rows
+
+	if tenant != "" && tenant != "all" && tenant != "*" {
+		query = fmt.Sprintf(`
+			SELECT
+				sumIf(event_count, minute >= ?),
+				sum(event_count)
+			FROM %s.events_1m
+			WHERE tenant = ?
+		`, c.Database())
+		rows, err = c.conn.Query(ctx, query, todayStart, tenant)
+	} else {
+		query = fmt.Sprintf(`
+			SELECT
+				sumIf(event_count, minute >= ?),
+				sum(event_count)
+			FROM %s.events_1m
+		`, c.Database())
+		rows, err = c.conn.Query(ctx, query, todayStart)
+	}
+
+	if err != nil {
+		return 0, 0, err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		_ = rows.Scan(&todayCount, &totalCount)
+	}
+	return todayCount, totalCount, nil
+}
+
 

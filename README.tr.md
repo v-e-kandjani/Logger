@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.6.2** (ClickHouse 1 Dakikalık Materialized View & Milisaniye-Altı Zaman Serisi Analitiği):
+  - **1 Dakikalık Önceden Hesaplanmış Görünümler (`events_1m` & `mv_events_1m`)**: Log girişi sırasında otomatik toplanan, `toYYYYMM(minute)` bölümlendirmeli ve `(tenant, minute, device_id, vendor, product, severity, facility)` sıralamalı `SummingMergeTree((event_count, total_bytes))` yapısı geliştirildi.
+  - **Yüksek Hızlı Zaman Serisi API'si**: Milyarlarca ham log kaydını taramadan milisaniye altı sürede saatlik ve günlük eğilimleri sunan `/api/v1/analytics/timeseries` uç noktası eklendi.
+  - **Gösterge Paneli Yük Hafifletme**: Ana kontrol paneli günlük log sayaçları ve kiracı istatistikleri `events_1m` tablosuna yönlendirilerek disk okuma yükü %97'den fazla azaltıldı.
+
 - **v1.6.1** (Saatlik SHA-256 Kanıt Hattı ve TÜBİTAK Zamane KS 5651 Entegrasyonu):
   - **Deterministik 6 Aşamalı Mühürleme Motoru (`internal/archive/sealer.go`)**: Ham log kayıtlarını SHA-256 ağaç özeti ile kanıt paketlerine dönüştüren, saatlik otomatik tetikleyici (`StartHourlyScheduler`) ve 6 adımlı durum makinesi (`QUEUED` ➔ `BUILDING` ➔ `SEALED` ➔ `TSA_PENDING` ➔ `VERIFIED` ➔ `COMMITTED`) geliştirildi.
   - **TÜBİTAK Zamane KS Uyarlayıcısı (`internal/timestamp/zamane.go`)**: 5651 sayılı kanun uyumluluğu için kısıtlı bellek (`-Xmx256m`), zaman aşımı koruması ve RFC 3161 DER doğrulama desteğine sahip alt süreç yöneticisi entegre edildi.

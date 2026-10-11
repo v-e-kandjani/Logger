@@ -213,6 +213,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/system/update/apply", h.requireAuth(h.handleSystemUpdateApply))
 	mux.HandleFunc("/api/v1/system/metrics", h.requireAuth(h.handleMetricsCurrent))
 	mux.HandleFunc("/api/v1/system/metrics/history", h.requireAuth(h.handleMetricsHistory))
+	mux.HandleFunc("/api/v1/analytics/timeseries", h.requireAuth(h.handleAnalyticsTimeseriesAPI))
 	mux.HandleFunc("/api/v1/governor/status", h.requireAuth(h.handleGovernorStatusAPI))
 
 	// Support & Debug Diagnostic Package Endpoints
@@ -336,14 +337,19 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 
 	if !cacheValid {
 		todayStart := time.Now().UTC().Truncate(24 * time.Hour)
-		// Partition-pruned count query on event_timestamp
-		countQuery := fmt.Sprintf("SELECT count() FROM %s.syslog_events WHERE event_timestamp >= ?", h.chClient.Database())
-		row, err := h.chClient.QueryEvents(ctx, countQuery, todayStart)
-		if err == nil && row != nil {
-			if row.Next() {
-				_ = row.Scan(&countToday)
+		// Use ultra-fast pre-aggregated events_1m SummingMergeTree with fallback to raw query
+		var qErr error
+		countToday, _, qErr = h.chClient.GetAggregatedCounts1m(ctx, "", todayStart)
+		if qErr != nil || countToday == 0 {
+			// Partition-pruned count query on event_timestamp fallback
+			countQuery := fmt.Sprintf("SELECT count() FROM %s.syslog_events WHERE event_timestamp >= ?", h.chClient.Database())
+			row, err := h.chClient.QueryEvents(ctx, countQuery, todayStart)
+			if err == nil && row != nil {
+				if row.Next() {
+					_ = row.Scan(&countToday)
+				}
+				row.Close()
 			}
-			row.Close()
 		}
 
 		storageStats, _ = h.chClient.GetStorageStats(ctx)
@@ -408,12 +414,18 @@ func (h *Handler) tenantLogCounts(ctx context.Context, tenant string) (uint64, u
 
 	var c counts
 	todayStart := time.Now().UTC().Truncate(24 * time.Hour)
-	q := fmt.Sprintf("SELECT countIf(event_timestamp >= ?), count() FROM %s.syslog_events WHERE tenant = ?", h.chClient.Database())
-	if rows, err := h.chClient.QueryEvents(ctx, q, todayStart, tenant); err == nil && rows != nil {
-		if rows.Next() {
-			_ = rows.Scan(&c.Today, &c.Total)
+	tToday, tTotal, err := h.chClient.GetAggregatedCounts1m(ctx, tenant, todayStart)
+	if err == nil && tTotal > 0 {
+		c.Today = tToday
+		c.Total = tTotal
+	} else {
+		q := fmt.Sprintf("SELECT countIf(event_timestamp >= ?), count() FROM %s.syslog_events WHERE tenant = ?", h.chClient.Database())
+		if rows, err := h.chClient.QueryEvents(ctx, q, todayStart, tenant); err == nil && rows != nil {
+			if rows.Next() {
+				_ = rows.Scan(&c.Today, &c.Total)
+			}
+			rows.Close()
 		}
-		rows.Close()
 	}
 	if h.resultCache != nil {
 		if b, err := json.Marshal(c); err == nil {
@@ -1859,4 +1871,44 @@ func (h *Handler) handleExportCustomRange(w http.ResponseWriter, r *http.Request
 
 func contextWithTimeout(r *http.Request, d time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(r.Context(), d)
+}
+
+// handleAnalyticsTimeseriesAPI returns 1-minute aggregated log counts and byte volumes
+// GET /api/v1/analytics/timeseries?hours=24
+func (h *Handler) handleAnalyticsTimeseriesAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	hoursStr := r.URL.Query().Get("hours")
+	hours := 24
+	if hoursStr != "" {
+		if val, err := strconv.Atoi(hoursStr); err == nil && val > 0 && val <= 720 {
+			hours = val
+		}
+	}
+
+	tenant := h.tenantScope(r)
+	now := time.Now().UTC()
+	from := now.Add(-time.Duration(hours) * time.Hour)
+
+	metrics, err := h.chClient.GetTimeseries1m(r.Context(), tenant, from, now)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	if metrics == nil {
+		metrics = []clickhouse.MinuteMetric{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"tenant":  tenant,
+		"hours":   hours,
+		"from":    from,
+		"to":      now,
+		"buckets": len(metrics),
+		"series":  metrics,
+	})
 }
