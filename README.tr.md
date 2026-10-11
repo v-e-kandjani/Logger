@@ -251,6 +251,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 
 ---
 
+- **v1.5.18** (Sistem Destek ve Tanılama Paketi (Tar), Parola Korumalı İndirme Kapısı & Kök Yöneticiye İletim):
+  - **Sistem Destek ve Hata Ayıklama Paketi (.tar.gz Arşivi)**: Sistem ortamı, sunucu donanım özellikleri, filtrelenmiş/arındırılmış sistem ayarları (tüm şifreler, anahtarlar ve tokenlar gizlenir), veri toplama boru hattı metrikleri, veritabanı envanter sayaçları, ağ arabirimleri ve son uygulama çalışma günlüklerini içeren standart `.tar.gz` formatında otomatik tanılama paketi üreteci.
+  - **Parola Korumalı ve Kimlik Doğrulamalı İndirme Kapısı (`/support/download`)**: Üretilen arşivin yetkisiz kişilerin eline geçmesini kesin olarak engelleyen, aktif Süper Yönetici oturumu veya pakete özel 10 haneli kriptografik güvenlik şifresi (`SUP-XXXX-XXXX`) gerektiren bağımsız güvenli indirme sayfası.
+  - **Kök Süper Yöneticiye Otomatik E-Posta Gönderimi (SMTP)**: SMTP motoru üzerinden paket oluşturulduğunda Kök Süper Yöneticiye talep detayını, doğrudan indirme bağlantısını ve güvenlik şifresini içeren biçimlendirilmiş e-posta bildirimi gönderir.
+  - **Arayüz Entegrasyonu**: Ayarlar menüsü altında "Destek & Hata Ayıklama (Debug)" sekmesi, geçmiş paketler tablosu ve Sistem Sağlığı (`#pane-health`) içerisinde tek tıkla destek paketi oluşturma butonu.
+
 - **v1.5.17** (Docker Olmadan Doğrudan Standalone Linux Kurulumu, Cihaz Kiracı Atama & Tam Arayüz Yerelleştirmesi):
   - **Standalone (Docker Olmadan) Linux Kurulum Betiği (`install_standalone.sh` & `STANDALONE_INSTALL.md`)**: Ubuntu 20.04, 22.04, 24.04 ve 26.04 LTS (ile Debian 11/12) üzerinde Docker çalıştırmadan platformun yerel servis olarak kurulması sağlandı. Yerel PostgreSQL, ClickHouse Server, OpenJDK 17 JRE Headless ve Go servislerini otomatik kurar; şemaları uygular ve `syslog-platform.service` systemd servisini yapılandırır.
   - **Cihaz Kiracı Atama ve Güncelleme**: Kayıtlı ve keşfedilen/bilinmeyen ağ cihazlarının istenen kiracıya (örn. `1ware`) atanabilmesi sağlandı. Cihaz grubu, üretici ve kiracı taşımalarını destekleyen `PUT /api/v1/devices` uç noktası ve `UpdateDevice` metodu geliştirildi.

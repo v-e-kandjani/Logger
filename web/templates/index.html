@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.17</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.18</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -133,6 +133,10 @@
                         <a class="nav-subitem" data-target="setting-section-tenants">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
                             <span data-i18n="nav_sub_tenants">Kiracı Yönetimi (Tenants)</span>
+                        </a>
+                        <a class="nav-subitem" data-target="setting-section-debug">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                            <span data-i18n="nav_sub_debug">Destek & Hata Ayıklama (Debug)</span>
                         </a>
                     </div>
                 </div>
@@ -725,6 +729,21 @@
                         <!-- Loaded dynamically -->
                     </div>
                 </div>
+
+                <div class="panel" style="margin-top: 20px;">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="font-size: 1.3rem;">🛠️</div>
+                            <div>
+                                <h3 data-i18n="debug_health_card_title">Sistem Tanılama & Destek Paketi (Debug)</h3>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="debug_health_card_sub">Tek tıkla sistem ayarları, donanım telemetrisi ve log dökümünü sıkıştırarak destek için gönderin.</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="openDebugSection()" style="display: inline-flex; align-items: center; gap: 6px;">
+                            <span>📦</span> <span data-i18n="btn_quick_debug">Destek Paketi Oluştur</span>
+                        </button>
+                    </div>
+                </div>
             </section>
 
             <!-- TAB: Settings & KamuSM Configuration -->
@@ -778,6 +797,10 @@
                     <button class="settings-subnav-btn" data-target="setting-section-tenants">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
                         <span data-i18n="nav_sub_tenants">Kiracı Yönetimi (Tenants)</span>
+                    </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-debug">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                        <span data-i18n="nav_sub_debug">Destek & Hata Ayıklama (Debug)</span>
                     </button>
                 </div>
 
@@ -1639,6 +1662,112 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Diagnostic Support & Debug Panel -->
+                    <div class="panel" id="setting-section-debug">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3 data-i18n="debug_panel_title">Destek & Sistem Tanılama Paketi (Diagnostic Support Bundle)</h3>
+                                <p class="subtitle" style="margin-top: 4px; font-size: 0.85rem;" data-i18n="debug_panel_subtitle">Sistem ayarları, donanım telemetrisi ve çalışma günlüklerini tar formatında paketleyerek kök yöneticiye iletin.</p>
+                            </div>
+                            <span class="badge badge-primary">Tar / Gzip (.tar.gz)</span>
+                        </div>
+                        <div class="panel-body">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start;">
+                                <!-- Left Column: Form -->
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px;">
+                                    <h4 style="margin: 0 0 14px 0; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                                        <span data-i18n="debug_form_title">📦 Yeni Tanılama Paketi Oluştur &amp; Gönder</span>
+                                    </h4>
+
+                                    <div class="form-group" style="margin-bottom: 12px;">
+                                        <label style="font-size: 0.84rem; font-weight: 600;" data-i18n="debug_desc_label">Sorun / Destek Talebi Açıklaması</label>
+                                        <textarea class="input" id="debug-issue-desc" rows="3" style="resize: vertical;" data-i18n-placeholder="debug_desc_ph" placeholder="Yaşanan sorun, hata kodu veya destek talebi detayı..."></textarea>
+                                    </div>
+
+                                    <div class="form-group" style="margin-bottom: 14px;">
+                                        <label style="font-size: 0.84rem; font-weight: 600;" data-i18n="debug_email_label">İletişim E-Postası (Bildirim İçin)</label>
+                                        <input type="email" class="input" id="debug-contact-email" data-i18n-placeholder="debug_email_ph" placeholder="destek@kurum.com">
+                                        <small style="color: var(--text-muted); font-size: 0.72rem;">Boş bırakılırsa sistemdeki Süper Yönetici e-posta adresine iletilir.</small>
+                                    </div>
+
+                                    <div style="margin-bottom: 16px;">
+                                        <label style="font-size: 0.84rem; font-weight: 600; display: block; margin-bottom: 8px;" data-i18n="debug_scope_title">Paket İçeriği &amp; Veri Kapsamı</label>
+                                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                                            <label class="checkbox-container" style="font-size: 0.82rem;">
+                                                <input type="checkbox" id="debug-opt-settings" checked>
+                                                <span data-i18n="debug_opt_settings">Sistem Ayarları (Hassas şifreler filtrelenir)</span>
+                                            </label>
+                                            <label class="checkbox-container" style="font-size: 0.82rem;">
+                                                <input type="checkbox" id="debug-opt-telemetry" checked>
+                                                <span data-i18n="debug_opt_telemetry">Donanım, Çekirdek &amp; Ağ Telemetrisi</span>
+                                            </label>
+                                            <label class="checkbox-container" style="font-size: 0.82rem;">
+                                                <input type="checkbox" id="debug-opt-logs" checked>
+                                                <span data-i18n="debug_opt_logs">Son Uygulama Hata &amp; Günlük Kayıtları</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <button class="btn btn-primary" id="btn-create-debug-bundle" onclick="submitGenerateDebugBundle()" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px;">
+                                        <span data-i18n="btn_generate_debug">⚡ Paketi Oluştur ve Gönder</span>
+                                    </button>
+
+                                    <!-- Result Card (Hidden until generated) -->
+                                    <div id="debug-result-card" style="display: none; margin-top: 18px; background: rgba(56, 189, 248, 0.05); border: 1px solid var(--accent); border-radius: 8px; padding: 14px;">
+                                        <div style="font-weight: 700; color: var(--accent); font-size: 0.9rem; margin-bottom: 8px;" data-i18n="debug_result_title">✅ Destek Paketi Başarıyla Oluşturuldu</div>
+                                        
+                                        <div style="font-size: 0.82rem; margin-bottom: 6px;">
+                                            <span style="color: var(--text-muted);" data-i18n="debug_lbl_bundle_id">Paket Referansı:</span>
+                                            <strong id="debug-res-id" class="mono-code" style="color: var(--text-main); margin-left: 4px;"></strong>
+                                        </div>
+                                        <div style="font-size: 0.82rem; margin-bottom: 6px;">
+                                            <span style="color: var(--text-muted);" data-i18n="debug_lbl_passcode">Erişim Güvenlik Şifresi:</span>
+                                            <strong id="debug-res-passcode" class="mono-code" style="color: #38bdf8; font-size: 1rem; margin-left: 4px;"></strong>
+                                            <button class="btn btn-xs btn-outline" onclick="copyDebugPasscode()" id="btn-copy-passcode" style="margin-left: 6px; padding: 2px 6px; font-size: 0.72rem;" data-i18n="debug_copy_passcode">📋 Şifreyi Kopyala</button>
+                                        </div>
+                                        <div style="font-size: 0.82rem; margin-bottom: 8px;">
+                                            <span style="color: var(--text-muted);" data-i18n="debug_lbl_download_url">İndirme Bağlantısı:</span>
+                                            <div style="display: flex; gap: 6px; margin-top: 4px;">
+                                                <input type="text" id="debug-res-url" class="input mono-code" readonly style="font-size: 0.75rem; padding: 4px 8px;">
+                                                <button class="btn btn-xs btn-primary" onclick="copyDebugLink()" id="btn-copy-link" style="padding: 4px 10px; font-size: 0.75rem; white-space: nowrap;" data-i18n="debug_copy_link">📋 Kopyala</button>
+                                            </div>
+                                        </div>
+                                        <div id="debug-res-email-banner" style="font-size: 0.75rem; color: #10b981; margin-bottom: 8px;"></div>
+                                        <div>
+                                            <a id="debug-res-direct-link" href="#" target="_blank" class="btn btn-outline btn-xs" style="width: 100%; text-align: center; display: block; padding: 6px;" data-i18n="btn_download_bundle_now">⬇️ Paketi Doğrudan İndir</a>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right Column: History -->
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                        <h4 style="margin: 0; font-size: 0.95rem;" data-i18n="debug_history_title">📋 Geçmiş Destek Paketleri</h4>
+                                        <button class="btn btn-xs btn-outline" onclick="loadDebugBundles()" data-i18n="btn_refresh">Yenile</button>
+                                    </div>
+                                    <div class="table-container" style="max-height: 440px; overflow-y: auto;">
+                                        <table class="data-table" id="debug-bundles-table" style="font-size: 0.8rem;">
+                                            <thead>
+                                                <tr>
+                                                    <th data-i18n="th_bundle_ref">Referans</th>
+                                                    <th data-i18n="th_bundle_date">Tarih</th>
+                                                    <th data-i18n="th_bundle_user">Kullanıcı</th>
+                                                    <th data-i18n="th_bundle_size">Boyut</th>
+                                                    <th data-i18n="th_bundle_passcode">Güvenlik Şifresi</th>
+                                                    <th data-i18n="th_bundle_downloads">İndirilme</th>
+                                                    <th data-i18n="th_actions">İşlem</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="debug-bundles-body">
+                                                <tr><td colspan="7" class="text-center" style="color: var(--text-muted);">Henüz oluşturulmuş destek paketi yok.</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1698,7 +1827,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.17</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.18</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -3021,7 +3150,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.17"></script>
-    <script src="/static/js/app.js?v=1.5.17"></script>
+    <script src="/static/js/translations.js?v=1.5.18"></script>
+    <script src="/static/js/app.js?v=1.5.18"></script>
 </body>
 </html>

@@ -183,6 +183,7 @@ function switchTab(tab, targetSectionId = null) {
             loadSettings();
             if (typeof loadEdgeNodes === 'function') loadEdgeNodes();
             if (typeof loadTenants === 'function') loadTenants();
+            if (typeof loadDebugBundles === 'function') loadDebugBundles();
             displaySettingsSection(targetSectionId || currentSettingsSection || 'setting-section-kamusm');
         }
         if (tab === 'users') loadUsers();
@@ -2645,6 +2646,7 @@ window.onLanguageChanged = (lang) => {
     if (activeTab === 'settings') {
         if (typeof loadEdgeNodes === 'function') loadEdgeNodes();
         if (typeof loadTenants === 'function') loadTenants();
+        if (typeof loadDebugBundles === 'function') loadDebugBundles();
     } else if (activeTab === 'archives') {
         if (typeof loadArchives === 'function') loadArchives();
     } else if (activeTab === 'dashboard') {
@@ -6047,6 +6049,171 @@ async function deleteEdgeNode(nodeId, nodeName) {
         loadEdgeNodes();
     } catch (err) {
         alert('Düğüm silinemedi: ' + err.message);
+    }
+}
+
+// ==============================================================================
+// Support & Diagnostic Debug Bundle Functions
+// ==============================================================================
+
+function openDebugSection() {
+    switchTab('settings', 'setting-section-debug');
+    if (typeof loadDebugBundles === 'function') {
+        loadDebugBundles();
+    }
+}
+
+async function submitGenerateDebugBundle() {
+    const btn = document.getElementById('btn-create-debug-bundle');
+    const desc = document.getElementById('debug-issue-desc') ? document.getElementById('debug-issue-desc').value.trim() : '';
+    const email = document.getElementById('debug-contact-email') ? document.getElementById('debug-contact-email').value.trim() : '';
+    const incSettings = document.getElementById('debug-opt-settings') ? document.getElementById('debug-opt-settings').checked : true;
+    const incTelemetry = document.getElementById('debug-opt-telemetry') ? document.getElementById('debug-opt-telemetry').checked : true;
+    const incLogs = document.getElementById('debug-opt-logs') ? document.getElementById('debug-opt-logs').checked : true;
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> <span>${(window.translations && window.translations[currentLang] && window.translations[currentLang].debug_generating) || 'Paket oluşturuluyor...'}</span>`;
+    }
+
+    try {
+        const payload = {
+            issue_description: desc,
+            contact_email: email,
+            include_settings: incSettings,
+            include_telemetry: incTelemetry,
+            include_logs: incLogs
+        };
+
+        const res = await fetch('/api/v1/debug/bundle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const b = data.bundle;
+
+        // Show result card
+        const card = document.getElementById('debug-result-card');
+        if (card) {
+            card.style.display = 'block';
+        }
+
+        const resId = document.getElementById('debug-res-id');
+        if (resId) resId.textContent = `#${b.id}`;
+
+        const resPasscode = document.getElementById('debug-res-passcode');
+        if (resPasscode) resPasscode.textContent = b.access_passcode;
+
+        const resUrl = document.getElementById('debug-res-url');
+        if (resUrl) resUrl.value = data.download_url;
+
+        const emailBanner = document.getElementById('debug-res-email-banner');
+        if (emailBanner) {
+            if (data.email_sent) {
+                emailBanner.style.color = '#10b981';
+                emailBanner.textContent = (window.translations && window.translations[currentLang] && window.translations[currentLang].debug_email_status_sent) || '✅ Bildirim ve şifre e-posta ile Süper Yöneticiye iletildi.';
+            } else {
+                emailBanner.style.color = '#94a3b8';
+                emailBanner.textContent = (window.translations && window.translations[currentLang] && window.translations[currentLang].debug_email_status_none) || 'ℹ️ E-posta sunucusu yapılandırılmamış; indirme bağlantısını ve şifreyi doğrudan paylaşabilirsiniz.';
+            }
+        }
+
+        const directLink = document.getElementById('debug-res-direct-link');
+        if (directLink) {
+            directLink.href = `${data.download_url}&passcode=${encodeURIComponent(b.access_passcode)}`;
+        }
+
+        if (typeof showToast === 'function') {
+            showToast('Tanılama paketi başarıyla oluşturuldu!', 'success');
+        }
+
+        // Refresh bundles history list
+        loadDebugBundles();
+
+    } catch (err) {
+        alert('Destek paketi oluşturulamadı: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<span data-i18n="btn_generate_debug">${(window.translations && window.translations[currentLang] && window.translations[currentLang].btn_generate_debug) || '⚡ Paketi Oluştur ve Gönder'}</span>`;
+        }
+    }
+}
+
+function copyDebugLink() {
+    const input = document.getElementById('debug-res-url');
+    if (!input || !input.value) return;
+    copyToClipboard(input.value, (window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'İndirme bağlantısı kopyalandı!');
+    const btn = document.getElementById('btn-copy-link');
+    if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✓ ' + ((window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'Kopyalandı!');
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+    }
+}
+
+function copyDebugPasscode() {
+    const el = document.getElementById('debug-res-passcode');
+    if (!el || !el.textContent) return;
+    copyToClipboard(el.textContent.trim(), (window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'Şifre kopyalandı!');
+    const btn = document.getElementById('btn-copy-passcode');
+    if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✓ ' + ((window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'Kopyalandı!');
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+    }
+}
+
+async function loadDebugBundles() {
+    const tbody = document.getElementById('debug-bundles-body');
+    if (!tbody) return;
+
+    try {
+        const res = await fetch('/api/v1/debug/bundles');
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Paketler yüklenemedi (HTTP ${res.status})</td></tr>`;
+            return;
+        }
+
+        const data = await res.json();
+        const bundles = data.bundles || [];
+
+        if (bundles.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted" style="padding: 16px;">Henüz oluşturulmuş destek paketi yok.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = bundles.map(b => {
+            const sizeKB = (b.file_size / 1024).toFixed(1);
+            const dateStr = new Date(b.created_at).toLocaleString();
+            const downloadUrl = `/support/download?id=${b.id}&passcode=${encodeURIComponent(b.access_passcode)}`;
+
+            return `
+                <tr>
+                    <td><strong class="mono-code" style="color: var(--primary);">#${escapeHtml(b.id)}</strong></td>
+                    <td style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(dateStr)}</td>
+                    <td><span class="badge badge-secondary">${escapeHtml(b.requested_by)}</span> <small class="text-muted">(${escapeHtml(b.tenant_slug)})</small></td>
+                    <td class="mono-code">${sizeKB} KB</td>
+                    <td><code class="mono-code" style="color: #38bdf8;">${escapeHtml(b.access_passcode)}</code></td>
+                    <td style="text-align: center;"><span class="badge ${b.download_count > 0 ? 'badge-success' : 'badge-secondary'}">${b.download_count}</span></td>
+                    <td>
+                        <a href="${downloadUrl}" target="_blank" class="btn btn-xs btn-outline" style="text-decoration: none; padding: 2px 8px;">
+                            ⬇️ ${(window.translations && window.translations[currentLang] && window.translations[currentLang].th_actions) || 'İndir'}
+                        </a>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Hata: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
 

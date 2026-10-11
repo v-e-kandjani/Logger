@@ -180,3 +180,21 @@ type EdgeNode struct {
 	CreatedAt        time.Time              `json:"created_at"`
 	UpdatedAt        time.Time              `json:"updated_at"`
 }
+
+// SupportBundle represents an archived diagnostic support bundle in tar.gz format
+type SupportBundle struct {
+	ID               string    `json:"id"`
+	Filename         string    `json:"filename"`
+	FilePath         string    `json:"file_path"`
+	FileSize         int64     `json:"file_size"`
+	SHA256           string    `json:"sha256"`
+	AccessPasscode   string    `json:"access_passcode"`
+	AccessToken      string    `json:"access_token"`
+	RequestedBy      string    `json:"requested_by"`
+	TenantSlug       string    `json:"tenant_slug"`
+	IssueDescription string    `json:"issue_description"`
+	ContactEmail     string    `json:"contact_email"`
+	DownloadCount    int       `json:"download_count"`
+	CreatedAt        time.Time `json:"created_at"`
+	ExpiresAt        time.Time `json:"expires_at"`
+}

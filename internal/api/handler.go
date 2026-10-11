@@ -201,6 +201,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/system/metrics", h.requireAuth(h.handleMetricsCurrent))
 	mux.HandleFunc("/api/v1/system/metrics/history", h.requireAuth(h.handleMetricsHistory))
 
+	// Support & Debug Diagnostic Package Endpoints
+	mux.HandleFunc("/api/v1/debug/bundle", h.requireAuth(h.handleCreateSupportBundle))
+	mux.HandleFunc("/api/v1/debug/bundles", h.requireAuth(h.handleListSupportBundles))
+	mux.HandleFunc("/support/download", h.handleSupportDownload)
+	mux.HandleFunc("/api/v1/debug/download", h.handleSupportDownload)
+
 	// Edge Forwarder Proxy Endpoints (Token-based authentication)
 	mux.HandleFunc("/api/v1/edge/heartbeat", h.handleEdgeHeartbeat)
 	mux.HandleFunc("/api/v1/edge/ingest", h.handleEdgeIngest)

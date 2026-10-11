@@ -262,6 +262,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 
 ---
 
+- **v1.5.18** (Diagnostic Support & Debug Package Generator, Password-Protected Download Portal & Root SuperAdmin Dispatch):
+  - **Diagnostic Support & Debug Package (.tar.gz Bundle)**: Automated support bundle generator collecting system environment, host hardware specs, sanitized system settings (all passwords, keys, and tokens redacted), ingestion pipeline telemetry, database inventory counts, network interfaces, and recent application log tail into a standard compressed `.tar.gz` archive.
+  - **Password-Protected & Credential-Gated Download Gateway (`/support/download`)**: Standalone secure download portal requiring either active Super Administrator credentials or a unique 10-character cryptographic Access Passcode (`SUP-XXXX-XXXX`) to download the archive, completely blocking unauthorized access.
+  - **Root SuperAdmin Automated Email Dispatch (SMTP)**: Integrates with SMTP notification engine to automatically dispatch an email alert to the Root SuperAdmin containing the ticket ID, requester, issue description, direct link, and access passcode upon bundle generation.
+  - **Operations Dashboard & Settings UI Integration**: Dedicated "Destek & Hata Ayıklama (Debug)" panel under Settings with inline generator form and past bundles history table, plus a quick-action diagnostic banner inside System Health (`#pane-health`).
+
 - **v1.5.17** (Standalone Bare-Metal Installer without Docker, Tenant Device Assignment & Full UI Localization):
   - **Standalone Bare-Metal Linux Installer (`install_standalone.sh` & `STANDALONE_INSTALL.md`)**: Complete support for installing and running the entire platform directly on Ubuntu 20.04, 22.04, 24.04, and 26.04 LTS (and Debian 11/12) without Docker. Automatically installs native PostgreSQL, official ClickHouse Server, OpenJDK 17 JRE Headless, builds Go binaries, provisions schemas, and configures `syslog-platform.service` under systemd.
   - **Device Tenant Assignment & Reassignment**: Enabled assigning registered devices and auto-discovered network sources to specific tenants (e.g., `1ware`). Added `PUT /api/v1/devices` and `UpdateDevice` to reassign tenants, change groups, and update device metadata with atomic cache refresh.

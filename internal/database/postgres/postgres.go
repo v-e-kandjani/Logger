@@ -59,6 +59,25 @@ func NewDB(cfg config.PostgresConfig) (*DB, error) {
 		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS detected_vendor VARCHAR(64) DEFAULT '';
 		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS detected_type VARCHAR(64) DEFAULT '';
 		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS confidence VARCHAR(16) DEFAULT 'MEDIUM';
+
+		CREATE TABLE IF NOT EXISTS support_bundles (
+			id VARCHAR(64) PRIMARY KEY,
+			filename VARCHAR(255) NOT NULL,
+			file_path TEXT NOT NULL,
+			file_size BIGINT NOT NULL DEFAULT 0,
+			sha256 VARCHAR(64) NOT NULL,
+			access_passcode VARCHAR(64) NOT NULL,
+			access_token VARCHAR(128) NOT NULL,
+			requested_by VARCHAR(128) NOT NULL,
+			tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default',
+			issue_description TEXT DEFAULT '',
+			contact_email VARCHAR(255) DEFAULT '',
+			download_count INT NOT NULL DEFAULT 0,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			expires_at TIMESTAMPTZ NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_support_bundles_created ON support_bundles(created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_support_bundles_token ON support_bundles(access_token);
 	`)
 
 	return &DB{pool: pool}, nil
@@ -2098,6 +2117,101 @@ func (db *DB) UpdateEdgeNodeHeartbeat(ctx context.Context, token, ip, ver string
 // DeleteEdgeNode removes an edge node
 func (db *DB) DeleteEdgeNode(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM edge_nodes WHERE id = $1`
+	_, err := db.pool.Exec(ctx, query, id)
+	return err
+}
+
+// CreateSupportBundle stores a generated support diagnostic bundle metadata record
+func (db *DB) CreateSupportBundle(ctx context.Context, b *models.SupportBundle) error {
+	if b.TenantSlug == "" {
+		b.TenantSlug = "default"
+	}
+	query := `
+		INSERT INTO support_bundles (
+			id, filename, file_path, file_size, sha256,
+			access_passcode, access_token, requested_by, tenant_slug,
+			issue_description, contact_email, download_count, created_at, expires_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
+	_, err := db.pool.Exec(ctx, query,
+		b.ID, b.Filename, b.FilePath, b.FileSize, b.SHA256,
+		b.AccessPasscode, b.AccessToken, b.RequestedBy, b.TenantSlug,
+		b.IssueDescription, b.ContactEmail, b.DownloadCount, b.CreatedAt, b.ExpiresAt)
+	return err
+}
+
+// GetSupportBundle retrieves a support bundle by its ID or access token
+func (db *DB) GetSupportBundle(ctx context.Context, idOrToken string) (*models.SupportBundle, error) {
+	query := `
+		SELECT id, filename, file_path, file_size, sha256,
+		       access_passcode, access_token, requested_by, tenant_slug,
+		       issue_description, contact_email, download_count, created_at, expires_at
+		FROM support_bundles
+		WHERE id = $1 OR access_token = $1`
+	var b models.SupportBundle
+	err := db.pool.QueryRow(ctx, query, idOrToken).Scan(
+		&b.ID, &b.Filename, &b.FilePath, &b.FileSize, &b.SHA256,
+		&b.AccessPasscode, &b.AccessToken, &b.RequestedBy, &b.TenantSlug,
+		&b.IssueDescription, &b.ContactEmail, &b.DownloadCount, &b.CreatedAt, &b.ExpiresAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &b, nil
+}
+
+// ListSupportBundles lists recent support bundles
+func (db *DB) ListSupportBundles(ctx context.Context, tenantSlug string, limit int) ([]models.SupportBundle, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	var query string
+	var rows pgx.Rows
+	var err error
+
+	if tenantSlug != "" && tenantSlug != "all" && tenantSlug != "*" {
+		query = `
+			SELECT id, filename, file_path, file_size, sha256,
+			       access_passcode, access_token, requested_by, tenant_slug,
+			       issue_description, contact_email, download_count, created_at, expires_at
+			FROM support_bundles
+			WHERE tenant_slug = $1
+			ORDER BY created_at DESC
+			LIMIT $2`
+		rows, err = db.pool.Query(ctx, query, tenantSlug, limit)
+	} else {
+		query = `
+			SELECT id, filename, file_path, file_size, sha256,
+			       access_passcode, access_token, requested_by, tenant_slug,
+			       issue_description, contact_email, download_count, created_at, expires_at
+			FROM support_bundles
+			ORDER BY created_at DESC
+			LIMIT $1`
+		rows, err = db.pool.Query(ctx, query, limit)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bundles []models.SupportBundle
+	for rows.Next() {
+		var b models.SupportBundle
+		if err := rows.Scan(
+			&b.ID, &b.Filename, &b.FilePath, &b.FileSize, &b.SHA256,
+			&b.AccessPasscode, &b.AccessToken, &b.RequestedBy, &b.TenantSlug,
+			&b.IssueDescription, &b.ContactEmail, &b.DownloadCount, &b.CreatedAt, &b.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		bundles = append(bundles, b)
+	}
+	return bundles, nil
+}
+
+// IncrementBundleDownloadCount increments download counter
+func (db *DB) IncrementBundleDownloadCount(ctx context.Context, id string) error {
+	query := `UPDATE support_bundles SET download_count = download_count + 1 WHERE id = $1`
 	_, err := db.pool.Exec(ctx, query, id)
 	return err
 }
