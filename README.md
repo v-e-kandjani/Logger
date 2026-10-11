@@ -260,7 +260,10 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
----
+- **v1.5.19** (Standalone Sidebar Support Menu & Dedicated Diagnostics Hub):
+  - **Dedicated Top-Level Support & Diagnostics Menu (`#support`)**: Promoted the diagnostic support module from an embedded panel in Settings to a first-class, standalone sidebar menu item (`#nav-tab-support`) and dedicated full-width tab pane (`#pane-support`), ensuring immediate, 1-click access for operators seeking technical support.
+  - **Clean Navigation Separation**: Completely decoupled diagnostic bundle generation and history cataloging from system configuration settings (`#pane-settings`), streamlining both views.
+  - **Seamless Cross-Tab Redirection**: Health telemetry quick-action card and helper triggers now navigate directly to the standalone `#support` pane, with automated bundle history loading and dynamic localization in Turkish and English.
 
 - **v1.5.18** (Diagnostic Support & Debug Package Generator, Password-Protected Download Portal & Root SuperAdmin Dispatch):
   - **Diagnostic Support & Debug Package (.tar.gz Bundle)**: Automated support bundle generator collecting system environment, host hardware specs, sanitized system settings (all passwords, keys, and tokens redacted), ingestion pipeline telemetry, database inventory counts, network interfaces, and recent application log tail into a standard compressed `.tar.gz` archive.

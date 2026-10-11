@@ -249,7 +249,10 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
----
+- **v1.5.19** (Bağımsız Kenar Çubuğu Destek Menüsü & Ayrılmış Tanılama Merkezi):
+  - **Bağımsız Üst Düzey Destek ve Tanılama Menüsü (`#support`)**: Sistem destek ve hata ayıklama modülü Ayarlar sayfasındaki gömülü panelden çıkarılarak, doğrudan kenar çubuğunda birinci sınıf bağımsız bir menü öğesi (`#nav-tab-support`) ve tam genişlikli özel bir sekme paneli (`#pane-support`) haline getirildi.
+  - **Temiz Menü ve Navigasyon Ayrımı**: Sistem konfigürasyon ayarları (`#pane-settings`) ile destek paketi oluşturma ve geçmiş paketler tablosu birbirinden tamamen ayrılarak her iki sayfa sadeleştirildi.
+  - **Sorunsuz Sayfalar Arası Yönlendirme**: Sistem Sağlığı sekmesindeki hızlı işlem kartı ve kısayollar doğrudan bağımsız `#support` sekmesine yönlendirilecek şekilde güncellendi; otomatik paket listeleme ve Türkçe/İngilizce çift dil desteği korundu.
 
 - **v1.5.18** (Sistem Destek ve Tanılama Paketi (Tar), Parola Korumalı İndirme Kapısı & Kök Yöneticiye İletim):
   - **Sistem Destek ve Hata Ayıklama Paketi (.tar.gz Arşivi)**: Sistem ortamı, sunucu donanım özellikleri, filtrelenmiş/arındırılmış sistem ayarları (tüm şifreler, anahtarlar ve tokenlar gizlenir), veri toplama boru hattı metrikleri, veritabanı envanter sayaçları, ağ arabirimleri ve son uygulama çalışma günlüklerini içeren standart `.tar.gz` formatında otomatik tanılama paketi üreteci.

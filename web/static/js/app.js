@@ -183,8 +183,10 @@ function switchTab(tab, targetSectionId = null) {
             loadSettings();
             if (typeof loadEdgeNodes === 'function') loadEdgeNodes();
             if (typeof loadTenants === 'function') loadTenants();
-            if (typeof loadDebugBundles === 'function') loadDebugBundles();
             displaySettingsSection(targetSectionId || currentSettingsSection || 'setting-section-kamusm');
+        }
+        if (tab === 'support') {
+            if (typeof loadDebugBundles === 'function') loadDebugBundles();
         }
         if (tab === 'users') loadUsers();
         if (tab === 'updates') loadUpdateStatus();
@@ -2646,6 +2648,7 @@ window.onLanguageChanged = (lang) => {
     if (activeTab === 'settings') {
         if (typeof loadEdgeNodes === 'function') loadEdgeNodes();
         if (typeof loadTenants === 'function') loadTenants();
+    } else if (activeTab === 'support') {
         if (typeof loadDebugBundles === 'function') loadDebugBundles();
     } else if (activeTab === 'archives') {
         if (typeof loadArchives === 'function') loadArchives();
@@ -6057,10 +6060,7 @@ async function deleteEdgeNode(nodeId, nodeName) {
 // ==============================================================================
 
 function openDebugSection() {
-    switchTab('settings', 'setting-section-debug');
-    if (typeof loadDebugBundles === 'function') {
-        loadDebugBundles();
-    }
+    switchTab('support');
 }
 
 async function submitGenerateDebugBundle() {

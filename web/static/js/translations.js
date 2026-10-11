@@ -4,7 +4,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Aktif Kiracı",
-        app_version: "v1.5.18",
+        app_version: "v1.5.19",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         nav_sub_all: "Tüm Ayarlar",
@@ -19,7 +19,6 @@ const translations = {
         nav_sub_smtp: "E-Posta Bildirimleri & SMTP",
         nav_sub_edge: "Edge Proxy Düğümleri",
         nav_sub_tenants: "Kiracı Yönetimi (Tenants)",
-        nav_sub_debug: "Destek & Hata Ayıklama (Debug)",
         debug_health_card_title: "Sistem Tanılama & Destek Paketi (Debug)",
         debug_health_card_sub: "Tek tıkla sistem ayarları, donanım telemetrisi ve log dökümünü sıkıştırarak destek için gönderin.",
         btn_quick_debug: "Destek Paketi Oluştur",
@@ -219,6 +218,8 @@ const translations = {
         view_subtitle_users: "Operatör rolleri, güvenlik profilleri ve kullanıcı yönetimi",
         view_title_updates: "Sistem Güncelleme & Sürüm Yönetimi",
         view_subtitle_updates: "GitHub deposu ile senkronizasyon, değişen dosyaların analizi ve tek tıkla güncelleme",
+        view_title_support: "Destek & Hata Ayıklama (Debug)",
+        view_subtitle_support: "Sistem ayarları, donanım telemetrisi ve çalışma günlüklerini tar formatında paketleyerek kök yöneticiye iletin.",
 
         // SIEM SOC
         siem_soc_title: "Güvenlik Operasyon Merkezi (SIEM)",
@@ -299,6 +300,7 @@ const translations = {
         nav_settings: "Ayarlar & TÜBİTAK",
         nav_users: "Kullanıcılar & Yetkiler",
         nav_updates: "Sistem Güncelleme",
+        nav_support: "Destek & Hata Ayıklama",
         sidebar_corp: "Valtrivo • Kurumsal SIEM",
 
         // Dashboard Stats
@@ -645,7 +647,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Active Tenant",
-        app_version: "v1.5.18",
+        app_version: "v1.5.19",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         nav_sub_all: "All Settings",
@@ -660,7 +662,6 @@ const translations = {
         nav_sub_smtp: "Email Alerts & SMTP",
         nav_sub_edge: "Edge Proxy Nodes",
         nav_sub_tenants: "Tenant Management (MSSP)",
-        nav_sub_debug: "Support & Diagnostics (Debug)",
         debug_health_card_title: "System Diagnostic & Support Bundle (Debug)",
         debug_health_card_sub: "Package and compress system settings, host telemetry, and error logs into a tar bundle for support.",
         btn_quick_debug: "Generate Support Bundle",
@@ -860,6 +861,8 @@ const translations = {
         view_subtitle_users: "Operator roles, security profiles, and credential governance",
         view_title_updates: "System Upgrade & Version Control",
         view_subtitle_updates: "GitHub repository synchronization, changed files inspection, and 1-click upgrades",
+        view_title_support: "Support & Diagnostics (Debug)",
+        view_subtitle_support: "Package system settings, hardware telemetry, and service logs in tar format to share securely with root.",
 
         // SIEM SOC
         siem_soc_title: "Security Operations Center (SIEM)",
@@ -940,6 +943,7 @@ const translations = {
         nav_settings: "Settings & KamuSM",
         nav_users: "Users & Access",
         nav_updates: "System Upgrade",
+        nav_support: "Support & Diagnostics",
         sidebar_corp: "Valtrivo • Enterprise SIEM",
 
         // Dashboard Stats
