@@ -263,6 +263,14 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.7.1** (Forensic PDF A4 Landscape Layout & Column Alignment Optimization):
+  - **A4 Landscape Re-Engineering (`pdf_exporter.go`)**: Switched PDF page orientation to A4 Landscape (297mm × 210mm) providing an expansive 269mm printable width for wide multi-column tables.
+  - **Optimally Seated Forensic Tables**:
+    - *MITRE ATT&CK & D3FEND Threat Matrix*: Expanded widths (Tactic 34mm, Technique 36mm, Technique Name 62mm, SIEM Detection Rule 92mm, D3FEND Counter 45mm), eliminating cramped column text truncation.
+    - *Threat Intelligence & IOC Ledger*: Expanded indicator value column to 105mm, comfortably accommodating long URLs, SHA-256 hashes, and fully qualified domain names without overflow.
+    - *Law 5651 Chain of Custody & Evidence Ledger*: Expanded SHA-256 digest column to 75mm and added full ISO timestamp formatting, providing audit-grade legibility for judicial review.
+  - **Balanced Metric Alignment**: Re-proportioned Executive KPI cards across 269mm line width (65mm per card with 3mm gaps) with unified landscape page boundary checks (`ensurePageSpace`).
+
 - **v1.7.0** (Multi-Tenant SIEM & SOC Reporting Engine & Dedicated Sidebar Workspace):
   - **Separated Sidebar Menu & Workspace (`#nav-tab-reports`)**: Dedicated reports module with interactive report template selector, live visual preview canvas, customizable timeframes, classification tags, and generation history ledger.
   - **5 Industry-Standard SOC & SIEM Templates**:

@@ -252,6 +252,14 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.7.1** (Adli Bilişim PDF A4 Yatay (Landscape) Mizanpaj ve Kolon Hizalama Optimizasyonu):
+  - **A4 Yatay (Landscape) Tasarım (`pdf_exporter.go`)**: PDF çıktı yönü A4 Yatay (297mm × 210mm) olarak yeniden yapılandırılarak çok kolonlu geniş adli bilişim tabloları için 269mm'lik ferah bir yazdırılabilir alan sağlandı.
+  - **Kusursuz Hizalanan Adli Bilişim Tabloları**:
+    - *MITRE ATT&CK & D3FEND Tehdit Matrisi*: Kolon genişlikleri (Taktik 34mm, Teknik 36mm, Teknik Adı 62mm, SIEM Tespit Kuralı 92mm, D3FEND Tedbiri 45mm) genişletilerek metin kırpılmaları ortadan kaldırıldı.
+    - *Tehdit İstihbaratı ve IoC Tablosu*: Gösterge değeri kolonu 105mm'ye çıkartılarak uzun URL'ler, SHA-256 özetleri ve tam etki alanı adları (FQDN) taşma yapmadan yerleştirildi.
+    - *5651 Kanıt Zinciri Tablosu*: SHA-256 özet kolonu 75mm'ye genişletildi, tam ISO zaman damgası biçimlendirmesiyle adli ve hukuki denetimler için okunabilirlik artırıldı.
+  - **Dengeli Metrik Kartları**: Yönetici KPI durum kartları 269mm satır genişliğine oranlandı (her kart 65mm, 3mm boşluk) ve yatay sayfa taşma kontrolleri (`ensurePageSpace`) optimize edildi.
+
 - **v1.7.0** (Çok Kiracılı SIEM & SOC Raporlama Motoru ve Ayrılmış Yan Menü Çalışma Alanı):
   - **Ayrılmış Yan Menü ve Raporlama Alanı (`#nav-tab-reports`)**: Dinamik rapor şablonu seçicisi, canlı görsel önizleme alanı, tarih aralığı filtreleri, gizlilik sınıflandırma etiketleri ve geçmiş raporlar tablosu içeren bağımsız çalışma alanı.
   - **5 Endüstri Standardı SOC & SIEM Şablonu**:
