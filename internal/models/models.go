@@ -84,6 +84,7 @@ type UnregisteredSource struct {
 	LastRawSample    string    `json:"last_raw_sample"`
 	DetectedFacility string    `json:"detected_facility"`
 	DetectedSeverity string    `json:"detected_severity"`
+	TenantSlug       string    `json:"tenant_slug"`
 }
 
 // LogArchive records an immutable compressed time-slice of logs with cryptographic hashes
@@ -211,7 +212,8 @@ type Tenant struct {
 	AdminName     string    `json:"admin_name"`
 	AdminEmail    string    `json:"admin_email"`
 	AdminUsername string    `json:"admin_username"`
-	Status        string    `json:"status"` // "active", "suspended", "pending_activation"
+	Status        string    `json:"status"`        // "active", "suspended", "pending_activation"
+	IngestPolicy  string    `json:"ingest_policy"` // "permissive" (auto-discovery), "strict" (whitelist only)
 	MaxNodes      int       `json:"max_nodes"`
 	MaxEPS        int       `json:"max_eps"`
 	CreatedAt     time.Time `json:"created_at"`

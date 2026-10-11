@@ -60,6 +60,8 @@ func NewDB(cfg config.PostgresConfig) (*DB, error) {
 		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS detected_vendor VARCHAR(64) DEFAULT '';
 		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS detected_type VARCHAR(64) DEFAULT '';
 		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS confidence VARCHAR(16) DEFAULT 'MEDIUM';
+		ALTER TABLE unregistered_sources ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) DEFAULT 'default';
+		CREATE INDEX IF NOT EXISTS idx_unreg_tenant ON unregistered_sources(tenant_slug);
 
 		CREATE TABLE IF NOT EXISTS support_bundles (
 			id VARCHAR(64) PRIMARY KEY,
@@ -93,8 +95,10 @@ func (db *DB) Ping(ctx context.Context) error {
 }
 
 type deviceMaps struct {
-	byIP map[string]*models.Device
-	byID map[uuid.UUID]*models.Device
+	byIP           map[string]*models.Device
+	byIPAndTenant  map[string]*models.Device
+	byID           map[uuid.UUID]*models.Device
+	tenantPolicies map[string]string
 }
 
 // DeviceCache maintains lock-free in-memory lookups for active IPs to avoid querying Postgres on every syslog packet
@@ -110,8 +114,10 @@ func NewDeviceCache(db *DB) *DeviceCache {
 		db: db,
 	}
 	empty := &deviceMaps{
-		byIP: make(map[string]*models.Device),
-		byID: make(map[uuid.UUID]*models.Device),
+		byIP:           make(map[string]*models.Device),
+		byIPAndTenant:  make(map[string]*models.Device),
+		byID:           make(map[uuid.UUID]*models.Device),
+		tenantPolicies: make(map[string]string),
 	}
 	dc.maps.Store(empty)
 	_ = dc.Refresh(context.Background())
@@ -124,19 +130,37 @@ func (dc *DeviceCache) Refresh(ctx context.Context) error {
 		return err
 	}
 
+	tenants, _ := dc.db.ListTenants(ctx)
+	policies := make(map[string]string)
+	for _, t := range tenants {
+		p := strings.ToLower(t.IngestPolicy)
+		if p != "strict" {
+			p = "permissive"
+		}
+		policies[t.Slug] = p
+	}
+
 	newByIP := make(map[string]*models.Device, len(devices))
+	newByIPAndTenant := make(map[string]*models.Device, len(devices))
 	newByID := make(map[uuid.UUID]*models.Device, len(devices))
 
 	for i := range devices {
 		d := &devices[i]
 		newByIP[d.IPAddress] = d
+		tenantKey := d.TenantSlug
+		if tenantKey == "" {
+			tenantKey = "default"
+		}
+		newByIPAndTenant[d.IPAddress+"|"+tenantKey] = d
 		newByID[d.ID] = d
 	}
 
 	dc.mu.Lock()
 	dc.maps.Store(&deviceMaps{
-		byIP: newByIP,
-		byID: newByID,
+		byIP:           newByIP,
+		byIPAndTenant:  newByIPAndTenant,
+		byID:           newByID,
+		tenantPolicies: policies,
 	})
 	dc.lastRef = time.Now()
 	dc.mu.Unlock()
@@ -150,6 +174,36 @@ func (dc *DeviceCache) LookupIP(ipStr string) (*models.Device, bool) {
 	}
 	dev, ok := m.byIP[ipStr]
 	return dev, ok
+}
+
+// LookupIPAndTenant checks device maps with tenant isolation fallback
+func (dc *DeviceCache) LookupIPAndTenant(ipStr, tenant string) (*models.Device, bool) {
+	m := dc.maps.Load()
+	if m == nil {
+		return nil, false
+	}
+	if tenant != "" && tenant != "all" && tenant != "*" {
+		if dev, ok := m.byIPAndTenant[ipStr+"|"+tenant]; ok {
+			return dev, true
+		}
+	}
+	dev, ok := m.byIP[ipStr]
+	return dev, ok
+}
+
+// GetTenantIngestPolicy returns whether the tenant enforces 'strict' (whitelist) or 'permissive' (auto-discovery)
+func (dc *DeviceCache) GetTenantIngestPolicy(tenant string) string {
+	m := dc.maps.Load()
+	if m == nil || m.tenantPolicies == nil {
+		return "permissive"
+	}
+	if tenant == "" {
+		tenant = "default"
+	}
+	if p, ok := m.tenantPolicies[tenant]; ok && p != "" {
+		return p
+	}
+	return "permissive"
 }
 
 // --- Device Repository Methods ---
@@ -311,13 +365,17 @@ func (db *DB) UpdateDeviceLastSeen(ctx context.Context, ipStr string, seenTime t
 
 // RecordUnregisteredSource upserts an auto-discovered sender
 func (db *DB) RecordUnregisteredSource(ctx context.Context, u *models.UnregisteredSource) error {
+	tenant := u.TenantSlug
+	if tenant == "" {
+		tenant = "default"
+	}
 	query := `
 		INSERT INTO unregistered_sources (
 			ip_address, first_seen_at, last_seen_at, packet_count, 
 			last_raw_sample, detected_facility, detected_severity,
-			hostname, detected_vendor, detected_type, confidence
+			hostname, detected_vendor, detected_type, confidence, tenant_slug
 		)
-		VALUES ($1::inet, $2, $2, 1, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1::inet, $2, $2, 1, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (ip_address) DO UPDATE
 		SET last_seen_at = EXCLUDED.last_seen_at,
 		    packet_count = unregistered_sources.packet_count + 1,
@@ -327,11 +385,12 @@ func (db *DB) RecordUnregisteredSource(ctx context.Context, u *models.Unregister
 		    hostname = CASE WHEN EXCLUDED.hostname <> '' THEN EXCLUDED.hostname ELSE unregistered_sources.hostname END,
 		    detected_vendor = CASE WHEN EXCLUDED.detected_vendor <> '' AND EXCLUDED.detected_vendor <> 'Generic' THEN EXCLUDED.detected_vendor ELSE unregistered_sources.detected_vendor END,
 		    detected_type = CASE WHEN EXCLUDED.detected_type <> '' AND EXCLUDED.detected_type <> 'Generic Syslog' THEN EXCLUDED.detected_type ELSE unregistered_sources.detected_type END,
-		    confidence = CASE WHEN EXCLUDED.confidence = 'HIGH' THEN 'HIGH' ELSE unregistered_sources.confidence END`
+		    confidence = CASE WHEN EXCLUDED.confidence = 'HIGH' THEN 'HIGH' ELSE unregistered_sources.confidence END,
+		    tenant_slug = CASE WHEN unregistered_sources.tenant_slug = 'default' AND EXCLUDED.tenant_slug <> 'default' THEN EXCLUDED.tenant_slug ELSE unregistered_sources.tenant_slug END`
 
 	_, err := db.pool.Exec(ctx, query,
 		u.IPAddress, u.LastSeenAt, u.LastRawSample, u.DetectedFacility, u.DetectedSeverity,
-		u.Hostname, u.DetectedVendor, u.DetectedType, u.Confidence,
+		u.Hostname, u.DetectedVendor, u.DetectedType, u.Confidence, tenant,
 	)
 	return err
 }
@@ -344,18 +403,30 @@ func (db *DB) DeleteUnregisteredSource(ctx context.Context, ipStr string) error 
 }
 
 func (db *DB) ListUnregisteredSources(ctx context.Context) ([]models.UnregisteredSource, error) {
-	// Exclude any IP that has already been registered in the devices table
+	return db.ListUnregisteredSourcesByTenant(ctx, "")
+}
+
+// ListUnregisteredSourcesByTenant returns auto-discovered sources optionally filtered by tenant
+func (db *DB) ListUnregisteredSourcesByTenant(ctx context.Context, tenant string) ([]models.UnregisteredSource, error) {
+	whereClauses := []string{"d.id IS NULL"}
+	args := []any{}
+	if tenant != "" && tenant != "all" && tenant != "*" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(u.tenant_slug = $%d OR (u.tenant_slug = 'default' AND $%d = 'default'))", len(args)+1, len(args)+1))
+		args = append(args, tenant)
+	}
+
 	query := `
 		SELECT host(u.ip_address), u.first_seen_at, u.last_seen_at, u.packet_count, 
 		       u.last_raw_sample, u.detected_facility, u.detected_severity,
 		       coalesce(u.hostname, ''), coalesce(u.detected_vendor, 'Generic'), 
-		       coalesce(u.detected_type, 'Generic Syslog'), coalesce(u.confidence, 'LOW')
+		       coalesce(u.detected_type, 'Generic Syslog'), coalesce(u.confidence, 'LOW'),
+		       coalesce(u.tenant_slug, 'default')
 		FROM unregistered_sources u
 		LEFT JOIN devices d ON u.ip_address = d.ip_address
-		WHERE d.id IS NULL
+		WHERE ` + strings.Join(whereClauses, " AND ") + `
 		ORDER BY u.last_seen_at DESC LIMIT 100`
 
-	rows, err := db.pool.Query(ctx, query)
+	rows, err := db.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -368,6 +439,7 @@ func (db *DB) ListUnregisteredSources(ctx context.Context) ([]models.Unregistere
 			&u.IPAddress, &u.FirstSeenAt, &u.LastSeenAt, &u.PacketCount, 
 			&u.LastRawSample, &u.DetectedFacility, &u.DetectedSeverity,
 			&u.Hostname, &u.DetectedVendor, &u.DetectedType, &u.Confidence,
+			&u.TenantSlug,
 		); err != nil {
 			return nil, err
 		}
@@ -1782,11 +1854,14 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 		admin_email VARCHAR(128) DEFAULT '',
 		admin_username VARCHAR(128) DEFAULT '',
 		status VARCHAR(32) NOT NULL DEFAULT 'active',
+		ingest_policy VARCHAR(32) NOT NULL DEFAULT 'permissive',
 		max_nodes INT NOT NULL DEFAULT 5,
 		max_eps INT NOT NULL DEFAULT 5000,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	);
+
+	ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ingest_policy VARCHAR(32) NOT NULL DEFAULT 'permissive';
 
 	INSERT INTO tenants (slug, name, description, admin_name, admin_email, admin_username, status)
 	VALUES ('default', 'Default Organization (Root)', 'Primary root tenant', 'Root Super Admin', 'admin@syslog.local', 'admin', 'active')
@@ -1920,7 +1995,7 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 // ListTenants returns all customer tenant organizations
 func (db *DB) ListTenants(ctx context.Context) ([]*models.Tenant, error) {
 	query := `
-		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, max_nodes, max_eps, created_at, updated_at
+		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, coalesce(ingest_policy, 'permissive'), max_nodes, max_eps, created_at, updated_at
 		FROM tenants
 		ORDER BY created_at ASC`
 	rows, err := db.pool.Query(ctx, query)
@@ -1935,7 +2010,7 @@ func (db *DB) ListTenants(ctx context.Context) ([]*models.Tenant, error) {
 		if err := rows.Scan(
 			&t.ID, &t.Slug, &t.Name, &t.Description,
 			&t.AdminName, &t.AdminEmail, &t.AdminUsername,
-			&t.Status, &t.MaxNodes, &t.MaxEPS, &t.CreatedAt, &t.UpdatedAt,
+			&t.Status, &t.IngestPolicy, &t.MaxNodes, &t.MaxEPS, &t.CreatedAt, &t.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1947,14 +2022,14 @@ func (db *DB) ListTenants(ctx context.Context) ([]*models.Tenant, error) {
 // GetTenantBySlug returns a tenant by its unique slug identifier
 func (db *DB) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
 	query := `
-		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, max_nodes, max_eps, created_at, updated_at
+		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, coalesce(ingest_policy, 'permissive'), max_nodes, max_eps, created_at, updated_at
 		FROM tenants
 		WHERE slug = $1`
 	var t models.Tenant
 	err := db.pool.QueryRow(ctx, query, slug).Scan(
 		&t.ID, &t.Slug, &t.Name, &t.Description,
 		&t.AdminName, &t.AdminEmail, &t.AdminUsername,
-		&t.Status, &t.MaxNodes, &t.MaxEPS, &t.CreatedAt, &t.UpdatedAt,
+		&t.Status, &t.IngestPolicy, &t.MaxNodes, &t.MaxEPS, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1976,6 +2051,9 @@ func (db *DB) CreateTenant(ctx context.Context, t *models.Tenant, initialAdminPa
 	if t.Status == "" {
 		t.Status = "active"
 	}
+	if t.IngestPolicy == "" {
+		t.IngestPolicy = "permissive"
+	}
 	if t.MaxNodes <= 0 {
 		t.MaxNodes = 5
 	}
@@ -1986,12 +2064,12 @@ func (db *DB) CreateTenant(ctx context.Context, t *models.Tenant, initialAdminPa
 	t.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO tenants (id, slug, name, description, admin_name, admin_email, admin_username, status, max_nodes, max_eps, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+		INSERT INTO tenants (id, slug, name, description, admin_name, admin_email, admin_username, status, ingest_policy, max_nodes, max_eps, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
 	_, err := db.pool.Exec(ctx, query,
 		t.ID, t.Slug, t.Name, t.Description,
 		t.AdminName, t.AdminEmail, t.AdminUsername,
-		t.Status, t.MaxNodes, t.MaxEPS, t.CreatedAt, t.UpdatedAt,
+		t.Status, t.IngestPolicy, t.MaxNodes, t.MaxEPS, t.CreatedAt, t.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -2016,6 +2094,17 @@ func (db *DB) CreateTenant(ctx context.Context, t *models.Tenant, initialAdminPa
 	}
 
 	return nil
+}
+
+// UpdateTenantIngestPolicy updates the auto-discovery or whitelist-only policy for a tenant
+func (db *DB) UpdateTenantIngestPolicy(ctx context.Context, slug, policy string) error {
+	p := strings.ToLower(policy)
+	if p != "strict" {
+		p = "permissive"
+	}
+	query := `UPDATE tenants SET ingest_policy = $1, updated_at = NOW() WHERE slug = $2`
+	_, err := db.pool.Exec(ctx, query, p, slug)
+	return err
 }
 
 // TenantUsage summarizes resources consumed by a tenant

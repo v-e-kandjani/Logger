@@ -14,6 +14,7 @@ type DetectionResult struct {
 	Confidence     string `json:"confidence"` // HIGH, MEDIUM, LOW
 	SuggestedGroup string `json:"suggested_group"`
 	SuggestedName  string `json:"suggested_name"`
+	Category       string `json:"category"` // Perimeter Defense, Core & Distribution, Application Delivery & ADC, Access & Wireless, Datacenter Compute
 }
 
 var (
@@ -22,6 +23,7 @@ var (
 	wgMsgIDRegex      = regexp.MustCompile(`msg_id="?([^"\s,]+)"?`)
 	winEventIDRegex   = regexp.MustCompile(`(?i)(?:EventID|Event ID)[:=\s]+([0-9]{3,5})`)
 	hostRegex         = regexp.MustCompile(`(?i)(?:host|hostname)="?([^"\s,]+)"?`)
+	huaweiCodeRegex   = regexp.MustCompile(`%%[0-9]{2}[A-Za-z0-9_]+/[0-7]/[A-Za-z0-9_]+(?:\([a-zA-Z0-9_]+\))?:`)
 )
 
 // Detect analyzes raw syslog message bodies, hostnames, and application headers to fingerprint device type and vendor
@@ -35,6 +37,7 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 		DeviceType:     "Generic Syslog",
 		Confidence:     "LOW",
 		SuggestedGroup: "Default Assets",
+		Category:       "General Network Asset",
 	}
 
 	// Extract potential embedded hostname
@@ -61,15 +64,19 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 
 		if strings.Contains(lowerRaw, "fortiswitch") || strings.Contains(lowerHost, "fsw") {
 			res.DeviceType = "Switch"
+			res.Category = "Core & Distribution"
 			res.SuggestedGroup = "Core Switches & Routers"
 		} else if strings.Contains(lowerRaw, "fortianalyzer") || strings.Contains(lowerHost, "faz") {
 			res.DeviceType = "Server"
+			res.Category = "Datacenter Compute"
 			res.SuggestedGroup = "Datacenter Servers"
 		} else if strings.Contains(lowerRaw, "fortimail") {
 			res.DeviceType = "Server"
+			res.Category = "Datacenter Compute"
 			res.SuggestedGroup = "Datacenter Servers"
 		} else {
 			res.DeviceType = "Firewall"
+			res.Category = "Perimeter Defense"
 			res.SuggestedGroup = "Perimeter Firewalls"
 		}
 		return res
@@ -89,6 +96,7 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 
 		res.Vendor = "WatchGuard"
 		res.DeviceType = "Firewall"
+		res.Category = "Perimeter Defense"
 		res.Confidence = "HIGH"
 		res.SuggestedGroup = "Perimeter Firewalls"
 		return res
@@ -114,6 +122,7 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 
 		if strings.Contains(rawMessage, "%ASA-") || strings.Contains(rawMessage, "%FTD-") || code == "ASA" || code == "FTD" {
 			res.DeviceType = "Firewall"
+			res.Category = "Perimeter Defense"
 			res.Confidence = "HIGH"
 			res.SuggestedGroup = "Perimeter Firewalls"
 		} else if strings.Contains(rawMessage, "%LINK-") || strings.Contains(rawMessage, "%LINEPROTO-") ||
@@ -122,20 +131,24 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 			strings.Contains(lowerRaw, "catalyst") || strings.Contains(lowerRaw, "nexus") ||
 			strings.Contains(lowerHost, "cat") || strings.Contains(lowerHost, "sw-") {
 			res.DeviceType = "Switch"
+			res.Category = "Core & Distribution"
 			res.Confidence = "HIGH"
 			res.SuggestedGroup = "Core Switches & Routers"
 		} else if strings.Contains(rawMessage, "%DOT11-") || strings.Contains(rawMessage, "%WLAN-") ||
 			strings.Contains(lowerRaw, "aironet") || strings.Contains(lowerHost, "wlc") {
 			res.DeviceType = "Wireless Controller"
+			res.Category = "Access & Wireless"
 			res.Confidence = "HIGH"
 			res.SuggestedGroup = "Edge / Branch Office"
 		} else if strings.Contains(rawMessage, "%BGP-") || strings.Contains(rawMessage, "%OSPF-") ||
 			strings.Contains(rawMessage, "%IP_ROUTING-") || strings.Contains(lowerHost, "rtr") || strings.Contains(lowerHost, "router") {
 			res.DeviceType = "Router"
+			res.Category = "Core & Distribution"
 			res.Confidence = "HIGH"
 			res.SuggestedGroup = "Core Switches & Routers"
 		} else {
 			res.DeviceType = "Router"
+			res.Category = "Core & Distribution"
 			res.Confidence = "MEDIUM"
 			res.SuggestedGroup = "Core Switches & Routers"
 		}
@@ -151,6 +164,7 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 
 		res.Vendor = "Palo Alto"
 		res.DeviceType = "Firewall"
+		res.Category = "Perimeter Defense"
 		res.Confidence = "HIGH"
 		res.SuggestedGroup = "Perimeter Firewalls"
 		return res
@@ -169,12 +183,15 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 		res.Confidence = "HIGH"
 		if strings.Contains(lowerRaw, "crs") || strings.Contains(lowerHost, "switch") {
 			res.DeviceType = "Switch"
+			res.Category = "Core & Distribution"
 			res.SuggestedGroup = "Core Switches & Routers"
 		} else if strings.Contains(lowerRaw, "firewall") {
 			res.DeviceType = "Firewall"
+			res.Category = "Perimeter Defense"
 			res.SuggestedGroup = "Perimeter Firewalls"
 		} else {
 			res.DeviceType = "Router"
+			res.Category = "Core & Distribution"
 			res.SuggestedGroup = "Core Switches & Routers"
 		}
 		return res
@@ -193,6 +210,7 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 			res.Vendor = "pfSense"
 		}
 		res.DeviceType = "Firewall"
+		res.Category = "Perimeter Defense"
 		res.Confidence = "HIGH"
 		res.SuggestedGroup = "Perimeter Firewalls"
 		return res
@@ -210,9 +228,11 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 		res.Confidence = "HIGH"
 		if strings.Contains(lowerRaw, "authmgr") || strings.Contains(lowerRaw, "wms") || strings.Contains(lowerRaw, "iap") {
 			res.DeviceType = "Wireless Controller"
+			res.Category = "Access & Wireless"
 			res.SuggestedGroup = "Edge / Branch Office"
 		} else {
 			res.DeviceType = "Switch"
+			res.Category = "Core & Distribution"
 			res.SuggestedGroup = "Core Switches & Routers"
 		}
 		return res
@@ -231,12 +251,15 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 		res.Confidence = "HIGH"
 		if strings.Contains(lowerHost, "srx") || strings.Contains(lowerRaw, "rt_flow") {
 			res.DeviceType = "Firewall"
+			res.Category = "Perimeter Defense"
 			res.SuggestedGroup = "Perimeter Firewalls"
 		} else if strings.Contains(lowerHost, "ex") || strings.Contains(lowerRaw, "eswd") {
 			res.DeviceType = "Switch"
+			res.Category = "Core & Distribution"
 			res.SuggestedGroup = "Core Switches & Routers"
 		} else {
 			res.DeviceType = "Router"
+			res.Category = "Core & Distribution"
 			res.SuggestedGroup = "Core Switches & Routers"
 		}
 		return res
@@ -250,6 +273,7 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 
 		res.Vendor = "Sophos"
 		res.DeviceType = "Firewall"
+		res.Category = "Perimeter Defense"
 		res.Confidence = "HIGH"
 		res.SuggestedGroup = "Perimeter Firewalls"
 		return res
@@ -263,6 +287,7 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 
 		res.Vendor = "Check Point"
 		res.DeviceType = "Firewall"
+		res.Category = "Perimeter Defense"
 		res.Confidence = "HIGH"
 		res.SuggestedGroup = "Perimeter Firewalls"
 		return res
@@ -279,18 +304,67 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 		res.Confidence = "HIGH"
 		if strings.Contains(lowerRaw, "edgerouter") || strings.Contains(lowerRaw, "usg") {
 			res.DeviceType = "Router"
+			res.Category = "Core & Distribution"
 			res.SuggestedGroup = "Core Switches & Routers"
 		} else if strings.Contains(lowerRaw, "edgeswitch") || strings.Contains(lowerRaw, "usw") {
 			res.DeviceType = "Switch"
+			res.Category = "Core & Distribution"
 			res.SuggestedGroup = "Core Switches & Routers"
 		} else {
 			res.DeviceType = "Wireless Controller"
+			res.Category = "Access & Wireless"
 			res.SuggestedGroup = "Edge / Branch Office"
 		}
 		return res
 	}
 
-	// 12. LINUX SERVERS & WORKSTATIONS
+	// 12. HUAWEI (VRP / CloudEngine / USG / Quidway)
+	if huaweiCodeRegex.MatchString(rawMessage) ||
+		strings.Contains(lowerRaw, "huawei") ||
+		strings.Contains(lowerHost, "huawei") ||
+		strings.Contains(lowerRaw, "cloudengine") ||
+		strings.Contains(lowerRaw, "quidway") ||
+		strings.Contains(lowerHost, "hw-") ||
+		strings.Contains(lowerHost, "usg") ||
+		strings.Contains(lowerHost, "ce68") || strings.Contains(lowerHost, "ce128") {
+
+		res.Vendor = "Huawei"
+		res.Confidence = "HIGH"
+		if strings.Contains(lowerRaw, "usg") || strings.Contains(lowerRaw, "firewall") || strings.Contains(lowerHost, "usg") {
+			res.DeviceType = "Firewall"
+			res.Category = "Perimeter Defense"
+			res.SuggestedGroup = "Perimeter Firewalls"
+		} else if strings.Contains(lowerRaw, "cloudengine") || strings.Contains(lowerRaw, "switch") ||
+			strings.Contains(lowerHost, "sw") || strings.Contains(lowerHost, "ce") {
+			res.DeviceType = "Switch"
+			res.Category = "Core & Distribution"
+			res.SuggestedGroup = "Core Switches & Routers"
+		} else {
+			res.DeviceType = "Router"
+			res.Category = "Core & Distribution"
+			res.SuggestedGroup = "Core Switches & Routers"
+		}
+		return res
+	}
+
+	// 13. F5 NETWORKS (BIG-IP / VIPRION / ADC)
+	if strings.Contains(lowerRaw, "tmm[") ||
+		strings.Contains(lowerRaw, "mcpd[") ||
+		strings.Contains(lowerRaw, "bigip") ||
+		strings.Contains(lowerRaw, "big-ip") ||
+		strings.Contains(lowerHost, "bigip") ||
+		strings.Contains(lowerHost, "f5-") ||
+		strings.Contains(lowerRaw, "f5_") {
+
+		res.Vendor = "F5 Networks"
+		res.DeviceType = "Load Balancer"
+		res.Category = "Application Delivery & ADC"
+		res.Confidence = "HIGH"
+		res.SuggestedGroup = "Application Delivery & ADC"
+		return res
+	}
+
+	// 14. LINUX SERVERS & WORKSTATIONS
 	if strings.Contains(lowerRaw, "sshd[") ||
 		strings.Contains(lowerRaw, "systemd[") ||
 		strings.Contains(lowerRaw, "sudo:") ||
@@ -304,12 +378,13 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 
 		res.Vendor = "Linux"
 		res.DeviceType = "Server"
+		res.Category = "Datacenter Compute"
 		res.Confidence = "HIGH"
 		res.SuggestedGroup = "Datacenter Servers"
 		return res
 	}
 
-	// 13. MICROSOFT WINDOWS (Active Directory / Windows Server)
+	// 15. MICROSOFT WINDOWS (Active Directory / Windows Server)
 	if strings.Contains(rawMessage, "Microsoft-Windows-Security-Auditing") ||
 		strings.Contains(lowerRaw, "mswineventlog") ||
 		strings.Contains(lowerRaw, "security-auditing") ||
@@ -317,27 +392,30 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 
 		res.Vendor = "Microsoft"
 		res.DeviceType = "Server"
+		res.Category = "Datacenter Compute"
 		res.Confidence = "HIGH"
 		res.SuggestedGroup = "Datacenter Servers"
 		return res
 	}
 
-	// 14. VMWARE ESXi (Hypervisor)
+	// 16. VMWARE ESXi (Hypervisor)
 	if strings.Contains(lowerRaw, "vmkernel:") ||
 		strings.Contains(lowerRaw, "hostd[") ||
 		strings.Contains(lowerRaw, "vobd:") {
 
 		res.Vendor = "VMware"
 		res.DeviceType = "Server"
+		res.Category = "Datacenter Compute"
 		res.Confidence = "HIGH"
 		res.SuggestedGroup = "Datacenter Servers"
 		return res
 	}
 
-	// 15. HEURISTICS & FACILITY FALLBACKS
+	// 17. HEURISTICS & FACILITY FALLBACKS
 	if strings.Contains(lowerApp, "firewall") || strings.Contains(lowerRaw, "iptables") || strings.Contains(lowerRaw, "nftables") || strings.Contains(lowerRaw, "ufw") {
 		res.Vendor = "Linux"
 		res.DeviceType = "Firewall"
+		res.Category = "Perimeter Defense"
 		res.Confidence = "MEDIUM"
 		res.SuggestedGroup = "Perimeter Firewalls"
 		return res
@@ -345,6 +423,7 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 
 	if strings.Contains(lowerApp, "switch") || strings.Contains(lowerHost, "switch") {
 		res.DeviceType = "Switch"
+		res.Category = "Core & Distribution"
 		res.Confidence = "LOW"
 		res.SuggestedGroup = "Core Switches & Routers"
 		return res
@@ -352,6 +431,7 @@ func Detect(rawMessage, hostname, appName string) DetectionResult {
 
 	if strings.Contains(lowerApp, "router") || strings.Contains(lowerHost, "router") {
 		res.DeviceType = "Router"
+		res.Category = "Core & Distribution"
 		res.Confidence = "LOW"
 		res.SuggestedGroup = "Core Switches & Routers"
 		return res
@@ -382,6 +462,8 @@ func GenerateSuggestedName(ip string, res DetectionResult) string {
 		typeSuffix = "SW"
 	case "Router":
 		typeSuffix = "RTR"
+	case "Load Balancer":
+		typeSuffix = "LB"
 	case "Server":
 		typeSuffix = "SRV"
 	case "Wireless Controller", "Access Point":

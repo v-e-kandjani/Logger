@@ -152,10 +152,30 @@ func (p *Pipeline) workerLoop() {
 			return
 		case pkt := <-p.inQueue:
 			ipStr := pkt.SourceIP.String()
-			dev, found := p.deviceCache.LookupIP(ipStr)
 
-			// Strict Zero-Trust Filtering: Discard packets from unauthorized / random IP senders
-			if p.strictFilter.Load() && !found {
+			// Tenant-aware device lookup:
+			// If pkt.Tenant is specified (e.g. from edge node), attempt tenant-scoped lookup first
+			var dev *models.Device
+			var found bool
+			if pkt.Tenant != "" {
+				dev, found = p.deviceCache.LookupIPAndTenant(ipStr, pkt.Tenant)
+			} else {
+				dev, found = p.deviceCache.LookupIP(ipStr)
+			}
+
+			// Determine tenant attribution
+			tenant := "default"
+			switch {
+			case pkt.Tenant != "":
+				tenant = pkt.Tenant
+			case found && dev.TenantSlug != "":
+				tenant = dev.TenantSlug
+			}
+
+			// Ingest Policy Enforcement (Phase 5):
+			// If global strictFilter is enabled OR tenant enforces 'strict' whitelist-only
+			tenantPolicy := p.deviceCache.GetTenantIngestPolicy(tenant)
+			if (p.strictFilter.Load() || tenantPolicy == "strict") && !found {
 				p.DroppedUnauthorized.Add(1)
 				continue
 			}
@@ -166,16 +186,7 @@ func (p *Pipeline) workerLoop() {
 				continue
 			}
 
-			// Tenant attribution: edge-proxy packets carry their node's tenant; otherwise
-			// inherit the registered device's tenant; unknown senders belong to root.
-			switch {
-			case pkt.Tenant != "":
-				event.Tenant = pkt.Tenant
-			case found && dev.TenantSlug != "":
-				event.Tenant = dev.TenantSlug
-			default:
-				event.Tenant = "default"
-			}
+			event.Tenant = tenant
 
 			// Cooldown rate-limiting: only persist device metadata updates to PostgreSQL once every 30 seconds per source
 			now := time.Now()
@@ -217,7 +228,7 @@ func (p *Pipeline) workerLoop() {
 					}(ipStr)
 				}
 			} else {
-				// Permissive mode: auto-discovery with deep device type & vendor fingerprinting
+				// Permissive mode: auto-discovery with deep device type, vendor fingerprinting & category
 				event.DeviceID = uuid.Nil
 				detection := detector.Detect(event.RawMessage, event.Hostname, event.ApplicationName)
 
@@ -234,7 +245,11 @@ func (p *Pipeline) workerLoop() {
 					}
 				}
 
-				event.DeviceGroup = "Unregistered"
+				if detection.SuggestedGroup != "" {
+					event.DeviceGroup = detection.SuggestedGroup
+				} else {
+					event.DeviceGroup = "Unregistered"
+				}
 				if event.Vendor == "" || event.Vendor == "Generic" {
 					event.Vendor = detection.Vendor
 				}
@@ -242,9 +257,9 @@ func (p *Pipeline) workerLoop() {
 					event.Product = detection.DeviceType
 				}
 
-				// Fire-and-forget record unknown sender with auto-discovered metadata (rate-limited)
+				// Fire-and-forget record unknown sender with auto-discovered metadata and tenant scoping (rate-limited)
 				if shouldUpdateDB {
-					go func(ip, host, vendor, devType, conf, sample, fac, sev string) {
+					go func(ip, host, vendor, devType, conf, sample, fac, sev, ten string) {
 						ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 						defer cancel()
 						_ = p.pgDB.RecordUnregisteredSource(ctx, &models.UnregisteredSource{
@@ -257,8 +272,9 @@ func (p *Pipeline) workerLoop() {
 							LastRawSample:    sample,
 							DetectedFacility: fac,
 							DetectedSeverity: sev,
+							TenantSlug:       ten,
 						})
-					}(ipStr, detection.Hostname, detection.Vendor, detection.DeviceType, detection.Confidence, event.RawMessage, event.Facility, event.Severity)
+					}(ipStr, detection.Hostname, detection.Vendor, detection.DeviceType, detection.Confidence, event.RawMessage, event.Facility, event.Severity, tenant)
 				}
 			}
 

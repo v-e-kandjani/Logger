@@ -260,6 +260,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.6.4** (Tenant-Scoped Ingestion Auto-Discovery & Network Device Category Enrichment):
+  - **Per-Tenant Ingestion Policy (`permissive` vs `strict`)**: Configurable ingestion policy per tenant allowing either automated discovery of unknown senders or strict whitelist-only drop enforcement with zero lock-in for the `default` root organization.
+  - **Lock-Free Multi-Tenant Device Resolution**: Enhanced in-memory `DeviceCache` with composite `(IP, TenantSlug)` routing and atomic policy retrieval, preventing cross-tenant IP collisions and unauthorized sender spoofing.
+  - **Network Device Vendor & Category Enrichment**: Expanded automated fingerprinting with Huawei (VRP, CloudEngine, USG) and F5 Networks (BIG-IP ADC), auto-classifying assets across 5 distinct operational categories (`Perimeter Defense`, `Core & Distribution`, `Application Delivery & ADC`, `Access & Wireless`, `Datacenter Compute`).
+  - **Auto-Discovered Senders UI & Policy Governance**: Upgraded `#pane-unregistered` and `#setting-section-tenants` with tenant badges, inline policy toggle switching, and tenant-aware 1-click batch onboarding.
+
 - **v1.6.3** (Edge Node Heartbeats, Health Checks, Dead Man's Switch & Active Tenant-Level Quota Enforcer):
   - **Dynamic Edge Node Heartbeat Health Checks**: Replaced rigid timeouts with adaptive status calculation (`online` 🟢, `degraded` 🟡, `offline` 🔴, `pending` ⏳) keyed to configured sync intervals (`online`/30s, 60s, 5m, 15m, 30m, 1h).
   - **Dead Man's Switch Background Monitor**: Added automated edge forwarder health supervisor (`StartEdgeHealthMonitor`) executing every 30 seconds; automatically records audit trails and fires high-severity SIEM security alerts (`EDG-DEAD-MAN-001`) whenever an active node stops reporting.

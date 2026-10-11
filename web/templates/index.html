@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.6.3</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.6.4</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -709,6 +709,7 @@
                         <thead>
                             <tr>
                                 <th data-i18n="th_sender_ip">Sender IP</th>
+                                <th data-i18n="th_tenant">Tenant</th>
                                 <th data-i18n="th_hostname_asset">Hostname / Asset</th>
                                 <th data-i18n="th_discovered_type">Discovered Type</th>
                                 <th data-i18n="th_detected_vendor">Detected Vendor</th>
@@ -1683,13 +1684,14 @@
                                             <th data-i18n="th_tenant_admin">Yönetici Bilgileri</th>
                                             <th data-i18n="th_status">Durum</th>
                                             <th data-i18n="th_tenant_limits">Kaynak Limitleri</th>
+                                            <th data-i18n="th_tenant_ingest_policy">Giriş Politikası</th>
                                             <th data-i18n="th_created_at">Kayıt Tarihi</th>
                                             <th style="text-align: right;" data-i18n="th_actions">İşlemler</th>
                                         </tr>
                                     </thead>
                                     <tbody id="tbody-tenants">
                                         <tr>
-                                            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                                            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">
                                                 Yükleniyor...
                                             </td>
                                         </tr>
@@ -1825,7 +1827,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.6.3</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.6.4</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -2082,6 +2084,8 @@
                         <option value="Sophos">Sophos (SFOS / XG / UTM)</option>
                         <option value="Check Point">Check Point (Quantum / Gaia)</option>
                         <option value="Ubiquiti">Ubiquiti (UniFi / EdgeMAX)</option>
+                        <option value="Huawei">Huawei (VRP / CloudEngine / USG)</option>
+                        <option value="F5 Networks">F5 Networks (BIG-IP / ADC)</option>
                         <option value="Linux">Linux Server (Ubuntu / RHEL / Debian)</option>
                         <option value="Microsoft">Microsoft Windows Server / Active Directory</option>
                         <option value="VMware">VMware ESXi Hypervisor</option>
@@ -2094,6 +2098,7 @@
                         <option value="Firewall">Firewall</option>
                         <option value="Switch">Switch</option>
                         <option value="Router">Router</option>
+                        <option value="Load Balancer">Load Balancer (ADC)</option>
                         <option value="Server">Server</option>
                         <option value="Wireless Controller">Wireless Controller</option>
                         <option value="Access Point">Access Point</option>
@@ -2106,6 +2111,7 @@
                     <select class="input" id="dev-group">
                         <option value="Perimeter Firewalls">Perimeter Firewalls</option>
                         <option value="Core Switches &amp; Routers">Core Switches &amp; Routers</option>
+                        <option value="Application Delivery &amp; ADC">Application Delivery &amp; ADC</option>
                         <option value="Datacenter Servers">Datacenter Servers</option>
                         <option value="Edge / Branch Office">Edge / Branch Office</option>
                         <option value="Default" selected>Default Assets</option>
@@ -3335,7 +3341,7 @@
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
                     <div class="form-group">
                         <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="lbl_tenant_max_nodes">Maksimum Proxy Node</label>
                         <input type="number" class="input" id="tenant-new-max-nodes" value="10" min="1" max="500">
@@ -3343,6 +3349,13 @@
                     <div class="form-group">
                         <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="lbl_tenant_max_eps">Maksimum EPS Limiti</label>
                         <input type="number" class="input" id="tenant-new-max-eps" value="5000" min="100" max="100000">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="lbl_tenant_ingest_policy">Giriş Politikası</label>
+                        <select class="input" id="tenant-new-ingest-policy">
+                            <option value="permissive" selected data-i18n="opt_policy_permissive">⚡ Otomatik Keşif (Permissive)</option>
+                            <option value="strict" data-i18n="opt_policy_strict">🛡️ Beyaz Liste Zorunlu (Strict)</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -3353,7 +3366,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.6.3"></script>
-    <script src="/static/js/app.js?v=1.6.3"></script>
+    <script src="/static/js/translations.js?v=1.6.4"></script>
+    <script src="/static/js/app.js?v=1.6.4"></script>
 </body>
 </html>

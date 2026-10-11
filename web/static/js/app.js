@@ -637,6 +637,9 @@ function getDeviceTypeBadge(type) {
     if (t.includes('router')) {
         return `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);">🌐 Router</span>`;
     }
+    if (t.includes('balancer') || t.includes('adc') || t.includes('load balancer')) {
+        return `<span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3);">⚖️ Load Balancer</span>`;
+    }
     if (t.includes('server')) {
         return `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">🖥️ Server</span>`;
     }
@@ -659,12 +662,13 @@ function getConfidenceBadge(conf) {
 // Auto-Discovered Sources
 async function loadUnregisteredSources() {
     const tbody = document.getElementById('unreg-body');
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center">Loading detected sources...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center">Loading detected sources...</td></tr>';
     try {
-        const res = await fetch('/api/v1/unregistered');
+        const tenantParam = (currentTenantContext && currentTenantContext !== 'all' && currentTenantContext !== '*') ? `?tenant=${encodeURIComponent(currentTenantContext)}` : '';
+        const res = await fetch(`/api/v1/unregistered${tenantParam}`);
         const sources = await res.json();
         if (!sources || sources.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No unregistered syslog traffic detected.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center">No unregistered syslog traffic detected.</td></tr>';
             return;
         }
 
@@ -672,6 +676,7 @@ async function loadUnregisteredSources() {
         tbody.innerHTML = sources.map((s, idx) => `
             <tr>
                 <td class="mono-code text-yellow">${escapeHtml(s.ip_address)}</td>
+                <td><span class="badge badge-outline" style="font-size: 11px;">🏢 ${escapeHtml(s.tenant_slug || 'default')}</span></td>
                 <td><strong>${escapeHtml(s.hostname && s.hostname !== '-' ? s.hostname : (s.detected_vendor ? s.detected_vendor + '-Asset' : 'Unknown'))}</strong></td>
                 <td>${getDeviceTypeBadge(s.detected_type)}</td>
                 <td><span class="badge badge-outline">${escapeHtml(s.detected_vendor || 'Generic')}</span></td>
@@ -695,7 +700,7 @@ async function loadUnregisteredSources() {
             });
         });
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-red">Failed: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-red">Failed: ${e.message}</td></tr>`;
     }
 }
 
@@ -742,6 +747,14 @@ window.onboardDevice = (ip, sample = '', sourceObj = null) => {
             detectedVendor = 'MikroTik';
             detectedType = 'Router';
             confidence = 'HIGH';
+        } else if (sLower.includes('huawei') || sLower.includes('cloudengine') || sLower.includes('quidway') || sample.includes('%%01')) {
+            detectedVendor = 'Huawei';
+            detectedType = (sLower.includes('usg') || sLower.includes('firewall')) ? 'Firewall' : 'Switch';
+            confidence = 'HIGH';
+        } else if (sLower.includes('tmm[') || sLower.includes('bigip') || sLower.includes('f5 networks') || sLower.includes('big-ip')) {
+            detectedVendor = 'F5 Networks';
+            detectedType = 'Load Balancer';
+            confidence = 'HIGH';
         }
     }
 
@@ -763,14 +776,19 @@ window.onboardDevice = (ip, sample = '', sourceObj = null) => {
     if (groupSelect) {
         if (detectedType === 'Firewall') groupSelect.value = 'Perimeter Firewalls';
         else if (detectedType === 'Switch' || detectedType === 'Router') groupSelect.value = 'Core Switches & Routers';
+        else if (detectedType === 'Load Balancer') groupSelect.value = 'Application Delivery & ADC';
         else if (detectedType === 'Server') groupSelect.value = 'Identity & Auth Servers';
         else groupSelect.value = 'Default';
     }
 
     populateDeviceTenantSelect();
     const tenantSel = document.getElementById('dev-tenant');
-    if (tenantSel && currentTenantContext && currentTenantContext !== 'all' && currentTenantContext !== '*') {
-        tenantSel.value = currentTenantContext;
+    if (tenantSel) {
+        if (sourceObj && sourceObj.tenant_slug) {
+            tenantSel.value = sourceObj.tenant_slug;
+        } else if (currentTenantContext && currentTenantContext !== 'all' && currentTenantContext !== '*') {
+            tenantSel.value = currentTenantContext;
+        }
     }
 
     if (modalBadge) {
@@ -5768,7 +5786,7 @@ async function loadTenants() {
         // 2. Populate Settings > Tenants table
         if (tbody) {
             if (currentTenants.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Henüz kiracı bulunmuyor.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Henüz kiracı bulunmuyor.</td></tr>`;
                 return;
             }
 
@@ -5802,6 +5820,16 @@ async function loadTenants() {
                         <div style="font-size: 0.7rem; color: var(--text-muted);">${t.device_count || 0} kayıtlı cihaz</div>
                     </div>`;
 
+                const policy = t.ingest_policy || 'permissive';
+                const isStrict = (policy === 'strict');
+                const policyBadge = isStrict
+                    ? `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">🛡️ Beyaz Liste</span>`
+                    : `<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">⚡ Otomatik Keşif</span>`;
+                const togglePolicyBtn = (!isDefault && tenantSessionIsRoot)
+                    ? `<button class="btn btn-outline" style="padding: 2px 6px; font-size: 0.68rem; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;" onclick="toggleTenantPolicy('${escapeHtml(t.slug)}', '${policy}')" title="Giriş politikasını değiştir">🔄 ${isStrict ? 'Keşfe Aç' : 'Beyaz Liste Yap'}</button>`
+                    : '';
+                const policyHtml = `<div>${policyBadge}</div>${togglePolicyBtn}`;
+
                 html += `
                     <tr>
                         <td><code style="background: rgba(0,0,0,0.3); padding: 3px 6px; border-radius: 4px; font-size: 0.8rem;">${escapeHtml(t.slug)}</code></td>
@@ -5812,6 +5840,7 @@ async function loadTenants() {
                         <td>${adminInfo}</td>
                         <td>${statusBadge}</td>
                         <td>${limitsStr}</td>
+                        <td>${policyHtml}</td>
                         <td style="font-size: 0.8rem;">${createdDate}</td>
                         <td style="text-align: right;">
                             <div style="display: flex; justify-content: flex-end; gap: 6px;">
@@ -5833,6 +5862,28 @@ async function loadTenants() {
     }
 }
 
+window.toggleTenantPolicy = async function(slug, currentPolicy) {
+    const newPolicy = currentPolicy === 'strict' ? 'permissive' : 'strict';
+    const policyLabel = newPolicy === 'strict' ? '🛡️ Beyaz Liste (Bilinmeyen trafik engellenir)' : '⚡ Otomatik Keşif (Bilinmeyen trafik tespit edilir)';
+    if (!confirm(`'${slug}' kiracısının giriş politikasını '${policyLabel}' olarak değiştirmek istiyor musunuz?`)) return;
+
+    try {
+        const res = await fetch('/api/v1/tenants', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slug: slug, ingest_policy: newPolicy })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+        if (typeof showToast === 'function') {
+            showToast(`✓ Giriş politikası güncellendi: ${slug} -> ${newPolicy}`, 'success');
+        }
+        loadTenants();
+    } catch (err) {
+        alert('Politika güncellenemedi: ' + err.message);
+    }
+};
+
 function switchTenantContext(slug) {
     setTenantContext(slug);
     if (typeof showToast === 'function') {
@@ -5853,6 +5904,8 @@ function openAddTenantModal() {
     document.getElementById('tenant-new-admin-pass').value = '';
     document.getElementById('tenant-new-max-nodes').value = '10';
     document.getElementById('tenant-new-max-eps').value = '5000';
+    const policySel = document.getElementById('tenant-new-ingest-policy');
+    if (policySel) policySel.value = 'permissive';
     modal.style.display = 'flex';
 }
 
@@ -5871,6 +5924,7 @@ async function submitAddTenant() {
     const adminPass = document.getElementById('tenant-new-admin-pass').value.trim();
     const maxNodes = parseInt(document.getElementById('tenant-new-max-nodes').value, 10) || 10;
     const maxEps = parseInt(document.getElementById('tenant-new-max-eps').value, 10) || 5000;
+    const ingestPolicy = (document.getElementById('tenant-new-ingest-policy')?.value) || 'permissive';
 
     if (!name) {
         alert('Lütfen kiracı / müşteri adını girin!');
@@ -5893,7 +5947,8 @@ async function submitAddTenant() {
                 admin_username: adminUsername,
                 admin_initial_pass: adminPass,
                 max_nodes: maxNodes,
-                max_eps: maxEps
+                max_eps: maxEps,
+                ingest_policy: ingestPolicy
             })
         });
 

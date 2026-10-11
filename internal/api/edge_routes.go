@@ -680,6 +680,7 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 			AdminEmail       string `json:"admin_email"`
 			AdminUsername    string `json:"admin_username"`
 			AdminInitialPass string `json:"admin_initial_pass"`
+			IngestPolicy     string `json:"ingest_policy"`
 			MaxNodes         int    `json:"max_nodes"`
 			MaxEPS           int    `json:"max_eps"`
 		}
@@ -699,6 +700,11 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 			slug = strings.ToLower(strings.ReplaceAll(name, " ", "-"))
 		}
 
+		policy := strings.ToLower(strings.TrimSpace(req.IngestPolicy))
+		if policy != "strict" {
+			policy = "permissive"
+		}
+
 		t := &models.Tenant{
 			Slug:          slug,
 			Name:          name,
@@ -707,6 +713,7 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 			AdminEmail:    strings.TrimSpace(req.AdminEmail),
 			AdminUsername: strings.TrimSpace(req.AdminUsername),
 			Status:        "active",
+			IngestPolicy:  policy,
 			MaxNodes:      req.MaxNodes,
 			MaxEPS:        req.MaxEPS,
 		}
@@ -717,8 +724,35 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.recordAudit(r, "TENANT_CREATE", "tenant/"+slug, "SUCCESS", map[string]interface{}{"name": name, "max_nodes": req.MaxNodes, "max_eps": req.MaxEPS})
+		_ = h.deviceCache.Refresh(ctx)
+		h.recordAudit(r, "TENANT_CREATE", "tenant/"+slug, "SUCCESS", map[string]interface{}{"name": name, "ingest_policy": policy, "max_nodes": req.MaxNodes, "max_eps": req.MaxEPS})
 		writeJSON(w, http.StatusCreated, t)
+
+	case http.MethodPut:
+		var req struct {
+			Slug         string `json:"slug"`
+			IngestPolicy string `json:"ingest_policy"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+			return
+		}
+		slug := strings.TrimSpace(req.Slug)
+		if slug == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "slug is required"})
+			return
+		}
+		policy := strings.ToLower(strings.TrimSpace(req.IngestPolicy))
+		if policy != "strict" {
+			policy = "permissive"
+		}
+		if err := h.pgDB.UpdateTenantIngestPolicy(ctx, slug, policy); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "updating policy: " + err.Error()})
+			return
+		}
+		_ = h.deviceCache.Refresh(ctx)
+		h.recordAudit(r, "TENANT_POLICY_UPDATE", "tenant/"+slug, "SUCCESS", map[string]interface{}{"ingest_policy": policy})
+		writeJSON(w, http.StatusOK, map[string]string{"status": "updated", "slug": slug, "ingest_policy": policy})
 
 	case http.MethodDelete:
 		slug := strings.TrimSpace(r.URL.Query().Get("slug"))

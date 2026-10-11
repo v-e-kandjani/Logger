@@ -374,7 +374,7 @@ func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	var tenantEPS float64
 	if tenantScope != "" {
 		countToday, totalIngested = h.tenantLogCounts(ctx, tenantScope)
-		unreg = nil // unregistered sources are a root-level concern
+		unreg, _ = h.pgDB.ListUnregisteredSourcesByTenant(ctx, tenantScope)
 		tenantEPS = h.currentEPSByTenant(ctx)[tenantScope]
 	}
 
@@ -1035,7 +1035,8 @@ func (h *Handler) handleUnregisteredSources(w http.ResponseWriter, r *http.Reque
 	ctx, cancel := contextWithTimeout(r, 5*time.Second)
 	defer cancel()
 
-	sources, err := h.pgDB.ListUnregisteredSources(ctx)
+	scope := h.tenantScope(r)
+	sources, err := h.pgDB.ListUnregisteredSourcesByTenant(ctx, scope)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1118,6 +1119,7 @@ func (h *Handler) handleDeviceAutoDetect(w http.ResponseWriter, r *http.Request)
 		"vendor":          detection.Vendor,
 		"device_type":     detection.DeviceType,
 		"confidence":      detection.Confidence,
+		"category":        detection.Category,
 		"suggested_group": detection.SuggestedGroup,
 		"suggested_name":  detection.SuggestedName,
 		"hostname":        detection.Hostname,
@@ -1132,15 +1134,6 @@ func (h *Handler) handleAutoOnboardAll(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := contextWithTimeout(r, 15*time.Second)
 	defer cancel()
-
-	sources, err := h.pgDB.ListUnregisteredSources(ctx)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	onboardedCount := 0
-	var registeredList []models.Device
 
 	targetTenant := h.tenantScope(r)
 	var bodyReq struct {
@@ -1158,6 +1151,15 @@ func (h *Handler) handleAutoOnboardAll(w http.ResponseWriter, r *http.Request) {
 		targetTenant = "default"
 	}
 
+	sources, err := h.pgDB.ListUnregisteredSourcesByTenant(ctx, targetTenant)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	onboardedCount := 0
+	var registeredList []models.Device
+
 	for _, s := range sources {
 		detection := detector.Detect(s.LastRawSample, s.Hostname, "")
 		vendor := s.DetectedVendor
@@ -1172,11 +1174,16 @@ func (h *Handler) handleAutoOnboardAll(w http.ResponseWriter, r *http.Request) {
 		devName := detector.GenerateSuggestedName(s.IPAddress, detection)
 		group := detection.SuggestedGroup
 
+		dTenant := s.TenantSlug
+		if dTenant == "" || dTenant == "default" {
+			dTenant = targetTenant
+		}
+
 		d := models.Device{
 			Name:             devName,
 			IPAddress:        s.IPAddress,
 			Hostname:         s.Hostname,
-			Description:      fmt.Sprintf("Auto-discovered %s %s", vendor, devType),
+			Description:      fmt.Sprintf("Auto-discovered %s %s (%s)", vendor, devType, detection.Category),
 			Vendor:           vendor,
 			DeviceType:       devType,
 			GroupName:        group,
@@ -1185,7 +1192,7 @@ func (h *Handler) handleAutoOnboardAll(w http.ResponseWriter, r *http.Request) {
 			IsEnabled:        true,
 			RetentionDays:    365,
 			TimestampPolicy:  "HOURLY",
-			TenantSlug:       targetTenant,
+			TenantSlug:       dTenant,
 		}
 
 		if err := h.pgDB.CreateDevice(ctx, &d); err == nil {

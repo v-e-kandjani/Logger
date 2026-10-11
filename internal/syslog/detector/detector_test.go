@@ -12,6 +12,7 @@ func TestDetect(t *testing.T) {
 		app        string
 		wantVendor string
 		wantType   string
+		wantCat    string
 	}{
 		{
 			name:       "Fortinet FortiGate traffic log",
@@ -92,6 +93,34 @@ func TestDetect(t *testing.T) {
 			app:        "Fortinet",
 			wantVendor: "Fortinet",
 			wantType:   "Firewall",
+			wantCat:    "Perimeter Defense",
+		},
+		{
+			name:       "Huawei CloudEngine Switch Syslog",
+			raw:        `<189>Oct 11 2026 18:30:12 CE6800-Core %%01SHELL/5/CMDRECORD(s): Recorded command: display interface brief`,
+			hostname:   "CE6800-Core",
+			app:        "",
+			wantVendor: "Huawei",
+			wantType:   "Switch",
+			wantCat:    "Core & Distribution",
+		},
+		{
+			name:       "Huawei USG Firewall Session Log",
+			raw:        `<187>Oct 11 2026 18:32:00 USG6000 %%01FIREWALL/6/SESSION_CREATE(l): USG session created src=192.168.10.5 dst=1.1.1.1`,
+			hostname:   "USG6000",
+			app:        "",
+			wantVendor: "Huawei",
+			wantType:   "Firewall",
+			wantCat:    "Perimeter Defense",
+		},
+		{
+			name:       "F5 BIG-IP Traffic Management Microkernel log",
+			raw:        `Oct 11 18:35:10 bigip-vip-01 notice tmm[14202]: 01010028:5: No members available for pool /Common/production_api_pool`,
+			hostname:   "bigip-vip-01",
+			app:        "tmm",
+			wantVendor: "F5 Networks",
+			wantType:   "Load Balancer",
+			wantCat:    "Application Delivery & ADC",
 		},
 	}
 
@@ -103,6 +132,9 @@ func TestDetect(t *testing.T) {
 			}
 			if res.DeviceType != tc.wantType {
 				t.Errorf("DeviceType got %s, want %s", res.DeviceType, tc.wantType)
+			}
+			if tc.wantCat != "" && res.Category != tc.wantCat {
+				t.Errorf("Category got %s, want %s", res.Category, tc.wantCat)
 			}
 		})
 	}

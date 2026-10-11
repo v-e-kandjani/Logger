@@ -249,6 +249,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.6.4** (Kiracı Bazlı Giriş Otomatik Keşfi & Ağ Cihazı Kategori Zenginleştirmesi):
+  - **Kiracı Başına Giriş Politikası (`permissive` / `strict`)**: Her kiracı için bilinmeyen log kaynaklarını otomatik keşfetme (`permissive`) veya yalnızca kayıtlı beyaz listedeki cihazları kabul edip diğerlerini anında düşürme (`strict`) politikası eklendi.
+  - **Kilitsiz Çok Kiracılı Cihaz Eşleme**: Bellek içi `DeviceCache` bileşik `(IP, TenantSlug)` haritası ve atomik politika sorgulama ile güçlendirilerek kiracılar arası IP çakışmaları ve izinsiz gönderici taklitleri engellendi.
+  - **Ağ Cihazı Üretici ve Kategori Zenginleştirmesi**: Otomatik parmak izi tespiti Huawei (VRP, CloudEngine, USG) ve F5 Networks (BIG-IP ADC) desteğiyle genişletildi; varlıklar 5 operasyonel kategoride (`Perimeter Defense`, `Core & Distribution`, `Application Delivery & ADC`, `Access & Wireless`, `Datacenter Compute`) otomatik sınıflandırılmaktadır.
+  - **Otomatik Keşfedilen Varlıklar Arayüzü & Politika Yönetimi**: Keşfedilen kaynaklar ve kiracı yönetimi tabloları kiracı rozetleri, tek tıkla politika değiştirme düğmesi ve kiracıya duyarlı toplu kayıt özelliğiyle güncellendi.
+
 - **v1.6.3** (Edge Node Kalp Atışı Takibi, Sağlık Denetimleri, Dead Man's Switch & Aktif Kiracı Kota Denetleyicisi):
   - **Dinamik Edge Node Kalp Atışı Sağlık Denetimleri**: Sabit zaman aşımları yerine düğümün yapılandırılmış senkronizasyon aralığına (`online`/30sn, 60sn, 5dk, 15dk, 30dk, 1sa) göre uyarlanabilir durum hesaplaması (`online` 🟢, `degraded` 🟡, `offline` 🔴, `pending` ⏳) entegre edildi.
   - **Dead Man's Switch Arka Plan Gözlemcisi**: Her 30 saniyede bir çalışan otomatik proxy sağlık denetçisi (`StartEdgeHealthMonitor`) eklendi; belirlenen aralıkta sinyal göndermeyen düğümler için otomatik denetim izi kaydı ve yüksek öncelikli SIEM güvenlik alarmı (`EDG-DEAD-MAN-001`) üretilmektedir.
