@@ -1,0 +1,16 @@
+[Unit]
+Description=LogSeal SIEM Aggregate Worker & Data Ingestion Budget Slice
+Documentation=https://github.com/v-e-kandjani/Logger
+Before=slices.target
+
+[Slice]
+CPUAccounting=yes
+MemoryAccounting=yes
+IOAccounting=yes
+AllowedCPUs=1-7
+CPUQuota=700%
+CPUQuotaPeriodSec=20ms
+CPUWeight=100
+MemoryHigh=9G
+MemoryMax=11G
+MemorySwapMax=0

@@ -1,0 +1,11 @@
+[Unit]
+Description=LogSeal SIEM Root Slice
+Documentation=https://github.com/v-e-kandjani/Logger
+Before=slices.target
+
+[Slice]
+CPUAccounting=yes
+MemoryAccounting=yes
+IOAccounting=yes
+MemoryLow=1536M
+MemoryMin=512M

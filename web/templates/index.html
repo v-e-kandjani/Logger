@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.24</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.6.0</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -235,6 +235,40 @@
                         <div class="stat-header" data-i18n="stat_db_storage">Database Storage</div>
                         <div class="stat-value text-blue" id="stat-db-size">0.0 MB</div>
                         <div class="stat-sub" id="stat-db-sub">ClickHouse Store</div>
+                    </div>
+                </div>
+
+                <!-- Resource Governor & Cgroups v2 Policy Banner -->
+                <div class="panel" id="panel-resource-governor" style="margin-bottom: 24px; padding: 14px 18px; border-radius: 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.25rem;">⚖️</span>
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <strong style="font-size: 0.95rem;" data-i18n="gov_title">Cgroups v2 Resource Governor</strong>
+                                    <span class="badge" id="gov-badge-state" style="font-size: 11px; padding: 2px 8px; font-weight: 700; background: rgba(34, 197, 94, 0.18); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.35);">NORMAL</span>
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" id="gov-state-reason">Management CPU 0 reserved · Data plane capped under siem-data.slice</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 14px; align-items: center; font-size: 0.82rem; flex-wrap: wrap;">
+                            <div style="background: rgba(255,255,255,0.03); padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                                <span style="color: var(--text-muted);" data-i18n="gov_control_plane">Control Plane:</span>
+                                <strong class="mono-code" id="gov-control-cpus" style="color: #38bdf8; margin-left: 4px;">CPU 0</strong>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.03); padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                                <span style="color: var(--text-muted);" data-i18n="gov_data_plane">Data Plane:</span>
+                                <strong class="mono-code" id="gov-worker-cpus" style="color: #fbbf24; margin-left: 4px;">CPUs 1-7</strong>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.03); padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                                <span style="color: var(--text-muted);" data-i18n="gov_admission">Search Admission:</span>
+                                <strong class="mono-code" id="gov-admission-status" style="color: #4ade80; margin-left: 4px;">0 / 4 Active</strong>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.03); padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                                <span style="color: var(--text-muted);" data-i18n="gov_mem_psi">Memory PSI:</span>
+                                <strong class="mono-code" id="gov-mem-psi" style="color: #a78bfa; margin-left: 4px;">0.0%</strong>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1790,7 +1824,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.24</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.6.0</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -3278,7 +3312,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.24"></script>
-    <script src="/static/js/app.js?v=1.5.24"></script>
+    <script src="/static/js/translations.js?v=1.6.0"></script>
+    <script src="/static/js/app.js?v=1.6.0"></script>
 </body>
 </html>

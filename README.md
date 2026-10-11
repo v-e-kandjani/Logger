@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.6.0** (Web-Based SIEM Architecture: CPU/RAM Resource Governor & Cgroups v2 Slice Isolation):
+  - **Linux Cgroups v2 & Systemd Slice Hierarchy**: Introduced three-tier cgroup slices (`siem.slice`, `siem-control.slice`, `siem-data.slice`) with strict CPU quotas and memory boundaries (`AllowedCPUs`, `CPUQuota`, `MemoryHigh`, `MemoryMax`, `MemoryLow`), separating management access from worker load.
+  - **Dynamic Resource Governor (`internal/governor`)**: Implemented automated host and cgroup metric probe with 4-phase state machine (`Normal`, `Pressure`, `Critical`, `Recovery`) to dynamically arbitrate query admission, report execution, and memory pressure.
+  - **Governor Telemetry API**: Added `/api/v1/governor/status` exposing real-time CPU throttling, memory pressure (PSI), cgroup allocations, and admission states.
+
 - **v1.5.24** (Multi-Tenant Isolation, Enterprise Audit Trail, Self-Service Password Policy & Deep Firewall Log Intelligence):
   - **Comprehensive Administrative Audit Trail**: Added PostgreSQL audit trail storage (`audit_logs`) and REST API (`/api/v1/audit/logs`) recording authentication events, user lifecycles, and tenant operations with IP extraction and multi-tenant scoping; introduced dedicated settings panel (`#setting-section-audit`) with instant action and text search filters.
   - **Enterprise Password Policy & Self-Service Change**: Enforced strict password complexity (min 8 chars, uppercase, lowercase, number, symbol) across user creation, administrative password resets, and introduced self-service password update endpoint (`/api/v1/auth/change-password`) with interactive client-side strength evaluation badge indicator.

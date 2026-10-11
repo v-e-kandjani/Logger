@@ -1,0 +1,15 @@
+[Unit]
+Description=LogSeal SIEM Management & Control Services Slice
+Documentation=https://github.com/v-e-kandjani/Logger
+Before=slices.target
+
+[Slice]
+CPUAccounting=yes
+MemoryAccounting=yes
+IOAccounting=yes
+AllowedCPUs=0
+CPUWeight=1000
+MemoryLow=1536M
+MemoryMin=512M
+MemoryHigh=1792M
+MemoryMax=2G

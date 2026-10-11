@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.6.0** (Web Tabanlı SIEM Mimarisi: CPU/RAM Kaynak Yöneticisi & Cgroups v2 Slice İzolasyonu):
+  - **Linux Cgroups v2 & Systemd Slice Hiyerarşisi**: Yönetim erişimi ile veri düzlemini birbirinden izole eden üç katmanlı cgroup dilimi (`siem.slice`, `siem-control.slice`, `siem-data.slice`) ve katı CPU/bellek kotaları (`AllowedCPUs`, `CPUQuota`, `MemoryHigh`, `MemoryMax`, `MemoryLow`) eklendi.
+  - **Dinamik Kaynak Yöneticisi (`internal/governor`)**: 4 aşamalı durum makinesi (`Normal`, `Pressure`, `Critical`, `Recovery`) ile cgroup ve sistem yükünü izleyen, sorgu kabulünü ve raporları otomatik frenleyen denetçi çekirdeği geliştirildi.
+  - **Kaynak Yöneticisi Telemetri API'si**: Gerçek zamanlı CPU kısıtlaması, bellek baskısı (PSI) ve kabul durumlarını sağlayan `/api/v1/governor/status` uç noktası eklendi.
+
 - **v1.5.24** (Çok Kiracılı İzolasyon, Kurumsal Denetim İzi, Self-Servis Şifre Politikası ve Derin Güvenlik Duvarı Log Zekası):
   - **Kapsamlı Yönetim ve Güvenlik Denetim İzi (Audit Trail)**: Kimlik doğrulama, kullanıcı yönetimi ve kiracı işlemlerini IP adresi ve kiracı kapsamıyla kaydeden PostgreSQL denetim tablosu (`audit_logs`) ve REST API (`/api/v1/audit/logs`) geliştirildi; arayüze anlık olay ve metin filtrelemeli özel denetim paneli (`#setting-section-audit`) eklendi.
   - **Kurumsal Şifre Politikası ve Kullanıcı Şifre Değiştirme**: Yeni kullanıcı oluşturma, yönetici şifre sıfırlama ve oturum açmış kullanıcılar için self-servis şifre güncelleme (`/api/v1/auth/change-password`) adımlarında güçlü şifre politikası (en az 8 karakter, büyük/küçük harf, rakam ve sembol) zorunlu kılındı; interaktif güç gösterge rozetleri eklendi.

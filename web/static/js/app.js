@@ -326,6 +326,52 @@ function startPollingTelemetry() {
     };
     poll();
     setInterval(poll, 5000);
+
+    pollGovernorStatus();
+    setInterval(pollGovernorStatus, 3000);
+}
+
+async function pollGovernorStatus() {
+    try {
+        const res = await fetch('/api/v1/governor/status');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const badge = document.getElementById('gov-badge-state');
+        const reason = document.getElementById('gov-state-reason');
+        const ctrlCpus = document.getElementById('gov-control-cpus');
+        const wrkCpus = document.getElementById('gov-worker-cpus');
+        const admission = document.getElementById('gov-admission-status');
+        const psi = document.getElementById('gov-mem-psi');
+
+        if (badge) {
+            badge.textContent = data.state || 'NORMAL';
+            if (data.state === 'CRITICAL') {
+                badge.style.background = 'rgba(239, 68, 68, 0.2)';
+                badge.style.color = '#f87171';
+                badge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+            } else if (data.state === 'PRESSURE') {
+                badge.style.background = 'rgba(245, 158, 11, 0.2)';
+                badge.style.color = '#fbbf24';
+                badge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+            } else if (data.state === 'RECOVERY') {
+                badge.style.background = 'rgba(56, 189, 248, 0.2)';
+                badge.style.color = '#38bdf8';
+                badge.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+            } else {
+                badge.style.background = 'rgba(34, 197, 94, 0.18)';
+                badge.style.color = '#4ade80';
+                badge.style.borderColor = 'rgba(34, 197, 94, 0.35)';
+            }
+        }
+        if (reason) reason.textContent = data.state_reason || '';
+        if (ctrlCpus) ctrlCpus.textContent = `CPU ${data.control_cpus || '0'}`;
+        if (wrkCpus) wrkCpus.textContent = `CPUs ${data.worker_cpus || '1-7'}`;
+        if (admission) admission.textContent = `${data.active_queries || 0} / ${data.max_allowed_queries || 4} Active`;
+        if (psi && data.metrics) psi.textContent = `${(data.metrics.memory_psi_avg60 || 0).toFixed(1)}%`;
+    } catch (e) {
+        // silent
+    }
 }
 
 // Live WebSocket Stream with bounded ring buffer

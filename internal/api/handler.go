@@ -22,6 +22,7 @@ import (
 	"github.com/syslog-platform/logger/internal/cache"
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
+	"github.com/syslog-platform/logger/internal/governor"
 	"github.com/syslog-platform/logger/internal/https"
 	"github.com/syslog-platform/logger/internal/metrics"
 	"github.com/syslog-platform/logger/internal/models"
@@ -202,6 +203,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/system/update/apply", h.requireAuth(h.handleSystemUpdateApply))
 	mux.HandleFunc("/api/v1/system/metrics", h.requireAuth(h.handleMetricsCurrent))
 	mux.HandleFunc("/api/v1/system/metrics/history", h.requireAuth(h.handleMetricsHistory))
+	mux.HandleFunc("/api/v1/governor/status", h.requireAuth(h.handleGovernorStatusAPI))
 
 	// Support & Debug Diagnostic Package Endpoints
 	mux.HandleFunc("/api/v1/debug/bundle", h.requireAuth(h.handleCreateSupportBundle))
@@ -430,6 +432,13 @@ func (h *Handler) handleMetricsHistory(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleSearchLogs(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := contextWithTimeout(r, 15*time.Second)
 	defer cancel()
+
+	gov := governor.GetGovernor()
+	if admitted, reason := gov.CanAdmitQuery(ctx); !admitted {
+		http.Error(w, `{"error":"`+reason+`"}`, http.StatusServiceUnavailable)
+		return
+	}
+	defer gov.ReleaseQuery()
 
 	limitStr := r.URL.Query().Get("limit")
 	limit := 100
@@ -1435,6 +1444,12 @@ func parseFlexibleTime(s string) (time.Time, error) {
 func (h *Handler) handleExportCustomStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	gov := governor.GetGovernor()
+	if ok, reason := gov.CanAdmitReport(); !ok {
+		http.Error(w, `{"error":"`+reason+`"}`, http.StatusServiceUnavailable)
 		return
 	}
 
