@@ -169,6 +169,8 @@ func generateStandaloneDOCX(report models.ComprehensiveIncidentReport, logoBytes
 		return err
 	}
 
+	isTR := strings.ToLower(report.Language) != "en"
+
 	var bodyBuilder strings.Builder
 	bodyBuilder.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -177,7 +179,11 @@ func generateStandaloneDOCX(report models.ComprehensiveIncidentReport, logoBytes
 	// Document Title
 	title := report.Title
 	if title == "" {
-		title = "Valtrivo LogSeal SIEM & SOC Investigation Report"
+		if isTR {
+			title = "Valtrivo LogSeal SIEM & SOC Olay İnceleme Raporu"
+		} else {
+			title = "Valtrivo LogSeal SIEM & SOC Investigation Report"
+		}
 	}
 	bodyBuilder.WriteString(fmt.Sprintf(`
     <w:p>
@@ -186,18 +192,38 @@ func generateStandaloneDOCX(report models.ComprehensiveIncidentReport, logoBytes
     </w:p>`, html.EscapeString(title)))
 
 	// Subheader Metadata
+	classLabel := "CLASSIFICATION"
+	tenantLabel := "Tenant"
+	reportIDLabel := "Report ID"
+	if isTR {
+		classLabel = "SINIFLANDIRMA"
+		tenantLabel = "Kiracı"
+		reportIDLabel = "Rapor ID"
+	}
 	bodyBuilder.WriteString(fmt.Sprintf(`
     <w:p>
       <w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr>
-      <w:r><w:rPr><w:b/><w:color w:val="DC2626"/></w:rPr><w:t>CLASSIFICATION: %s</w:t></w:r>
-      <w:r><w:t>  |  Tenant: %s (%s)  |  Report ID: %s</w:t></w:r>
-    </w:p>`, html.EscapeString(report.Classification), html.EscapeString(report.Tenant.TenantName), html.EscapeString(report.Tenant.TenantSlug), html.EscapeString(report.ReportID)))
+      <w:r><w:rPr><w:b/><w:color w:val="DC2626"/></w:rPr><w:t>%s: %s</w:t></w:r>
+      <w:r><w:t>  |  %s: %s (%s)  |  %s: %s</w:t></w:r>
+    </w:p>`, classLabel, html.EscapeString(report.Classification), tenantLabel, html.EscapeString(report.Tenant.TenantName), html.EscapeString(report.Tenant.TenantSlug), reportIDLabel, html.EscapeString(report.ReportID)))
 
 	// Section 1: Executive Overview
-	bodyBuilder.WriteString(`
+	sec1Title := "1. Executive Summary &amp; Operational Metrics"
+	lblMTTD := "Mean Time to Detect (MTTD)"
+	lblMTTA := "Mean Time to Triage (MTTA)"
+	lblMTTR := "Mean Time to Remediate (MTTR)"
+	lbl5651 := "Law 5651 Regulatory Sealed"
+	if isTR {
+		sec1Title = "1. Yönetici Özeti ve Operasyonel Metrikler"
+		lblMTTD = "Ortalama Tespit Süresi (MTTD)"
+		lblMTTA = "Ortalama İnceleme Süresi (MTTA)"
+		lblMTTR = "Ortalama Çözüm Süresi (MTTR)"
+		lbl5651 = "5651 Sayılı Kanun Zaman Damgası Mühürlü"
+	}
+	bodyBuilder.WriteString(fmt.Sprintf(`
     <w:p><w:pPr><w:spacing w:before="240" w:after="120"/></w:pPr>
-      <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="0F172A"/></w:rPr><w:t>1. Executive Summary &amp; Operational Metrics</w:t></w:r>
-    </w:p>`)
+      <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="0F172A"/></w:rPr><w:t>%s</w:t></w:r>
+    </w:p>`, sec1Title))
 	bodyBuilder.WriteString(fmt.Sprintf(`
     <w:p><w:pPr><w:spacing w:after="160"/></w:pPr>
       <w:r><w:t>%s</w:t></w:r>
@@ -208,37 +234,49 @@ func generateStandaloneDOCX(report models.ComprehensiveIncidentReport, logoBytes
     <w:tbl>
       <w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/><w:left w:val="none"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/><w:right w:val="none"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/></w:tblBorders></w:tblPr>
       <w:tr>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Mean Time to Detect (MTTD)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
         <w:tc><w:p><w:r><w:t>%d min</w:t></w:r></w:p></w:tc>
       </w:tr>
       <w:tr>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Mean Time to Triage (MTTA)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
         <w:tc><w:p><w:r><w:t>%d min</w:t></w:r></w:p></w:tc>
       </w:tr>
       <w:tr>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Mean Time to Remediate (MTTR)</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
         <w:tc><w:p><w:r><w:t>%d min</w:t></w:r></w:p></w:tc>
       </w:tr>
       <w:tr>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Law 5651 Regulatory Sealed</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
         <w:tc><w:p><w:r><w:t>%t</w:t></w:r></w:p></w:tc>
       </w:tr>
-    </w:tbl>`, report.MTTDMinutes, report.MTTAMinutes, report.MTTRMinutes, report.RegulatoryImpact.Law5651Relevant))
+    </w:tbl>`, lblMTTD, report.MTTDMinutes, lblMTTA, report.MTTAMinutes, lblMTTR, report.MTTRMinutes, lbl5651, report.RegulatoryImpact.Law5651Relevant))
 
 	// Section 2: MITRE ATT&CK Threat Mappings
 	if len(report.ThreatMappings) > 0 {
-		bodyBuilder.WriteString(`
+		sec2Title := "2. Tactical Threat Mapping (MITRE ATT&amp;CK &amp; D3FEND)"
+		thTactic := "Tactic"
+		thTechnique := "Technique"
+		thName := "Name"
+		thRule := "SIEM Detection Rule"
+		if isTR {
+			sec2Title = "2. Taktik Tehdit Matrisi (MITRE ATT&amp;CK &amp; D3FEND)"
+			thTactic = "Taktik"
+			thTechnique = "Teknik"
+			thName = "Ad"
+			thRule = "SIEM Tespit Kuralı"
+		}
+		bodyBuilder.WriteString(fmt.Sprintf(`
     <w:p><w:pPr><w:spacing w:before="240" w:after="120"/></w:pPr>
-      <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="0F172A"/></w:rPr><w:t>2. Tactical Threat Mapping (MITRE ATT&amp;CK &amp; D3FEND)</w:t></w:r>
+      <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="0F172A"/></w:rPr><w:t>%s</w:t></w:r>
     </w:p>
     <w:tbl>
       <w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/></w:tblBorders></w:tblPr>
       <w:tr>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Tactic</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Technique</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Name</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>SIEM Detection Rule</w:t></w:r></w:p></w:tc>
-      </w:tr>`)
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+      </w:tr>`, sec2Title, thTactic, thTechnique, thName, thRule))
 		for _, m := range report.ThreatMappings {
 			bodyBuilder.WriteString(fmt.Sprintf(`
       <w:tr>
@@ -253,18 +291,30 @@ func generateStandaloneDOCX(report models.ComprehensiveIncidentReport, logoBytes
 
 	// Section 3: IOCs
 	if len(report.IOCs) > 0 {
-		bodyBuilder.WriteString(`
+		sec3Title := "3. Threat Intelligence &amp; Indicators of Compromise (IOC)"
+		thType := "Type"
+		thValue := "Value"
+		thConf := "Confidence"
+		thAction := "Action Taken"
+		if isTR {
+			sec3Title = "3. Tehdit İstihbaratı ve Tehdit Göstergeleri (IOC)"
+			thType = "Tür"
+			thValue = "Değer"
+			thConf = "Güven"
+			thAction = "Uygulanan Eylem"
+		}
+		bodyBuilder.WriteString(fmt.Sprintf(`
     <w:p><w:pPr><w:spacing w:before="240" w:after="120"/></w:pPr>
-      <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="0F172A"/></w:rPr><w:t>3. Threat Intelligence &amp; Indicators of Compromise (IOC)</w:t></w:r>
+      <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="0F172A"/></w:rPr><w:t>%s</w:t></w:r>
     </w:p>
     <w:tbl>
       <w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/></w:tblBorders></w:tblPr>
       <w:tr>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Type</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Value</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Confidence</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Action Taken</w:t></w:r></w:p></w:tc>
-      </w:tr>`)
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+      </w:tr>`, sec3Title, thType, thValue, thConf, thAction))
 		for _, ioc := range report.IOCs {
 			bodyBuilder.WriteString(fmt.Sprintf(`
       <w:tr>
@@ -279,19 +329,33 @@ func generateStandaloneDOCX(report models.ComprehensiveIncidentReport, logoBytes
 
 	// Section 4: Forensic Chain of Custody & Law 5651
 	if len(report.ChainOfCustody) > 0 {
-		bodyBuilder.WriteString(`
+		sec4Title := "4. Forensic Chain of Custody &amp; Law No. 5651 Evidence Ledger"
+		thEvID := "Evidence ID"
+		thArtType := "Type"
+		thHost := "Source Host"
+		thHash := "SHA-256 Checksum"
+		thToken := "TSA Token"
+		if isTR {
+			sec4Title = "4. Adli Kanıt Defteri ve 5651 Sayılı Kanun Kanıt Zinciri"
+			thEvID = "Kanıt ID"
+			thArtType = "Tür"
+			thHost = "Kaynak Cihaz"
+			thHash = "SHA-256 Özeti"
+			thToken = "Zaman Damgası"
+		}
+		bodyBuilder.WriteString(fmt.Sprintf(`
     <w:p><w:pPr><w:spacing w:before="240" w:after="120"/></w:pPr>
-      <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="0F172A"/></w:rPr><w:t>4. Forensic Chain of Custody &amp; Law No. 5651 Evidence Ledger</w:t></w:r>
+      <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="0F172A"/></w:rPr><w:t>%s</w:t></w:r>
     </w:p>
     <w:tbl>
       <w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/></w:tblBorders></w:tblPr>
       <w:tr>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Evidence ID</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Type</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Source Host</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>SHA-256 Checksum</w:t></w:r></w:p></w:tc>
-        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>TSA Token</w:t></w:r></w:p></w:tc>
-      </w:tr>`)
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>
+      </w:tr>`, sec4Title, thEvID, thArtType, thHost, thHash, thToken))
 		for _, ev := range report.ChainOfCustody {
 			bodyBuilder.WriteString(fmt.Sprintf(`
       <w:tr>
@@ -307,16 +371,22 @@ func generateStandaloneDOCX(report models.ComprehensiveIncidentReport, logoBytes
 
 	// Section 5: Root Cause & Action Items
 	if report.RootCause != "" || len(report.RemediationPlan) > 0 {
-		bodyBuilder.WriteString(`
+		sec5Title := "5. Root Cause Analysis &amp; Corrective Recommendations"
+		rcPrefix := "Root Cause:"
+		if isTR {
+			sec5Title = "5. Kök Neden Analizi ve Düzeltici İyileştirme Tavsiyeleri"
+			rcPrefix = "Kök Neden:"
+		}
+		bodyBuilder.WriteString(fmt.Sprintf(`
     <w:p><w:pPr><w:spacing w:before="240" w:after="120"/></w:pPr>
-      <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="0F172A"/></w:rPr><w:t>5. Root Cause Analysis &amp; Corrective Recommendations</w:t></w:r>
-    </w:p>`)
+      <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="0F172A"/></w:rPr><w:t>%s</w:t></w:r>
+    </w:p>`, sec5Title))
 		if report.RootCause != "" {
 			bodyBuilder.WriteString(fmt.Sprintf(`
     <w:p><w:pPr><w:spacing w:after="120"/></w:pPr>
-      <w:r><w:rPr><w:b/></w:rPr><w:t>Root Cause: </w:t></w:r>
+      <w:r><w:rPr><w:b/></w:rPr><w:t>%s </w:t></w:r>
       <w:r><w:t>%s</w:t></w:r>
-    </w:p>`, html.EscapeString(report.RootCause)))
+    </w:p>`, rcPrefix, html.EscapeString(report.RootCause)))
 		}
 		for i, plan := range report.RemediationPlan {
 			bodyBuilder.WriteString(fmt.Sprintf(`
@@ -327,10 +397,18 @@ func generateStandaloneDOCX(report models.ComprehensiveIncidentReport, logoBytes
 	}
 
 	// Sign-off Footer
+	footerText := fmt.Sprintf("Generated at %s by Valtrivo LogSeal SIEM Platform | Timestamp Verified", report.GeneratedAt.UTC().Format(time.RFC3339))
+	if isTR {
+		footerText = fmt.Sprintf("Valtrivo LogSeal SIEM Platformu tarafından %s tarihinde üretildi | Zaman Damgası Doğrulandı", report.GeneratedAt.UTC().Format(time.RFC3339))
+	}
 	bodyBuilder.WriteString(fmt.Sprintf(`
     <w:p><w:pPr><w:spacing w:before="360"/><w:jc w:val="center"/></w:pPr>
-      <w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>Generated at %s by Valtrivo LogSeal SIEM Platform | Timestamp Verified</w:t></w:r>
-    </w:p>`, report.GeneratedAt.UTC().Format(time.RFC3339)))
+      <w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>%s</w:t></w:r>
+    </w:p>`, html.EscapeString(footerText)))
+
+	bodyBuilder.WriteString(`
+  </w:body>
+</w:document>`)
 
 	bodyBuilder.WriteString(`
   </w:body>

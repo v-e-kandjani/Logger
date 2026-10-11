@@ -76,66 +76,85 @@ func sampleTestReport() models.ComprehensiveIncidentReport {
 }
 
 func TestExportIncidentCSV(t *testing.T) {
-	report := sampleTestReport()
-	var buf bytes.Buffer
-	err := ExportIncidentCSV(&buf, report)
-	if err != nil {
-		t.Fatalf("ExportIncidentCSV returned error: %v", err)
+	// 1. English
+	reportEN := sampleTestReport()
+	reportEN.Language = "en"
+	var bufEN bytes.Buffer
+	if err := ExportIncidentCSV(&bufEN, reportEN); err != nil {
+		t.Fatalf("ExportIncidentCSV (EN) returned error: %v", err)
+	}
+	contentEN := bufEN.String()
+	if !strings.Contains(contentEN, "# Valtrivo LogSeal SIEM & Forensic Reporting Engine") {
+		t.Errorf("CSV EN missing header metadata comment")
+	}
+	if !strings.Contains(contentEN, "Tenant Name: Acme Corporation (Slug: acme)") {
+		t.Errorf("CSV EN missing tenant metadata")
+	}
+	if !strings.Contains(contentEN, "198.51.100.44") {
+		t.Errorf("CSV EN missing IOC data")
 	}
 
-	content := buf.String()
-	if !strings.Contains(content, "# Valtrivo LogSeal SIEM & Forensic Reporting Engine") {
-		t.Errorf("CSV missing header metadata comment")
+	// 2. Turkish
+	reportTR := sampleTestReport()
+	reportTR.Language = "tr"
+	var bufTR bytes.Buffer
+	if err := ExportIncidentCSV(&bufTR, reportTR); err != nil {
+		t.Fatalf("ExportIncidentCSV (TR) returned error: %v", err)
 	}
-	if !strings.Contains(content, "Acme Corporation (Slug: acme)") {
-		t.Errorf("CSV missing tenant metadata")
+	contentTR := bufTR.String()
+	if !strings.Contains(contentTR, "# Valtrivo LogSeal SIEM & Adli Bilişim Raporlama Motoru") {
+		t.Errorf("CSV TR missing header metadata comment")
 	}
-	if !strings.Contains(content, "198.51.100.44") {
-		t.Errorf("CSV missing IOC data")
+	if !strings.Contains(contentTR, "Kiracı Adı: Acme Corporation (Kısa Ad: acme)") {
+		t.Errorf("CSV TR missing tenant metadata")
 	}
-	if !strings.Contains(content, "TÜBİTAK KamuSM .zd") {
-		t.Errorf("CSV missing Law 5651 timestamp token")
+	if !strings.Contains(contentTR, "[YÖNETİCİ ÖZETİ VE OPERASYONEL METRİKLER]") {
+		t.Errorf("CSV TR missing localized section header")
 	}
 }
 
 func TestGenerateForensicIncidentPDF(t *testing.T) {
-	report := sampleTestReport()
-	var buf bytes.Buffer
-	err := GenerateForensicIncidentPDF(&buf, report)
-	if err != nil {
-		t.Fatalf("GenerateForensicIncidentPDF returned error: %v", err)
-	}
+	for _, lang := range []string{"en", "tr"} {
+		report := sampleTestReport()
+		report.Language = lang
+		var buf bytes.Buffer
+		err := GenerateForensicIncidentPDF(&buf, report)
+		if err != nil {
+			t.Fatalf("GenerateForensicIncidentPDF (%s) returned error: %v", lang, err)
+		}
 
-	pdfBytes := buf.Bytes()
-	if len(pdfBytes) < 500 {
-		t.Fatalf("Generated PDF unexpectedly small (%d bytes)", len(pdfBytes))
-	}
-	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-")) {
-		t.Errorf("Generated output does not start with %%PDF- magic header")
+		pdfBytes := buf.Bytes()
+		if len(pdfBytes) < 500 {
+			t.Fatalf("Generated PDF (%s) unexpectedly small (%d bytes)", lang, len(pdfBytes))
+		}
+		if !bytes.HasPrefix(pdfBytes, []byte("%PDF-")) {
+			t.Errorf("Generated output (%s) does not start with %%PDF- magic header", lang)
+		}
 	}
 }
 
 func TestExportIncidentDOCX(t *testing.T) {
-	report := sampleTestReport()
-	var buf bytes.Buffer
-	err := ExportIncidentDOCX("", report, &buf)
-	if err != nil {
-		t.Fatalf("ExportIncidentDOCX returned error: %v", err)
-	}
+	for _, lang := range []string{"en", "tr"} {
+		report := sampleTestReport()
+		report.Language = lang
+		var buf bytes.Buffer
+		err := ExportIncidentDOCX("", report, &buf)
+		if err != nil {
+			t.Fatalf("ExportIncidentDOCX (%s) returned error: %v", lang, err)
+		}
 
-	docxBytes := buf.Bytes()
-	if len(docxBytes) < 500 {
-		t.Fatalf("Generated DOCX unexpectedly small (%d bytes)", len(docxBytes))
-	}
-	// Check standard ZIP magic bytes (PK\x03\x04)
-	if docxBytes[0] != 0x50 || docxBytes[1] != 0x4B {
-		t.Errorf("Generated DOCX does not start with ZIP PK header")
+		docxBytes := buf.Bytes()
+		if len(docxBytes) < 500 {
+			t.Fatalf("Generated DOCX (%s) unexpectedly small (%d bytes)", lang, len(docxBytes))
+		}
+		// Check standard ZIP magic bytes (PK\x03\x04)
+		if docxBytes[0] != 0x50 || docxBytes[1] != 0x4B {
+			t.Errorf("Generated DOCX (%s) does not start with ZIP PK header", lang)
+		}
 	}
 }
 
 func TestRenderTextReport_AllTemplates(t *testing.T) {
-	report := sampleTestReport()
-
 	templates := []string{
 		"exec_posture",
 		"incident_rca",
@@ -144,18 +163,26 @@ func TestRenderTextReport_AllTemplates(t *testing.T) {
 		"vuln_exposure",
 	}
 
-	for _, tmpl := range templates {
-		report.ReportType = tmpl
-		out, err := RenderTextReport(report)
-		if err != nil {
-			t.Errorf("RenderTextReport failed for template %s: %v", tmpl, err)
-			continue
-		}
-		if len(out) == 0 {
-			t.Errorf("RenderTextReport returned empty string for template %s", tmpl)
-		}
-		if !strings.Contains(out, "Valtrivo LogSeal SIEM Engine") {
-			t.Errorf("RenderTextReport missing signature for template %s", tmpl)
+	for _, lang := range []string{"en", "tr"} {
+		report := sampleTestReport()
+		report.Language = lang
+
+		for _, tmpl := range templates {
+			report.ReportType = tmpl
+			out, err := RenderTextReport(report)
+			if err != nil {
+				t.Errorf("RenderTextReport failed for template %s (%s): %v", tmpl, lang, err)
+				continue
+			}
+			if len(out) == 0 {
+				t.Errorf("RenderTextReport returned empty string for template %s (%s)", tmpl, lang)
+			}
+			if lang == "en" && !strings.Contains(out, "Valtrivo LogSeal SIEM Engine") {
+				t.Errorf("RenderTextReport missing signature for template %s (en)", tmpl)
+			}
+			if lang == "tr" && !strings.Contains(out, "Valtrivo LogSeal SIEM Motoru") {
+				t.Errorf("RenderTextReport missing signature for template %s (tr)", tmpl)
+			}
 		}
 	}
 }

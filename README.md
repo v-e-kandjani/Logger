@@ -263,6 +263,17 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.7.3** (Application-Selected Multi-Language Support for SIEM & SOC Reports):
+  - **Dynamic Language Selection Synchronization**: Automatically detects and passes the active application language (`localStorage.getItem('logseal_lang')` / `window.i18n.currentLang`) to report generation endpoints (`/api/v1/reports/preview` & `/api/v1/reports/export?lang=...`).
+  - **Full Bilingual Report Synthesis**:
+    - Generates report titles, executive summaries, tactical MITRE defense mappings, threat intelligence IOC classifications, Law 5651 cryptographic evidence records, root cause findings, and remediation action plans in Turkish (`tr`) or English (`en`).
+  - **Multi-Format Bilingual Exporters**:
+    - *Forensic PDF*: Section headers, table columns, operational KPI labels ("MTTD (Tespit Süresi)", "5651 Mühürlendi"), classification notices, and pagination footers dynamically rendered with safe Unicode handling for standard PDF fonts.
+    - *RFC 4180 CSV*: Metadata header comments, section blocks (`[YÖNETİCİ ÖZETİ...]`), and column labels localized.
+    - *DOCX OpenXML*: Headings, table cells, and document properties fully localized.
+    - *Plain-Text / Markdown*: Specialized English and Turkish templates for all 5 SOC report types.
+    - *Live Web Preview*: Real-time UI inspection reflecting the selected platform language.
+
 - **v1.7.2** (Root Global Update Access Control, 1st-Week Baseline Storage Runway & TÜBİTAK KamuSM Upstream Sync):
   - **Root Global Administrator Upgrade Restriction**: Restricted system update checks, git synchronization, and 1-click upgrades strictly to Root Super Administrators (`default` organization). Tenant users are barred with HTTP 403 Forbidden on the API layer and presented with an access restricted banner in the UI.
   - **Empirical 1st-Week Baseline Storage Runway Recalculation**:

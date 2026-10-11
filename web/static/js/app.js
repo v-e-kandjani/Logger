@@ -7317,6 +7317,9 @@ function getReportFilterParams() {
     const selectedRadio = document.querySelector('input[name="report_template_type"]:checked');
     params.set('type', selectedRadio ? selectedRadio.value : 'incident_rca');
 
+    const appLang = (window.i18n && window.i18n.currentLang) || localStorage.getItem('logseal_lang') || 'tr';
+    params.set('lang', appLang);
+
     const timeframe = document.getElementById('report-timeframe-select')?.value || '24h';
     params.set('timeframe', timeframe);
 
@@ -7345,15 +7348,18 @@ async function generateReportPreview() {
     const summaryText = document.getElementById('report-preview-summary-text');
     const rawText = document.getElementById('report-raw-text');
 
+    const isEn = (window.i18n && window.i18n.currentLang === 'en') || localStorage.getItem('logseal_lang') === 'en';
     if (previewBtn) previewBtn.disabled = true;
-    if (summaryText) summaryText.textContent = 'Rapor verisi dinamik olarak derleniyor ve şifreli kanıt defteri sorgulanıyor...';
+    if (summaryText) summaryText.textContent = isEn ?
+        'Compiling report data and querying cryptographic ledger...' :
+        'Rapor verisi dinamik olarak derleniyor ve şifreli kanıt defteri sorgulanıyor...';
 
     try {
         const params = getReportFilterParams();
         const res = await fetch(`/api/v1/reports/preview?${params.toString()}`);
         if (!res.ok) {
             const errText = await res.text();
-            throw new Error(errText || 'Önizleme oluşturulamadı');
+            throw new Error(errText || (isEn ? 'Failed to generate preview' : 'Önizleme oluşturulamadı'));
         }
 
         const data = await res.json();
@@ -7367,7 +7373,7 @@ async function generateReportPreview() {
     } catch (err) {
         console.error('Report preview error:', err);
         if (summaryText) {
-            summaryText.innerHTML = `<span style="color: var(--danger);">Hata: ${escapeHtml(err.message)}</span>`;
+            summaryText.innerHTML = `<span style="color: var(--danger);">${isEn ? 'Error:' : 'Hata:'} ${escapeHtml(err.message)}</span>`;
         }
     } finally {
         if (previewBtn) previewBtn.disabled = false;
@@ -7377,13 +7383,19 @@ async function generateReportPreview() {
 function renderVisualReportPreview(report) {
     if (!report) return;
 
+    const isEn = report.language === 'en' || (!report.language && (window.i18n && window.i18n.currentLang === 'en'));
+
     // Header Strip
     const titleEl = document.getElementById('report-preview-title');
-    if (titleEl) titleEl.textContent = report.title || 'SOC Raporu';
+    if (titleEl) titleEl.textContent = report.title || (isEn ? 'SOC Investigation Report' : 'SOC Raporu');
 
     const metaEl = document.getElementById('report-preview-meta');
     if (metaEl) {
-        metaEl.textContent = `Tenant: ${report.tenant?.tenant_name || 'Default'} [Slug: ${report.tenant?.tenant_slug || 'default'}] | Rapor ID: ${report.report_id} | Zaman Damgası: Doğrulandı`;
+        if (isEn) {
+            metaEl.textContent = `Tenant: ${report.tenant?.tenant_name || 'Default'} [Slug: ${report.tenant?.tenant_slug || 'default'}] | Report ID: ${report.report_id} | Timestamp: Verified`;
+        } else {
+            metaEl.textContent = `Kiracı: ${report.tenant?.tenant_name || 'Varsayılan'} [Kısa Ad: ${report.tenant?.tenant_slug || 'default'}] | Rapor ID: ${report.report_id} | Zaman Damgası: Doğrulandı`;
+        }
     }
 
     const classEl = document.getElementById('report-preview-classification');
@@ -7400,7 +7412,7 @@ function renderVisualReportPreview(report) {
 
     // Summary & KPIs
     const summaryText = document.getElementById('report-preview-summary-text');
-    if (summaryText) summaryText.textContent = report.executive_summary || 'Özet bulunmuyor.';
+    if (summaryText) summaryText.textContent = report.executive_summary || (isEn ? 'No summary available.' : 'Özet bulunmuyor.');
 
     const kpiMTTD = document.getElementById('report-kpi-mttd');
     if (kpiMTTD) kpiMTTD.textContent = `${report.mttd_minutes || 0} min`;
@@ -7414,10 +7426,10 @@ function renderVisualReportPreview(report) {
     const kpiLegal = document.getElementById('report-kpi-legal');
     if (kpiLegal) {
         if (report.regulatory_impact?.law5651_relevant) {
-            kpiLegal.textContent = 'Mühürlendi (.zd)';
+            kpiLegal.textContent = isEn ? 'Law 5651 Sealed (.zd)' : '5651 Mühürlendi (.zd)';
             kpiLegal.style.color = 'var(--success)';
         } else {
-            kpiLegal.textContent = 'Uyumlu';
+            kpiLegal.textContent = isEn ? 'Compliant' : 'Uyumlu';
             kpiLegal.style.color = 'var(--text-main)';
         }
     }
@@ -7491,7 +7503,8 @@ function renderVisualReportPreview(report) {
     if (rcaSec && rootCauseEl && actionsListEl) {
         if (report.root_cause || (report.remediation_plan && report.remediation_plan.length > 0)) {
             rcaSec.style.display = 'block';
-            rootCauseEl.textContent = report.root_cause ? `Kök Neden Tespiti: ${report.root_cause}` : '';
+            const rcLabel = isEn ? 'Root Cause Finding:' : 'Kök Neden Tespiti:';
+            rootCauseEl.textContent = report.root_cause ? `${rcLabel} ${report.root_cause}` : '';
             actionsListEl.innerHTML = (report.remediation_plan || []).map(p => `<li>${escapeHtml(p)}</li>`).join('');
         } else {
             rcaSec.style.display = 'none';
@@ -7503,8 +7516,11 @@ function exportReport(format) {
     const params = getReportFilterParams();
     params.set('format', format);
 
-    // Provide visual feedback
-    const toastMsg = `Rapor (${format.toUpperCase()}) oluşturuluyor ve indiriliyor...`;
+    const isEn = (window.i18n && window.i18n.currentLang === 'en') || localStorage.getItem('logseal_lang') === 'en';
+    const toastMsg = isEn ?
+        `Generating and downloading ${format.toUpperCase()} report...` :
+        `Rapor (${format.toUpperCase()}) oluşturuluyor ve indiriliyor...`;
+
     if (typeof showToast === 'function') {
         showToast(toastMsg, 'info');
     }
@@ -7525,15 +7541,17 @@ async function loadReportHistory() {
     const tbody = document.getElementById('report-history-body');
     if (!tbody) return;
 
+    const isEn = (window.i18n && window.i18n.currentLang === 'en') || localStorage.getItem('logseal_lang') === 'en';
+
     try {
         const res = await fetch('/api/v1/reports/history');
-        if (!res.ok) throw new Error('Geçmiş alınamadı');
+        if (!res.ok) throw new Error(isEn ? 'Failed to fetch history' : 'Geçmiş alınamadı');
 
         const data = await res.json();
         const list = data.history || [];
 
         if (list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 16px;">Henüz oluşturulmuş rapor kaydı bulunmuyor.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 16px;">${isEn ? 'No generated report history records yet.' : 'Henüz oluşturulmuş rapor kaydı bulunmuyor.'}</td></tr>`;
             return;
         }
 
@@ -7554,7 +7572,7 @@ async function loadReportHistory() {
                     <td style="font-size: 11px; color: var(--text-muted);">${escapeHtml(dateStr)}</td>
                     <td>
                         <button class="btn btn-outline btn-sm" style="font-size: 10px; padding: 2px 8px;" onclick="exportReport('${escapeHtml((item.format || 'pdf').toLowerCase())}')">
-                            İndir
+                            ${isEn ? 'Download' : 'İndir'}
                         </button>
                     </td>
                 </tr>

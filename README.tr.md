@@ -252,6 +252,17 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.7.3** (Uygulama Dil Seçimine Duyarlı Çok Dilli SIEM & SOC Raporlama Desteği):
+  - **Aktif Uygulama Diliyle Dinamik Senkronizasyon**: Rapor oluşturma ve dışa aktarma isteklerinde arayüzün aktif dili (`localStorage.getItem('logseal_lang')` / `window.i18n.currentLang`) `/api/v1/reports/preview` ve `/api/v1/reports/export?lang=...` uç noktalarına otomatik olarak iletilir.
+  - **Kapsamlı İki Dilli Rapor Derleme (TR / EN)**:
+    - Rapor başlıkları, yönetici özetleri, taktiksel MITRE savunma eşleştirmeleri, IoC tehdit istihbaratı, 5651 Sayılı Kanun kriptografik kanıt defteri, kök neden analizi ve iyileştirme direktifleri seçilen dilde (Türkçe veya İngilizce) sentezlenir.
+  - **Tüm Dışa Aktarma Formatlarında Dil Uyumu**:
+    - *Adli Bilişim PDF*: Bölüm başlıkları, tablo kolonları, operasyonel KPI etiketleri ("MTTD (Tespit Süresi)", "5651 Mühürlendi"), gizlilik ibareleri ve sayfa altlıkları güvenli karakter dönüşümüyle eksiksiz yerelleştirilir.
+    - *RFC 4180 CSV*: Başlık metaveri yorumları, bölüm blokları (`[YÖNETİCİ ÖZETİ VE OPERASYONEL METRİKLER]`) ve tablo sütunları yerelleştirilir.
+    - *DOCX OpenXML*: Başlıklar, metrik tabloları ve doküman özellikleri seçilen dille uyumlu üretilir.
+    - *Düz Metin / Markdown*: 5 standart SOC şablonunun tamamı için özel Türkçe ve İngilizce şablon motoru.
+    - *Canlı Web Önizlemesi*: Canlı tarayıcı arayüz önizlemesi platformun aktif diliyle senkronize çalışır.
+
 - **v1.7.2** (Kök Global Güncelleme Erişim Kısıtlaması, 1. Hafta Bazlı Saklama Süresi ve TÜBİTAK KamuSM Eşitlemesi):
   - **Kök Global Süper Yönetici Güncelleme Kısıtlaması**: Sistem güncelleme denetimi, GitHub eşitlemesi ve 1-tıkla yükseltme yetkisi kesin olarak Kök Süper Yöneticilere (`default` kurumu) tahsis edildi. Kiracı kullanıcıların API istekleri HTTP 403 Forbidden ile engellenir ve arayüzde yetkisiz erişim uyarısı gösterilir.
   - **1. Hafta Verisiyle Saklama Süresi Yeniden Hesaplama**:

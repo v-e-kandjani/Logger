@@ -85,6 +85,7 @@ type ForensicArtifact struct {
 type ComprehensiveIncidentReport struct {
 	ReportID       string         `json:"report_id"`
 	ReportType     string         `json:"report_type"` // incident_rca, exec_posture, shift_handover, compliance_audit, vuln_exposure
+	Language       string         `json:"language"`    // "tr" or "en"
 	Title          string         `json:"title"`
 	Classification string         `json:"classification"` // e.g., "TLP:AMBER", "CONFIDENTIAL", "LAW 5651 LEGAL EVIDENCE"
 	StartTime      time.Time      `json:"start_time"`
