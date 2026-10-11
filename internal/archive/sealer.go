@@ -309,24 +309,46 @@ func (s *EvidenceSealer) reconcileDueHourlyWindows(ctx context.Context) {
 		return // Still within grace period
 	}
 
-	idempotencyKey := fmt.Sprintf("hourly_default_%s", previousHourStart.Format("2006010215"))
-
-	job := &models.ArchiveJob{
-		TenantSlug:     "default",
-		RequestType:    "HOURLY_SCHEDULED",
-		PeriodStart:    previousHourStart,
-		PeriodEnd:      previousHourEnd,
-		TimeBasis:      "receipt_time",
-		IdempotencyKey: idempotencyKey,
-		Requester:      "system-scheduler",
-		Reason:         "Law 5651 Automated Hourly Evidence Sealing",
-		State:          "QUEUED",
+	// 1. Enumerate all active tenants for multi-tenant hourly sealing
+	tenants := []string{"default"}
+	if dbTenants, err := s.db.ListTenants(ctx); err == nil && len(dbTenants) > 0 {
+		tenants = make([]string, 0, len(dbTenants))
+		for _, t := range dbTenants {
+			if t.Status == "active" || t.Status == "" {
+				tenants = append(tenants, t.Slug)
+			}
+		}
 	}
 
-	if err := s.db.CreateArchiveJob(ctx, job); err == nil && job.State == "QUEUED" {
-		log.Printf("[ArchiveScheduler] Enqueued hourly archive window: %s to %s", previousHourStart, previousHourEnd)
-		go func(j *models.ArchiveJob) {
-			_, _ = s.ProcessJob(context.Background(), j)
-		}(job)
+	// 2. Enqueue missing hourly jobs idempotently
+	for _, tenant := range tenants {
+		idempotencyKey := fmt.Sprintf("hourly_%s_%s", tenant, previousHourStart.Format("2006010215"))
+		job := &models.ArchiveJob{
+			TenantSlug:     tenant,
+			RequestType:    "HOURLY_SCHEDULED",
+			PeriodStart:    previousHourStart,
+			PeriodEnd:      previousHourEnd,
+			TimeBasis:      "receipt_time",
+			IdempotencyKey: idempotencyKey,
+			Requester:      "system-scheduler",
+			Reason:         "Law 5651 Automated Hourly Evidence Sealing",
+			State:          "QUEUED",
+		}
+
+		if err := s.db.CreateArchiveJob(ctx, job); err == nil && job.State == "QUEUED" {
+			log.Printf("[ArchiveScheduler] Enqueued hourly archive window for '%s': %s to %s",
+				tenant, previousHourStart.Format(time.RFC3339), previousHourEnd.Format(time.RFC3339))
+		}
+	}
+
+	// 3. Distributed Job Processor: Claim and process next available leased jobs
+	for {
+		claimedJob, err := s.db.ClaimNextArchiveJob(ctx, "worker-sealer", 5*time.Minute)
+		if err != nil || claimedJob == nil {
+			break
+		}
+		log.Printf("[ArchiveScheduler] Claimed distributed archive lease for job %s (tenant: %s)",
+			claimedJob.ID, claimedJob.TenantSlug)
+		_, _ = s.ProcessJob(context.Background(), claimedJob)
 	}
 }

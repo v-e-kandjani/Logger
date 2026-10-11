@@ -4,7 +4,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Aktif Kiracı",
-        app_version: "v1.6.7",
+        app_version: "v1.6.8",
         app_subtitle: "Merkezi Log Yönetimi ve Zaman Damgalama",
         app_tagline: "“Her kayıt, zamanıyla kanıt.”",
         nav_sub_all: "Tüm Ayarlar",
@@ -721,7 +721,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Active Tenant",
-        app_version: "v1.6.7",
+        app_version: "v1.6.8",
         app_subtitle: "Centralized Log Management & Timestamping",
         app_tagline: "“Every record, proven by time.”",
         nav_sub_all: "All Settings",

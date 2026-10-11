@@ -618,6 +618,46 @@ func (db *DB) UpdateArchiveJobState(ctx context.Context, id uuid.UUID, state, er
 	return err
 }
 
+// ClaimNextArchiveJob atomically locks and claims the oldest pending or expired archive job using FOR UPDATE SKIP LOCKED.
+func (db *DB) ClaimNextArchiveJob(ctx context.Context, workerID string, leaseDuration time.Duration) (*models.ArchiveJob, error) {
+	if leaseDuration <= 0 {
+		leaseDuration = 5 * time.Minute
+	}
+
+	query := `
+		UPDATE archive_jobs
+		SET state = 'BUILDING',
+		    lease_until = NOW() + $1::interval,
+		    attempts = attempts + 1,
+		    updated_at = NOW()
+		WHERE id = (
+			SELECT id
+			FROM archive_jobs
+			WHERE (state = 'QUEUED' OR (state = 'BUILDING' AND lease_until < NOW()))
+			ORDER BY period_start ASC
+			LIMIT 1
+			FOR UPDATE SKIP LOCKED
+		)
+		RETURNING id, tenant_slug, request_type, period_start, period_end, time_basis,
+		          idempotency_key, requester, reason, lease_until, attempts, state, error_message,
+		          created_at, updated_at`
+
+	intervalStr := fmt.Sprintf("%d seconds", int(leaseDuration.Seconds()))
+	var j models.ArchiveJob
+	err := db.pool.QueryRow(ctx, query, intervalStr).Scan(
+		&j.ID, &j.TenantSlug, &j.RequestType, &j.PeriodStart, &j.PeriodEnd, &j.TimeBasis,
+		&j.IdempotencyKey, &j.Requester, &j.Reason, &j.LeaseUntil, &j.Attempts, &j.State, &j.ErrorMessage,
+		&j.CreatedAt, &j.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil // No eligible job available
+		}
+		return nil, err
+	}
+	return &j, nil
+}
+
 func (db *DB) ListArchiveJobs(ctx context.Context, tenant string, limit int) ([]models.ArchiveJob, error) {
 	if limit <= 0 {
 		limit = 50

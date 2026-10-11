@@ -260,6 +260,14 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.6.8** (Phase 9 Edge Proxy Hardening, Durable Replay & SaaS Scale-Out):
+  - **Edge Forwarder Disk Spool Durability (`logseal-proxy v1.6.8`)**: Implemented periodic physical fsync commits (`Sync()`), total spool directory bounding (`max_spool_mb`), and crash recovery automatically scanning and draining pending offline spools upon startup.
+  - **Paced WAN Replay with Jitter & Non-Destructive Failure Backoff**: Prevented thundering-herd spikes after WAN link recovery by introducing batch rate-limiting with randomized sleep jitter (50–150ms). Preserves spooled files on transmission errors to guarantee zero data loss.
+  - **Distributed PostgreSQL Job Leases (`ClaimNextArchiveJob`)**: Implemented `FOR UPDATE SKIP LOCKED` distributed worker queue semantics with expiring leases (`lease_until`), enabling horizontal SaaS replicas to execute 5651 evidence sealing and maintenance without contention or duplicates.
+  - **Multi-Tenant Hourly Evidence Sealing**: Expanded the hourly reconciliation engine to enumerate and schedule missing sealing windows for all active customer organizations (`ListTenants`).
+  - **Overlapping Private IP Subnet Validation**: Verified multi-tenant lock-free `DeviceCache` composite lookups (`LookupIPAndTenant`), ensuring identical private customer subnets (e.g. `192.168.1.1` in Tenant A vs Tenant B) never cross-pollinate device records or correlation state.
+  - **ClickHouse Cluster High-Availability Migration**: Introduced `003_replicated_cluster_template.sql` specifying `ReplicatedMergeTree` with ZooKeeper/Keeper cluster sharding and `Distributed` table routing templates.
+
 - **v1.6.7** (Phase 8 Combined Resource Governor, Operator Views & Threat Simulation Access Control):
   - **Simulate Threat Root Super-Admin Role Restriction**: Restricted SOC threat attack simulation triggers exclusively to the Super Administrator of the root tenant (`default` organization). Enforced across backend (`handleSIEMSimulate` returns `403 Forbidden` for non-root or non-super-admin users) and UI (Simulate Threat button `#btn-open-siem-simulate` is hidden for all other users).
   - **Memory Token Semaphores & Cold Query Admission**: Implemented conservative 128 MB query memory tokens per query against a dedicated query token pool (25% of data plane memory) and `MemoryHigh` headroom, preventing cold-cache query spikes from provoking out-of-memory crashes.

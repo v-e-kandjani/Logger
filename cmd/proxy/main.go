@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -25,7 +26,7 @@ import (
 const (
 	DefaultConfigPath = "/etc/logseal/proxy.json"
 	FallbackConfig    = "./proxy.json"
-	ProxyVersion      = "1.6.5"
+	ProxyVersion      = "1.6.8"
 )
 
 // ProxyConfig stores local forwarder settings
@@ -37,8 +38,10 @@ type ProxyConfig struct {
 	ListenTCP    string `json:"listen_tcp"`     // e.g. :514
 	SpoolDir     string `json:"spool_dir"`      // /var/spool/logseal
 	InsecureTLS  bool   `json:"insecure_tls"`   // Allow self-signed certificates
-	MaxBatchSize int    `json:"max_batch_size"` // Max events per HTTP push
-	MaxSpoolMB   int    `json:"max_spool_mb"`   // Max local disk spool storage
+	MaxBatchSize  int    `json:"max_batch_size"`  // Max events per HTTP push
+	MaxSpoolMB    int    `json:"max_spool_mb"`    // Max local disk spool storage
+	ReplayRateEPS int    `json:"replay_rate_eps"` // Max replay events per second
+	ReplayJitterMs int   `json:"replay_jitter_ms"`// Jitter between batches in ms
 }
 
 // LogPacket represents a captured local syslog message
@@ -400,6 +403,9 @@ func (d *ProxyDaemon) Start() {
 	d.wg.Add(1)
 	go d.transmissionLoop()
 
+	// 5. Check and resume draining any residual spool files from previous crashes/restarts
+	go d.drainDiskSpool()
+
 	log.Printf("[Edge Proxy] Ready. Syslog active on UDP %s and TCP %s", d.cfg.ListenUDP, d.cfg.ListenTCP)
 }
 
@@ -534,9 +540,24 @@ func (d *ProxyDaemon) spoolLogToDisk(pkt LogPacket) {
 	if d.spoolFile == nil {
 		return
 	}
+
+	// Enforce max spool directory capacity (default 500 MB)
+	maxMB := d.cfg.MaxSpoolMB
+	if maxMB <= 0 {
+		maxMB = 500
+	}
+	if fi, err := d.spoolFile.Stat(); err == nil && fi.Size() > int64(maxMB)*1024*1024 {
+		// Log drop warning to prevent filling physical host disk
+		return
+	}
+
 	line, err := json.Marshal(pkt)
 	if err == nil {
 		_, _ = d.spoolFile.Write(append(line, '\n'))
+		// Durable fsync: commit data to physical media periodically
+		if d.spooledLogs.Load()%25 == 0 {
+			_ = d.spoolFile.Sync()
+		}
 	}
 }
 
@@ -704,55 +725,91 @@ Send:
 	d.drainDiskSpool()
 }
 
-// drainDiskSpool reads previously offlined disk spooled logs and sends them to Cloud
+// drainDiskSpool reads previously offlined disk spooled logs and sends them to Cloud with rate limiting and jitter
 func (d *ProxyDaemon) drainDiskSpool() {
 	d.spoolMu.Lock()
-	defer d.spoolMu.Unlock()
 
 	spoolPath := filepath.Join(d.cfg.SpoolDir, "spool.log")
 	fi, err := os.Stat(spoolPath)
-	if err != nil || fi.Size() == 0 {
-		return
-	}
-
-	// Rotate spool file
-	_ = d.spoolFile.Close()
-	drainPath := filepath.Join(d.cfg.SpoolDir, fmt.Sprintf("drain_%d.log", time.Now().UnixNano()))
-	if err := os.Rename(spoolPath, drainPath); err != nil {
-		// Re-open
-		d.spoolFile, _ = os.OpenFile(spoolPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0600)
-		return
-	}
-
-	// Re-open fresh spool file
-	d.spoolFile, _ = os.OpenFile(spoolPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0600)
-
-	// Read and send drained logs
-	go func(path string) {
-		defer os.Remove(path)
-
-		f, err := os.Open(path)
-		if err != nil {
-			return
+	if err == nil && fi.Size() > 0 {
+		// Flush and sync before rotating
+		if d.spoolFile != nil {
+			_ = d.spoolFile.Sync()
+			_ = d.spoolFile.Close()
 		}
-		defer f.Close()
+		drainPath := filepath.Join(d.cfg.SpoolDir, fmt.Sprintf("drain_%d.log", time.Now().UnixNano()))
+		if err := os.Rename(spoolPath, drainPath); err == nil {
+			d.spoolFile, _ = os.OpenFile(spoolPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0600)
+		} else {
+			d.spoolFile, _ = os.OpenFile(spoolPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0600)
+		}
+	}
+	d.spoolMu.Unlock()
 
-		var batch []LogPacket
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			var pkt LogPacket
-			if err := json.Unmarshal(scanner.Bytes(), &pkt); err == nil {
-				batch = append(batch, pkt)
-				if len(batch) >= d.cfg.MaxBatchSize {
-					d.transmitBatch(batch)
-					batch = nil
+	// Enumerate all pending drain files (including residual ones from earlier crashes)
+	matches, _ := filepath.Glob(filepath.Join(d.cfg.SpoolDir, "drain_*.log"))
+	if len(matches) == 0 {
+		return
+	}
+
+	go func(files []string) {
+		maxBatch := d.cfg.MaxBatchSize
+		if maxBatch <= 0 {
+			maxBatch = 500
+		}
+
+		jitterBase := d.cfg.ReplayJitterMs
+		if jitterBase <= 0 {
+			jitterBase = 80
+		}
+
+		for _, path := range files {
+			f, err := os.Open(path)
+			if err != nil {
+				continue
+			}
+
+			var batch []LogPacket
+			scanner := bufio.NewScanner(f)
+			buf := make([]byte, 64*1024)
+			scanner.Buffer(buf, 1024*1024)
+
+			transmissionFailed := false
+			for scanner.Scan() {
+				var pkt LogPacket
+				if err := json.Unmarshal(scanner.Bytes(), &pkt); err == nil {
+					batch = append(batch, pkt)
+					if len(batch) >= maxBatch {
+						if !d.transmitBatch(batch) {
+							transmissionFailed = true
+							break
+						}
+						batch = nil
+						// Rate-limiting and jitter to prevent thundering-herd on Cloud endpoint
+						jitter := time.Duration(jitterBase+rand.Intn(jitterBase)) * time.Millisecond
+						time.Sleep(jitter)
+					}
 				}
 			}
+
+			if !transmissionFailed && len(batch) > 0 {
+				if !d.transmitBatch(batch) {
+					transmissionFailed = true
+				}
+			}
+
+			_ = f.Close()
+
+			if transmissionFailed {
+				log.Printf("[Edge Spool] Replay paused: cloud endpoint unreachable. Retaining spool '%s' for next retry", filepath.Base(path))
+				return
+			}
+
+			// Successfully transmitted complete spool file; remove cleanly
+			_ = os.Remove(path)
+			log.Printf("[Edge Spool] Drained and removed completed spool file: %s", filepath.Base(path))
 		}
-		if len(batch) > 0 {
-			d.transmitBatch(batch)
-		}
-	}(drainPath)
+	}(matches)
 }
 
 // transmitBatch sends GZIP-compressed log batch over HTTPS to /api/v1/edge/ingest

@@ -249,6 +249,14 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.6.8** (Aşama 9 Edge Proxy Güçlendirmesi, Dayanıklı Yeniden Oynatma ve SaaS Ölçekleme):
+  - **Uç Düğüm Disk Kuyruğu Güvenilirliği (`logseal-proxy v1.6.8`)**: Periyodik fiziksel fsync (`Sync()`) taahhütleri, toplam disk kuyruğu kapasite denetimi (`max_spool_mb`) ve başlangıçta bekleyen çevrimdışı kuyrukları otomatik tarayıp oynatan çökme kurtarma mekanizması eklendi.
+  - **Jitter ve Hız Sınırlı WAN Yeniden Oynatma**: WAN bağlantı kesintisi sonrası bulut sunucunun kilitlenmesini (thundering-herd) önlemek için rastgele jitter (50–150ms) ve hız sınırlı aktarım uygulandı. İletim başarısız olduğunda dosya silinmeyerek sıfır veri kaybı güvencesi sağlandı.
+  - **Dağıtık PostgreSQL İş Kiralama (`ClaimNextArchiveJob`)**: `FOR UPDATE SKIP LOCKED` ve süreli kiralama (`lease_until`) mekanizması geliştirilerek çok kopyalı (horizontal) SaaS sunucularında 5651 kanıt mühürleme işlerinin çakışmasız ve tekil yürütülmesi sağlandı.
+  - **Çok Kiracılı Otomatik Saatlik Kanıt Mühürleme**: Saatlik uzlaştırma motoru tüm aktif kiracıları (`ListTenants`) tarayacak şekilde genişletilerek her kurum için eksiksiz saatlik mühürleme güvencesi sunuldu.
+  - **Çakışan Özel IP Blokları İzolasyonu**: Çok kiracılı `DeviceCache` bileşik arama (`LookupIPAndTenant`) ve korelasyon anahtarları doğrulanarak, farklı müşterilerdeki aynı yerel IP adreslerinin (`192.168.1.1`) birbirine karışması %100 engellendi.
+  - **ClickHouse Küme Yüksek Erişilebilirlik Şablonu**: ZooKeeper/Keeper senkronizasyonlu `ReplicatedMergeTree` ve `Distributed` tablo motorlarını içeren `003_replicated_cluster_template.sql` migrasyon şablonu eklendi.
+
 - **v1.6.7** (Aşama 8 Birleşik Kaynak Yöneticisi, Operatör Görünümü ve Tehdit Simülasyonu Erişim Koruması):
   - **Tehdit Simülasyonu Root Süper Yönetici Kısıtlaması**: SOC saldırı simülasyonu tetikleyicileri yalnızca root organizasyonun (`default`) Süper Yöneticisine sınırlandırıldı. Hem arka planda (`handleSIEMSimulate` yetkisiz isteklerde `403 Forbidden` döner) hem de kullanıcı arayüzünde (`#btn-open-siem-simulate` butonu diğer tüm roller için gizlenir) tam güvenlik sağlandı.
   - **Bellek Belirteci Semaförleri ve Soğuk Sorgu Kabulü**: Soğuk sorgu yürütmelerinde aşırı RAM tüketimini ve OOM çökmelerini önlemek için sorgu başına muhafazakar 128 MB bellek belirteci ve %25 veri düzlemi belirteç havuzu denetimi uygulandı.
