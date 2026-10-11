@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.5.21** (Destek Portalı Evrensel Pano Kopyalama & Tek Tıkla İndirme Optimizasyonu):
+  - **Evrensel Pano Kopyalama Motoru (`copyToClipboard`)**: Asenkron `navigator.clipboard.writeText` ve saydam `document.execCommand('copy')` yedeklemesi içeren dayanıklı kopyalama sistemi geliştirildi; "Şifreyi Kopyala" ve "Bağlantıyı Kopyala" butonlarının tüm tarayıcılarda anında görsel geri bildirimle ("✓ Kopyalandı!") sorunsuz çalışması sağlandı.
+  - **Tam Genişlikte İndirme Bağlantısı & Tek Tıkla Doğrudan İndirme**: İndirme URL kutusunun dar kalarak metni gizlemesi sorunu esnek flex düzeni ve tek tıkla tümünü seçme (`onclick="this.select()"`) ile giderildi; "Paketi Doğrudan İndir" butonunun mutlak URL çözümlemesi ve indirme garantisi güçlendirildi.
+  - **Kalıcı Destek Paketi Deposu (`syslog_support_bundles`)**: `/opt/syslog-platform/data/support_bundles` dizini adlandırılmış kalıcı Docker birimine bağlanarak konteyner yeniden derleme ve güncellemelerinde tanılama paketlerinin silinmesi önlendi.
+
 - **v1.5.20** (Destek Paketi İçin Veritabanı Son 1.000 Log ve SIEM Olay Dökümü):
   - **ClickHouse Son 1.000 Syslog Kaydı Dökümü**: Destek paketine ClickHouse (`syslog_events`) üzerindeki son 1.000 ham ve ayrıştırılmış log kaydını dahil eden seçilebilir seçenek (`include_db_logs` / `database_last_1000_logs.json`) eklendi.
   - **SIEM Güvenlik Olayları & Alarm Geçmişi**: PostgreSQL üzerindeki son güvenlik alarmlarını ve SIEM vakalarını (`siem_alerts`) pakete ekleyen seçilebilir seçenek (`include_siem_events` / `siem_security_activity.json`) eklendi.

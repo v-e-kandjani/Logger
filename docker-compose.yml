@@ -100,6 +100,7 @@ services:
       - SEED_DEMO_DEVICES=${SEED_DEMO_DEVICES:-false}
     volumes:
       - syslog_archives:/opt/syslog-platform/archive
+      - syslog_support_bundles:/opt/syslog-platform/data/support_bundles
       - ./timestamp-client:/opt/syslog-platform/timestamp-client
     restart: unless-stopped
     stop_grace_period: 30s
@@ -113,3 +114,4 @@ volumes:
   clickhouse_data:
   postgres_data:
   syslog_archives:
+  syslog_support_bundles:

@@ -823,6 +823,49 @@ function showToast(message, type = 'info') {
     }, 4500);
 }
 
+// Universal Clipboard Helper
+function copyToClipboard(text, successMsg) {
+    if (!text) return;
+
+    const onCopied = () => {
+        if (typeof showToast === 'function') {
+            showToast(successMsg || 'Panoya kopyalandı!', 'success');
+        }
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(onCopied).catch(err => {
+            console.warn('navigator.clipboard error, fallback to execCommand:', err);
+            fallbackCopyText(text, onCopied);
+        });
+    } else {
+        fallbackCopyText(text, onCopied);
+    }
+}
+
+function fallbackCopyText(text, callback) {
+    try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        textArea.setAttribute('readonly', '');
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        if (successful && typeof callback === 'function') {
+            callback();
+        }
+    } catch (err) {
+        console.error('Fallback clipboard error:', err);
+        window.prompt('Kopyalayınız / Copy to clipboard:', text);
+    }
+}
+window.copyToClipboard = copyToClipboard;
+
 function initArchiveTrigger() {
     const btn = document.getElementById('btn-manual-archive');
     if (!btn) return;
@@ -6115,8 +6158,16 @@ async function submitGenerateDebugBundle() {
         const resPasscode = document.getElementById('debug-res-passcode');
         if (resPasscode) resPasscode.textContent = b.access_passcode;
 
+        // Ensure fully qualified, absolute URL using current browser origin
+        let fullDownloadUrl = '';
+        try {
+            fullDownloadUrl = new URL(data.download_url || `/support/download?id=${b.id}`, window.location.origin).href;
+        } catch (e) {
+            fullDownloadUrl = `${window.location.origin}/support/download?id=${b.id}`;
+        }
+
         const resUrl = document.getElementById('debug-res-url');
-        if (resUrl) resUrl.value = data.download_url;
+        if (resUrl) resUrl.value = fullDownloadUrl;
 
         const emailBanner = document.getElementById('debug-res-email-banner');
         if (emailBanner) {
@@ -6129,9 +6180,15 @@ async function submitGenerateDebugBundle() {
             }
         }
 
+        const directUrl = `${fullDownloadUrl}${fullDownloadUrl.includes('?') ? '&' : '?'}passcode=${encodeURIComponent(b.access_passcode)}`;
         const directLink = document.getElementById('debug-res-direct-link');
         if (directLink) {
-            directLink.href = `${data.download_url}&passcode=${encodeURIComponent(b.access_passcode)}`;
+            directLink.href = directUrl;
+            directLink.setAttribute('download', b.filename || `support-bundle-${b.id}.tar.gz`);
+            directLink.onclick = function(e) {
+                window.location.href = directUrl;
+                return false;
+            };
         }
 
         if (typeof showToast === 'function') {
@@ -6154,24 +6211,30 @@ async function submitGenerateDebugBundle() {
 function copyDebugLink() {
     const input = document.getElementById('debug-res-url');
     if (!input || !input.value) return;
-    copyToClipboard(input.value, (window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'İndirme bağlantısı kopyalandı!');
+    input.focus();
+    input.select();
+    if (input.setSelectionRange) input.setSelectionRange(0, 99999);
+    const msg = (window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'İndirme bağlantısı kopyalandı!';
+    copyToClipboard(input.value, msg);
     const btn = document.getElementById('btn-copy-link');
     if (btn) {
-        const orig = btn.textContent;
-        btn.textContent = '✓ ' + ((window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'Kopyalandı!');
-        setTimeout(() => { btn.textContent = orig; }, 2000);
+        const orig = btn.innerHTML;
+        btn.innerHTML = '✓ ' + ((window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'Kopyalandı!');
+        setTimeout(() => { btn.innerHTML = orig; }, 2500);
     }
 }
 
 function copyDebugPasscode() {
     const el = document.getElementById('debug-res-passcode');
     if (!el || !el.textContent) return;
-    copyToClipboard(el.textContent.trim(), (window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'Şifre kopyalandı!');
+    const text = el.textContent.trim();
+    const msg = (window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'Şifre kopyalandı!';
+    copyToClipboard(text, msg);
     const btn = document.getElementById('btn-copy-passcode');
     if (btn) {
-        const orig = btn.textContent;
-        btn.textContent = '✓ ' + ((window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'Kopyalandı!');
-        setTimeout(() => { btn.textContent = orig; }, 2000);
+        const orig = btn.innerHTML;
+        btn.innerHTML = '✓ ' + ((window.translations && window.translations[currentLang] && window.translations[currentLang].btn_copy_done) || 'Kopyalandı!');
+        setTimeout(() => { btn.innerHTML = orig; }, 2500);
     }
 }
 
@@ -6205,10 +6268,15 @@ async function loadDebugBundles() {
                     <td style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(dateStr)}</td>
                     <td><span class="badge badge-secondary">${escapeHtml(b.requested_by)}</span> <small class="text-muted">(${escapeHtml(b.tenant_slug)})</small></td>
                     <td class="mono-code">${sizeKB} KB</td>
-                    <td><code class="mono-code" style="color: #38bdf8;">${escapeHtml(b.access_passcode)}</code></td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <code class="mono-code" style="color: #38bdf8; background: rgba(56, 189, 248, 0.1); padding: 1px 6px; border-radius: 4px;">${escapeHtml(b.access_passcode)}</code>
+                            <button type="button" class="btn btn-outline" style="padding: 1px 5px; font-size: 0.7rem;" onclick="copyToClipboard('${escapeHtml(b.access_passcode)}', 'Şifre kopyalandı!')" title="Şifreyi Kopyala">📋</button>
+                        </div>
+                    </td>
                     <td style="text-align: center;"><span class="badge ${b.download_count > 0 ? 'badge-success' : 'badge-secondary'}">${b.download_count}</span></td>
                     <td>
-                        <a href="${downloadUrl}" target="_blank" class="btn btn-xs btn-outline" style="text-decoration: none; padding: 2px 8px;">
+                        <a href="${downloadUrl}" download="${escapeHtml(b.filename)}" class="btn btn-xs btn-outline" style="text-decoration: none; padding: 2px 8px;">
                             ⬇️ ${(window.translations && window.translations[currentLang] && window.translations[currentLang].th_actions) || 'İndir'}
                         </a>
                     </td>

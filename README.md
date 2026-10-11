@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.5.21** (Support Portal Universal Clipboard & One-Click Download Optimization):
+  - **Universal Clipboard Copy Engine (`copyToClipboard`)**: Implemented robust clipboard helper with asynchronous `navigator.clipboard.writeText` and transparent fallback to `document.execCommand('copy')`, fixing "Copy Passcode" and "Copy Link" buttons across all browsers and SSL contexts with instant visual confirmation feedback ("✓ Copied!").
+  - **Full-Width Responsive Download URL & 1-Click Direct Download**: Resolved narrow input truncation by applying fluid flexbox width and automatic click-to-select (`onclick="this.select()"`); enhanced direct download button (`⬇️ Download Bundle Directly`) with absolute URL resolution and download trigger guarantees.
+  - **Persistent Support Bundle Storage (`syslog_support_bundles`)**: Added persistent named Docker volume for `/opt/syslog-platform/data/support_bundles`, preventing diagnostic bundle loss during container upgrades and maintenance cycles.
+
 - **v1.5.20** (Diagnostic Support Database Last 1,000 Logs & SIEM Security Activity Export):
   - **ClickHouse Last 1,000 Syslog Events Extraction**: Added selectable option (`include_db_logs`) to query and include the latest 1,000 raw and parsed events from ClickHouse (`syslog_events`) directly into `database_last_1000_logs.json` inside the `.tar.gz` diagnostic bundle, with tenant scoping support.
   - **SIEM Security Activity & Incident Records Extraction**: Added selectable option (`include_siem_events`) to extract recent security incidents and detection activity from PostgreSQL (`siem_alerts`) into `siem_security_activity.json` inside the diagnostic bundle.
