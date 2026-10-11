@@ -260,6 +260,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.5.24** (Multi-Tenant Isolation, Enterprise Audit Trail, Self-Service Password Policy & Deep Firewall Log Intelligence):
+  - **Comprehensive Administrative Audit Trail**: Added PostgreSQL audit trail storage (`audit_logs`) and REST API (`/api/v1/audit/logs`) recording authentication events, user lifecycles, and tenant operations with IP extraction and multi-tenant scoping; introduced dedicated settings panel (`#setting-section-audit`) with instant action and text search filters.
+  - **Enterprise Password Policy & Self-Service Change**: Enforced strict password complexity (min 8 chars, uppercase, lowercase, number, symbol) across user creation, administrative password resets, and introduced self-service password update endpoint (`/api/v1/auth/change-password`) with interactive client-side strength evaluation badge indicator.
+  - **Deep Firewall & Multi-Vendor Network Log Intelligence**: Normalized Fortinet FortiGate UTM, traffic, VPN, and system logs with automatic threat severity escalation; integrated Cisco IOS/NX-OS, HPE Aruba, and Juniper Junos telemetry extraction with vendor and application badges across forensic search and live streams.
+  - **Tenant Storage Breakdown & Scoped User Management**: Added ClickHouse tenant-level log distribution aggregation (`GetTenantStorageBreakdown`) for MSSP quota monitoring and enforced strict organization scoping in PostgreSQL user management.
+
 - **v1.5.23** (Diagnostic Support Database Last 8,000 Logs & SIEM Security Activity Last 1,000 Alerts Export):
   - **ClickHouse Last 8,000 Syslog Events Extraction**: Increased database diagnostic export depth from 1,000 to 8,000 events (`database_last_8000_logs.json`) with tenant scoping support, providing deeper forensic context for support investigations.
   - **SIEM Security Activity & Last 1,000 Alerts Export**: Expanded SIEM security incident extraction to up to 1,000 alerts (`siem_security_activity_last_1000_alerts.json`), adjusting database pagination limits from 200 to 1,000.

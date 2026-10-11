@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
@@ -201,6 +202,7 @@ func (h *Handler) handleLoginAPI(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if authenticatedUser == nil {
+			h.recordAudit(r, "AUTH_LOGIN", "auth/login", "FAILED", map[string]interface{}{"username": req.Username, "reason": "invalid credentials"})
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid username or password"})
 			return
 		}
@@ -233,6 +235,8 @@ func (h *Handler) handleLoginAPI(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	h.recordAudit(r, "AUTH_LOGIN", "auth/login", "SUCCESS", map[string]interface{}{"username": authenticatedUser.Username, "role": authenticatedUser.Role})
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status": "ok",
 		"user": map[string]any{
@@ -245,6 +249,9 @@ func (h *Handler) handleLoginAPI(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleLogoutAPI(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(SessionCookieName); err == nil && cookie.Value != "" {
+		if sess, ok := h.sessions.Get(cookie.Value); ok && sess != nil {
+			h.recordAudit(r, "AUTH_LOGOUT", "auth/logout", "SUCCESS", map[string]interface{}{"username": sess.Username})
+		}
 		h.sessions.Delete(cookie.Value)
 	}
 
@@ -259,6 +266,105 @@ func (h *Handler) handleLogoutAPI(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// ValidatePasswordPolicy verifies that a password meets enterprise complexity rules
+func ValidatePasswordPolicy(pw string) error {
+	if len(pw) < 8 {
+		return errors.New("password must be at least 8 characters long")
+	}
+	var hasUpper, hasLower, hasNumber, hasSpecial bool
+	for _, ch := range pw {
+		switch {
+		case ch >= 'A' && ch <= 'Z':
+			hasUpper = true
+		case ch >= 'a' && ch <= 'z':
+			hasLower = true
+		case ch >= '0' && ch <= '9':
+			hasNumber = true
+		case strings.ContainsRune("!@#$%^&*()-_=+[]{}|;:,.<>?/~`", ch):
+			hasSpecial = true
+		}
+	}
+	if !hasUpper {
+		return errors.New("password must contain at least one uppercase letter (A-Z)")
+	}
+	if !hasLower {
+		return errors.New("password must contain at least one lowercase letter (a-z)")
+	}
+	if !hasNumber {
+		return errors.New("password must contain at least one number (0-9)")
+	}
+	if !hasSpecial {
+		return errors.New("password must contain at least one special character (!@#$%^&*...)")
+	}
+	return nil
+}
+
+// handleSelfChangePasswordAPI allows an authenticated user to change their own password
+func (h *Handler) handleSelfChangePasswordAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	session, ok := h.getSession(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		return
+	}
+
+	if strings.TrimSpace(req.CurrentPassword) == "" || strings.TrimSpace(req.NewPassword) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "current password and new password are required"})
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r, 5*time.Second)
+	defer cancel()
+
+	user, err := h.pgDB.GetUserByID(ctx, session.UserID)
+	if err != nil || user == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+		return
+	}
+
+	// Verify current password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+		h.recordAudit(r, "AUTH_PASSWORD_CHANGE", "user/"+session.Username, "FAILED", map[string]interface{}{"reason": "current password incorrect"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "current password is incorrect"})
+		return
+	}
+
+	// Validate complexity
+	if err := ValidatePasswordPolicy(req.NewPassword); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	// Prevent reusing current password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.NewPassword)); err == nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "new password cannot be the same as your current password"})
+		return
+	}
+
+	if err := h.pgDB.ResetUserPassword(ctx, session.UserID, req.NewPassword); err != nil {
+		h.recordAudit(r, "AUTH_PASSWORD_CHANGE", "user/"+session.Username, "FAILED", map[string]interface{}{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed changing password: " + err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "AUTH_PASSWORD_CHANGE", "user/"+session.Username, "SUCCESS", map[string]interface{}{"username": session.Username})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "password_changed_successfully"})
 }
 
 func (h *Handler) getSession(r *http.Request) (*Session, bool) {

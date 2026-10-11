@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.23</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.24</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -202,6 +202,7 @@
                             <span class="user-name" id="current-user-name">admin</span>
                             <span class="user-role" id="current-user-role">Super Administrator</span>
                         </div>
+                        <button class="btn btn-outline" id="btn-open-change-password" data-i18n="btn_change_password" title="Change Password" style="padding: 3px 8px; font-size: 11px; margin-left: 4px;">🔑</button>
                         <button class="btn btn-outline text-red" id="btn-logout" data-i18n="sign_out" style="padding: 3px 8px; font-size: 11px; margin-left: 4px;">Sign Out</button>
                     </div>
                 </div>
@@ -797,6 +798,10 @@
                     <button class="settings-subnav-btn" data-target="setting-section-tenants">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
                         <span data-i18n="nav_sub_tenants">Kiracı Yönetimi (Tenants)</span>
+                    </button>
+                    <button class="settings-subnav-btn" data-target="setting-section-audit">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        <span data-i18n="nav_sub_audit">Denetim İzi (Audit Trail)</span>
                     </button>
                 </div>
 
@@ -1658,6 +1663,74 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Administrative Audit Trail Panel -->
+                    <div class="panel" id="setting-section-audit">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <h3 data-i18n="audit_panel_title">Yönetim ve Güvenlik Denetim İzi (Audit Trail)</h3>
+                                <p class="subtitle" style="margin: 4px 0 0 0;" data-i18n="audit_panel_subtitle">
+                                    Sistem yapılandırma değişiklikleri, kullanıcı işlemleri, kimlik doğrulama olayları ve arşiv kayıtları.
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-outline" id="btn-refresh-audit" onclick="loadAuditLogs()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" style="vertical-align: middle;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                                    <span data-i18n="btn_refresh">Yenile</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Filters -->
+                            <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <label style="font-size: 12px; color: var(--text-muted);" data-i18n="filter_action">İşlem / Olay:</label>
+                                    <select class="input" id="audit-filter-action" style="padding: 4px 10px; font-size: 12px; width: auto;" onchange="loadAuditLogs()">
+                                        <option value="" data-i18n="filter_all">Tüm İşlemler (All)</option>
+                                        <option value="AUTH_LOGIN">AUTH_LOGIN</option>
+                                        <option value="AUTH_LOGOUT">AUTH_LOGOUT</option>
+                                        <option value="AUTH_PASSWORD_CHANGE">AUTH_PASSWORD_CHANGE</option>
+                                        <option value="USER_CREATE">USER_CREATE</option>
+                                        <option value="USER_DELETE">USER_DELETE</option>
+                                        <option value="USER_STATUS_TOGGLE">USER_STATUS_TOGGLE</option>
+                                        <option value="USER_PASSWORD_RESET">USER_PASSWORD_RESET</option>
+                                        <option value="TENANT_CREATE">TENANT_CREATE</option>
+                                        <option value="TENANT_DELETE">TENANT_DELETE</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
+                                    <input type="text" class="input" id="audit-filter-search" placeholder="Kullanıcı, kaynak veya IP ara..." style="padding: 4px 10px; font-size: 12px; width: 100%;" onkeydown="if(event.key==='Enter') loadAuditLogs()">
+                                    <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="loadAuditLogs()">🔍</button>
+                                </div>
+                                <div id="audit-total-badge" style="font-size: 12px; color: var(--text-muted); font-weight: 600;"></div>
+                            </div>
+
+                            <!-- Audit Table -->
+                            <div class="table-container" style="overflow-x: auto;">
+                                <table class="table" id="table-audit-logs">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="th_timestamp">Zaman Damgası</th>
+                                            <th data-i18n="th_username">Operatör / Kullanıcı</th>
+                                            <th data-i18n="th_source_ip">Kaynak IP</th>
+                                            <th data-i18n="th_action">İşlem</th>
+                                            <th data-i18n="th_resource">Hedef Kaynak</th>
+                                            <th data-i18n="th_result">Sonuç</th>
+                                            <th data-i18n="th_tenant">Organizasyon</th>
+                                            <th data-i18n="th_details">Detaylar</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody-audit-logs">
+                                        <tr>
+                                            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                                                Yükleniyor...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1717,7 +1790,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.23</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.24</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -2092,6 +2165,37 @@
             <div class="modal-footer">
                 <button class="btn btn-outline" id="btn-cancel-reset-modal" data-i18n="btn_cancel">Cancel</button>
                 <button class="btn btn-primary" id="btn-save-reset-password" data-i18n="btn_update_password">Update Password</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Self-Service Change Password Modal -->
+    <div class="modal-backdrop" id="modal-change-password" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 data-i18n="modal_change_password_title">Şifremi Değiştir (Change Password)</h3>
+                <button class="btn-close" id="btn-close-change-password">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label data-i18n="lbl_current_password">Mevcut Şifre</label>
+                    <input type="password" class="input" id="change-pass-current" placeholder="Mevcut şifrenizi girin" required>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="lbl_new_password_req">Yeni Şifre (En az 8 karakter, büyük/küçük harf, rakam ve sembol)</label>
+                    <input type="password" class="input" id="change-pass-new" placeholder="Yeni şifrenizi girin" required oninput="checkPasswordStrength(this.value, 'change-pass-strength')">
+                    <div id="change-pass-strength" style="margin-top: 6px; font-size: 11px; display: flex; gap: 6px; flex-wrap: wrap;"></div>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="lbl_confirm_password">Yeni Şifre Tekrar</label>
+                    <input type="password" class="input" id="change-pass-confirm" placeholder="Yeni şifreyi tekrar girin" required>
+                </div>
+                <div id="change-pass-error" class="alert-box alert-danger" style="display: none; margin-top: 8px; font-size: 0.85rem;"></div>
+                <div id="change-pass-success" class="alert-box alert-success" style="display: none; margin-top: 8px; font-size: 0.85rem; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 8px 12px; border-radius: 6px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-change-password" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" id="btn-submit-change-password" data-i18n="btn_save_password">Şifreyi Güncelle</button>
             </div>
         </div>
     </div>
@@ -3174,7 +3278,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.23"></script>
-    <script src="/static/js/app.js?v=1.5.23"></script>
+    <script src="/static/js/translations.js?v=1.5.24"></script>
+    <script src="/static/js/app.js?v=1.5.24"></script>
 </body>
 </html>

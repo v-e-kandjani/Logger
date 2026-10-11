@@ -190,6 +190,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/settings/cache/stats", h.requireAuth(h.handleCacheStats))
 	mux.HandleFunc("/api/v1/settings/cache/clear", h.requireAuth(h.handleCacheClear))
 	mux.HandleFunc("/api/v1/settings/cache/toggle", h.requireAuth(h.handleCacheToggle))
+	mux.HandleFunc("/api/v1/auth/change-password", h.requireAuth(h.handleSelfChangePasswordAPI))
+	mux.HandleFunc("/api/v1/audit/logs", h.requireAuth(h.handleAuditLogsAPI))
 	mux.HandleFunc("/api/v1/timestamp/credit", h.requireAuth(h.handleTimestampCredit))
 	mux.HandleFunc("/api/v1/users", h.requireAuth(h.handleUsersAPI))
 	mux.HandleFunc("/api/v1/users/toggle", h.requireAuth(h.handleToggleUserAPI))

@@ -109,15 +109,16 @@ type LogArchive struct {
 
 // AuditLog tracks administrative actions
 type AuditLog struct {
-	ID        uuid.UUID              `json:"id"`
-	UserID    *uuid.UUID             `json:"user_id,omitempty"`
-	Username  string                 `json:"username"`
-	SourceIP  string                 `json:"source_ip"`
-	Action    string                 `json:"action"`
-	Resource  string                 `json:"resource"`
-	Result    string                 `json:"result"` // SUCCESS, FAILED, DENIED
-	Details   map[string]interface{} `json:"details,omitempty"`
-	CreatedAt time.Time              `json:"created_at"`
+	ID         uuid.UUID              `json:"id"`
+	UserID     *uuid.UUID             `json:"user_id,omitempty"`
+	Username   string                 `json:"username"`
+	SourceIP   string                 `json:"source_ip"`
+	Action     string                 `json:"action"`
+	Resource   string                 `json:"resource"`
+	Result     string                 `json:"result"` // SUCCESS, FAILED, DENIED
+	Details    map[string]interface{} `json:"details,omitempty"`
+	TenantSlug string                 `json:"tenant_slug"`
+	CreatedAt  time.Time              `json:"created_at"`
 }
 
 // User represents an administrative or security operator

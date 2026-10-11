@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -490,14 +491,99 @@ func (db *DB) GetArchive(ctx context.Context, id uuid.UUID) (*models.LogArchive,
 
 // AuditLog recording
 func (db *DB) InsertAuditLog(ctx context.Context, a *models.AuditLog) error {
+	ipStr := strings.TrimSpace(a.SourceIP)
+	if h, _, err := net.SplitHostPort(ipStr); err == nil {
+		ipStr = h
+	}
+	if parsed := net.ParseIP(ipStr); parsed == nil {
+		ipStr = "127.0.0.1"
+	}
+	tenant := strings.TrimSpace(a.TenantSlug)
+	if tenant == "" {
+		tenant = "default"
+	}
+	detailsJSON, _ := json.Marshal(a.Details)
+	if len(detailsJSON) == 0 {
+		detailsJSON = []byte("{}")
+	}
 	query := `
-		INSERT INTO audit_logs (user_id, username, source_ip, action, resource, result, details)
-		VALUES ($1, $2, $3::inet, $4, $5, $6, $7)
+		INSERT INTO audit_logs (user_id, username, source_ip, action, resource, result, details, tenant_slug)
+		VALUES ($1, $2, $3::inet, $4, $5, $6, $7, $8)
 		RETURNING id, created_at`
 
 	return db.pool.QueryRow(ctx, query,
-		a.UserID, a.Username, a.SourceIP, a.Action, a.Resource, a.Result, a.Details,
+		a.UserID, a.Username, ipStr, a.Action, a.Resource, a.Result, detailsJSON, tenant,
 	).Scan(&a.ID, &a.CreatedAt)
+}
+
+// ListAuditLogs retrieves audit records with optional tenant, action, search filters and pagination
+func (db *DB) ListAuditLogs(ctx context.Context, tenant, action, search string, limit, offset int) ([]models.AuditLog, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	whereClauses := []string{"1=1"}
+	args := []interface{}{}
+	argIdx := 1
+
+	if tenant != "" && tenant != "all" && tenant != "*" {
+		whereClauses = append(whereClauses, fmt.Sprintf("COALESCE(tenant_slug, 'default') = $%d", argIdx))
+		args = append(args, tenant)
+		argIdx++
+	}
+
+	if action != "" && action != "ALL" {
+		whereClauses = append(whereClauses, fmt.Sprintf("action = $%d", argIdx))
+		args = append(args, action)
+		argIdx++
+	}
+
+	if search != "" {
+		like := "%" + search + "%"
+		whereClauses = append(whereClauses, fmt.Sprintf("(username ILIKE $%d OR resource ILIKE $%d OR host(source_ip) ILIKE $%d OR action ILIKE $%d)", argIdx, argIdx, argIdx, argIdx))
+		args = append(args, like)
+		argIdx++
+	}
+
+	whereSQL := " WHERE " + joinWithAND(whereClauses)
+
+	var total int
+	countQuery := "SELECT COUNT(*) FROM audit_logs" + whereSQL
+	if err := db.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, user_id, username, host(source_ip), action, resource, result, COALESCE(details, '{}'::jsonb), COALESCE(tenant_slug, 'default'), created_at
+		FROM audit_logs
+		%s
+		ORDER BY created_at DESC
+		LIMIT $%d OFFSET $%d`, whereSQL, argIdx, argIdx+1)
+
+	args = append(args, limit, offset)
+	rows, err := db.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var logs []models.AuditLog
+	for rows.Next() {
+		var a models.AuditLog
+		var rawDetails []byte
+		if err := rows.Scan(
+			&a.ID, &a.UserID, &a.Username, &a.SourceIP, &a.Action, &a.Resource, &a.Result, &rawDetails, &a.TenantSlug, &a.CreatedAt,
+		); err != nil {
+			return nil, 0, err
+		}
+		if len(rawDetails) > 0 {
+			_ = json.Unmarshal(rawDetails, &a.Details)
+		}
+		logs = append(logs, a)
+	}
+	return logs, total, nil
 }
 
 // System Settings methods
@@ -639,17 +725,24 @@ func (db *DB) SeedDefaultUser(ctx context.Context, username, password string) er
 	return err
 }
 
-func (db *DB) ListUsers(ctx context.Context) ([]models.User, error) {
+func (db *DB) ListUsers(ctx context.Context, tenant string) ([]models.User, error) {
 	query := `
 		SELECT id, username, full_name, email, role, is_enabled,
 		       COALESCE(auth_source, 'local'), COALESCE(mfa_enabled, false),
 		       mfa_enrolled_at, COALESCE(mfa_provider, 'totp'),
 		       last_login_at, created_at, updated_at,
 		       COALESCE(tenant_slug, 'default'), COALESCE(is_tenant_admin, false)
-		FROM users
-		ORDER BY created_at ASC`
+		FROM users`
 
-	rows, err := db.pool.Query(ctx, query)
+	var rows pgx.Rows
+	var err error
+	if tenant != "" && tenant != "all" && tenant != "*" {
+		query += ` WHERE COALESCE(tenant_slug, 'default') = $1 ORDER BY created_at ASC`
+		rows, err = db.pool.Query(ctx, query, tenant)
+	} else {
+		query += ` ORDER BY created_at ASC`
+		rows, err = db.pool.Query(ctx, query)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1584,6 +1677,10 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 	-- Multi-Tenant Log Archives
 	ALTER TABLE log_archives ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
 	CREATE INDEX IF NOT EXISTS idx_log_archives_tenant ON log_archives(tenant_slug);
+
+	-- Multi-Tenant Audit Logs
+	ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
+	CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_logs(tenant_slug);
 
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) DEFAULT 'default';
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS is_tenant_admin BOOLEAN DEFAULT FALSE;

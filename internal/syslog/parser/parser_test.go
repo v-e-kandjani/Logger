@@ -176,3 +176,46 @@ func TestParseWatchGuard_EventLog(t *testing.T) {
 	}
 }
 
+func TestParseFortiGate_UTMLog(t *testing.T) {
+	p := NewUniversalParser("test-node")
+	msg := []byte("<189>date=2026-10-11 time=17:00:00 devname=\"FGT-HQ\" devid=\"FGT60E123456\" type=\"utm\" subtype=\"ips\" action=\"drop\" attack=\"SQL.Injection\" srcip=192.168.1.50 dstip=10.0.0.10")
+	ip := net.ParseIP("192.168.1.1")
+
+	event, err := p.Parse(msg, ip, 514, "UDP")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if event.Vendor != "Fortinet" {
+		t.Errorf("expected vendor Fortinet, got %s", event.Vendor)
+	}
+	if event.Product != "FortiGate" {
+		t.Errorf("expected product FortiGate, got %s", event.Product)
+	}
+	if event.Severity != "CRITICAL" {
+		t.Errorf("expected elevated severity CRITICAL for UTM drop, got %s", event.Severity)
+	}
+}
+
+func TestParseCisco_IOSLog(t *testing.T) {
+	p := NewUniversalParser("test-node")
+	msg := []byte("<189>Oct 11 17:05:00 core-switch-01 45: %SYS-5-CONFIG_I: Configured from console by admin on vty0")
+	ip := net.ParseIP("10.0.0.254")
+
+	event, err := p.Parse(msg, ip, 514, "UDP")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if event.Vendor != "Cisco" {
+		t.Errorf("expected vendor Cisco, got %s", event.Vendor)
+	}
+	if event.Product != "Cisco IOS/NX-OS" {
+		t.Errorf("expected product Cisco IOS/NX-OS, got %s", event.Product)
+	}
+	if event.MessageID != "CONFIG_I" {
+		t.Errorf("expected MessageID CONFIG_I, got %s", event.MessageID)
+	}
+}
+
+

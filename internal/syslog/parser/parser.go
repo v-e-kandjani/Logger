@@ -266,29 +266,127 @@ func (p *UniversalSyslogParser) enrichVendorAndProduct(event *models.LogEvent) {
 		return
 	}
 
-	// 2. Fortinet FortiGate Detection
-	if strings.Contains(lowerRaw, "devname=") || strings.Contains(lowerRaw, "fortigate") || strings.Contains(lowerHost, "fortigate") {
+	// 2. Fortinet FortiGate Detection (FortiLens Synergy)
+	if strings.Contains(lowerRaw, "devname=") || strings.Contains(lowerRaw, "fortigate") || strings.Contains(lowerHost, "fortigate") ||
+		strings.Contains(lowerRaw, "type=utm") || strings.Contains(lowerRaw, "type=traffic") {
 		if event.Vendor == "" || event.Vendor == "Generic" {
 			event.Vendor = "Fortinet"
 		}
 		if event.Product == "" || event.Product == "Unknown" {
 			event.Product = "FortiGate"
 		}
+
+		logType := extractKV(event.RawMessage, "type")
+		subtype := extractKV(event.RawMessage, "subtype")
+		action := extractKV(event.RawMessage, "action")
+		threat := extractKV(event.RawMessage, "threat")
+		if threat == "" {
+			threat = extractKV(event.RawMessage, "attack")
+		}
+		if threat == "" {
+			threat = extractKV(event.RawMessage, "virus")
+		}
+
+		if logType == "utm" {
+			appName := "FortiGate UTM"
+			if subtype != "" {
+				appName += fmt.Sprintf(" [%s]", strings.ToUpper(subtype))
+			}
+			if threat != "" {
+				appName += fmt.Sprintf(": %s", threat)
+			}
+			if action != "" {
+				appName += fmt.Sprintf(" (%s)", strings.Title(action))
+			}
+			event.ApplicationName = appName
+			if event.SeverityCode > 2 {
+				event.SeverityCode = 2
+				event.Severity = "CRITICAL"
+			}
+		} else if logType == "traffic" {
+			appName := "FortiGate Traffic"
+			if action != "" {
+				appName += fmt.Sprintf(" (%s)", strings.Title(action))
+			}
+			event.ApplicationName = appName
+			if action == "deny" || action == "drop" || action == "block" {
+				if event.SeverityCode > 4 {
+					event.SeverityCode = 4
+					event.Severity = "WARNING"
+				}
+			}
+		} else if logType == "event" && subtype == "vpn" {
+			event.ApplicationName = "FortiGate VPN"
+			if action != "" {
+				event.ApplicationName += fmt.Sprintf(" (%s)", strings.Title(action))
+			}
+		} else if action != "" {
+			event.ApplicationName = fmt.Sprintf("FortiGate (%s)", strings.Title(action))
+		}
 		return
 	}
 
-	// 3. Cisco ASA / IOS Detection
-	if strings.Contains(event.RawMessage, "%ASA-") || strings.Contains(event.RawMessage, "%FTD-") || strings.Contains(event.RawMessage, "%IOS-") {
+	// 3. Cisco IOS / NX-OS / ASA Detection (NetVault Synergy)
+	if strings.Contains(event.RawMessage, "%ASA-") || strings.Contains(event.RawMessage, "%FTD-") || strings.Contains(event.RawMessage, "%IOS-") ||
+		strings.Contains(event.RawMessage, "%SYS-") || strings.Contains(event.RawMessage, "%LINK-") || strings.Contains(event.RawMessage, "%SEC-") ||
+		strings.Contains(event.RawMessage, "%LINEPROTO-") || strings.Contains(event.RawMessage, "%CDP-") || strings.Contains(event.RawMessage, "%OSPF-") ||
+		strings.Contains(event.RawMessage, "%BGP-") {
 		if event.Vendor == "" || event.Vendor == "Generic" {
 			event.Vendor = "Cisco"
 		}
 		if event.Product == "" || event.Product == "Unknown" {
-			event.Product = "ASA/IOS"
+			if strings.Contains(event.RawMessage, "%ASA-") || strings.Contains(event.RawMessage, "%FTD-") {
+				event.Product = "Cisco ASA/FTD"
+			} else {
+				event.Product = "Cisco IOS/NX-OS"
+			}
+		}
+		if idx := strings.Index(event.RawMessage, "%"); idx != -1 {
+			sub := event.RawMessage[idx+1:]
+			end := strings.IndexAny(sub, ": ")
+			if end != -1 {
+				mnemonicPart := sub[:end]
+				parts := strings.Split(mnemonicPart, "-")
+				if len(parts) >= 3 {
+					event.ApplicationName = "Cisco " + parts[0]
+					event.MessageID = parts[2]
+				}
+			}
 		}
 		return
 	}
 
-	// 4. Palo Alto Networks Detection
+	// 4. HPE Aruba OS / OS-CX Detection (NetVault Synergy)
+	if strings.Contains(lowerRaw, "arubaos-cx") || strings.Contains(lowerRaw, "aruba") || strings.Contains(lowerHost, "aruba") ||
+		strings.Contains(event.RawMessage, "%MODULE-") || strings.Contains(event.RawMessage, "%SYSTEM-") {
+		if event.Vendor == "" || event.Vendor == "Generic" {
+			event.Vendor = "HPE Aruba"
+		}
+		if event.Product == "" || event.Product == "Unknown" {
+			event.Product = "ArubaOS-CX"
+		}
+		if event.ApplicationName == "" {
+			event.ApplicationName = "Aruba Network"
+		}
+		return
+	}
+
+	// 5. Juniper Junos Detection (NetVault Synergy)
+	if strings.Contains(lowerRaw, "junos") || strings.Contains(event.RawMessage, "RT_FLOW:") || strings.Contains(event.RawMessage, "RT_IDP:") ||
+		strings.Contains(lowerHost, "juniper") || strings.Contains(lowerHost, "srx") || strings.Contains(lowerHost, "qfx") {
+		if event.Vendor == "" || event.Vendor == "Generic" {
+			event.Vendor = "Juniper"
+		}
+		if event.Product == "" || event.Product == "Unknown" {
+			event.Product = "Junos OS"
+		}
+		if event.ApplicationName == "" {
+			event.ApplicationName = "Junos RT"
+		}
+		return
+	}
+
+	// 6. Palo Alto Networks Detection
 	if strings.Contains(event.RawMessage, "TRAFFIC,") || strings.Contains(lowerHost, "pa-") {
 		if event.Vendor == "" || event.Vendor == "Generic" {
 			event.Vendor = "Palo Alto"
@@ -298,6 +396,30 @@ func (p *UniversalSyslogParser) enrichVendorAndProduct(event *models.LogEvent) {
 		}
 		return
 	}
+}
+
+// extractKV retrieves value for key= or key="value" from a string
+func extractKV(s, key string) string {
+	target := key + "="
+	idx := strings.Index(s, target)
+	if idx == -1 {
+		return ""
+	}
+	sub := s[idx+len(target):]
+	if len(sub) == 0 {
+		return ""
+	}
+	if sub[0] == '"' {
+		sub = sub[1:]
+		if end := strings.IndexByte(sub, '"'); end != -1 {
+			return sub[:end]
+		}
+		return sub
+	}
+	if end := strings.IndexAny(sub, " ,;\t\r\n"); end != -1 {
+		return sub[:end]
+	}
+	return sub
 }
 
 // RFC 5424: TIMESTAMP HOSTNAME APP-NAME PROCID MSGID [STRUCTURED-DATA] MSG

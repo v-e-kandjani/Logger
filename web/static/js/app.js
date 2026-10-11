@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initDeviceModal();
     initUserModal();
     initResetPasswordModal();
+    initChangePasswordModal();
     initArchiveTrigger();
     initCustomExportModal();
     initStorageManagement();
@@ -227,6 +228,10 @@ function displaySettingsSection(targetId) {
 
     // Reset scroll to top of view instantly
     window.scrollTo({ top: 0, behavior: 'instant' });
+
+    if (targetId === 'setting-section-audit' || isAll) {
+        if (typeof loadAuditLogs === 'function') loadAuditLogs();
+    }
 }
 
 // Backward-compatible alias
@@ -347,7 +352,7 @@ function initLiveStream() {
                     const row = document.createElement('div');
                     row.className = 'log-row';
                     const timeStr = log.timestamp ? log.timestamp.substring(11, 23) : '';
-                    const vendorBadge = log.vendor === 'WatchGuard' ? '<span class="badge badge-primary">WatchGuard</span> ' : log.vendor ? `[${log.vendor}] ` : '';
+                    const vendorBadge = (typeof renderVendorBadge === 'function' ? renderVendorBadge(log.vendor) : (log.vendor ? `[${log.vendor}]` : '')) + ' ';
                     row.innerHTML = `
                         <span class="log-time">${timeStr}</span>
                         <span class="log-src">${log.source_ip}:${log.port}</span>
@@ -383,7 +388,7 @@ function initLiveStream() {
                 const row = document.createElement('div');
                 row.className = 'log-row';
                 const timeStr = new Date(log.event_timestamp).toISOString().substring(11, 23);
-                const vendorBadge = log.vendor === 'WatchGuard' ? '<span class="badge badge-primary">WatchGuard</span> ' : log.vendor ? `[${log.vendor}] ` : '';
+                const vendorBadge = (typeof renderVendorBadge === 'function' ? renderVendorBadge(log.vendor) : (log.vendor ? `[${log.vendor}]` : '')) + ' ';
                 row.innerHTML = `
                     <span class="log-time">${timeStr}</span>
                     <span class="log-src">${log.source_ip}:${log.source_port}</span>
@@ -452,12 +457,12 @@ function initSearch() {
                         <td class="mono-code">${l.timestamp}</td>
                         <td class="text-green">${l.source_ip}:${l.port}</td>
                         <td>
-                            <span class="badge ${l.vendor === 'WatchGuard' ? 'badge-primary' : 'badge-secondary'}">${escapeHtml(l.vendor || 'Generic')}</span>
+                            ${typeof renderVendorBadge === 'function' ? renderVendorBadge(l.vendor) : `<span class="badge badge-secondary">${escapeHtml(l.vendor || 'Generic')}</span>`}
                             <strong>${escapeHtml(l.device_name || 'UNKNOWN')}</strong>
                         </td>
                         <td><span class="badge sev-${l.severity}">${l.severity}</span></td>
                         <td>${l.facility}</td>
-                        <td>${escapeHtml(l.application || '-')}</td>
+                        <td>${typeof formatApplicationBadge === 'function' ? formatApplicationBadge(l.application) : escapeHtml(l.application || '-')}</td>
                         <td>${escapeHtml(l.message)}</td>
                     </tr>
                 `).join('');
@@ -6309,4 +6314,272 @@ async function loadDebugBundles() {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Hata: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
+
+// ==========================================================================
+// Enterprise Security & Password Policy Helpers
+// ==========================================================================
+function checkPasswordStrength(pw, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (!pw) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const rules = [
+        { label: '8+ Karakter', pass: pw.length >= 8 },
+        { label: 'Büyük Harf (A-Z)', pass: /[A-Z]/.test(pw) },
+        { label: 'Küçük Harf (a-z)', pass: /[a-z]/.test(pw) },
+        { label: 'Rakam (0-9)', pass: /[0-9]/.test(pw) },
+        { label: 'Sembol (@#$%...)', pass: /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?~`'"]/.test(pw) }
+    ];
+
+    container.innerHTML = rules.map(r => {
+        const color = r.pass ? '#22c55e' : '#94a3b8';
+        const bg = r.pass ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)';
+        const border = r.pass ? 'rgba(34, 197, 94, 0.35)' : 'rgba(255, 255, 255, 0.1)';
+        const icon = r.pass ? '✓' : '○';
+        return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; background: ${bg}; color: ${color}; border: 1px solid ${border};">
+            <span>${icon}</span> ${r.label}
+        </span>`;
+    }).join('');
+}
+
+function initChangePasswordModal() {
+    const modal = document.getElementById('modal-change-password');
+    const btnOpen = document.getElementById('btn-open-change-password');
+    const btnClose = document.getElementById('btn-close-change-password');
+    const btnCancel = document.getElementById('btn-cancel-change-password');
+    const btnSubmit = document.getElementById('btn-submit-change-password');
+    const curInput = document.getElementById('change-pass-current');
+    const newInput = document.getElementById('change-pass-new');
+    const confirmInput = document.getElementById('change-pass-confirm');
+    const errBox = document.getElementById('change-pass-error');
+    const succBox = document.getElementById('change-pass-success');
+    const strengthBox = document.getElementById('change-pass-strength');
+
+    const resetForm = () => {
+        if (curInput) curInput.value = '';
+        if (newInput) newInput.value = '';
+        if (confirmInput) confirmInput.value = '';
+        if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
+        if (succBox) { succBox.style.display = 'none'; succBox.textContent = ''; }
+        if (strengthBox) strengthBox.innerHTML = '';
+    };
+
+    const closeModal = () => {
+        if (modal) modal.style.display = 'none';
+        resetForm();
+    };
+
+    if (btnOpen) {
+        btnOpen.addEventListener('click', (e) => {
+            e.preventDefault();
+            resetForm();
+            if (modal) modal.style.display = 'flex';
+            if (curInput) curInput.focus();
+        });
+    }
+
+    if (btnClose) btnClose.addEventListener('click', closeModal);
+    if (btnCancel) btnCancel.addEventListener('click', closeModal);
+
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+    }
+
+    if (btnSubmit) {
+        btnSubmit.addEventListener('click', async () => {
+            const current_password = curInput ? curInput.value : '';
+            const new_password = newInput ? newInput.value : '';
+            const confirm_password = confirmInput ? confirmInput.value : '';
+
+            if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
+            if (succBox) { succBox.style.display = 'none'; succBox.textContent = ''; }
+
+            if (!current_password) {
+                if (errBox) {
+                    errBox.textContent = (window.translations && window.translations[currentLang] && window.translations[currentLang].err_current_password_required) || 'Mevcut şifrenizi giriniz.';
+                    errBox.style.display = 'block';
+                }
+                return;
+            }
+
+            if (!new_password) {
+                if (errBox) {
+                    errBox.textContent = (window.translations && window.translations[currentLang] && window.translations[currentLang].err_new_password_required) || 'Yeni şifrenizi giriniz.';
+                    errBox.style.display = 'block';
+                }
+                return;
+            }
+
+            if (new_password !== confirm_password) {
+                if (errBox) {
+                    errBox.textContent = (window.translations && window.translations[currentLang] && window.translations[currentLang].err_passwords_do_not_match) || 'Yeni şifreler birbiriyle eşleşmiyor.';
+                    errBox.style.display = 'block';
+                }
+                return;
+            }
+
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = '...';
+
+            try {
+                const res = await fetch('/api/v1/auth/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ current_password, new_password })
+                });
+
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.error || `HTTP ${res.status}`);
+                }
+
+                if (succBox) {
+                    succBox.textContent = (window.translations && window.translations[currentLang] && window.translations[currentLang].msg_password_changed_success) || 'Şifreniz başarıyla güncellendi!';
+                    succBox.style.display = 'block';
+                }
+                showToast('Şifreniz başarıyla güncellendi', 'success');
+
+                setTimeout(() => {
+                    closeModal();
+                }, 1400);
+
+            } catch (err) {
+                if (errBox) {
+                    errBox.textContent = err.message;
+                    errBox.style.display = 'block';
+                } else {
+                    showToast(err.message, 'error');
+                }
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = (window.translations && window.translations[currentLang] && window.translations[currentLang].btn_save_password) || 'Şifreyi Güncelle';
+            }
+        });
+    }
+}
+
+// ==========================================================================
+// Deep Vendor & Application Badge Intelligence
+// ==========================================================================
+function renderVendorBadge(vendor) {
+    if (!vendor) return '';
+    const vLower = String(vendor).toLowerCase();
+
+    if (vLower.includes('fortinet') || vLower.includes('fortigate')) {
+        return `<span class="badge" style="background: rgba(239, 68, 68, 0.16); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); font-weight: 600; padding: 2px 7px; border-radius: 4px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Fortinet FortiGate Firewall / UTM">🛡️ Fortinet</span>`;
+    }
+    if (vLower.includes('cisco')) {
+        return `<span class="badge" style="background: rgba(14, 165, 233, 0.16); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.35); font-weight: 600; padding: 2px 7px; border-radius: 4px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Cisco IOS / NX-OS Network Device">🌐 Cisco</span>`;
+    }
+    if (vLower.includes('aruba') || vLower.includes('hpe')) {
+        return `<span class="badge" style="background: rgba(245, 158, 11, 0.16); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 600; padding: 2px 7px; border-radius: 4px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Aruba / HPE Switch or Controller">📶 Aruba/HPE</span>`;
+    }
+    if (vLower.includes('juniper') || vLower.includes('junos')) {
+        return `<span class="badge" style="background: rgba(16, 185, 129, 0.16); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-weight: 600; padding: 2px 7px; border-radius: 4px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Juniper Junos OS Router / Switch">🌲 Juniper</span>`;
+    }
+
+    return `<span class="badge badge-secondary" style="font-size: 11px; padding: 2px 6px;">🏷️ ${escapeHtml(vendor)}</span>`;
+}
+
+function formatApplicationBadge(app) {
+    if (!app) return '';
+    return `<span class="badge badge-outline" style="font-size: 10.5px; padding: 1px 6px; border-color: rgba(255,255,255,0.14); color: var(--text-main); font-family: monospace; font-weight: 500;">${escapeHtml(app)}</span>`;
+}
+
+// ==========================================================================
+// Administrative & Security Audit Trail Controller
+// ==========================================================================
+async function loadAuditLogs() {
+    const tbody = document.getElementById('tbody-audit-logs');
+    if (!tbody) return;
+
+    const actionSelect = document.getElementById('audit-filter-action');
+    const searchInput = document.getElementById('audit-filter-search');
+    const totalBadge = document.getElementById('audit-total-badge');
+
+    const action = actionSelect ? actionSelect.value.trim() : '';
+    const search = searchInput ? searchInput.value.trim() : '';
+
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">Denetim izleri yükleniyor...</td></tr>`;
+
+    try {
+        const params = new URLSearchParams();
+        if (action) params.set('action', action);
+        if (search) params.set('search', search);
+        params.set('limit', '50');
+
+        const res = await fetch(`/api/v1/audit/logs?${params.toString()}`);
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const logs = data.logs || [];
+        const total = data.total || logs.length;
+
+        if (totalBadge) {
+            totalBadge.textContent = `${total} ${(window.translations && window.translations[currentLang] && window.translations[currentLang].lbl_audit_events) || 'Kayıt / Event'}`;
+        }
+
+        if (logs.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Kriterlere uygun denetim kaydı bulunamadı.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = logs.map(l => {
+            const dateStr = l.created_at ? new Date(l.created_at).toLocaleString() : '-';
+            const statusUpper = String(l.status || 'SUCCESS').toUpperCase();
+            const statusBadge = statusUpper === 'SUCCESS'
+                ? `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 11px;">✓ SUCCESS</span>`
+                : `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 11px;">✕ ${escapeHtml(statusUpper)}</span>`;
+
+            let actionBadgeStyle = 'background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.25);';
+            if (l.action && l.action.startsWith('AUTH_')) {
+                actionBadgeStyle = 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);';
+            } else if (l.action && l.action.includes('DELETE')) {
+                actionBadgeStyle = 'background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);';
+            } else if (l.action && l.action.includes('CREATE')) {
+                actionBadgeStyle = 'background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);';
+            }
+
+            const actionBadge = `<span class="badge mono-code" style="${actionBadgeStyle} font-size: 11px; font-weight: 600;">${escapeHtml(l.action)}</span>`;
+
+            let detailsText = '';
+            if (typeof l.details === 'object' && l.details !== null) {
+                detailsText = JSON.stringify(l.details);
+            } else {
+                detailsText = String(l.details || '');
+            }
+
+            return `
+                <tr>
+                    <td style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">${escapeHtml(dateStr)}</td>
+                    <td>
+                        <span style="font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                            <span>👤</span> ${escapeHtml(l.username || 'system')}
+                        </span>
+                    </td>
+                    <td><code class="mono-code" style="font-size: 12px; color: #38bdf8;">${escapeHtml(l.source_ip || '-')}</code></td>
+                    <td>${actionBadge}</td>
+                    <td><span class="mono-code" style="font-size: 12px;">${escapeHtml(l.resource || '-')}</span></td>
+                    <td>${statusBadge}</td>
+                    <td><span class="tenant-chip" style="font-size: 11px;">🏢 ${escapeHtml(l.tenant_slug || 'default')}</span></td>
+                    <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text-muted);" title="${escapeHtml(detailsText)}">
+                        ${escapeHtml(detailsText || '-')}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--danger); padding: 20px;">Denetim izleri alınamadı: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
 

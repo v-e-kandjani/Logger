@@ -249,6 +249,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.5.24** (Çok Kiracılı İzolasyon, Kurumsal Denetim İzi, Self-Servis Şifre Politikası ve Derin Güvenlik Duvarı Log Zekası):
+  - **Kapsamlı Yönetim ve Güvenlik Denetim İzi (Audit Trail)**: Kimlik doğrulama, kullanıcı yönetimi ve kiracı işlemlerini IP adresi ve kiracı kapsamıyla kaydeden PostgreSQL denetim tablosu (`audit_logs`) ve REST API (`/api/v1/audit/logs`) geliştirildi; arayüze anlık olay ve metin filtrelemeli özel denetim paneli (`#setting-section-audit`) eklendi.
+  - **Kurumsal Şifre Politikası ve Kullanıcı Şifre Değiştirme**: Yeni kullanıcı oluşturma, yönetici şifre sıfırlama ve oturum açmış kullanıcılar için self-servis şifre güncelleme (`/api/v1/auth/change-password`) adımlarında güçlü şifre politikası (en az 8 karakter, büyük/küçük harf, rakam ve sembol) zorunlu kılındı; interaktif güç gösterge rozetleri eklendi.
+  - **Derin Güvenlik Duvarı & Çok Üreticili Ağ Logu Zekası**: Fortinet FortiGate UTM, trafik, VPN ve sistem logları otomatik tehdit önceliği yükseltmesiyle normalleştirildi; Cisco IOS/NX-OS, HPE Aruba ve Juniper Junos log ayrıştırma yetenekleri ve adli arama/canlı akışta üretici/uygulama rozetleri eklendi.
+  - **Kiracı Depolama Dağılımı ve İzolasyonlu Kullanıcı Yönetimi**: MSSP kota takibi için ClickHouse kiracı bazlı log sayısı dağılımı (`GetTenantStorageBreakdown`) ve PostgreSQL kullanıcı yönetiminde organizasyon izolasyonu sağlandı.
+
 - **v1.5.23** (Tanılama Desteği Veritabanı Son 8.000 Log ve SIEM Güvenlik Olayları Son 1.000 Alarm Dışa Aktarımı):
   - **ClickHouse Son 8.000 Syslog Kaydı Çıkarımı**: Tanılama paketi veritabanı log derinliği 1.000'den 8.000 kayda yükseltildi (`database_last_8000_logs.json`), kiracı filtreleme desteği ile adli bilişim incelemeleri için derinlemesine bağlam sağlandı.
   - **SIEM Güvenlik Olayları & Son 1.000 Alarm Dışa Aktarımı**: SIEM olay dökümü 1.000 alarma kadar genişletildi (`siem_security_activity_last_1000_alerts.json`), veritabanı sayfalama sınırı 200'den 1.000'e çıkarıldı.

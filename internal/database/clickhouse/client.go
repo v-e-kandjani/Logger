@@ -337,3 +337,30 @@ func (c *Client) PruneOlderThanDays(ctx context.Context, days int) error {
 	query := fmt.Sprintf("ALTER TABLE %s.syslog_events DELETE WHERE event_timestamp < now() - INTERVAL %d DAY", c.Database(), days)
 	return c.conn.Exec(ctx, query)
 }
+
+// GetTenantStorageBreakdown returns total log count per tenant from ClickHouse
+func (c *Client) GetTenantStorageBreakdown(ctx context.Context) (map[string]uint64, error) {
+	query := fmt.Sprintf(`
+		SELECT tenant, count(*)
+		FROM %s.syslog_events
+		GROUP BY tenant`, c.Database())
+	rows, err := c.conn.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[string]uint64)
+	for rows.Next() {
+		var t string
+		var cnt uint64
+		if err := rows.Scan(&t, &cnt); err == nil {
+			if t == "" {
+				t = "default"
+			}
+			res[t] = cnt
+		}
+	}
+	return res, nil
+}
+

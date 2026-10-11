@@ -582,16 +582,19 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 
 		usage, _ := h.pgDB.GetTenantUsage(ctx)
 		epsByTenant := h.currentEPSByTenant(ctx)
+		logCounts, _ := h.chClient.GetTenantStorageBreakdown(ctx)
 
 		type tenantView struct {
 			*models.Tenant
 			Unlimited   bool    `json:"unlimited"`
 			NodeCount   int     `json:"node_count"`
 			DeviceCount int     `json:"device_count"`
+			LogCount    uint64  `json:"log_count"`
 			CurrentEPS  float64 `json:"current_eps"`
 		}
 		views := make([]tenantView, 0, len(tenants))
 		var totalNodes, totalDevices int
+		var totalLogs uint64
 		var totalEPS float64
 		for _, t := range tenants {
 			// Tenant users only see their own organization
@@ -603,9 +606,13 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 				v.NodeCount = u.NodeCount
 				v.DeviceCount = u.DeviceCount
 			}
+			if logCounts != nil {
+				v.LogCount = logCounts[t.Slug]
+			}
 			v.CurrentEPS = epsByTenant[t.Slug]
 			totalNodes += v.NodeCount
 			totalDevices += v.DeviceCount
+			totalLogs += v.LogCount
 			totalEPS += v.CurrentEPS
 			views = append(views, v)
 		}
@@ -622,6 +629,7 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 			"totals": map[string]interface{}{
 				"nodes":   totalNodes,
 				"devices": totalDevices,
+				"logs":    totalLogs,
 				"eps":     totalEPS,
 			},
 		})
@@ -667,10 +675,12 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := h.pgDB.CreateTenant(ctx, t, strings.TrimSpace(req.AdminInitialPass)); err != nil {
+			h.recordAudit(r, "TENANT_CREATE", "tenant/"+slug, "FAILED", map[string]interface{}{"error": err.Error()})
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "creating tenant: " + err.Error()})
 			return
 		}
 
+		h.recordAudit(r, "TENANT_CREATE", "tenant/"+slug, "SUCCESS", map[string]interface{}{"name": name, "max_nodes": req.MaxNodes, "max_eps": req.MaxEPS})
 		writeJSON(w, http.StatusCreated, t)
 
 	case http.MethodDelete:
@@ -685,10 +695,12 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := h.pgDB.DeleteTenant(ctx, slug); err != nil {
+			h.recordAudit(r, "TENANT_DELETE", "tenant/"+slug, "FAILED", map[string]interface{}{"error": err.Error()})
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
 
+		h.recordAudit(r, "TENANT_DELETE", "tenant/"+slug, "SUCCESS", map[string]interface{}{"slug": slug})
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 
 	default:
