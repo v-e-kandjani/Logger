@@ -309,6 +309,22 @@ func (c *Client) QueryEvents(ctx context.Context, query string, args ...any) (dr
 	return c.conn.Query(ctx, query, args...)
 }
 
+// StorageRunway encapsulates retention calculations based on 1st week baseline
+type StorageRunway struct {
+	HasOneWeekBaseline bool       `json:"has_one_week_baseline"`
+	FirstLogReceivedAt *time.Time `json:"first_log_received_at,omitempty"`
+	DaysSinceFirstLog  float64    `json:"days_since_first_log"`
+	Week1TotalLogs     uint64     `json:"week1_total_logs"`
+	Week1AvgEPS        float64    `json:"week1_avg_eps"`
+	Week1DailyLogs     float64    `json:"week1_daily_logs"`
+	Week1DailyBytes    uint64     `json:"week1_daily_bytes"`
+	StorageDays        int        `json:"storage_days"`
+	RunwayLabel        string     `json:"runway_label"`
+	RunwaySubLabel     string     `json:"runway_sub_label"`
+	RunwayLabelTR      string     `json:"runway_label_tr"`
+	RunwaySubLabelTR   string     `json:"runway_sub_label_tr"`
+}
+
 // StorageStats encapsulates physical disk and table volume telemetry
 type StorageStats struct {
 	TotalBytesOnDisk      uint64  `json:"total_bytes_on_disk"`
@@ -319,6 +335,141 @@ type StorageStats struct {
 	TotalDiskBytes        uint64  `json:"total_disk_bytes"`
 	DiskUsagePercent      float64 `json:"disk_usage_percent"`
 	ActivePartitions      uint64  `json:"active_partitions"`
+}
+
+// CalculateStorageRunway recalculates how many days of storage remain based on the 1st week of logs received.
+// Before 1 week (7 days) has elapsed, it returns "Estimated 365 Days (based on Archival & Retention Policies)".
+func (c *Client) CalculateStorageRunway(ctx context.Context, tenant string, stats *StorageStats, fifoThresholdPct float64) (*StorageRunway, error) {
+	runway := &StorageRunway{
+		HasOneWeekBaseline: false,
+		StorageDays:        365,
+		RunwayLabel:        "Estimated 365 Days",
+		RunwaySubLabel:     "(based on Archival & Retention Policies)",
+		RunwayLabelTR:      "Tahmini 365 Gün",
+		RunwaySubLabelTR:   "(Arşivleme ve Saklama Politikalarına Göre)",
+	}
+
+	if stats == nil {
+		return runway, nil
+	}
+
+	// 1. Find earliest log timestamp from events_1m or syslog_events
+	var earliest time.Time
+	var latest time.Time
+
+	query1m := fmt.Sprintf("SELECT min(minute), max(minute) FROM %s.events_1m", c.Database())
+	if tenant != "" && tenant != "all" && tenant != "*" {
+		query1m = fmt.Sprintf("SELECT min(minute), max(minute) FROM %s.events_1m WHERE tenant = '%s'", c.Database(), tenant)
+	}
+	row := c.conn.QueryRow(ctx, query1m)
+	_ = row.Scan(&earliest, &latest)
+
+	if earliest.IsZero() {
+		queryRaw := fmt.Sprintf("SELECT min(received_at), max(received_at) FROM %s.syslog_events", c.Database())
+		if tenant != "" && tenant != "all" && tenant != "*" {
+			queryRaw = fmt.Sprintf("SELECT min(received_at), max(received_at) FROM %s.syslog_events WHERE tenant = '%s'", c.Database(), tenant)
+		}
+		rowRaw := c.conn.QueryRow(ctx, queryRaw)
+		_ = rowRaw.Scan(&earliest, &latest)
+	}
+
+	if earliest.IsZero() {
+		return runway, nil
+	}
+
+	runway.FirstLogReceivedAt = &earliest
+	daysSince := time.Since(earliest).Hours() / 24.0
+	runway.DaysSinceFirstLog = daysSince
+
+	// If less than 7 days (1st week) of logs have elapsed, policy default is 365 days
+	if daysSince < 7.0 {
+		return runway, nil
+	}
+
+	// We have 1st week baseline! Query event counts and bytes from the 1st week (earliest to earliest + 7 days)
+	week1End := earliest.Add(7 * 24 * time.Hour)
+	var week1Events uint64
+	var week1Bytes uint64
+
+	wQuery := fmt.Sprintf(`
+		SELECT coalesce(sum(event_count), 0), coalesce(sum(total_bytes), 0)
+		FROM %s.events_1m
+		WHERE minute >= ? AND minute < ?
+	`, c.Database())
+	var wArgs []any
+	if tenant != "" && tenant != "all" && tenant != "*" {
+		wQuery = fmt.Sprintf(`
+			SELECT coalesce(sum(event_count), 0), coalesce(sum(total_bytes), 0)
+			FROM %s.events_1m
+			WHERE minute >= ? AND minute < ? AND tenant = ?
+		`, c.Database())
+		wArgs = []any{earliest, week1End, tenant}
+	} else {
+		wArgs = []any{earliest, week1End}
+	}
+
+	wRow := c.conn.QueryRow(ctx, wQuery, wArgs...)
+	_ = wRow.Scan(&week1Events, &week1Bytes)
+
+	if week1Events == 0 {
+		rawWQuery := fmt.Sprintf(`
+			SELECT count(), coalesce(sum(length(raw_message)), 0)
+			FROM %s.syslog_events
+			WHERE received_at >= ? AND received_at < ?
+		`, c.Database())
+		if tenant != "" && tenant != "all" && tenant != "*" {
+			rawWQuery += " AND tenant = ?"
+			wRow = c.conn.QueryRow(ctx, rawWQuery, earliest, week1End, tenant)
+		} else {
+			wRow = c.conn.QueryRow(ctx, rawWQuery, earliest, week1End)
+		}
+		_ = wRow.Scan(&week1Events, &week1Bytes)
+	}
+
+	if week1Events == 0 {
+		return runway, nil
+	}
+
+	runway.HasOneWeekBaseline = true
+	runway.Week1TotalLogs = week1Events
+	runway.Week1AvgEPS = float64(week1Events) / (7.0 * 86400.0)
+	runway.Week1DailyLogs = float64(week1Events) / 7.0
+	runway.Week1DailyBytes = uint64(float64(week1Bytes) / 7.0)
+
+	compression := stats.CompressionRatio
+	if compression <= 0 {
+		compression = 1.0
+	}
+	dailyDiskBytes := float64(runway.Week1DailyBytes) / compression
+	if dailyDiskBytes <= 0 {
+		dailyDiskBytes = runway.Week1DailyLogs * 120.0
+	}
+
+	if fifoThresholdPct <= 0 || fifoThresholdPct > 99 {
+		fifoThresholdPct = 85.0
+	}
+	totalUsableBytes := float64(stats.TotalDiskBytes) * (fifoThresholdPct / 100.0)
+	currentlyUsed := float64(stats.TotalDiskBytes - stats.FreeDiskBytes)
+	remainingHeadroom := totalUsableBytes - currentlyUsed
+	if remainingHeadroom < float64(stats.FreeDiskBytes)*0.5 && stats.FreeDiskBytes > 0 {
+		remainingHeadroom = float64(stats.FreeDiskBytes) * 0.85
+	}
+	if remainingHeadroom <= 0 {
+		remainingHeadroom = float64(stats.FreeDiskBytes)
+	}
+
+	calcDays := int(remainingHeadroom / dailyDiskBytes)
+	if calcDays < 1 {
+		calcDays = 1
+	}
+
+	runway.StorageDays = calcDays
+	runway.RunwayLabel = fmt.Sprintf("%d Days", calcDays)
+	runway.RunwaySubLabel = fmt.Sprintf("(recalculated: 1st week avg %.1f EPS, %.0f logs/day)", runway.Week1AvgEPS, runway.Week1DailyLogs)
+	runway.RunwayLabelTR = fmt.Sprintf("%d Gün", calcDays)
+	runway.RunwaySubLabelTR = fmt.Sprintf("(1. hafta baz alındı: ort. %.1f EPS, %.0f log/gün)", runway.Week1AvgEPS, runway.Week1DailyLogs)
+
+	return runway, nil
 }
 
 // GetStorageStats retrieves storage consumption and host disk allocation

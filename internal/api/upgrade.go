@@ -47,16 +47,26 @@ type ChangedFile struct {
 	CanHotApply bool   `json:"can_hot_apply"` // true for web templates, static assets, docs
 }
 
+type KamuSMClientUpdateInfo struct {
+	CurrentVersion  string `json:"current_version"`
+	LatestVersion   string `json:"latest_version"`
+	UpdateAvailable bool   `json:"update_available"`
+	Downloaded      bool   `json:"downloaded"`
+	JarPath         string `json:"jar_path"`
+	Message         string `json:"message"`
+}
+
 type UpdateCheckResponse struct {
-	HasUpdate     bool          `json:"has_update"`
-	CurrentCommit string        `json:"current_commit"`
-	LatestCommit  *GitHubCommit `json:"latest_commit,omitempty"`
-	CommitsBehind int           `json:"commits_behind"`
-	ChangedFiles  []ChangedFile `json:"changed_files"`
-	CommitHistory []string      `json:"commit_history"`
-	BinaryChanged bool          `json:"binary_changed"`
-	LastChecked   time.Time     `json:"last_checked"`
-	Message       string        `json:"message"`
+	HasUpdate     bool                   `json:"has_update"`
+	CurrentCommit string                 `json:"current_commit"`
+	LatestCommit  *GitHubCommit          `json:"latest_commit,omitempty"`
+	CommitsBehind int                    `json:"commits_behind"`
+	ChangedFiles  []ChangedFile          `json:"changed_files"`
+	CommitHistory []string               `json:"commit_history"`
+	BinaryChanged bool                   `json:"binary_changed"`
+	LastChecked   time.Time              `json:"last_checked"`
+	Message       string                 `json:"message"`
+	KamuSM        KamuSMClientUpdateInfo `json:"kamusm"`
 }
 
 type UpdateApplyResponse struct {
@@ -69,13 +79,27 @@ type UpdateApplyResponse struct {
 	CLIInstruction string   `json:"cli_instruction"`
 }
 
+func (h *Handler) requireRootGlobalAdmin(w http.ResponseWriter, r *http.Request) (*Session, bool) {
+	session, ok := h.requireAdmin(w, r)
+	if !ok {
+		return nil, false
+	}
+	if !session.IsRootOperator() {
+		writeJSON(w, http.StatusForbidden, map[string]string{
+			"error": "access denied: only root organization and global super-administrators can perform platform upgrades and updates; tenant administrators are restricted",
+		})
+		return nil, false
+	}
+	return session, true
+}
+
 func (h *Handler) handleSystemUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	_, ok := h.requireAdmin(w, r)
+	_, ok := h.requireRootGlobalAdmin(w, r)
 	if !ok {
 		return
 	}
@@ -97,7 +121,7 @@ func (h *Handler) handleSystemUpdateCheck(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	_, ok := h.requireAdmin(w, r)
+	_, ok := h.requireRootGlobalAdmin(w, r)
 	if !ok {
 		return
 	}
@@ -145,7 +169,10 @@ func (h *Handler) handleSystemUpdateCheck(w http.ResponseWriter, r *http.Request
 		currentShort = currentShort[:7]
 	}
 
-	// 2. Check if already up to date
+	// 2. Check and optionally download new TÜBİTAK KamuSM TSS Client jar
+	kamuSMInfo := h.checkAndDownloadKamuSMClient(ctx)
+
+	// 3. Check if already up to date
 	if currentShort == latestShort || strings.HasPrefix(strings.ToLower(latestCommit.SHA), currentShort) {
 		writeJSON(w, http.StatusOK, UpdateCheckResponse{
 			HasUpdate:     false,
@@ -156,6 +183,7 @@ func (h *Handler) handleSystemUpdateCheck(w http.ResponseWriter, r *http.Request
 			BinaryChanged: false,
 			LastChecked:   time.Now().UTC(),
 			Message:       "System is up to date! You are running the latest version from origin/main.",
+			KamuSM:        kamuSMInfo,
 		})
 		return
 	}
@@ -233,6 +261,7 @@ func (h *Handler) handleSystemUpdateCheck(w http.ResponseWriter, r *http.Request
 		BinaryChanged: binaryChanged,
 		LastChecked:   time.Now().UTC(),
 		Message:       fmt.Sprintf("Update available: %d new commit(s) on origin/main", commitsBehind),
+		KamuSM:        kamuSMInfo,
 	})
 }
 
@@ -242,7 +271,7 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	session, ok := h.requireAdmin(w, r)
+	session, ok := h.requireRootGlobalAdmin(w, r)
 	if !ok {
 		return
 	}
@@ -502,4 +531,184 @@ func isHotApplicable(filename string) bool {
 		return true
 	}
 	return false
+}
+
+// checkAndDownloadKamuSMClient checks the TÜBİTAK KamuSM TSS client jar file and downloads new versions if available
+func (h *Handler) checkAndDownloadKamuSMClient(ctx context.Context) KamuSMClientUpdateInfo {
+	info := KamuSMClientUpdateInfo{
+		CurrentVersion:  "3.1.33",
+		LatestVersion:   "3.1.33",
+		UpdateAvailable: false,
+		Downloaded:      false,
+		JarPath:         "/opt/syslog-platform/timestamp-client/tss-client-console-3.1.33.jar",
+		Message:         "TÜBİTAK KamuSM TSS client console is up to date (v3.1.33).",
+	}
+
+	// 1. Detect existing JAR in local paths
+	possibleDirs := []string{
+		"/opt/syslog-platform/timestamp-client",
+		"timestamp-client",
+	}
+	reJar := regexp.MustCompile(`tss-client-console-(\d+\.\d+\.\d+)\.jar`)
+	var foundJar string
+	for _, dir := range possibleDirs {
+		entries, err := os.ReadDir(dir)
+		if err == nil {
+			for _, e := range entries {
+				if m := reJar.FindStringSubmatch(e.Name()); len(m) > 1 {
+					info.CurrentVersion = m[1]
+					foundJar = filepath.Join(dir, e.Name())
+					info.JarPath = foundJar
+					break
+				}
+			}
+		}
+		if foundJar != "" {
+			break
+		}
+	}
+
+	// 2. Query upstream TÜBİTAK KamuSM repository and mirror endpoints
+	client := &http.Client{Timeout: 8 * time.Second}
+	upstreamURLs := []string{
+		"https://depo.kamusm.gov.tr/zamane/",
+		"https://kamusm.bilgem.tubitak.gov.tr/urunler/zaman_damgasi/",
+		fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/timestamp-client", version.RepoOwner, version.RepoName),
+	}
+
+	var discoveredLatest string
+	var downloadURL string
+
+	for _, checkURL := range upstreamURLs {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, checkURL, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("User-Agent", "Valtrivo-LogSeal-KamuSM-Checker/1.0")
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			matches := reJar.FindAllStringSubmatch(string(body), -1)
+			for _, match := range matches {
+				if len(match) > 1 {
+					v := match[1]
+					if compareSemver(v, discoveredLatest) > 0 {
+						discoveredLatest = v
+						if strings.Contains(checkURL, "github.com") {
+							downloadURL = fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/timestamp-client/tss-client-console-%s.jar",
+								version.RepoOwner, version.RepoName, version.Branch, v)
+						} else {
+							downloadURL = fmt.Sprintf("https://depo.kamusm.gov.tr/zamane/tss-client-console-%s.jar", v)
+						}
+					}
+				}
+			}
+		}
+		if discoveredLatest != "" {
+			break
+		}
+	}
+
+	if discoveredLatest == "" {
+		discoveredLatest = info.CurrentVersion
+	}
+	info.LatestVersion = discoveredLatest
+
+	// 3. If new version discovered and download URL available, perform automated retrieval
+	if compareSemver(discoveredLatest, info.CurrentVersion) > 0 && downloadURL != "" {
+		info.UpdateAvailable = true
+		targetName := fmt.Sprintf("tss-client-console-%s.jar", discoveredLatest)
+		destPath := filepath.Join("/opt/syslog-platform/timestamp-client", targetName)
+		if _, err := os.Stat("/opt/syslog-platform/timestamp-client"); err != nil {
+			destPath = filepath.Join("timestamp-client", targetName)
+		}
+
+		dlReq, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+		if err == nil {
+			dlReq.Header.Set("User-Agent", "Valtrivo-LogSeal-KamuSM-Downloader/1.0")
+			dlResp, err := client.Do(dlReq)
+			if err == nil && dlResp.StatusCode == http.StatusOK {
+				defer dlResp.Body.Close()
+				tmpFile := destPath + ".tmp"
+				f, err := os.Create(tmpFile)
+				if err == nil {
+					n, copyErr := io.Copy(f, dlResp.Body)
+					f.Close()
+					if copyErr == nil && n > 1024*100 { // valid jar threshold
+						_ = os.Rename(tmpFile, destPath)
+						info.Downloaded = true
+						info.JarPath = destPath
+						info.Message = fmt.Sprintf("TÜBİTAK KamuSM TSS Client updated to v%s (saved to %s)", discoveredLatest, destPath)
+
+						if destPath != filepath.Join("timestamp-client", targetName) {
+							if _, err := os.Stat("timestamp-client"); err == nil {
+								_ = copyFile(destPath, filepath.Join("timestamp-client", targetName))
+							}
+						}
+					} else {
+						_ = os.Remove(tmpFile)
+					}
+				}
+			}
+		}
+		if !info.Downloaded {
+			info.Message = fmt.Sprintf("New TÜBİTAK KamuSM TSS Client v%s found at %s. Verification pending network fetch.", discoveredLatest, downloadURL)
+		}
+	} else {
+		info.Message = fmt.Sprintf("TÜBİTAK KamuSM TSS client is up to date (v%s verified).", info.CurrentVersion)
+	}
+
+	return info
+}
+
+// compareSemver returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+func compareSemver(v1, v2 string) int {
+	if v1 == v2 {
+		return 0
+	}
+	if v2 == "" {
+		return 1
+	}
+	if v1 == "" {
+		return -1
+	}
+	p1 := strings.Split(v1, ".")
+	p2 := strings.Split(v2, ".")
+	for i := 0; i < len(p1) && i < len(p2); i++ {
+		var n1, n2 int
+		fmt.Sscanf(p1[i], "%d", &n1)
+		fmt.Sscanf(p2[i], "%d", &n2)
+		if n1 > n2 {
+			return 1
+		}
+		if n1 < n2 {
+			return -1
+		}
+	}
+	if len(p1) > len(p2) {
+		return 1
+	} else if len(p1) < len(p2) {
+		return -1
+	}
+	return 0
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
 }

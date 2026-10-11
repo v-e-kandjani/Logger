@@ -1405,6 +1405,9 @@ func (h *Handler) handleStorageStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	tenant := h.tenantScope(r)
+	runway, _ := h.chClient.CalculateStorageRunway(ctx, tenant, stats, fifoThreshold)
+
 	resp := map[string]any{
 		"total_bytes_on_disk":     stats.TotalBytesOnDisk,
 		"uncompressed_data_bytes": stats.UncompressedDataBytes,
@@ -1416,6 +1419,7 @@ func (h *Handler) handleStorageStats(w http.ResponseWriter, r *http.Request) {
 		"active_partitions":       stats.ActivePartitions,
 		"fifo_threshold_percent":  fifoThreshold,
 		"auto_fifo_active":        true,
+		"runway":                  runway,
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

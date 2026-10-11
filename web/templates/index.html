@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.1</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.2</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -239,6 +239,7 @@
                         <div class="stat-header" data-i18n="stat_db_storage">Database Storage</div>
                         <div class="stat-value text-blue" id="stat-db-size">0.0 MB</div>
                         <div class="stat-sub" id="stat-db-sub">ClickHouse Store</div>
+                        <div class="stat-sub" id="stat-storage-runway" style="color: var(--color-success); font-weight: 600; font-size: 11px; margin-top: 4px;">Estimated 365 Days (based on Archival &amp; Retention Policies)</div>
                     </div>
                 </div>
 
@@ -449,6 +450,11 @@
                                 <div class="storage-metric-box">
                                     <div class="storage-metric-label" data-i18n="storage_total_rows">Toplam Olay Kaydı</div>
                                     <div class="storage-metric-val text-cyan" id="metric-db-rows">0</div>
+                                </div>
+                                <div class="storage-metric-box" style="grid-column: span 2;">
+                                    <div class="storage-metric-label" data-i18n="storage_retention_runway">Depolama &amp; Saklama Süresi (Retention Runway)</div>
+                                    <div class="storage-metric-val text-green" id="metric-storage-runway" style="font-size: 1.05rem;">Estimated 365 Days</div>
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="metric-storage-runway-sub">(based on Archival &amp; Retention Policies)</div>
                                 </div>
                             </div>
 
@@ -2150,16 +2156,25 @@
                     </div>
                 </div>
 
+                <!-- Tenant Restricted Notice Banner -->
+                <div id="upd-tenant-restricted-alert" class="panel" style="display: none; padding: 24px; text-align: center; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                    <div style="font-size: 2.5rem; margin-bottom: 8px;">🔒</div>
+                    <h4 style="color: var(--color-warning); margin: 0 0 6px 0;" data-i18n="updates_restricted_title">Erişim Kısıtlandı (Access Restricted)</h4>
+                    <p style="color: var(--text-muted); font-size: 13px; max-width: 620px; margin: 0 auto;" data-i18n="updates_restricted_desc">
+                        Platform güncelleme ve yükseltme işlemleri yalnızca Kök Sistem (Root) ve Global Süper Yöneticiler tarafından gerçekleştirilebilir. Kiracılar (Tenants) güncelleme yapamaz.
+                    </p>
+                </div>
+
                 <!-- Version & Git Status Cards -->
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.1</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.2</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">4f3f2e7</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">2d2fd10</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-12</div>
                     </div>
                     <div class="stat-card">
@@ -2175,6 +2190,11 @@
                             <span class="badge badge-outline" id="upd-status-badge">Not Checked</span>
                         </div>
                         <div class="stat-sub" id="upd-last-checked-label">Click 'Check for Updates' to query GitHub</div>
+                    </div>
+                    <div class="stat-card" id="upd-kamusm-card">
+                        <div class="stat-header">TÜBİTAK KamuSM TSS Client</div>
+                        <div class="stat-value" id="upd-kamusm-version" style="font-size: 1.3rem;">v3.1.33</div>
+                        <div class="stat-sub" id="upd-kamusm-status">Timestamp Client Verified</div>
                     </div>
                 </div>
 
@@ -3861,7 +3881,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.7.1"></script>
-    <script src="/static/js/app.js?v=1.7.1"></script>
+    <script src="/static/js/translations.js?v=1.7.2"></script>
+    <script src="/static/js/app.js?v=1.7.2"></script>
 </body>
 </html>

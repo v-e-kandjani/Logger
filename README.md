@@ -263,6 +263,15 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.7.2** (Root Global Update Access Control, 1st-Week Baseline Storage Runway & TÜBİTAK KamuSM Upstream Sync):
+  - **Root Global Administrator Upgrade Restriction**: Restricted system update checks, git synchronization, and 1-click upgrades strictly to Root Super Administrators (`default` organization). Tenant users are barred with HTTP 403 Forbidden on the API layer and presented with an access restricted banner in the UI.
+  - **Empirical 1st-Week Baseline Storage Runway Recalculation**:
+    - Evaluates the earliest log timestamp across ClickHouse tables. If less than 7 days (1st week) have elapsed, reliably reports `"Estimated 365 Days (based on Archival & Retention Policies)"`.
+    - Once >= 1 week of continuous telemetry is established, dynamically calculates the exact remaining days of storage by projecting the 1st week's average EPS, daily log count, compression ratio, and available disk headroom up to the FIFO threshold.
+  - **Automated TÜBİTAK KamuSM TSS Client Version Check & Retrieval**:
+    - Integrated upstream version checks against official TÜBİTAK KamuSM repository endpoints during the platform update workflow.
+    - Automatically discovers newer `tss-client-console-*.jar` versions, safely downloads and verifies binary archives to `timestamp-client/`, and displays verified timestamp client status in the System Upgrade dashboard.
+
 - **v1.7.1** (Forensic PDF A4 Landscape Layout & Column Alignment Optimization):
   - **A4 Landscape Re-Engineering (`pdf_exporter.go`)**: Switched PDF page orientation to A4 Landscape (297mm × 210mm) providing an expansive 269mm printable width for wide multi-column tables.
   - **Optimally Seated Forensic Tables**:

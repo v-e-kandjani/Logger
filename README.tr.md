@@ -252,6 +252,15 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.7.2** (Kök Global Güncelleme Erişim Kısıtlaması, 1. Hafta Bazlı Saklama Süresi ve TÜBİTAK KamuSM Eşitlemesi):
+  - **Kök Global Süper Yönetici Güncelleme Kısıtlaması**: Sistem güncelleme denetimi, GitHub eşitlemesi ve 1-tıkla yükseltme yetkisi kesin olarak Kök Süper Yöneticilere (`default` kurumu) tahsis edildi. Kiracı kullanıcıların API istekleri HTTP 403 Forbidden ile engellenir ve arayüzde yetkisiz erişim uyarısı gösterilir.
+  - **1. Hafta Verisiyle Saklama Süresi Yeniden Hesaplama**:
+    - ClickHouse tablolarındaki en eski log zaman damgası incelenir. İlk logun üzerinden 7 gün (1. hafta) geçmemişse güvenle `"Tahmini 365 Gün (Arşivleme ve Saklama Politikalarına Göre)"` ibaresi sunulur.
+    - 7 gün veya daha fazla veri biriktiğinde, ilk haftanın ortalama EPS'i, günlük log adedi, sıkıştırma oranı ve FIFO eşiğine kadar olan kullanılabilir disk alanı baz alınarak kalan saklama süresi gün cinsinden dinamik olarak yeniden hesaplanır.
+  - **Otomatik TÜBİTAK KamuSM TSS İstemcisi Sürüm Denetimi ve İndirme**:
+    - Platform güncelleme akışında resmi TÜBİTAK KamuSM Zamane istemcisi (`tss-client-console-*.jar`) için kaynak sürüm denetimi entegre edildi.
+    - TÜBİTAK deposunda daha yeni bir konsol sürümü tespit edildiğinde otomatik olarak indirilip `timestamp-client/` dizinine yerleştirilir ve Sistem Güncelleme panelinde doğrulanmış istemci durumu gösterilir.
+
 - **v1.7.1** (Adli Bilişim PDF A4 Yatay (Landscape) Mizanpaj ve Kolon Hizalama Optimizasyonu):
   - **A4 Yatay (Landscape) Tasarım (`pdf_exporter.go`)**: PDF çıktı yönü A4 Yatay (297mm × 210mm) olarak yeniden yapılandırılarak çok kolonlu geniş adli bilişim tabloları için 269mm'lik ferah bir yazdırılabilir alan sağlandı.
   - **Kusursuz Hizalanan Adli Bilişim Tabloları**:

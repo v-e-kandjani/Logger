@@ -86,13 +86,30 @@ async function initAuthSession() {
         if (usersTab) {
             usersTab.style.display = data.role === 'Super Administrator' ? '' : 'none';
         }
+        // Only Super Administrator of the root tenant can perform platform upgrades
+        const isRootSuperAdmin = (data.is_root !== false && (data.tenant_slug === 'default' || !data.tenant_slug)) && data.role === 'Super Administrator';
         const updatesTab = document.getElementById('nav-tab-updates');
         if (updatesTab) {
-            updatesTab.style.display = data.role === 'Super Administrator' ? '' : 'none';
+            updatesTab.style.display = isRootSuperAdmin ? '' : 'none';
+        }
+
+        // Toggle tenant upgrade restriction notice
+        const updRestrictedAlert = document.getElementById('upd-tenant-restricted-alert');
+        const updActions = document.querySelector('#pane-updates .section-actions');
+        const updStats = document.querySelector('#pane-updates .stats-grid');
+        const updDetails = document.getElementById('upd-details-panel');
+        if (!isRootSuperAdmin) {
+            if (updRestrictedAlert) updRestrictedAlert.style.display = 'block';
+            if (updActions) updActions.style.display = 'none';
+            if (updStats) updStats.style.display = 'none';
+            if (updDetails) updDetails.style.display = 'none';
+        } else {
+            if (updRestrictedAlert) updRestrictedAlert.style.display = 'none';
+            if (updActions) updActions.style.display = 'flex';
+            if (updStats) updStats.style.display = 'grid';
         }
 
         // Only Super Administrator of the root tenant can simulate threats
-        const isRootSuperAdmin = (data.is_root !== false && (data.tenant_slug === 'default' || !data.tenant_slug)) && data.role === 'Super Administrator';
         const simBtn = document.getElementById('btn-open-siem-simulate');
         if (simBtn) {
             simBtn.style.display = isRootSuperAdmin ? '' : 'none';
@@ -3037,6 +3054,28 @@ function updateStorageUI(storage) {
         const fifoDisp = document.getElementById('fifo-threshold-display');
         if (fifoDisp) fifoDisp.textContent = storage.fifo_threshold_percent;
     }
+
+    // Storage Runway & 1st week recalculation
+    if (storage.runway) {
+        const lang = (window.i18n && window.i18n.currentLang) || localStorage.getItem('logseal_lang') || 'tr';
+        const runwayLabel = lang === 'tr' ? (storage.runway.runway_label_tr || storage.runway.runway_label) : storage.runway.runway_label;
+        const runwaySub = lang === 'tr' ? (storage.runway.runway_sub_label_tr || storage.runway.runway_sub_label) : storage.runway.runway_sub_label;
+
+        const statRunway = document.getElementById('stat-storage-runway');
+        if (statRunway) {
+            statRunway.textContent = `${runwayLabel} ${runwaySub}`;
+        }
+
+        const metricRunway = document.getElementById('metric-storage-runway');
+        if (metricRunway) {
+            metricRunway.textContent = runwayLabel;
+        }
+
+        const metricRunwaySub = document.getElementById('metric-storage-runway-sub');
+        if (metricRunwaySub) {
+            metricRunwaySub.textContent = runwaySub;
+        }
+    }
 }
 
 function initStorageManagement() {
@@ -3526,6 +3565,27 @@ function initUpdatesManagement() {
                     if (detailsPanel) detailsPanel.style.display = 'none';
 
                     showToast('✓ Platform is running the latest version from origin/main.', 'success');
+                }
+
+                // Update TÜBİTAK KamuSM TSS Client status card
+                if (data.kamusm) {
+                    const kVersionEl = document.getElementById('upd-kamusm-version');
+                    const kStatusEl = document.getElementById('upd-kamusm-status');
+                    if (kVersionEl) {
+                        kVersionEl.textContent = `v${data.kamusm.latest_version || data.kamusm.current_version}`;
+                    }
+                    if (kStatusEl) {
+                        if (data.kamusm.downloaded) {
+                            kStatusEl.textContent = '✓ Updated & Downloaded from TÜBİTAK';
+                            kStatusEl.style.color = '#10b981';
+                        } else if (data.kamusm.update_available) {
+                            kStatusEl.textContent = '⚡ New Version Available at TÜBİTAK';
+                            kStatusEl.style.color = '#f59e0b';
+                        } else {
+                            kStatusEl.textContent = '✓ Verified Up to Date';
+                            kStatusEl.style.color = '#10b981';
+                        }
+                    }
                 }
             } catch (err) {
                 if (badge) {
