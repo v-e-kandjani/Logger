@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.5.23** (Diagnostic Support Database Last 8,000 Logs & SIEM Security Activity Last 1,000 Alerts Export):
+  - **ClickHouse Last 8,000 Syslog Events Extraction**: Increased database diagnostic export depth from 1,000 to 8,000 events (`database_last_8000_logs.json`) with tenant scoping support, providing deeper forensic context for support investigations.
+  - **SIEM Security Activity & Last 1,000 Alerts Export**: Expanded SIEM security incident extraction to up to 1,000 alerts (`siem_security_activity_last_1000_alerts.json`), adjusting database pagination limits from 200 to 1,000.
+  - **UI & Checkbox Synchronization**: Updated Support & Diagnostics scope options and multilingual descriptions across Turkish and English to reflect 8,000 logs and 1,000 alerts.
+
 - **v1.5.22** (Support Diagnostics 7-Day TTL Auto-Purge & Retention Governance):
   - **Automated 1-Week TTL Server Auto-Cleaner**: Introduced background retention worker running every hour (`StartSupportBundleCleaner`) to automatically delete expired `.tar.gz` diagnostic bundles from disk and purge database catalog records once 7 days elapse.
   - **Gate & Download Route Expiration Enforcement**: Enhanced `/support/download` to verify bundle `expires_at` (7-day window); automatically removes file and returns `410 Gone` if expired, preventing stale diagnostic bundles from persisting on disk.

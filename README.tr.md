@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.5.23** (Tanılama Desteği Veritabanı Son 8.000 Log ve SIEM Güvenlik Olayları Son 1.000 Alarm Dışa Aktarımı):
+  - **ClickHouse Son 8.000 Syslog Kaydı Çıkarımı**: Tanılama paketi veritabanı log derinliği 1.000'den 8.000 kayda yükseltildi (`database_last_8000_logs.json`), kiracı filtreleme desteği ile adli bilişim incelemeleri için derinlemesine bağlam sağlandı.
+  - **SIEM Güvenlik Olayları & Son 1.000 Alarm Dışa Aktarımı**: SIEM olay dökümü 1.000 alarma kadar genişletildi (`siem_security_activity_last_1000_alerts.json`), veritabanı sayfalama sınırı 200'den 1.000'e çıkarıldı.
+  - **Arayüz ve Onay Kutusu Senkronizasyonu**: Destek & Tanılama formundaki kapsam seçenekleri ve Türkçe/İngilizce dil çevirileri 8.000 log ve 1.000 alarm bilgilerini yansıtacak şekilde güncellendi.
+
 - **v1.5.22** (Destek Tanılama Dosyaları İçin 7 Günlük TTL ve Otomatik Sunucudan Temizleme):
   - **Otomatik 1 Hafta TTL Sunucu Temizleyici**: Arka planda her saat başı çalışan temizlik işçisi (`StartSupportBundleCleaner`) eklenerek 7 günlük saklama süresi dolan `.tar.gz` paket dosyalarının diskten silinmesi ve veritabanı kayıtlarının temizlenmesi sağlandı.
   - **İndirme Kapısında Süre Denetimi**: `/support/download` rotasına `expires_at` (7 gün) denetimi eklendi; süresi dolan paketler için dosya diskten derhal silinir ve kullanıcıya `410 Gone (Süre Doldu)` uyarısı verilir.

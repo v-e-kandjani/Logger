@@ -242,7 +242,7 @@ func (g *Generator) Generate(ctx context.Context, req BundleRequest, healthStats
 		_ = writeTarFile("recent_application_logs.txt", []byte(logDump))
 	}
 
-	// 8. Database Last 1,000 Logs (ClickHouse)
+	// 8. Database Last 8,000 Logs (ClickHouse)
 	if req.IncludeDBLogs && g.chClient != nil {
 		where := ""
 		var args []any
@@ -256,7 +256,7 @@ func (g *Generator) Generate(ctx context.Context, req BundleRequest, healthStats
 			FROM %s.syslog_events
 			%s
 			ORDER BY event_timestamp DESC
-			LIMIT 1000
+			LIMIT 8000
 		`, g.chClient.Database(), where)
 
 		rows, err := g.chClient.QueryEvents(ctx, q, args...)
@@ -300,21 +300,21 @@ func (g *Generator) Generate(ctx context.Context, req BundleRequest, healthStats
 			}
 			rows.Close()
 			if b, err := json.MarshalIndent(events, "", "  "); err == nil {
-				_ = writeTarFile("database_last_1000_logs.json", b)
+				_ = writeTarFile("database_last_8000_logs.json", b)
 			}
 		}
 	}
 
-	// 9. SIEM Security Activity & Incidents
+	// 9. SIEM Security Activity & Last 1,000 Alerts
 	if req.IncludeSIEMEvents && g.pgDB != nil {
 		filterTenant := req.TenantSlug
 		if filterTenant == "all" || filterTenant == "global" {
 			filterTenant = ""
 		}
-		alerts, _, err := g.pgDB.ListSIEMAlerts(ctx, filterTenant, "", "", "", 200, 0)
+		alerts, _, err := g.pgDB.ListSIEMAlerts(ctx, filterTenant, "", "", "", 1000, 0)
 		if err == nil {
 			if b, err := json.MarshalIndent(alerts, "", "  "); err == nil {
-				_ = writeTarFile("siem_security_activity.json", b)
+				_ = writeTarFile("siem_security_activity_last_1000_alerts.json", b)
 			}
 		}
 	}

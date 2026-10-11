@@ -1233,8 +1233,8 @@ func (db *DB) ListSIEMAlerts(ctx context.Context, tenant, status, severity, sear
 	if limit <= 0 {
 		limit = 50
 	}
-	if limit > 200 {
-		limit = 200
+	if limit > 1000 {
+		limit = 1000
 	}
 
 	whereClauses := []string{"1=1"}
