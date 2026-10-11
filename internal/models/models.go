@@ -216,6 +216,8 @@ type Tenant struct {
 	IngestPolicy  string    `json:"ingest_policy"` // "permissive" (auto-discovery), "strict" (whitelist only)
 	MaxNodes      int       `json:"max_nodes"`
 	MaxEPS        int       `json:"max_eps"`
+	RetentionDays int       `json:"retention_days"` // 0 = unlimited / system default (e.g. 365)
+	MaxStorageGB  int       `json:"max_storage_gb"` // 0 = unlimited
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

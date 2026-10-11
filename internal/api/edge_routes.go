@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -867,34 +868,56 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 		usage, _ := h.pgDB.GetTenantUsage(ctx)
 		epsByTenant := h.currentEPSByTenant(ctx)
 		logCounts, _ := h.chClient.GetTenantStorageBreakdown(ctx)
+		storageMetrics, _ := h.chClient.GetTenantStorageMetrics(ctx)
 
 		type tenantView struct {
 			*models.Tenant
-			Unlimited        bool    `json:"unlimited"`
-			NodeCount        int     `json:"node_count"`
-			DeviceCount      int     `json:"device_count"`
-			LogCount         uint64  `json:"log_count"`
-			CurrentEPS       float64 `json:"current_eps"`
-			NodeQuotaPercent float64 `json:"node_quota_percent"`
-			EPSQuotaPercent  float64 `json:"eps_quota_percent"`
-			QuotaExceeded    bool    `json:"quota_exceeded"`
+			Unlimited           bool    `json:"unlimited"`
+			NodeCount           int     `json:"node_count"`
+			DeviceCount         int     `json:"device_count"`
+			LogCount            uint64  `json:"log_count"`
+			CurrentEPS          float64 `json:"current_eps"`
+			NodeQuotaPercent    float64 `json:"node_quota_percent"`
+			EPSQuotaPercent     float64 `json:"eps_quota_percent"`
+			QuotaExceeded       bool    `json:"quota_exceeded"`
+			StorageBytes        uint64  `json:"storage_bytes"`
+			StorageGB           float64 `json:"storage_gb"`
+			StorageQuotaPercent float64 `json:"storage_quota_percent"`
+			StorageExceeded     bool    `json:"storage_exceeded"`
+			OldestLogTime       string  `json:"oldest_log_time"`
+			NewestLogTime       string  `json:"newest_log_time"`
 		}
 		views := make([]tenantView, 0, len(tenants))
 		var totalNodes, totalDevices int
-		var totalLogs uint64
+		var totalLogs, totalStorageBytes uint64
 		var totalEPS float64
 		for _, t := range tenants {
 			// Tenant users only see their own organization
 			if !isRoot && t.Slug != session.TenantSlug {
 				continue
 			}
-			v := tenantView{Tenant: t, Unlimited: t.Slug == "default" || (t.MaxNodes <= 0 && t.MaxEPS <= 0)}
+			v := tenantView{Tenant: t, Unlimited: t.Slug == "default" || (t.MaxNodes <= 0 && t.MaxEPS <= 0 && t.MaxStorageGB <= 0 && t.RetentionDays <= 0)}
 			if u, ok := usage[t.Slug]; ok {
 				v.NodeCount = u.NodeCount
 				v.DeviceCount = u.DeviceCount
 			}
 			if logCounts != nil {
 				v.LogCount = logCounts[t.Slug]
+			}
+			if storageMetrics != nil {
+				if sm, ok := storageMetrics[t.Slug]; ok && sm != nil {
+					v.StorageBytes = sm.TotalBytes
+					v.StorageGB = float64(sm.TotalBytes) / (1024.0 * 1024.0 * 1024.0)
+					if sm.LogCount > 0 && v.LogCount == 0 {
+						v.LogCount = sm.LogCount
+					}
+					if !sm.OldestTimestamp.IsZero() {
+						v.OldestLogTime = sm.OldestTimestamp.Format("2006-01-02 15:04:05")
+					}
+					if !sm.NewestTimestamp.IsZero() {
+						v.NewestLogTime = sm.NewestTimestamp.Format("2006-01-02 15:04:05")
+					}
+				}
 			}
 			v.CurrentEPS = epsByTenant[t.Slug]
 			if t.MaxNodes > 0 {
@@ -903,12 +926,20 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 			if t.MaxEPS > 0 {
 				v.EPSQuotaPercent = v.CurrentEPS / float64(t.MaxEPS) * 100.0
 			}
-			v.QuotaExceeded = (t.MaxNodes > 0 && v.NodeCount >= t.MaxNodes) || (t.MaxEPS > 0 && v.CurrentEPS >= float64(t.MaxEPS))
+			if t.MaxStorageGB > 0 {
+				maxBytes := float64(t.MaxStorageGB) * 1024.0 * 1024.0 * 1024.0
+				v.StorageQuotaPercent = (float64(v.StorageBytes) / maxBytes) * 100.0
+				v.StorageExceeded = v.StorageBytes >= uint64(maxBytes)
+			}
+			v.QuotaExceeded = (t.MaxNodes > 0 && v.NodeCount >= t.MaxNodes) ||
+				(t.MaxEPS > 0 && v.CurrentEPS >= float64(t.MaxEPS)) ||
+				v.StorageExceeded
 
 			totalNodes += v.NodeCount
 			totalDevices += v.DeviceCount
 			totalLogs += v.LogCount
 			totalEPS += v.CurrentEPS
+			totalStorageBytes += v.StorageBytes
 			views = append(views, v)
 		}
 
@@ -922,10 +953,12 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 			"current_tenant": currentTenant,
 			// Root operates every tenant's nodes/EPS without quota: aggregate totals
 			"totals": map[string]interface{}{
-				"nodes":   totalNodes,
-				"devices": totalDevices,
-				"logs":    totalLogs,
-				"eps":     totalEPS,
+				"nodes":         totalNodes,
+				"devices":       totalDevices,
+				"logs":          totalLogs,
+				"eps":           totalEPS,
+				"storage_bytes": totalStorageBytes,
+				"storage_gb":    float64(totalStorageBytes) / (1024.0 * 1024.0 * 1024.0),
 			},
 		})
 
@@ -941,6 +974,8 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 			IngestPolicy     string `json:"ingest_policy"`
 			MaxNodes         int    `json:"max_nodes"`
 			MaxEPS           int    `json:"max_eps"`
+			RetentionDays    int    `json:"retention_days"`
+			MaxStorageGB     int    `json:"max_storage_gb"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
@@ -974,6 +1009,8 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 			IngestPolicy:  policy,
 			MaxNodes:      req.MaxNodes,
 			MaxEPS:        req.MaxEPS,
+			RetentionDays: req.RetentionDays,
+			MaxStorageGB:  req.MaxStorageGB,
 		}
 
 		if err := h.pgDB.CreateTenant(ctx, t, strings.TrimSpace(req.AdminInitialPass)); err != nil {
@@ -983,13 +1020,24 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 		}
 
 		_ = h.deviceCache.Refresh(ctx)
-		h.recordAudit(r, "TENANT_CREATE", "tenant/"+slug, "SUCCESS", map[string]interface{}{"name": name, "ingest_policy": policy, "max_nodes": req.MaxNodes, "max_eps": req.MaxEPS})
+		h.recordAudit(r, "TENANT_CREATE", "tenant/"+slug, "SUCCESS", map[string]interface{}{
+			"name":           name,
+			"ingest_policy":  policy,
+			"max_nodes":      req.MaxNodes,
+			"max_eps":        req.MaxEPS,
+			"retention_days": req.RetentionDays,
+			"max_storage_gb": req.MaxStorageGB,
+		})
 		writeJSON(w, http.StatusCreated, t)
 
 	case http.MethodPut:
 		var req struct {
-			Slug         string `json:"slug"`
-			IngestPolicy string `json:"ingest_policy"`
+			Slug          string  `json:"slug"`
+			IngestPolicy  *string `json:"ingest_policy"`
+			MaxNodes      *int    `json:"max_nodes"`
+			MaxEPS        *int    `json:"max_eps"`
+			RetentionDays *int    `json:"retention_days"`
+			MaxStorageGB  *int    `json:"max_storage_gb"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
@@ -1000,17 +1048,58 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "slug is required"})
 			return
 		}
-		policy := strings.ToLower(strings.TrimSpace(req.IngestPolicy))
-		if policy != "strict" {
-			policy = "permissive"
+
+		existing, err := h.pgDB.GetTenantBySlug(ctx, slug)
+		if err != nil || existing == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "tenant not found"})
+			return
 		}
-		if err := h.pgDB.UpdateTenantIngestPolicy(ctx, slug, policy); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "updating policy: " + err.Error()})
+
+		maxNodes := existing.MaxNodes
+		if req.MaxNodes != nil {
+			maxNodes = *req.MaxNodes
+		}
+		maxEPS := existing.MaxEPS
+		if req.MaxEPS != nil {
+			maxEPS = *req.MaxEPS
+		}
+		retentionDays := existing.RetentionDays
+		if req.RetentionDays != nil {
+			retentionDays = *req.RetentionDays
+		}
+		maxStorageGB := existing.MaxStorageGB
+		if req.MaxStorageGB != nil {
+			maxStorageGB = *req.MaxStorageGB
+		}
+		policy := existing.IngestPolicy
+		if req.IngestPolicy != nil && *req.IngestPolicy != "" {
+			p := strings.ToLower(strings.TrimSpace(*req.IngestPolicy))
+			if p == "strict" || p == "permissive" {
+				policy = p
+			}
+		}
+
+		if err := h.pgDB.UpdateTenantQuotas(ctx, slug, maxNodes, maxEPS, retentionDays, maxStorageGB, policy); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "updating quotas: " + err.Error()})
 			return
 		}
 		_ = h.deviceCache.Refresh(ctx)
-		h.recordAudit(r, "TENANT_POLICY_UPDATE", "tenant/"+slug, "SUCCESS", map[string]interface{}{"ingest_policy": policy})
-		writeJSON(w, http.StatusOK, map[string]string{"status": "updated", "slug": slug, "ingest_policy": policy})
+		h.recordAudit(r, "TENANT_QUOTA_UPDATE", "tenant/"+slug, "SUCCESS", map[string]interface{}{
+			"max_nodes":      maxNodes,
+			"max_eps":        maxEPS,
+			"retention_days": retentionDays,
+			"max_storage_gb": maxStorageGB,
+			"ingest_policy":  policy,
+		})
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"status":         "updated",
+			"slug":           slug,
+			"max_nodes":      maxNodes,
+			"max_eps":        maxEPS,
+			"retention_days": retentionDays,
+			"max_storage_gb": maxStorageGB,
+			"ingest_policy":  policy,
+		})
 
 	case http.MethodDelete:
 		slug := strings.TrimSpace(r.URL.Query().Get("slug"))
@@ -1034,6 +1123,182 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleTenantPrune triggers on-demand retention pruning and automated partition drops
+func (h *Handler) handleTenantPrune(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, _ := h.getSession(r)
+	isRoot := session == nil || session.IsRootOperator()
+	if !isRoot {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "only root administrators can trigger retention prune"})
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r, 60*time.Second)
+	defer cancel()
+
+	var req struct {
+		TenantSlug     string `json:"tenant"`
+		Days           int    `json:"days"`
+		DropPartitions bool   `json:"drop_partitions"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	tenants, err := h.pgDB.ListTenants(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "listing tenants: " + err.Error()})
+		return
+	}
+
+	type pruneResult struct {
+		Tenant        string `json:"tenant"`
+		RetentionDays int    `json:"retention_days"`
+		PrunedRows    int64  `json:"pruned_rows"`
+		StorageFreed  bool   `json:"storage_freed"`
+	}
+
+	results := []pruneResult{}
+	storageMetrics, _ := h.chClient.GetTenantStorageMetrics(ctx)
+
+	for _, t := range tenants {
+		if req.TenantSlug != "" && t.Slug != req.TenantSlug {
+			continue
+		}
+		retention := t.RetentionDays
+		if req.TenantSlug == t.Slug && req.Days > 0 {
+			retention = req.Days
+		}
+		res := pruneResult{Tenant: t.Slug, RetentionDays: retention}
+		if retention > 0 {
+			err := h.chClient.PruneTenantOlderThanDays(ctx, t.Slug, retention)
+			if err == nil {
+				res.PrunedRows = 1
+			}
+		}
+		if t.MaxStorageGB > 0 && storageMetrics != nil {
+			if sm, ok := storageMetrics[t.Slug]; ok && sm != nil {
+				maxBytes := uint64(t.MaxStorageGB) * 1024 * 1024 * 1024
+				if sm.TotalBytes > maxBytes {
+					_ = h.chClient.PruneTenantOldestBatch(ctx, t.Slug, 24)
+					res.StorageFreed = true
+				}
+			}
+		}
+		results = append(results, res)
+	}
+
+	var droppedPartitions []string
+	if req.DropPartitions {
+		hasUnlimited := false
+		maxRetention := 0
+		for _, t := range tenants {
+			if t.RetentionDays == 0 {
+				hasUnlimited = true
+				break
+			}
+			if t.RetentionDays > maxRetention {
+				maxRetention = t.RetentionDays
+			}
+		}
+		if !hasUnlimited && maxRetention > 0 {
+			cutoff := time.Now().AddDate(0, 0, -maxRetention)
+			cutoffMonth := cutoff.Format("200601")
+			if dropped, err := h.chClient.PrunePartitionsOlderThan(ctx, cutoffMonth); err == nil && len(dropped) > 0 {
+				droppedPartitions = append(droppedPartitions, dropped...)
+			}
+		}
+	}
+
+	h.recordAudit(r, "TENANT_RETENTION_PRUNE", "tenants/prune", "SUCCESS", map[string]interface{}{
+		"target_tenant":      req.TenantSlug,
+		"results_count":      len(results),
+		"dropped_partitions": droppedPartitions,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":             "completed",
+		"tenants_evaluated":  len(results),
+		"results":            results,
+		"dropped_partitions": droppedPartitions,
+	})
+}
+
+// StartTenantRetentionWorker launches the background worker that enforces per-tenant data retention and storage quotas
+func (h *Handler) StartTenantRetentionWorker(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Hour)
+	go func() {
+		defer ticker.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(1 * time.Minute):
+			h.runRetentionCycle(ctx)
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.runRetentionCycle(ctx)
+			}
+		}
+	}()
+}
+
+func (h *Handler) runRetentionCycle(ctx context.Context) {
+	runCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	tenants, err := h.pgDB.ListTenants(runCtx)
+	if err != nil || len(tenants) == 0 {
+		return
+	}
+
+	storageMetrics, _ := h.chClient.GetTenantStorageMetrics(runCtx)
+	for _, t := range tenants {
+		if t.RetentionDays > 0 {
+			if err := h.chClient.PruneTenantOlderThanDays(runCtx, t.Slug, t.RetentionDays); err != nil {
+				log.Printf("[RetentionWorker] Pruning tenant '%s' (>%d days) failed: %v", t.Slug, t.RetentionDays, err)
+			} else {
+				log.Printf("[RetentionWorker] Pruned events older than %d days for tenant '%s'", t.RetentionDays, t.Slug)
+			}
+		}
+
+		if t.MaxStorageGB > 0 && storageMetrics != nil {
+			if sm, ok := storageMetrics[t.Slug]; ok && sm != nil {
+				maxBytes := uint64(t.MaxStorageGB) * 1024 * 1024 * 1024
+				if sm.TotalBytes > maxBytes {
+					log.Printf("[RetentionWorker] Tenant '%s' exceeded storage quota (%d bytes > %d bytes max). Purging oldest 24h batch...",
+						t.Slug, sm.TotalBytes, maxBytes)
+					_ = h.chClient.PruneTenantOldestBatch(runCtx, t.Slug, 24)
+				}
+			}
+		}
+	}
+
+	hasUnlimited := false
+	maxRetention := 0
+	for _, t := range tenants {
+		if t.RetentionDays == 0 {
+			hasUnlimited = true
+			break
+		}
+		if t.RetentionDays > maxRetention {
+			maxRetention = t.RetentionDays
+		}
+	}
+	if !hasUnlimited && maxRetention > 0 {
+		cutoff := time.Now().AddDate(0, 0, -maxRetention)
+		cutoffMonth := cutoff.Format("200601")
+		if dropped, err := h.chClient.PrunePartitionsOlderThan(runCtx, cutoffMonth); err == nil && len(dropped) > 0 {
+			log.Printf("[RetentionWorker] Partition drop evaluated for months <= %s (dropped partitions: %v)", cutoffMonth, dropped)
+		}
 	}
 }
 

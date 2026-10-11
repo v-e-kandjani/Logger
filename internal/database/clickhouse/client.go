@@ -390,6 +390,123 @@ func (c *Client) PruneOlderThanDays(ctx context.Context, days int) error {
 	return c.conn.Exec(ctx, query)
 }
 
+// TenantStorageMetrics represents detailed physical & logical storage usage per tenant
+type TenantStorageMetrics struct {
+	Tenant          string    `json:"tenant"`
+	LogCount        uint64    `json:"log_count"`
+	TotalBytes      uint64    `json:"total_bytes"`
+	TotalGB         float64   `json:"total_gb"`
+	OldestTimestamp time.Time `json:"oldest_timestamp"`
+	NewestTimestamp time.Time `json:"newest_timestamp"`
+}
+
+// GetTenantStorageMetrics returns log counts, uncompressed byte volumes, and time bounds per tenant
+func (c *Client) GetTenantStorageMetrics(ctx context.Context) (map[string]*TenantStorageMetrics, error) {
+	query := fmt.Sprintf(`
+		SELECT
+			tenant,
+			count() AS log_count,
+			coalesce(sum(length(raw_message)), 0) AS total_bytes,
+			min(received_at) AS oldest_timestamp,
+			max(received_at) AS newest_timestamp
+		FROM %s.syslog_events
+		GROUP BY tenant`, c.Database())
+	rows, err := c.conn.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[string]*TenantStorageMetrics)
+	for rows.Next() {
+		var t string
+		var cnt uint64
+		var totalBytes uint64
+		var oldest, newest time.Time
+		if err := rows.Scan(&t, &cnt, &totalBytes, &oldest, &newest); err == nil {
+			if t == "" {
+				t = "default"
+			}
+			res[t] = &TenantStorageMetrics{
+				Tenant:          t,
+				LogCount:        cnt,
+				TotalBytes:      totalBytes,
+				TotalGB:         float64(totalBytes) / (1024 * 1024 * 1024),
+				OldestTimestamp: oldest,
+				NewestTimestamp: newest,
+			}
+		}
+	}
+	return res, nil
+}
+
+// PruneTenantOlderThanDays deletes events and 1m metrics for a specific tenant older than the retention threshold
+func (c *Client) PruneTenantOlderThanDays(ctx context.Context, tenant string, days int) error {
+	if days <= 0 || tenant == "" {
+		return nil
+	}
+	query := fmt.Sprintf("ALTER TABLE %s.syslog_events DELETE WHERE tenant = '%s' AND received_at < now() - INTERVAL %d DAY", c.Database(), tenant, days)
+	if err := c.conn.Exec(ctx, query); err != nil {
+		return err
+	}
+	// Also clean materialized summary table
+	query1m := fmt.Sprintf("ALTER TABLE %s.events_1m DELETE WHERE tenant = '%s' AND minute < now() - INTERVAL %d DAY", c.Database(), tenant, days)
+	_ = c.conn.Exec(ctx, query1m)
+	return nil
+}
+
+// PruneTenantOldestBatch deletes the oldest batch of logs for a tenant when their storage quota is exceeded
+func (c *Client) PruneTenantOldestBatch(ctx context.Context, tenant string, hours int) error {
+	if hours <= 0 {
+		hours = 24
+	}
+	deleteQuery := fmt.Sprintf(`
+		ALTER TABLE %s.syslog_events 
+		DELETE WHERE tenant = '%s' AND received_at <= (
+			SELECT min(received_at) + INTERVAL %d HOUR 
+			FROM %s.syslog_events 
+			WHERE tenant = '%s'
+		)
+	`, c.Database(), tenant, hours, c.Database(), tenant)
+	return c.conn.Exec(ctx, deleteQuery)
+}
+
+// PrunePartitionsOlderThan drops whole monthly ClickHouse partitions that are strictly older than the cutoff month
+func (c *Client) PrunePartitionsOlderThan(ctx context.Context, cutoffMonth string) ([]string, error) {
+	if cutoffMonth == "" {
+		return nil, nil
+	}
+	query := fmt.Sprintf(`
+		SELECT DISTINCT partition
+		FROM system.parts
+		WHERE database = '%s' AND table = 'syslog_events' AND active = 1 AND partition < '%s'
+		ORDER BY partition ASC`, c.Database(), cutoffMonth)
+	rows, err := c.conn.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var toDrop []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err == nil && p != "" {
+			toDrop = append(toDrop, p)
+		}
+	}
+
+	var dropped []string
+	for _, part := range toDrop {
+		dropQuery := fmt.Sprintf("ALTER TABLE %s.syslog_events DROP PARTITION '%s'", c.Database(), part)
+		if err := c.conn.Exec(ctx, dropQuery); err == nil {
+			dropped = append(dropped, part)
+			// Drop from events_1m too if partition exists
+			_ = c.conn.Exec(ctx, fmt.Sprintf("ALTER TABLE %s.events_1m DROP PARTITION '%s'", c.Database(), part))
+		}
+	}
+	return dropped, nil
+}
+
 // GetTenantStorageBreakdown returns total log count per tenant from ClickHouse
 func (c *Client) GetTenantStorageBreakdown(ctx context.Context) (map[string]uint64, error) {
 	query := fmt.Sprintf(`

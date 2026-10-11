@@ -260,6 +260,13 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.6.6** (Dynamic Tenant Data Retention & Storage Quotas with Automated ClickHouse Partition Dropping):
+  - **Configurable Multi-Tenant Data Retention (`retention_days`)**: Granular per-tenant log retention policies allowing finite log life cycles (e.g. 30, 90, 180 days) while preserving indefinite storage (`retention_days = 0`) for root or compliance-mandated organizations.
+  - **Storage Quota Enforcement (`max_storage_gb`)**: Real-time ClickHouse physical log volume tracking per tenant; automatically alerts on quota overflow and purges the oldest 24-hour log batch when customer tenants exceed designated storage limits.
+  - **Automated ClickHouse Partition Dropping**: Zero-mutation, instant partition reclamation (`ALTER TABLE syslog_events DROP PARTITION 'YYYYMM'`) executed during retention pruning cycles when all active tenants allow pruning older historical months.
+  - **Background Retention Worker (`StartTenantRetentionWorker`)**: Automated hourly lifecycle cleaner that evaluates per-tenant retention days, verifies storage limits, reclaims disk space, and records structured audit events (`TENANT_RETENTION_PRUNE`).
+  - **Tenant Quotas & Retention Management UI**: Added `#modal-edit-tenant-quotas` modal for editing proxy nodes, EPS, retention, and storage limits anytime; enhanced Tenants table with storage utilization bars, retention badges, date boundaries, and on-demand manual pruning triggers (`/api/v1/tenants/prune`).
+
 - **v1.6.5** (Zero-Trust API Key Authentication for Distributed Forwarders & Granular Audit Logging):
   - **Zero-Trust Edge Proxy Authentication**: Replaced plaintext token evaluation with cryptographically secure SHA-256 hashed lookups (`token_hash`) and masked prefix tracking (`token_prefix`), maintaining seamless backward compatibility with existing forwarders.
   - **Granular Source IP / CIDR Whitelisting**: Added per-node Zero-Trust network boundary verification (`AllowedCIDRs`), restricting proxy heartbeats and log batches strictly to authorized corporate IP subnets (e.g., `10.0.0.0/8, 192.168.1.50`) and dropping unauthorized attempts with `403 Forbidden`.

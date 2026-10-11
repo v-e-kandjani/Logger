@@ -249,6 +249,13 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.6.6** (Dinamik Kiracı Veri Saklama Süreleri, Depolama Kotaları ve Otomatik ClickHouse Bölüm Düşürme):
+  - **Yapılandırılabilir Çoklu Kiracı Veri Saklama Süresi (`retention_days`)**: Her müşteri/organizasyon için bağımsız saklama günleri (örn. 30, 90, 180 gün); root veya yasal saklama zorunluluğu olan kurumlar için süresiz (`retention_days = 0`) saklama güvencesi.
+  - **Depolama Kotası Denetimi (`max_storage_gb`)**: Kiracı bazlı ClickHouse fiziksel disk alanı takibi; kota aşıldığında anlık uyarı verme ve kiracının en eski 24 saatlik log bloğunu otomatik temizleyerek kotayı koruma.
+  - **Otomatik ClickHouse Bölüm Düşürme (Partition Dropping)**: Tüm kiracıların saklama politikaları izin verdiğinde, `ALTER TABLE syslog_events DROP PARTITION 'YYYYMM'` komutuyla CPU/I/O maliyeti olmadan sıfır zamanda tüm aylık bölümleri düşürme ve %100 disk alanını geri kazanma.
+  - **Arka Plan Saklama İşçisi (`StartTenantRetentionWorker`)**: Kiracı saklama sürelerini ve depolama limitlerini periyodik denetleyen, otomatik temizlik yapan ve denetim izine (`TENANT_RETENTION_PRUNE`) kaydeden arka plan servisi.
+  - **Kiracı Kotaları ve Saklama Yönetim Arayüzü**: Proxy node, EPS, saklama günü ve depolama kotasını her an düzenlemeyi sağlayan `#modal-edit-tenant-quotas` modalı; Kiracılar tablosuna depolama ilerleme çubuğu, saklama rozetleri, log zaman aralıkları ve manuel temizlik tetikleyici (`/api/v1/tenants/prune`) entegrasyonu.
+
 - **v1.6.5** (Dağıtık Forwarder'lar için Zero-Trust API Anahtarı Doğrulaması ve Kapsamlı Denetim İzi):
   - **Zero-Trust Edge Proxy Kimlik Doğrulaması**: Düz metin token kontrolleri yerine SHA-256 hash araması (`token_hash`) ve maskeli önek takibi (`token_prefix`) geliştirilerek mevcut proxy düğümleriyle %100 geriye dönük uyumluluk korundu.
   - **Granüler Kaynak IP / CIDR Beyaz Listesi**: Düğüm bazında Zero-Trust ağ sınırı doğrulaması (`AllowedCIDRs`) getirilerek proxy kalp atışları ve log paketleri yalnızca yetkili IP bloklarına (örn. `10.0.0.0/8, 192.168.1.50`) sınırlandırıldı; yabancı IP istekleri `403 Forbidden` ile engellenmektedir.

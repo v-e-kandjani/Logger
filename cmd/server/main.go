@@ -247,6 +247,7 @@ func main() {
 	apiHandler.StartMitreAutoSync(appCtx)
 	apiHandler.StartSupportBundleCleaner(appCtx)
 	apiHandler.StartEdgeHealthMonitor(appCtx)
+	apiHandler.StartTenantRetentionWorker(appCtx)
 	mux := http.NewServeMux()
 	apiHandler.RegisterRoutes(mux)
 

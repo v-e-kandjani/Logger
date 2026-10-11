@@ -5786,7 +5786,7 @@ async function loadTenants() {
         // 2. Populate Settings > Tenants table
         if (tbody) {
             if (currentTenants.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Henüz kiracı bulunmuyor.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 24px;">Henüz kiracı bulunmuyor.</td></tr>`;
                 return;
             }
 
@@ -5806,7 +5806,7 @@ async function loadTenants() {
                 const nodeQuota = unlimited || !t.max_nodes ? '∞' : t.max_nodes;
                 const epsQuota = unlimited || !t.max_eps ? '∞' : Number(t.max_eps).toLocaleString();
                 const isExceeded = !!t.quota_exceeded;
-                const isWarning = !unlimited && ((t.node_quota_percent && t.node_quota_percent >= 80) || (t.eps_quota_percent && t.eps_quota_percent >= 80));
+                const isWarning = !unlimited && ((t.node_quota_percent && t.node_quota_percent >= 80) || (t.eps_quota_percent && t.eps_quota_percent >= 80) || (t.storage_quota_percent && t.storage_quota_percent >= 80));
                 let quotaBadge = '';
                 if (isExceeded) {
                     quotaBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.7rem; margin-bottom: 3px; display: inline-block;">⚠️ Kota Aşıldı</span><br>`;
@@ -5819,6 +5819,38 @@ async function loadTenants() {
                         &nbsp;|&nbsp; EPS: <strong>${Math.round(t.current_eps || 0).toLocaleString()}</strong> / ${epsQuota}
                         <div style="font-size: 0.7rem; color: var(--text-muted);">${t.device_count || 0} kayıtlı cihaz</div>
                     </div>`;
+
+                // Retention & Storage
+                const retentionDays = Number(t.retention_days || 0);
+                const retentionBadge = retentionDays > 0
+                    ? `<span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14,165,233,0.3); font-size: 0.72rem;">🕒 ${retentionDays} Gün</span>`
+                    : `<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); font-size: 0.72rem;">♾️ Süresiz</span>`;
+
+                const storageGB = Number(t.storage_gb || 0).toFixed(2);
+                const maxStorageGB = Number(t.max_storage_gb || 0);
+                let storageBar = '';
+                if (maxStorageGB > 0) {
+                    const storagePct = Math.min(100, Math.round(t.storage_quota_percent || 0));
+                    const barColor = (storagePct >= 90 || t.storage_exceeded) ? '#ef4444' : storagePct >= 75 ? '#f59e0b' : '#38bdf8';
+                    const exceededWarn = t.storage_exceeded ? '<span style="color: #ef4444; font-weight: 600;">(Aşıldı!)</span> ' : '';
+                    storageBar = `
+                        <div style="font-size: 0.72rem; margin-top: 4px;">
+                            ${exceededWarn}<strong>${storageGB} GB</strong> / ${maxStorageGB} GB (%${storagePct})
+                        </div>
+                        <div style="width: 100%; max-width: 130px; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 2px;">
+                            <div style="width: ${storagePct}%; height: 100%; background: ${barColor};"></div>
+                        </div>`;
+                } else {
+                    storageBar = `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;"><strong>${storageGB} GB</strong> (Sınırsız)</div>`;
+                }
+
+                const timeBounds = (t.oldest_log_time || t.newest_log_time)
+                    ? `<div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 3px;" title="İlk ve son log kayıt zamanları">
+                        📅 ${(t.oldest_log_time || '').split(' ')[0]} ➔ ${(t.newest_log_time || '').split(' ')[0]}
+                       </div>`
+                    : '';
+
+                const storageRetHtml = `<div>${retentionBadge}</div>${storageBar}${timeBounds}`;
 
                 const policy = t.ingest_policy || 'permissive';
                 const isStrict = (policy === 'strict');
@@ -5840,14 +5872,19 @@ async function loadTenants() {
                         <td>${adminInfo}</td>
                         <td>${statusBadge}</td>
                         <td>${limitsStr}</td>
+                        <td>${storageRetHtml}</td>
                         <td>${policyHtml}</td>
                         <td style="font-size: 0.8rem;">${createdDate}</td>
                         <td style="text-align: right;">
                             <div style="display: flex; justify-content: flex-end; gap: 6px;">
                                 <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="switchTenantContext('${escapeHtml(t.slug)}')">
-                                    🔍 Seç &amp; Görüntüle
+                                    🔍 Seç
                                 </button>
-                                ${!isDefault ? `
+                                ${tenantSessionIsRoot ? `
+                                <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openEditTenantQuotasModal('${escapeHtml(t.slug)}')" title="Limitleri ve Saklama Süresini Düzenle">
+                                    ⚙️ Limitler
+                                </button>` : ''}
+                                ${!isDefault && tenantSessionIsRoot ? `
                                 <button class="btn btn-outline text-danger" style="padding: 3px 8px; font-size: 0.75rem;" onclick="deleteTenant('${escapeHtml(t.slug)}', '${escapeHtml(t.name)}')" title="Kiracıyı Sil">
                                     🗑️
                                 </button>` : ''}
@@ -5904,6 +5941,10 @@ function openAddTenantModal() {
     document.getElementById('tenant-new-admin-pass').value = '';
     document.getElementById('tenant-new-max-nodes').value = '10';
     document.getElementById('tenant-new-max-eps').value = '5000';
+    const retDays = document.getElementById('tenant-new-retention-days');
+    if (retDays) retDays.value = '0';
+    const maxStorage = document.getElementById('tenant-new-max-storage');
+    if (maxStorage) maxStorage.value = '0';
     const policySel = document.getElementById('tenant-new-ingest-policy');
     if (policySel) policySel.value = 'permissive';
     modal.style.display = 'flex';
@@ -5922,8 +5963,10 @@ async function submitAddTenant() {
     const adminEmail = document.getElementById('tenant-new-admin-email').value.trim();
     const adminUsername = document.getElementById('tenant-new-admin-username').value.trim();
     const adminPass = document.getElementById('tenant-new-admin-pass').value.trim();
-    const maxNodes = parseInt(document.getElementById('tenant-new-max-nodes').value, 10) || 10;
-    const maxEps = parseInt(document.getElementById('tenant-new-max-eps').value, 10) || 5000;
+    const maxNodes = parseInt(document.getElementById('tenant-new-max-nodes').value, 10) || 0;
+    const maxEps = parseInt(document.getElementById('tenant-new-max-eps').value, 10) || 0;
+    const retentionDays = parseInt(document.getElementById('tenant-new-retention-days')?.value, 10) || 0;
+    const maxStorage = parseInt(document.getElementById('tenant-new-max-storage')?.value, 10) || 0;
     const ingestPolicy = (document.getElementById('tenant-new-ingest-policy')?.value) || 'permissive';
 
     if (!name) {
@@ -5948,6 +5991,8 @@ async function submitAddTenant() {
                 admin_initial_pass: adminPass,
                 max_nodes: maxNodes,
                 max_eps: maxEps,
+                retention_days: retentionDays,
+                max_storage_gb: maxStorage,
                 ingest_policy: ingestPolicy
             })
         });
@@ -5966,6 +6011,116 @@ async function submitAddTenant() {
         if (btn) { btn.disabled = false; btn.textContent = '✓ Kiracıyı Oluştur'; }
     }
 }
+
+window.openEditTenantQuotasModal = function(slug) {
+    const t = currentTenants.find(x => x.slug === slug);
+    if (!t) return;
+    const modal = document.getElementById('modal-edit-tenant-quotas');
+    if (!modal) return;
+    document.getElementById('tenant-edit-slug').value = t.slug;
+    const nameEl = document.getElementById('modal-edit-quotas-tenant-name');
+    if (nameEl) nameEl.textContent = `${t.name} (${t.slug})`;
+    document.getElementById('tenant-edit-max-nodes').value = t.max_nodes || 0;
+    document.getElementById('tenant-edit-max-eps').value = t.max_eps || 0;
+    document.getElementById('tenant-edit-retention-days').value = t.retention_days || 0;
+    document.getElementById('tenant-edit-max-storage').value = t.max_storage_gb || 0;
+    const policySel = document.getElementById('tenant-edit-ingest-policy');
+    if (policySel) policySel.value = t.ingest_policy || 'permissive';
+    modal.style.display = 'flex';
+};
+
+window.closeEditTenantQuotasModal = function() {
+    const modal = document.getElementById('modal-edit-tenant-quotas');
+    if (modal) modal.style.display = 'none';
+};
+
+window.submitEditTenantQuotas = async function() {
+    const slug = document.getElementById('tenant-edit-slug').value.trim();
+    if (!slug) return;
+    const maxNodes = parseInt(document.getElementById('tenant-edit-max-nodes').value, 10) || 0;
+    const maxEps = parseInt(document.getElementById('tenant-edit-max-eps').value, 10) || 0;
+    const retentionDays = parseInt(document.getElementById('tenant-edit-retention-days').value, 10) || 0;
+    const maxStorageGB = parseInt(document.getElementById('tenant-edit-max-storage').value, 10) || 0;
+    const ingestPolicy = document.getElementById('tenant-edit-ingest-policy')?.value || 'permissive';
+
+    const btn = document.getElementById('btn-save-tenant-quotas');
+    try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor...'; }
+        const res = await fetch('/api/v1/tenants', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                slug: slug,
+                max_nodes: maxNodes,
+                max_eps: maxEps,
+                retention_days: retentionDays,
+                max_storage_gb: maxStorageGB,
+                ingest_policy: ingestPolicy
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+        if (typeof showToast === 'function') {
+            showToast(`✓ Kiracı limitleri ve saklama süresi güncellendi: ${slug}`, 'success');
+        }
+        closeEditTenantQuotasModal();
+        loadTenants();
+    } catch (err) {
+        alert('Limitler güncellenemedi: ' + err.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✓ Limitleri Kaydet'; }
+    }
+};
+
+window.triggerSingleTenantPrune = async function() {
+    const slug = document.getElementById('tenant-edit-slug').value.trim();
+    if (!slug) return;
+    if (!confirm(`'${slug}' kiracısının saklama süresi dolan kayıtları ve aşan depolama kotalarını şimdi temizlemek istiyor musunuz?`)) return;
+
+    try {
+        const res = await fetch('/api/v1/tenants/prune', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenant: slug, drop_partitions: true })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+        if (typeof showToast === 'function') {
+            showToast(`✓ '${slug}' için temizleme işlemi tamamlandı`, 'success');
+        }
+        closeEditTenantQuotasModal();
+        loadTenants();
+    } catch (err) {
+        alert('Temizleme işlemi başarısız: ' + err.message);
+    }
+};
+
+window.triggerTenantPrune = async function() {
+    if (!confirm('Tüm kiracıların saklama süresi dolan kayıtları ve aşan depolama kotaları taranıp temizlenecek. Devam etmek istiyor musunuz?')) return;
+
+    const btn = document.getElementById('btn-trigger-retention-prune');
+    try {
+        if (btn) { btn.disabled = true; btn.innerHTML = '🧹 Temizleniyor...'; }
+        const res = await fetch('/api/v1/tenants/prune', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ drop_partitions: true })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+        if (typeof showToast === 'function') {
+            showToast(`✓ Saklama ve kota temizleme tamamlandı (${data.tenants_evaluated || 0} kiracı tarandı)`, 'success');
+        }
+        loadTenants();
+    } catch (err) {
+        alert('Temizleme başarısız: ' + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" style="vertical-align: middle;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> <span data-i18n="btn_prune_retention">Kotaları &amp; Saklamayı Temizle</span>`;
+        }
+    }
+};
 
 async function deleteTenant(slug, name) {
     if (!confirm(`'${name}' (${slug}) kiracısını ve ilişkili verileri silmek istediğinize emin misiniz?`)) return;

@@ -1859,18 +1859,22 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 		ingest_policy VARCHAR(32) NOT NULL DEFAULT 'permissive',
 		max_nodes INT NOT NULL DEFAULT 5,
 		max_eps INT NOT NULL DEFAULT 5000,
+		retention_days INT NOT NULL DEFAULT 0,
+		max_storage_gb INT NOT NULL DEFAULT 0,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	);
 
 	ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ingest_policy VARCHAR(32) NOT NULL DEFAULT 'permissive';
+	ALTER TABLE tenants ADD COLUMN IF NOT EXISTS retention_days INT NOT NULL DEFAULT 0;
+	ALTER TABLE tenants ADD COLUMN IF NOT EXISTS max_storage_gb INT NOT NULL DEFAULT 0;
 
 	INSERT INTO tenants (slug, name, description, admin_name, admin_email, admin_username, status)
 	VALUES ('default', 'Default Organization (Root)', 'Primary root tenant', 'Root Super Admin', 'admin@syslog.local', 'admin', 'active')
 	ON CONFLICT (slug) DO NOTHING;
 
-	-- Root tenant is the MSSP operator: no node / EPS quota (0 = unlimited)
-	UPDATE tenants SET max_nodes = 0, max_eps = 0 WHERE slug = 'default' AND (max_nodes <> 0 OR max_eps <> 0);
+	-- Root tenant is the MSSP operator: no node / EPS quota / storage quota (0 = unlimited)
+	UPDATE tenants SET max_nodes = 0, max_eps = 0, max_storage_gb = 0 WHERE slug = 'default' AND (max_nodes <> 0 OR max_eps <> 0 OR max_storage_gb <> 0);
 
 	-- Device ownership for tenant-scoped data views
 	ALTER TABLE devices ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
@@ -2040,7 +2044,7 @@ func MaskEdgeToken(token string) string {
 // ListTenants returns all customer tenant organizations
 func (db *DB) ListTenants(ctx context.Context) ([]*models.Tenant, error) {
 	query := `
-		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, coalesce(ingest_policy, 'permissive'), max_nodes, max_eps, created_at, updated_at
+		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, coalesce(ingest_policy, 'permissive'), max_nodes, max_eps, coalesce(retention_days, 0), coalesce(max_storage_gb, 0), created_at, updated_at
 		FROM tenants
 		ORDER BY created_at ASC`
 	rows, err := db.pool.Query(ctx, query)
@@ -2055,7 +2059,9 @@ func (db *DB) ListTenants(ctx context.Context) ([]*models.Tenant, error) {
 		if err := rows.Scan(
 			&t.ID, &t.Slug, &t.Name, &t.Description,
 			&t.AdminName, &t.AdminEmail, &t.AdminUsername,
-			&t.Status, &t.IngestPolicy, &t.MaxNodes, &t.MaxEPS, &t.CreatedAt, &t.UpdatedAt,
+			&t.Status, &t.IngestPolicy, &t.MaxNodes, &t.MaxEPS,
+			&t.RetentionDays, &t.MaxStorageGB,
+			&t.CreatedAt, &t.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -2067,14 +2073,16 @@ func (db *DB) ListTenants(ctx context.Context) ([]*models.Tenant, error) {
 // GetTenantBySlug returns a tenant by its unique slug identifier
 func (db *DB) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
 	query := `
-		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, coalesce(ingest_policy, 'permissive'), max_nodes, max_eps, created_at, updated_at
+		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, coalesce(ingest_policy, 'permissive'), max_nodes, max_eps, coalesce(retention_days, 0), coalesce(max_storage_gb, 0), created_at, updated_at
 		FROM tenants
 		WHERE slug = $1`
 	var t models.Tenant
 	err := db.pool.QueryRow(ctx, query, slug).Scan(
 		&t.ID, &t.Slug, &t.Name, &t.Description,
 		&t.AdminName, &t.AdminEmail, &t.AdminUsername,
-		&t.Status, &t.IngestPolicy, &t.MaxNodes, &t.MaxEPS, &t.CreatedAt, &t.UpdatedAt,
+		&t.Status, &t.IngestPolicy, &t.MaxNodes, &t.MaxEPS,
+		&t.RetentionDays, &t.MaxStorageGB,
+		&t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -2099,22 +2107,30 @@ func (db *DB) CreateTenant(ctx context.Context, t *models.Tenant, initialAdminPa
 	if t.IngestPolicy == "" {
 		t.IngestPolicy = "permissive"
 	}
-	if t.MaxNodes <= 0 {
+	if t.MaxNodes < 0 {
 		t.MaxNodes = 5
 	}
-	if t.MaxEPS <= 0 {
+	if t.MaxEPS < 0 {
 		t.MaxEPS = 5000
+	}
+	if t.RetentionDays < 0 {
+		t.RetentionDays = 0
+	}
+	if t.MaxStorageGB < 0 {
+		t.MaxStorageGB = 0
 	}
 	t.CreatedAt = time.Now()
 	t.UpdatedAt = time.Now()
 
 	query := `
-		INSERT INTO tenants (id, slug, name, description, admin_name, admin_email, admin_username, status, ingest_policy, max_nodes, max_eps, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+		INSERT INTO tenants (id, slug, name, description, admin_name, admin_email, admin_username, status, ingest_policy, max_nodes, max_eps, retention_days, max_storage_gb, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`
 	_, err := db.pool.Exec(ctx, query,
 		t.ID, t.Slug, t.Name, t.Description,
 		t.AdminName, t.AdminEmail, t.AdminUsername,
-		t.Status, t.IngestPolicy, t.MaxNodes, t.MaxEPS, t.CreatedAt, t.UpdatedAt,
+		t.Status, t.IngestPolicy, t.MaxNodes, t.MaxEPS,
+		t.RetentionDays, t.MaxStorageGB,
+		t.CreatedAt, t.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -2138,6 +2154,31 @@ func (db *DB) CreateTenant(ctx context.Context, t *models.Tenant, initialAdminPa
 		_ = db.CreateUser(ctx, u, initialAdminPass)
 	}
 
+	return nil
+}
+
+// UpdateTenantQuotas updates all operational resource constraints and retention policies for a tenant
+func (db *DB) UpdateTenantQuotas(ctx context.Context, slug string, maxNodes, maxEPS, retentionDays, maxStorageGB int, ingestPolicy string) error {
+	p := strings.ToLower(strings.TrimSpace(ingestPolicy))
+	if p != "strict" && p != "permissive" {
+		p = ""
+	}
+	query := `
+		UPDATE tenants
+		SET max_nodes = $1,
+		    max_eps = $2,
+		    retention_days = $3,
+		    max_storage_gb = $4,
+		    ingest_policy = CASE WHEN $5 <> '' THEN $5 ELSE ingest_policy END,
+		    updated_at = NOW()
+		WHERE slug = $6`
+	tag, err := db.pool.Exec(ctx, query, maxNodes, maxEPS, retentionDays, maxStorageGB, p, slug)
+	if err != nil {
+		return fmt.Errorf("updating tenant quotas: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("tenant '%s' not found", slug)
+	}
 	return nil
 }
 
