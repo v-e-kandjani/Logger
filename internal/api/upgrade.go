@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/syslog-platform/logger/internal/models"
@@ -104,6 +106,8 @@ func (h *Handler) handleSystemUpdateStatus(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	version.ReloadRuntimeVersion()
+
 	writeJSON(w, http.StatusOK, UpdateStatusResponse{
 		Platform:       version.Platform,
 		CurrentVersion: version.Version,
@@ -125,6 +129,9 @@ func (h *Handler) handleSystemUpdateCheck(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
+
+	// Synchronize runtime version state from disk / git first
+	version.ReloadRuntimeVersion()
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
@@ -167,6 +174,15 @@ func (h *Handler) handleSystemUpdateCheck(w http.ResponseWriter, r *http.Request
 	}
 	if len(currentShort) > 7 {
 		currentShort = currentShort[:7]
+	}
+
+	// If local git CLI exists, check HEAD directly to prevent discrepancies
+	if out, err := exec.CommandContext(ctx, "git", "rev-parse", "--short", "HEAD").Output(); err == nil {
+		localGitSHA := strings.ToLower(strings.TrimSpace(string(out)))
+		if localGitSHA != "" && !strings.Contains(localGitSHA, "fatal") && !strings.Contains(localGitSHA, "error") {
+			currentShort = localGitSHA
+			version.CommitSHA = localGitSHA
+		}
 	}
 
 	// 2. Check and optionally download new TÜBİTAK KamuSM TSS Client jar
@@ -379,29 +395,67 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 		sendProgress(50, "GIT_SYNC", "Container running without git CLI; streaming raw file updates directly.", false, true, nil)
 	}
 
-	// 3. Pull files from GitHub raw contents
-	hotPaths := []string{
-		"web/static/js/app.js",
-		"web/static/js/translations.js",
-		"web/static/js/i18n.js",
-		"web/static/css/dashboard.css",
-		"web/templates/index.html",
-		"web/templates/login.html",
-		"internal/version/version.go",
-		"upgrade.sh",
-		"produce-logs.sh",
-		"HOW_TO_INSTALL.md",
-		"HOW_TO_INSTALL.en.md",
-		"HOW_TO_INSTALL.tr.md",
-		"UPGRADE.md",
-		"README.md",
-		"README.tr.md",
-		"docs/ARCHITECTURE.md",
-		"docs/MITRE_ATTACK_GUIDE.md",
-		"migrations/postgres/001_initial_schema.sql",
-		"migrations/postgres/002_siem_tables.sql",
-		"migrations/clickhouse/001_initial_events.sql",
-		"docker-compose.yml",
+	// 3. Resolve changed files from GitHub compare API if available
+	hotPathsMap := map[string]bool{
+		"web/static/js/app.js":                        true,
+		"web/static/js/translations.js":               true,
+		"web/static/js/i18n.js":                       true,
+		"web/static/css/dashboard.css":                true,
+		"web/templates/index.html":                    true,
+		"web/templates/login.html":                    true,
+		"internal/version/version.go":                 true,
+		"upgrade.sh":                                  true,
+		"produce-logs.sh":                             true,
+		"HOW_TO_INSTALL.md":                           true,
+		"HOW_TO_INSTALL.en.md":                        true,
+		"HOW_TO_INSTALL.tr.md":                        true,
+		"UPGRADE.md":                                  true,
+		"README.md":                                   true,
+		"README.tr.md":                                true,
+		"docs/PORT_SPECIFICATIONS.md":                 true,
+		"docs/PORT_SPECIFICATIONS.tr.md":              true,
+		"docs/HELP.md":                                true,
+		"docs/HELP.tr.md":                             true,
+		"docs/ARCHITECTURE.md":                        true,
+		"docs/MITRE_ATTACK_GUIDE.md":                  true,
+		"migrations/postgres/001_initial_schema.sql":  true,
+		"migrations/postgres/002_siem_tables.sql":     true,
+		"migrations/clickhouse/001_initial_events.sql": true,
+		"docker-compose.yml":                          true,
+		"Dockerfile":                                  true,
+		"go.mod":                                      true,
+		"go.sum":                                      true,
+	}
+
+	// Query GitHub compare endpoint to discover all remote files added/modified
+	compareURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/compare/%s...%s",
+		version.RepoOwner, version.RepoName, version.CommitSHA, latest.SHA)
+	if compReq, err := http.NewRequestWithContext(ctx, http.MethodGet, compareURL, nil); err == nil {
+		compReq.Header.Set("User-Agent", "Valtrivo-LogSeal-Updater/1.0")
+		compReq.Header.Set("Accept", "application/vnd.github.v3+json")
+		if compResp, err := http.DefaultClient.Do(compReq); err == nil {
+			defer compResp.Body.Close()
+			if compResp.StatusCode == http.StatusOK {
+				var compData struct {
+					Files []struct {
+						Filename string `json:"filename"`
+						Status   string `json:"status"`
+					} `json:"files"`
+				}
+				if json.NewDecoder(compResp.Body).Decode(&compData) == nil {
+					for _, cf := range compData.Files {
+						if cf.Status != "removed" && cf.Filename != "" {
+							hotPathsMap[cf.Filename] = true
+						}
+					}
+				}
+			}
+		}
+	}
+
+	var hotPaths []string
+	for p := range hotPathsMap {
+		hotPaths = append(hotPaths, p)
 	}
 
 	var updatedFiles []string
@@ -409,7 +463,7 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 	binaryChanged := false
 
 	for i, relPath := range hotPaths {
-		pct := 50 + int(float64(i+1)/float64(len(hotPaths))*35) // 50% -> 85%
+		pct := 40 + int(float64(i+1)/float64(len(hotPaths))*35) // 40% -> 75%
 		rawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s",
 			version.RepoOwner, version.RepoName, version.Branch, relPath)
 
@@ -452,7 +506,10 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 		}
 		if wroteAny {
 			updatedFiles = append(updatedFiles, relPath)
-			sendProgress(pct, "HOT_PATCH", fmt.Sprintf("Hot-patched %s (%d bytes)", relPath, len(content)), false, true, nil)
+			if strings.HasSuffix(relPath, ".go") || relPath == "go.mod" || relPath == "go.sum" {
+				binaryChanged = true
+			}
+			sendProgress(pct, "HOT_PATCH", fmt.Sprintf("Synchronized %s (%d bytes)", relPath, len(content)), false, true, nil)
 		} else {
 			skippedFiles = append(skippedFiles, relPath)
 		}
@@ -472,7 +529,7 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	sendProgress(90, "VERSION_STATE", fmt.Sprintf("Updated runtime version state to %s (%s)", version.Version, shortSHA), false, true, nil)
+	sendProgress(78, "VERSION_STATE", fmt.Sprintf("Updated runtime version state to %s (%s)", version.Version, shortSHA), false, true, nil)
 
 	versionInfoContent := fmt.Sprintf("COMMIT_SHA=%s\nVERSION=%s\nBUILD_DATE=%s\nUPDATED_AT=%s\nUPDATED_BY=%s\n",
 		shortSHA, version.Version, time.Now().Format("2006-01-02"), time.Now().UTC().Format(time.RFC3339), session.Username)
@@ -480,7 +537,44 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 	_ = os.WriteFile("/opt/syslog-platform/config/.version_info", []byte(versionInfoContent), 0644)
 	_ = os.WriteFile("config/.version_info", []byte(versionInfoContent), 0644)
 
-	// 5. Record audit log
+	// 5. Download required Go libraries (go mod download) and recompile binary
+	if _, goErr := exec.LookPath("go"); goErr == nil {
+		sendProgress(82, "GO_MOD", "Downloading updated Go dependencies & libraries (go mod download)...", false, true, nil)
+		modCmd := exec.CommandContext(ctx, "go", "mod", "download")
+		if out, err := modCmd.CombinedOutput(); err != nil {
+			sendProgress(85, "GO_MOD_WARN", "go mod download notice: "+strings.TrimSpace(string(out)), false, true, nil)
+		} else {
+			sendProgress(85, "GO_MOD", "Go modules successfully downloaded and cached.", false, true, nil)
+		}
+
+		sendProgress(88, "GO_BUILD", "Compiling updated Go platform engine binary (go build)...", false, true, nil)
+		binTargets := []string{
+			"/opt/syslog-platform/bin/syslog-platform",
+		}
+		if exe, err := os.Executable(); err == nil && exe != "" {
+			binTargets = append(binTargets, exe)
+		}
+		builtAny := false
+		for _, binTgt := range binTargets {
+			buildCmd := exec.CommandContext(ctx, "go", "build", "-trimpath",
+				fmt.Sprintf("-ldflags=-s -w -X github.com/syslog-platform/logger/internal/version.CommitSHA=%s -X github.com/syslog-platform/logger/internal/version.Version=%s -X github.com/syslog-platform/logger/internal/version.BuildDate=%s",
+					shortSHA, version.Version, time.Now().Format("2006-01-02")),
+				"-o", binTgt, "./cmd/server/main.go")
+			if out, err := buildCmd.CombinedOutput(); err != nil {
+				sendProgress(91, "GO_BUILD_WARN", "go build: "+strings.TrimSpace(string(out)), false, true, nil)
+			} else {
+				sendProgress(91, "GO_BUILD", fmt.Sprintf("Platform binary recompiled successfully (%s)", binTgt), false, true, nil)
+				builtAny = true
+			}
+		}
+		if builtAny {
+			binaryChanged = true
+		}
+	} else {
+		sendProgress(88, "GO_INFO", "Container environment running without go compiler; hot-patches applied directly.", false, true, nil)
+	}
+
+	// 6. Record audit log
 	sendProgress(95, "AUDIT_LOG", "Recording upgrade event in system audit trail...", false, true, nil)
 	auditEntry := &models.AuditLog{
 		Username: session.Username,
@@ -492,20 +586,23 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 			"new_commit":    shortSHA,
 			"files_updated": len(updatedFiles),
 			"git_pulled":    gitSuccess,
+			"binary_built":  binaryChanged,
 			"version":       version.Version,
 		},
 		CreatedAt: time.Now().UTC(),
 	}
 	_ = h.pgDB.InsertAuditLog(ctx, auditEntry)
 
-	msg := fmt.Sprintf("Upgrade completed successfully! %d files hot-patched to %s (%s).", len(updatedFiles), version.Version, shortSHA)
+	msg := fmt.Sprintf("Upgrade completed successfully! System upgraded to %s (%s). Reloading platform...", version.Version, shortSHA)
 	cliCmd := "sudo bash upgrade.sh\n# or\ngit pull origin main && docker compose build syslog-app && docker compose up -d"
 
 	sendProgress(100, "COMPLETE", msg, true, true, map[string]interface{}{
 		"new_version":     version.Version,
 		"new_commit":      shortSHA,
 		"updated_files":   len(updatedFiles),
+		"binary_changed":  binaryChanged,
 		"cli_instruction": cliCmd,
+		"reloading":       true,
 	})
 
 	if !isStream {
@@ -519,6 +616,25 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 			CLIInstruction: cliCmd,
 		})
 	}
+
+	// 7. Trigger graceful application reload in background after 1.5 seconds so SSE response flushes to client
+	go func() {
+		time.Sleep(1500 * time.Millisecond)
+		log.Printf("[UPGRADE] Initiating automatic platform reload to activate %s (%s)...", version.Version, shortSHA)
+
+		// 1. Try systemd service restart if available
+		if _, err := exec.LookPath("systemctl"); err == nil {
+			_ = exec.Command("systemctl", "restart", "syslog-app").Run()
+		}
+
+		// 2. Try in-place executable replacement with syscall.Exec
+		if exe, err := os.Executable(); err == nil && exe != "" {
+			_ = syscall.Exec(exe, os.Args, os.Environ())
+		}
+
+		// 3. Fallback: Exit 0 so Docker container restart policy (restart: unless-stopped) reloads process immediately
+		os.Exit(0)
+	}()
 }
 
 // isHotApplicable checks if a file can be updated live without recompiling the Go binary

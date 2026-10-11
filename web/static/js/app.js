@@ -3750,18 +3750,40 @@ function initUpdatesManagement() {
 
         showToast(`✓ Platform upgraded to ${data.new_version || 'latest'}!`, 'success');
 
-        // Auto reload countdown
-        let remaining = 4;
+        // Auto reload countdown and server healthcheck reconnection
+        let remaining = 3;
         const countdownEl = document.getElementById('upd-reload-countdown');
         if (countdownEl) countdownEl.textContent = `${remaining}s`;
 
         if (upgradeReloadTimer) clearInterval(upgradeReloadTimer);
         upgradeReloadTimer = setInterval(() => {
             remaining--;
-            if (countdownEl) countdownEl.textContent = `${remaining}s`;
+            if (countdownEl) countdownEl.textContent = `${Math.max(0, remaining)}s`;
             if (remaining <= 0) {
                 clearInterval(upgradeReloadTimer);
-                window.location.reload(true);
+                if (footerStatus) {
+                    footerStatus.innerHTML = `🔄 <strong>Waiting for server restart...</strong> Reconnecting to dashboard...`;
+                    footerStatus.style.color = '#38bdf8';
+                }
+                // Poll healthcheck until server is back online
+                let checkAttempts = 0;
+                const pollTimer = setInterval(async () => {
+                    checkAttempts++;
+                    try {
+                        const hRes = await fetch('/api/v1/system/health', { cache: 'no-store' });
+                        if (hRes.ok) {
+                            clearInterval(pollTimer);
+                            window.location.reload(true);
+                            return;
+                        }
+                    } catch (e) {
+                        // Service restarting, wait for next attempt
+                    }
+                    if (checkAttempts >= 20) {
+                        clearInterval(pollTimer);
+                        window.location.reload(true);
+                    }
+                }, 1000);
             }
         }, 1000);
     }
@@ -7605,6 +7627,50 @@ async function loadReportIncidents() {
         console.error('Failed to load SIEM incidents for report selector:', err);
     }
 }
+
+// Network Ports & Architecture Guide Modal Controller
+function openPortsHelpModal() {
+    const modal = document.getElementById('ports-help-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closePortsHelpModal() {
+    const modal = document.getElementById('ports-help-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function copyPortsFirewallUFW() {
+    const cmd = "sudo ufw allow 22/tcp && sudo ufw allow 8443/tcp && sudo ufw allow 8080/tcp && sudo ufw allow 514/udp && sudo ufw allow 514/tcp && sudo ufw allow 5514/udp && sudo ufw allow 5514/tcp && sudo ufw allow 6514/tcp";
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(cmd).then(() => {
+            showToast('✓ UFW Firewall commands copied to clipboard!', 'success');
+        }).catch(() => {
+            showToast('Please copy the command manually.', 'info');
+        });
+    } else {
+        showToast('Clipboard access unavailable.', 'info');
+    }
+}
+
+function copyPortsFirewallFirewalld() {
+    const cmd = "sudo firewall-cmd --permanent --add-port=8443/tcp --add-port=8080/tcp --add-port=514/udp --add-port=514/tcp --add-port=5514/udp --add-port=5514/tcp --add-port=6514/tcp && sudo firewall-cmd --reload";
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(cmd).then(() => {
+            showToast('✓ Firewalld commands copied to clipboard!', 'success');
+        }).catch(() => {
+            showToast('Please copy the command manually.', 'info');
+        });
+    } else {
+        showToast('Clipboard access unavailable.', 'info');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('btn-open-ports-help');
+    if (btn) {
+        btn.addEventListener('click', openPortsHelpModal);
+    }
+});
 
 
 

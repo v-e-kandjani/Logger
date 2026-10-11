@@ -67,6 +67,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        COMMIT_SHA: ${COMMIT_SHA:-}
+        VERSION: ${VERSION:-}
+        BUILD_DATE: ${BUILD_DATE:-}
     container_name: syslog-app
     depends_on:
       clickhouse:
@@ -102,6 +106,7 @@ services:
       - syslog_archives:/opt/syslog-platform/archive
       - syslog_support_bundles:/opt/syslog-platform/data/support_bundles
       - ./timestamp-client:/opt/syslog-platform/timestamp-client
+      - ./config:/opt/syslog-platform/config
     restart: unless-stopped
     stop_grace_period: 30s
     healthcheck:

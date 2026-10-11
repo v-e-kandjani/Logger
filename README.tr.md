@@ -250,7 +250,21 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📋 [**Operasyon ve Felaket Kurtarma Kılavuzu (Runbook)**](docs/operations/recovery-runbook.md) — Olay eskalasyon matrisi, sunucu çökme toparlanması, WAN disk kuyruğu oynatma ve çevrimdışı RFC 3161 doğrulama adımları.
 - 🧪 [**Kabul Testi Sonuçları ve Sertifikasyon Raporu**](docs/validation/acceptance-results.md) — 10 kabul senaryosu sonucu, SLO kıyaslama metrikleri ve üretim onay kaydı.
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
+- 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
+- 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
+
+- **v1.7.4** (Güncelleme Eşitlik Hatası Düzeltmesi, Dinamik Go Modülü Eşitleme & Yeniden Başlatma, UI Buton Hizalama & Port Spesifikasyonları):
+  - **CLI ve Web Güncellemeleri Arasındaki Tam Eşitlik**:
+    - *CLI Güncelleme Durum Kalıcılığı*: CLI güncellemesi (`upgrade.sh`) yapıldıktan sonra Web Arayüzünün hâlâ güncelleme gerekiyor göstermesi hatası giderildi. `upgrade.sh` artık `config/.version_info` dosyasına güncel Git commit SHA'sını yazar, Docker derleme argümanlarını iletir ve çalışma zamanı sürümünü dinamik olarak günceller.
+    - *Web Güncellemesinde Go Kütüphanesi İndirme ve Otomatik Yeniden Başlatma*: Web arayüzü üzerinden yapılan güncellemelerde Go kütüphanelerinin indirilmemesi ve uygulamanın yeniden başlamaması sorunu çözüldü. Web güncelleme motoru artık GitHub compare API'sini kullanarak tüm değişen dosyaları (`go.mod`, `go.sum`, Go kaynak dosyaları) tespit eder, `go mod download` çalıştırarak kütüphaneleri indirir, Go ikili dosyasını derler ve arka planda güvenli yeniden başlatma (`syscall.Exec` / Docker respawn) tetikleyerek tarayıcıyı otomatik olarak yeni sürüme bağlar.
+    - *Sıfır Farklılık*: Her iki güncelleme yöntemi de aynı Go kütüphanelerini indirir, aynı ikili dosyayı derler ve sistemi kesintisiz yeniden başlatır.
+  - **Sistem Güncelleme Panelinde Buton Çakışması Düzeltildi**:
+    - `dashboard.css` ve `index.html` üzerinde `.section-actions` yapısı esnek flexbox düzeni (`justify-content: space-between`, `flex-wrap: wrap`, `gap: 16px`) ile yeniden tasarlandı. Eylem butonlarının (`#btn-check-updates` ve `#btn-apply-updates`) başlık ve alt başlık metinlerinin üzerine binmesi engellendi.
+  - **Ağ Mimarisi ve Port Spesifikasyon Dokümantasyonu**:
+    - Web arayüzü (8080/8443), Syslog toplama (514/5514/6514), PostgreSQL (5432 loopback), ClickHouse (8123/9000 loopback) ve Edge Proxy WAN çıkışını (8443 HTTPS) kapsayan kapsamlı dokümanlar oluşturuldu (`docs/PORT_SPECIFICATIONS.md` & `docs/PORT_SPECIFICATIONS.tr.md`).
+    - Kapsamlı Yardım Kılavuzu oluşturuldu (`docs/HELP.md` & `docs/HELP.tr.md`).
+    - Web arayüzü üst menüsüne tek tıkla açılan interaktif "Ağ Portları & Mimari Rehberi" modal penceresi eklendi.
 
 - **v1.7.3** (Uygulama Dil Seçimine Duyarlı Çok Dilli SIEM & SOC Raporlama Desteği):
   - **Aktif Uygulama Diliyle Dinamik Senkronizasyon**: Rapor oluşturma ve dışa aktarma isteklerinde arayüzün aktif dili (`localStorage.getItem('logseal_lang')` / `window.i18n.currentLang`) `/api/v1/reports/preview` ve `/api/v1/reports/export?lang=...` uç noktalarına otomatik olarak iletilir.

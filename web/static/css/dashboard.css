@@ -703,6 +703,46 @@ body.dark-theme {
     display: block;
 }
 
+/* Section Actions & Header Bars */
+.section-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.section-actions .section-title-group,
+.section-actions > div:first-child {
+    min-width: 260px;
+    flex: 1 1 auto;
+}
+
+.section-actions .section-title-group h3,
+.section-actions > div:first-child h3 {
+    margin: 0 0 4px 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.section-actions .section-title-group .subtitle,
+.section-actions > div:first-child .subtitle {
+    margin: 0;
+    white-space: normal;
+    word-break: break-word;
+    max-width: 720px;
+}
+
+.section-actions .section-btn-group,
+.section-actions > div:last-child {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+
 /* Stats Cards */
 .stats-grid {
     display: grid;

@@ -261,7 +261,21 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📋 [**Operations & Disaster Recovery Runbook**](docs/operations/recovery-runbook.md) — Incident escalation matrix, node failure recovery, WAN spool replay, and offline RFC 3161 audit verification.
 - 🧪 [**Acceptance Test Results & Certification**](docs/validation/acceptance-results.md) — 10 validation scenarios, SLO benchmark results, and production sign-off.
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
+- 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
+- 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
+
+- **v1.7.4** (Update Parity Bug Fix, Dynamic Go Module Sync & Reload, UI Button Positioning & Port Specifications):
+  - **Full Parity Between CLI and Web Upgrades**:
+    - *CLI Update State Persistence*: Fixed issue where CLI upgrade (`upgrade.sh`) left the Web UI indicating an update was still required. `upgrade.sh` now synchronizes `config/.version_info` with the exact Git commit SHA, passes build args to Docker build, and injects runtime metadata.
+    - *Web Update Dynamic Go Dependency & Binary Compilation*: Fixed issue where Web UI upgrades did not download updated Go modules or reload the application. Web upgrade engine now queries GitHub compare API for all modified files (including `go.mod`, `go.sum`, and Go source files), executes `go mod download`, recompiles the Go platform binary, and triggers graceful background application reload (`syscall.Exec` / Docker respawn) with automatic dashboard reconnection.
+    - *Zero Discrepancy*: Standardized both upgrade workflows so both download Go libraries, compile binaries, and reload processes identically.
+  - **System Upgrade UI Button Overlap Correction**:
+    - Re-architected `.section-actions` in `dashboard.css` and `index.html` with responsive flexbox layout (`justify-content: space-between`, `flex-wrap: wrap`, `gap: 16px`), preventing the upgrade action buttons (`#btn-check-updates` and `#btn-apply-updates`) from overlapping title and subtitle text across all screen sizes.
+  - **Network Architecture & Port Specifications Documentation**:
+    - Created comprehensive documentation in `docs/PORT_SPECIFICATIONS.md` (and `docs/PORT_SPECIFICATIONS.tr.md`) covering Web UI (8080/8443), Syslog ingestion (514/5514/6514), PostgreSQL (5432 loopback), ClickHouse (8123/9000 loopback), and Edge Proxy egress (8443 HTTPS).
+    - Created comprehensive Operations Help Guide in `docs/HELP.md` (and `docs/HELP.tr.md`).
+    - Added interactive "Network Ports & Architecture Guide" modal in the Web UI accessible from the top bar.
 
 - **v1.7.3** (Application-Selected Multi-Language Support for SIEM & SOC Reports):
   - **Dynamic Language Selection Synchronization**: Automatically detects and passes the active application language (`localStorage.getItem('logseal_lang')` / `window.i18n.currentLang`) to report generation endpoints (`/api/v1/reports/preview` & `/api/v1/reports/export?lang=...`).

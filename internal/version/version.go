@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	Version   = "v1.7.3"
+	Version   = "v1.7.4"
 	BuildDate = "2026-10-12"
-	CommitSHA = "2d2fd10"
+	CommitSHA = "7c1b29c"
 	Platform  = "Valtrivo LogSeal"
 	Company   = "Valtrivo"
 	Tagline   = "Her kayıt, zamanıyla kanıt."
@@ -19,18 +19,17 @@ var (
 )
 
 func init() {
-	// Attempt to detect current Git commit SHA dynamically if running in a repo
-	if out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output(); err == nil {
-		s := strings.TrimSpace(string(out))
-		if s != "" {
-			CommitSHA = s
-		}
-	}
+	ReloadRuntimeVersion()
+}
 
-	// Attempt to load runtime version overrides from .version_info if updated dynamically
+// ReloadRuntimeVersion synchronizes the in-memory version, commit SHA, and build date
+// from either local git repository or config/.version_info written by CLI / Web updates.
+func ReloadRuntimeVersion() {
+	// 1. Attempt to load runtime version overrides from .version_info if updated dynamically
 	paths := []string{
 		"/opt/syslog-platform/config/.version_info",
 		"config/.version_info",
+		"./config/.version_info",
 	}
 	for _, p := range paths {
 		if data, err := os.ReadFile(p); err == nil {
@@ -42,21 +41,29 @@ func init() {
 					v := strings.TrimSpace(parts[1])
 					switch k {
 					case "COMMIT_SHA":
-						if v != "" {
+						if v != "" && v != "unknown" {
 							CommitSHA = v
 						}
 					case "VERSION":
-						if v != "" {
+						if v != "" && v != "unknown" {
 							Version = v
 						}
 					case "BUILD_DATE":
-						if v != "" {
+						if v != "" && v != "unknown" {
 							BuildDate = v
 						}
 					}
 				}
 			}
 			break
+		}
+	}
+
+	// 2. Attempt to detect current Git commit SHA dynamically if running in a repo
+	if out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output(); err == nil {
+		s := strings.TrimSpace(string(out))
+		if s != "" && !strings.Contains(s, "fatal") && !strings.Contains(s, "error") {
+			CommitSHA = s
 		}
 	}
 }

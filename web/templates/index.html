@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.3</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.4</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -183,6 +183,13 @@
                         <button class="lang-btn active" id="lang-btn-tr" onclick="i18n.setLanguage('tr')">🇹🇷 TR</button>
                         <button class="lang-btn" id="lang-btn-en" onclick="i18n.setLanguage('en')">🇬🇧 EN</button>
                     </div>
+
+                    <!-- Network Ports & Help Guide Button -->
+                    <button class="btn btn-outline btn-top-compact" id="btn-open-ports-help" title="Network Ports & Architecture Documentation">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <span class="btn-label-long" data-i18n="btn_ports_help">Ağ Portları &amp; Yardım</span>
+                        <span class="btn-label-short" style="display: none;">Yardım</span>
+                    </button>
 
                     <button class="btn btn-primary btn-top-compact" id="btn-open-custom-export">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -2146,11 +2153,11 @@
             <!-- TAB: System Upgrade & Version Control -->
             <section class="tab-pane" id="pane-updates">
                 <div class="section-actions">
-                    <div>
+                    <div class="section-title-group">
                         <h3 data-i18n="view_title_updates">System Upgrade & Version Control</h3>
                         <p class="subtitle" data-i18n="view_subtitle_updates">GitHub repository synchronization, changed files inspection, and 1-click upgrades</p>
                     </div>
-                    <div style="display: flex; gap: 8px;">
+                    <div class="section-btn-group">
                         <button class="btn btn-outline" id="btn-check-updates">🔍 Check for Updates</button>
                         <button class="btn btn-primary" id="btn-apply-updates" disabled title="Check for updates first">🚀 Apply Upgrade (Changed Files)</button>
                     </div>
@@ -2169,7 +2176,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.3</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.4</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -3881,7 +3888,189 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.7.3"></script>
-    <script src="/static/js/app.js?v=1.7.3"></script>
+    <!-- MODAL: Network Ports & Architecture Guide -->
+    <div class="modal-backdrop" id="ports-help-modal" style="display: none;">
+        <div class="modal modal-wide" style="max-width: 960px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 24px;">🌐</span>
+                    <div>
+                        <h3 style="margin: 0;" data-i18n="modal_ports_title">Ağ Portları &amp; Mimari Rehberi</h3>
+                        <p class="subtitle" style="margin: 2px 0 0 0;">Merkez Sunucu, Veritabanları (PostgreSQL &amp; ClickHouse) ve Proxy Düğümleri İletişim Spesifikasyonu</p>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closePortsHelpModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1;">
+                <!-- Quick Info Alert -->
+                <div style="background: rgba(59, 130, 246, 0.08); border-left: 4px solid var(--primary); padding: 12px 16px; border-radius: 4px; margin-bottom: 20px; font-size: 13px;">
+                    💡 <strong>Çift Motorlu Güvenlik Mimarisi:</strong> Veritabanları (PostgreSQL 5432 ve ClickHouse 8123/9000) kesinlikle yalnızca <code>127.0.0.1</code> (loopback) dinler ve dış ağa kapalıdır. Uzak şube proxy düğümleri ise merkeze sadece çıkış yönünde (outbound) <strong>HTTPS 8443/tcp</strong> üzerinden bağlanır; şubede hiçbir port açılması gerekmez.
+                </div>
+
+                <!-- Section 1: Central Public & Ingestion Ports -->
+                <h4 style="margin: 0 0 10px 0; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                    <span>📡</span> 1. Merkez Sunucu Açık Portları (Web, API &amp; Syslog Toplama)
+                </h4>
+                <div class="table-container" style="margin-bottom: 20px;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Port</th>
+                                <th>Protokol</th>
+                                <th>Servis</th>
+                                <th>Yön</th>
+                                <th>Erişim Kapsamı &amp; Amaç</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong style="color: #38bdf8;">8443</strong></td>
+                                <td><span class="badge badge-primary">TCP</span></td>
+                                <td><strong>HTTPS Web &amp; Edge API</strong></td>
+                                <td>Giriş (Inbound)</td>
+                                <td>Önerilen güvenli web arayüzü ve Proxy Düğüm telemetri/toplu log aktarımı (TLS 1.3).</td>
+                            </tr>
+                            <tr>
+                                <td><strong>8080</strong></td>
+                                <td><span class="badge badge-outline">TCP</span></td>
+                                <td>HTTP Web Dashboard</td>
+                                <td>Giriş (Inbound)</td>
+                                <td>Dahili HTTP erişimi veya HTTPS yönlendirmesi.</td>
+                            </tr>
+                            <tr>
+                                <td><strong style="color: #10b981;">514</strong></td>
+                                <td><span class="badge badge-success">UDP</span></td>
+                                <td>Syslog Receiver</td>
+                                <td>Giriş (Inbound)</td>
+                                <td>Standart RFC 3164 / RFC 5424 UDP log dinleyicisi (Switch, Router, Firewall).</td>
+                            </tr>
+                            <tr>
+                                <td><strong style="color: #10b981;">514</strong></td>
+                                <td><span class="badge badge-success">TCP</span></td>
+                                <td>Syslog Stream</td>
+                                <td>Giriş (Inbound)</td>
+                                <td>Bağlantı temelli güvenilir TCP syslog teslimi.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>5514</strong></td>
+                                <td><span class="badge badge-outline">UDP / TCP</span></td>
+                                <td>Syslog Alt Port</td>
+                                <td>Giriş (Inbound)</td>
+                                <td>Yüksek hacimli güvenlik duvarı trafiğini ayrıştırmak için alternatif dinleyici.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>6514</strong></td>
+                                <td><span class="badge badge-warning">TLS TCP</span></td>
+                                <td>Syslog TLS (RFC 5425)</td>
+                                <td>Giriş (Inbound)</td>
+                                <td>Karşılıklı istemci sertifikası doğrulamalı (mTLS) şifreli syslog.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Section 2: Database Internal Loopback Isolation -->
+                <h4 style="margin: 0 0 10px 0; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                    <span>🔒</span> 2. Veritabanı Portları (Kesinlikle 127.0.0.1 Loopback İzolasyonu)
+                </h4>
+                <div class="table-container" style="margin-bottom: 20px;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Port</th>
+                                <th>Protokol</th>
+                                <th>Veritabanı</th>
+                                <th>Dinleme Arayüzü</th>
+                                <th>Saklanan Veri Kapsamı &amp; Güvenlik</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong style="color: #6366f1;">5432</strong></td>
+                                <td><span class="badge badge-primary">TCP</span></td>
+                                <td><strong>PostgreSQL 16</strong></td>
+                                <td><span class="badge badge-danger">127.0.0.1 (Loopback)</span></td>
+                                <td>Kiracılar, Cihaz Envanteri, RBAC Kullanıcılar, SIEM Kuralları, Denetim İzleri ve 5651 Arşivleri. Dış ağa kapalıdır.</td>
+                            </tr>
+                            <tr>
+                                <td><strong style="color: #f59e0b;">9000</strong></td>
+                                <td><span class="badge badge-warning">Native TCP</span></td>
+                                <td><strong>ClickHouse 24.3</strong></td>
+                                <td><span class="badge badge-danger">127.0.0.1 (Loopback)</span></td>
+                                <td>Go motorunun 100.000+ EPS hızında vektörize blok yazma yaptığı ikili protokol. Dış ağa kapalıdır.</td>
+                            </tr>
+                            <tr>
+                                <td><strong style="color: #f59e0b;">8123</strong></td>
+                                <td><span class="badge badge-outline">HTTP</span></td>
+                                <td>ClickHouse HTTP</td>
+                                <td><span class="badge badge-danger">127.0.0.1 (Loopback)</span></td>
+                                <td>Konteyner sağlık testi ve analitik şema göçleri. Dış ağa kapalıdır.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Section 3: Proxy Nodes (logseal-proxy) & NAT Traversal -->
+                <h4 style="margin: 0 0 10px 0; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                    <span>🔄</span> 3. Uzak Proxy Düğümleri (logseal-proxy) &amp; NAT Geçişi
+                </h4>
+                <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 12px;">
+                        <div>
+                            <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">Şube İçi Yerel Giriş (LAN)</div>
+                            <div style="font-size: 13px;">
+                                <strong>UDP/TCP 514 &amp; 5514:</strong> Şube içindeki firewall, switch ve router'lar loglarını doğrudan proxy düğümünün yerel IP'sine gönderir.
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">Merkeze Çıkış (WAN Egress)</div>
+                            <div style="font-size: 13px;">
+                                <strong>HTTPS 8443/tcp:</strong> Proxy, merkeze TLS 1.3 şifreli çıkış başlatır. Kalp atışı (heartbeat) ve gzip sıkıştırmalı log paketleri iletilir.
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">Sıfır Port Açma (Zero Inbound)</div>
+                            <div style="font-size: 13px; color: #10b981;">
+                                ✓ <strong>Şube firewall'unda hiçbir inbound port açılmaz.</strong> Tüm oturumlar proxy tarafından dışa doğru başlatılır.
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">Hat Kesintisi Koruması (Spool)</div>
+                            <div style="font-size: 13px;">
+                                İnternet kesilirse loglar yerel SQLite disk kuyruğuna yazılır, bağlantı sağlandığında sıfır kayıpla aktarılır.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: Firewall Configuration Commands -->
+                <h4 style="margin: 0 0 10px 0; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                    <span>🛡️</span> 4. Güvenlik Duvarı Komutları (Hızlı Kurulum)
+                </h4>
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px;" onclick="copyPortsFirewallUFW()">📋 UFW Komutlarını Kopyala (Ubuntu/Debian)</button>
+                    <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px;" onclick="copyPortsFirewallFirewalld()">📋 Firewalld Komutlarını Kopyala (RHEL/CentOS)</button>
+                </div>
+                <pre id="ports-firewall-code-block" style="background: #0f172a; color: #38bdf8; padding: 12px 14px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin: 0 0 16px 0; border: 1px solid #1e293b;"><code>sudo ufw allow 22/tcp && sudo ufw allow 8443/tcp && sudo ufw allow 8080/tcp && sudo ufw allow 514/udp && sudo ufw allow 514/tcp && sudo ufw allow 5514/udp && sudo ufw allow 5514/tcp && sudo ufw allow 6514/tcp</code></pre>
+
+                <!-- Documentation Links -->
+                <div style="border-top: 1px solid var(--border-color); padding-top: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div style="font-size: 12px; color: var(--text-muted);">
+                        Detaylı dokümantasyon dosyaları: <code>docs/PORT_SPECIFICATIONS.md</code> &amp; <code>docs/HELP.md</code>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <a href="/docs/PORT_SPECIFICATIONS.md" target="_blank" class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; text-decoration: none;">📄 Port Spesifikasyonu (MD)</a>
+                        <a href="/docs/HELP.md" target="_blank" class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; text-decoration: none;">📖 Yardım Kılavuzu (MD)</a>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; flex-shrink: 0;">
+                <button class="btn btn-primary" onclick="closePortsHelpModal()" data-i18n="btn_close">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/translations.js?v=1.7.4"></script>
+    <script src="/static/js/app.js?v=1.7.4"></script>
 </body>
 </html>
