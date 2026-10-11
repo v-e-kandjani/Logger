@@ -529,3 +529,45 @@ func generateRandomHex(n int) string {
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
+
+// PurgeExpiredBundles deletes support bundles older than 7 days from database and removes archive files from disk
+func (g *Generator) PurgeExpiredBundles(ctx context.Context) (int, error) {
+	var totalPurged int
+
+	// 1. Purge via database records
+	if g.pgDB != nil {
+		filePaths, err := g.pgDB.PurgeExpiredSupportBundles(ctx)
+		if err == nil {
+			for _, fp := range filePaths {
+				if fp != "" {
+					if err := os.Remove(fp); err == nil {
+						totalPurged++
+					}
+				}
+			}
+		}
+	}
+
+	// 2. Scan storage directory to delete any files older than 7 days (including untracked/orphaned bundles)
+	if entries, err := os.ReadDir(g.storagePath); err == nil {
+		cutoff := time.Now().Add(-7 * 24 * time.Hour)
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasPrefix(entry.Name(), "support-bundle-") || !strings.HasSuffix(entry.Name(), ".tar.gz") {
+				continue
+			}
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			if info.ModTime().Before(cutoff) {
+				fullPath := filepath.Join(g.storagePath, entry.Name())
+				if err := os.Remove(fullPath); err == nil {
+					totalPurged++
+				}
+			}
+		}
+	}
+
+	return totalPurged, nil
+}
+

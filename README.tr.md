@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.5.22** (Destek Tanılama Dosyaları İçin 7 Günlük TTL ve Otomatik Sunucudan Temizleme):
+  - **Otomatik 1 Hafta TTL Sunucu Temizleyici**: Arka planda her saat başı çalışan temizlik işçisi (`StartSupportBundleCleaner`) eklenerek 7 günlük saklama süresi dolan `.tar.gz` paket dosyalarının diskten silinmesi ve veritabanı kayıtlarının temizlenmesi sağlandı.
+  - **İndirme Kapısında Süre Denetimi**: `/support/download` rotasına `expires_at` (7 gün) denetimi eklendi; süresi dolan paketler için dosya diskten derhal silinir ve kullanıcıya `410 Gone (Süre Doldu)` uyarısı verilir.
+  - **Kullanıcı Arayüzünde TTL ve Kalan Süre Telemetrisi**: Sonuç kartına `⏳ 7 Gün (1 Hafta TTL)` bildirimi ve Geçmiş Paketler tablosuna kalan gün sayısını veya süresi doldu durumunu gösteren `Geçerlilik` rozeti eklendi.
+
 - **v1.5.21** (Destek Portalı Evrensel Pano Kopyalama & Tek Tıkla İndirme Optimizasyonu):
   - **Evrensel Pano Kopyalama Motoru (`copyToClipboard`)**: Asenkron `navigator.clipboard.writeText` ve saydam `document.execCommand('copy')` yedeklemesi içeren dayanıklı kopyalama sistemi geliştirildi; "Şifreyi Kopyala" ve "Bağlantıyı Kopyala" butonlarının tüm tarayıcılarda anında görsel geri bildirimle ("✓ Kopyalandı!") sorunsuz çalışması sağlandı.
   - **Tam Genişlikte İndirme Bağlantısı & Tek Tıkla Doğrudan İndirme**: İndirme URL kutusunun dar kalarak metni gizlemesi sorunu esnek flex düzeni ve tek tıkla tümünü seçme (`onclick="this.select()"`) ile giderildi; "Paketi Doğrudan İndir" butonunun mutlak URL çözümlemesi ve indirme garantisi güçlendirildi.

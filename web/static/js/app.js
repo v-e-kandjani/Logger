@@ -6262,6 +6262,22 @@ async function loadDebugBundles() {
             const dateStr = new Date(b.created_at).toLocaleString();
             const downloadUrl = `/support/download?id=${b.id}&passcode=${encodeURIComponent(b.access_passcode)}`;
 
+            const createdDate = new Date(b.created_at);
+            const expiresDate = b.expires_at ? new Date(b.expires_at) : new Date(createdDate.getTime() + 7 * 24 * 3600 * 1000);
+            const now = new Date();
+            const isExpired = now > expiresDate;
+            const diffMs = expiresDate - now;
+            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+            let ttlBadge = '';
+            if (isExpired) {
+                ttlBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; font-size: 0.72rem;">❌ ${(window.translations && window.translations[currentLang] && window.translations[currentLang].badge_expired) || 'Süresi Doldu'}</span>`;
+            } else if (diffDays <= 1) {
+                ttlBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; font-size: 0.72rem;">⚠️ ${(window.translations && window.translations[currentLang] && window.translations[currentLang].badge_expiring_today) || '< 24 Saat'}</span>`;
+            } else {
+                ttlBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.72rem;">⏳ ${diffDays} ${(window.translations && window.translations[currentLang] && window.translations[currentLang].lbl_days_left) || 'gün kaldı'}</span>`;
+            }
+
             return `
                 <tr>
                     <td><strong class="mono-code" style="color: var(--primary);">#${escapeHtml(b.id)}</strong></td>
@@ -6275,17 +6291,22 @@ async function loadDebugBundles() {
                         </div>
                     </td>
                     <td style="text-align: center;"><span class="badge ${b.download_count > 0 ? 'badge-success' : 'badge-secondary'}">${b.download_count}</span></td>
+                    <td style="text-align: center;">${ttlBadge}</td>
                     <td>
-                        <a href="${downloadUrl}" download="${escapeHtml(b.filename)}" class="btn btn-xs btn-outline" style="text-decoration: none; padding: 2px 8px;">
-                            ⬇️ ${(window.translations && window.translations[currentLang] && window.translations[currentLang].th_actions) || 'İndir'}
-                        </a>
+                        ${isExpired ? `
+                            <span class="text-muted" style="font-size: 0.75rem;">(Silindi)</span>
+                        ` : `
+                            <a href="${downloadUrl}" download="${escapeHtml(b.filename)}" class="btn btn-xs btn-outline" style="text-decoration: none; padding: 2px 8px;">
+                                ⬇️ ${(window.translations && window.translations[currentLang] && window.translations[currentLang].th_actions) || 'İndir'}
+                            </a>
+                        `}
                     </td>
                 </tr>
             `;
         }).join('');
 
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Hata: ${escapeHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Hata: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
 

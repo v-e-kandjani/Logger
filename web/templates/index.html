@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.21</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.5.22</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -1717,12 +1717,12 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.21</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.5.22</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">0521f01</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">0522f01</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-11</div>
                     </div>
                     <div class="stat-card">
@@ -1892,6 +1892,11 @@
                                             <button type="button" class="btn btn-xs btn-primary" onclick="copyDebugLink()" id="btn-copy-link" style="padding: 6px 12px; font-size: 0.75rem; white-space: nowrap;" data-i18n="debug_copy_link">📋 Kopyala</button>
                                         </div>
                                     </div>
+                                    <div style="font-size: 0.82rem; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                        <span style="color: var(--text-muted);" data-i18n="debug_lbl_ttl">Geçerlilik Süresi:</span>
+                                        <span class="badge badge-warning" style="font-size: 0.72rem; padding: 2px 8px; font-weight: 600;" data-i18n="debug_ttl_badge">⏳ 7 Gün (1 Hafta TTL)</span>
+                                        <small style="color: var(--text-muted); font-size: 0.72rem;" data-i18n="debug_ttl_desc">(Süre bitiminde sunucudan otomatik silinir)</small>
+                                    </div>
                                     <div id="debug-res-email-banner" style="font-size: 0.75rem; color: #10b981; margin-bottom: 10px;"></div>
                                     <div>
                                         <a id="debug-res-direct-link" href="#" class="btn btn-outline btn-xs" style="width: 100%; text-align: center; display: block; padding: 8px; font-weight: 600; text-decoration: none;" data-i18n="btn_download_bundle_now">⬇️ Paketi Doğrudan İndir</a>
@@ -1915,11 +1920,12 @@
                                                 <th data-i18n="th_bundle_size">Boyut</th>
                                                 <th data-i18n="th_bundle_passcode">Güvenlik Şifresi</th>
                                                 <th data-i18n="th_bundle_downloads">İndirilme</th>
+                                                <th data-i18n="th_bundle_ttl">Geçerlilik</th>
                                                 <th data-i18n="th_actions">İşlem</th>
                                             </tr>
                                         </thead>
                                         <tbody id="debug-bundles-body">
-                                            <tr><td colspan="7" class="text-center" style="color: var(--text-muted);">Henüz oluşturulmuş destek paketi yok.</td></tr>
+                                            <tr><td colspan="8" class="text-center" style="color: var(--text-muted);">Henüz oluşturulmuş destek paketi yok.</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -3168,7 +3174,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.5.21"></script>
-    <script src="/static/js/app.js?v=1.5.21"></script>
+    <script src="/static/js/translations.js?v=1.5.22"></script>
+    <script src="/static/js/app.js?v=1.5.22"></script>
 </body>
 </html>

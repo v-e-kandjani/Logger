@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.5.22** (Support Diagnostics 7-Day TTL Auto-Purge & Retention Governance):
+  - **Automated 1-Week TTL Server Auto-Cleaner**: Introduced background retention worker running every hour (`StartSupportBundleCleaner`) to automatically delete expired `.tar.gz` diagnostic bundles from disk and purge database catalog records once 7 days elapse.
+  - **Gate & Download Route Expiration Enforcement**: Enhanced `/support/download` to verify bundle `expires_at` (7-day window); automatically removes file and returns `410 Gone` if expired, preventing stale diagnostic bundles from persisting on disk.
+  - **TTL & Expiry Telemetry in UI**: Added prominent 7-day TTL countdown telemetry across both the Result Card (`⏳ 7 Gün (1 Hafta TTL)`) and Support Bundles History table (`Geçerlilik` badge with remaining days or expired status).
+
 - **v1.5.21** (Support Portal Universal Clipboard & One-Click Download Optimization):
   - **Universal Clipboard Copy Engine (`copyToClipboard`)**: Implemented robust clipboard helper with asynchronous `navigator.clipboard.writeText` and transparent fallback to `document.execCommand('copy')`, fixing "Copy Passcode" and "Copy Link" buttons across all browsers and SSL contexts with instant visual confirmation feedback ("✓ Copied!").
   - **Full-Width Responsive Download URL & 1-Click Direct Download**: Resolved narrow input truncation by applying fluid flexbox width and automatic click-to-select (`onclick="this.select()"`); enhanced direct download button (`⬇️ Download Bundle Directly`) with absolute URL resolution and download trigger guarantees.

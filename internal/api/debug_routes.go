@@ -1,9 +1,11 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -120,6 +122,13 @@ func (h *Handler) handleSupportDownload(w http.ResponseWriter, r *http.Request) 
 	bundle, err := h.pgDB.GetSupportBundle(ctx, bundleID)
 	if err != nil || bundle == nil {
 		http.Error(w, "Support bundle not found or expired", http.StatusNotFound)
+		return
+	}
+
+	// Verify 7-day TTL expiration
+	if time.Now().After(bundle.ExpiresAt) || time.Since(bundle.CreatedAt) > 7*24*time.Hour {
+		_ = os.Remove(bundle.FilePath)
+		http.Error(w, "Bu destek paketinin 7 günlük kullanım süresi (TTL) dolmuş ve sunucudan kalıcı olarak kaldırılmıştır. / This support bundle has expired (7-day TTL) and was automatically removed from the server.", http.StatusGone)
 		return
 	}
 
@@ -371,6 +380,10 @@ func (h *Handler) renderDownloadGatePage(w http.ResponseWriter, r *http.Request,
                 <span class="meta-lbl">Oluşturulma Tarihi:</span>
                 <span class="meta-val">{{.CreatedStr}}</span>
             </div>
+            <div class="meta-row">
+                <span class="meta-lbl">Geçerlilik Süresi (TTL):</span>
+                <span class="meta-val" style="color: #fbbf24;">⏳ 7 Gün &bull; Son: {{.ExpiresStr}}</span>
+            </div>
         </div>
 
         <form method="POST" action="/support/download">
@@ -418,6 +431,7 @@ func (h *Handler) renderDownloadGatePage(w http.ResponseWriter, r *http.Request,
 		"Bundle":     b,
 		"SizeKB":     float64(b.FileSize) / 1024,
 		"CreatedStr": b.CreatedAt.Format("2006-01-02 15:04:05 UTC"),
+		"ExpiresStr": b.ExpiresAt.Format("2006-01-02 15:04:05 UTC"),
 		"Error":      errorMsg,
 	})
 }
@@ -460,3 +474,37 @@ func (h *Handler) gatherDiagnosticHealth(r *http.Request) map[string]any {
 
 	return stats
 }
+
+// StartSupportBundleCleaner runs a background cleanup worker that removes expired support bundles (7-day TTL)
+func (h *Handler) StartSupportBundleCleaner(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+
+		runPurge := func() {
+			if h.pgDB == nil {
+				return
+			}
+			gen := debug.NewGenerator(h.pgDB, h.chClient, "")
+			purged, err := gen.PurgeExpiredBundles(context.Background())
+			if err != nil {
+				log.Printf("[Support-Cleaner] Error purging expired bundles: %v", err)
+			} else if purged > 0 {
+				log.Printf("[Support-Cleaner] Automatically removed %d expired support bundle archive(s) (7-day TTL policy)", purged)
+			}
+		}
+
+		// Initial sweep on startup
+		runPurge()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				runPurge()
+			}
+		}
+	}()
+}
+

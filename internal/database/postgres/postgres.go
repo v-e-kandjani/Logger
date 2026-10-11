@@ -2215,3 +2215,32 @@ func (db *DB) IncrementBundleDownloadCount(ctx context.Context, id string) error
 	_, err := db.pool.Exec(ctx, query, id)
 	return err
 }
+
+// PurgeExpiredSupportBundles deletes support bundles whose expires_at < NOW() or older than 7 days, returning their file paths
+func (db *DB) PurgeExpiredSupportBundles(ctx context.Context) ([]string, error) {
+	querySelect := `
+		SELECT file_path
+		FROM support_bundles
+		WHERE expires_at <= NOW() OR created_at <= NOW() - INTERVAL '7 days'`
+	rows, err := db.pool.Query(ctx, querySelect)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var filePaths []string
+	for rows.Next() {
+		var fp string
+		if err := rows.Scan(&fp); err == nil && fp != "" {
+			filePaths = append(filePaths, fp)
+		}
+	}
+
+	queryDelete := `
+		DELETE FROM support_bundles
+		WHERE expires_at <= NOW() OR created_at <= NOW() - INTERVAL '7 days'`
+	_, _ = db.pool.Exec(ctx, queryDelete)
+
+	return filePaths, nil
+}
+

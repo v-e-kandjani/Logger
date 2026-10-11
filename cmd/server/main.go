@@ -245,6 +245,7 @@ func main() {
 	apiHandler.SetHTTPSManager(httpsMgr)
 	apiHandler.SetResultCache(resultCache)
 	apiHandler.StartMitreAutoSync(appCtx)
+	apiHandler.StartSupportBundleCleaner(appCtx)
 	mux := http.NewServeMux()
 	apiHandler.RegisterRoutes(mux)
 
