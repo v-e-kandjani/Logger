@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.6.4</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.6.5</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -1604,7 +1604,7 @@
                                             <th data-i18n="th_sync_interval">Gönderim Zamanlaması</th>
                                             <th data-i18n="th_last_seen">Son İletişim / IP</th>
                                             <th data-i18n="th_logs_forwarded">İletilen Log</th>
-                                            <th data-i18n="th_token">Erişim Tokenı</th>
+                                            <th data-i18n="th_token">Erişim Tokenı &amp; Güvenlik</th>
                                             <th style="text-align: right;" data-i18n="th_actions">İşlemler</th>
                                         </tr>
                                     </thead>
@@ -1733,6 +1733,15 @@
                                         <option value="USER_PASSWORD_RESET">USER_PASSWORD_RESET</option>
                                         <option value="TENANT_CREATE">TENANT_CREATE</option>
                                         <option value="TENANT_DELETE">TENANT_DELETE</option>
+                                        <option value="EDGE_NODE_CREATED">EDGE_NODE_CREATED</option>
+                                        <option value="EDGE_NODE_ACTIVATED">EDGE_NODE_ACTIVATED</option>
+                                        <option value="EDGE_NODE_DELETED">EDGE_NODE_DELETED</option>
+                                        <option value="EDGE_KEY_ROTATED">EDGE_KEY_ROTATED</option>
+                                        <option value="EDGE_INTERVAL_UPDATED">EDGE_INTERVAL_UPDATED</option>
+                                        <option value="EDGE_CIDR_UPDATED">EDGE_CIDR_UPDATED</option>
+                                        <option value="EDGE_AUTH_FAILURE">EDGE_AUTH_FAILURE</option>
+                                        <option value="EDGE_AUTH_EXPIRED">EDGE_AUTH_EXPIRED</option>
+                                        <option value="EDGE_IP_BLOCKED">EDGE_IP_BLOCKED</option>
                                     </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
@@ -1827,7 +1836,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.6.4</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.6.5</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -3137,6 +3146,30 @@
                         </select>
                         <small style="color: var(--text-muted); font-size: 0.75rem;" data-i18n="help_edge_sync_interval">İstemci bu ayarı buluttan otomatik alır. İleride doğrudan tablodan değiştirilebilir.</small>
                     </div>
+
+                    <!-- Zero-Trust Security & API Key Policies (Phase 6) -->
+                    <div style="background: rgba(56, 189, 248, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+                        <div style="font-weight: 600; font-size: 0.82rem; color: #38bdf8; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                            <span>🛡️</span> <span data-i18n="sec_edge_zero_trust">Zero-Trust Güvenlik &amp; API Anahtarı Kuralları</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div class="form-group">
+                                <label style="font-size: 0.78rem; font-weight: 600;" data-i18n="lbl_edge_key_expiry">Anahtar Geçerlilik Süresi</label>
+                                <select class="input" id="edge-new-key-expiry">
+                                    <option value="0" selected data-i18n="opt_expiry_never">Süresiz (Rotasyon Yapılana Kadar)</option>
+                                    <option value="30" data-i18n="opt_expiry_30d">30 Gün</option>
+                                    <option value="90" data-i18n="opt_expiry_90d">90 Gün (Önerilen)</option>
+                                    <option value="180" data-i18n="opt_expiry_180d">180 Gün (6 Ay)</option>
+                                    <option value="365" data-i18n="opt_expiry_365d">365 Gün (1 Yıl)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size: 0.78rem; font-weight: 600;" data-i18n="lbl_edge_allowed_cidrs">İzin Verilen Kaynak IP / CIDR</label>
+                                <input type="text" class="input mono-code" id="edge-new-allowed-cidrs" placeholder="Örn: 10.0.0.0/8, 192.168.1.50">
+                            </div>
+                        </div>
+                        <small style="color: var(--text-muted); font-size: 0.72rem; display: block; margin-top: 4px;" data-i18n="help_edge_allowed_cidrs">Boş veya * girilirse tüm IP'lerden log kabul edilir. Belirtilirse sadece listedeki IP/CIDR'dan kabul edilir.</small>
+                    </div>
                 </div>
 
                 <!-- Success Box showing token and 1-line installation curl command -->
@@ -3267,7 +3300,7 @@
                 </div>
 
                 <!-- 3. Cloud Schedule -->
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 12px;">
                     <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="act_lbl_sync_freq">Log Gönderim Sıklığı (Cloud Schedule)</label>
                     <select class="input" id="act-edge-sync-interval">
                         <option value="online" data-i18n="opt_sync_online">online (Anlık / Gerçek Zamanlı)</option>
@@ -3278,10 +3311,77 @@
                         <option value="every hour" data-i18n="opt_sync_1h">every hour (Her saat başı)</option>
                     </select>
                 </div>
+
+                <!-- 4. Zero-Trust Allowed CIDRs -->
+                <div class="form-group">
+                    <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="act_lbl_allowed_cidrs">Zero-Trust Kaynak IP / CIDR Beyaz Listesi</label>
+                    <input type="text" class="input mono-code" id="act-edge-allowed-cidrs" placeholder="Örn: 10.0.0.0/8, 192.168.1.50 (Boş veya * = Herkes)">
+                    <small style="color: var(--text-muted); font-size: 0.72rem;" data-i18n="help_edge_allowed_cidrs">Boş veya * girilirse tüm IP'lerden log kabul edilir. Belirtilirse sadece listedeki IP/CIDR'dan kabul edilir.</small>
+                </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
                 <button class="btn btn-outline" onclick="closeActivateEdgeNodeModal()" data-i18n="btn_cancel">İptal</button>
                 <button class="btn btn-primary" id="btn-save-act-edge" onclick="submitActivateEdgeNode()" data-i18n="btn_save_act_edge">⚡ Düğümü Etkinleştir &amp; Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Rotate Edge API Key (Zero-Trust Key Rotation) -->
+    <div class="modal-backdrop" id="modal-rotate-edge-key" style="display: none;">
+        <div class="modal" style="max-width: 560px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="background: rgba(234, 179, 8, 0.1); padding: 8px; border-radius: 8px; font-size: 1.3rem;">🔑</div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_rotate_edge_title">API Anahtarını Yenile (Key Rotation)</h3>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="modal_rotate_edge_sub">Zero-Trust Güvenlik Anahtarı Değişimi</div>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeRotateEdgeKeyModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <input type="hidden" id="rotate-edge-node-id">
+                <div id="rotate-key-form-container">
+                    <div class="alert alert-warning" style="background: rgba(234, 179, 8, 0.1); border-left: 4px solid #eab308; padding: 12px; border-radius: 6px; margin-bottom: 16px;">
+                        <strong style="color: #facc15;" data-i18n="warn_rotate_key_title">⚠️ Dikkat: Mevcut Anahtar Geçersiz Kılınacaktır</strong>
+                        <div style="font-size: 0.82rem; margin-top: 4px; color: var(--text-color);" data-i18n="warn_rotate_key_desc">Bu işlem tamamlandığında eski token anında iptal edilir. Uzak proxy sunucusundaki proxy.json dosyasını yeni token ile güncellemeniz gerekir.</div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="lbl_rotate_node_name">Düğüm Adı</label>
+                        <input type="text" class="input" id="rotate-edge-node-name-disp" readonly style="background: rgba(0,0,0,0.25);">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label style="font-size: 0.85rem; font-weight: 600;" data-i18n="lbl_rotate_key_expiry">Yeni Anahtar Geçerlilik Süresi</label>
+                        <select class="input" id="rotate-edge-key-expiry">
+                            <option value="0" data-i18n="opt_expiry_never">Süresiz (Rotasyon Yapılana Kadar)</option>
+                            <option value="30" data-i18n="opt_expiry_30d">30 Gün</option>
+                            <option value="90" selected data-i18n="opt_expiry_90d">90 Gün (Önerilen)</option>
+                            <option value="180" data-i18n="opt_expiry_180d">180 Gün (6 Ay)</option>
+                            <option value="365" data-i18n="opt_expiry_365d">365 Gün (1 Yıl)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="rotate-key-success-box" style="display: none;">
+                    <div class="alert alert-success" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid var(--accent-green); padding: 12px; border-radius: 6px; margin-bottom: 16px;">
+                        <strong style="color: #4ade80;" data-i18n="rotate_key_success_title">✓ Yeni API Anahtarı Üretildi!</strong>
+                        <div style="font-size: 0.82rem; margin-top: 4px; color: var(--text-muted);" data-i18n="rotate_key_success_desc">Aşağıdaki yeni erişim tokenını kopyalayıp uzak sunucuda güncelleyiniz.</div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label style="font-size: 0.82rem; font-weight: 600;" data-i18n="lbl_result_new_token">Yeni Erişim Tokenı</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" class="input mono-code" id="rotate-result-token" readonly style="background: rgba(0,0,0,0.3); font-size: 0.8rem;">
+                            <button class="btn btn-outline" onclick="copyRotateResultToken()" title="Kopyala">📋</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" id="modal-rotate-edge-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-outline" onclick="closeRotateEdgeKeyModal()" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" id="btn-submit-rotate-key" onclick="submitRotateEdgeNodeKey()" style="background: #eab308; border-color: #eab308; color: #000;" data-i18n="btn_confirm_rotate">🔄 Anahtarı Yenile</button>
             </div>
         </div>
     </div>
@@ -3366,7 +3466,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.6.4"></script>
-    <script src="/static/js/app.js?v=1.6.4"></script>
+    <script src="/static/js/translations.js?v=1.6.5"></script>
+    <script src="/static/js/app.js?v=1.6.5"></script>
 </body>
 </html>

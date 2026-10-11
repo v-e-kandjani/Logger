@@ -236,6 +236,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/settings/edge/nodes/interval", h.requireAuth(h.handleEdgeNodeInterval))
 	mux.HandleFunc("/api/v1/settings/edge/nodes/activate", h.requireAuth(h.handleEdgeNodeActivate))
 	mux.HandleFunc("/api/v1/settings/edge/nodes/delete", h.requireAuth(h.handleEdgeNodeDelete))
+	mux.HandleFunc("/api/v1/settings/edge/nodes/rotate-key", h.requireAuth(h.handleEdgeRotateKey))
+	mux.HandleFunc("/api/v1/settings/edge/nodes/cidr", h.requireAuth(h.handleEdgeNodeCIDRs))
 
 	// Multi-Tenant Governance Endpoints
 	mux.HandleFunc("/api/v1/tenants", h.requireAuth(h.handleTenants))

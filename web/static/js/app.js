@@ -6068,9 +6068,27 @@ async function loadEdgeNodes() {
                 optionsHtml += `<option value="${opt.id}" ${sel}>${opt.label}</option>`;
             });
 
-            const maskedToken = (n.token && n.token.length > 14)
+            const tokenDisp = n.token_prefix || (n.token && n.token.length > 14
                 ? `${n.token.substring(0, 10)}...${n.token.substring(n.token.length - 4)}`
-                : (n.token || '');
+                : (n.token || 'lp_edge_***'));
+
+            let expiryBadge = `<span class="badge" style="background: rgba(148,163,184,0.1); color: #94a3b8; font-size: 0.7rem;">♾️ ${t('badge_key_never', 'Süresiz')}</span>`;
+            if (n.key_expires_at) {
+                const expDate = new Date(n.key_expires_at);
+                const isExpired = expDate.getTime() < Date.now();
+                if (isExpired) {
+                    expiryBadge = `<span class="badge" style="background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); font-size: 0.7rem;">⚠️ ${t('badge_key_expired', 'Süresi Doldu')}: ${expDate.toLocaleDateString()}</span>`;
+                } else {
+                    expiryBadge = `<span class="badge" style="background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); font-size: 0.7rem;">⏳ ${t('badge_key_expires', 'Bitiş')}: ${expDate.toLocaleDateString()}</span>`;
+                }
+            }
+
+            let cidrBadge = `<span class="badge" style="background: rgba(56,189,248,0.08); color: #38bdf8; font-size: 0.7rem;">🌐 ${t('filter_all', 'Tüm IP\'ler (*)')}</span>`;
+            if (n.allowed_cidrs && n.allowed_cidrs.trim() !== '' && n.allowed_cidrs.trim() !== '*') {
+                const cleanCidr = n.allowed_cidrs.trim();
+                const shortCidr = cleanCidr.length > 16 ? cleanCidr.substring(0, 14) + '...' : cleanCidr;
+                cidrBadge = `<span class="badge" style="background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); font-size: 0.7rem;" title="${escapeHtml(cleanCidr)}">🔒 ${escapeHtml(shortCidr)}</span>`;
+            }
 
             const adminInfo = (n.admin_name || n.admin_username)
                 ? `<div><strong>${escapeHtml(n.admin_name || n.admin_username)}</strong> <span style="font-size: 0.72rem; color: var(--text-muted);">(@${escapeHtml(n.admin_username || '')})</span></div><div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(n.admin_email || '')}</div>`
@@ -6083,7 +6101,7 @@ async function loadEdgeNodes() {
                             <span style="font-size: 1.1rem;">🖥️</span>
                             <div>
                                 <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(n.name)}</div>
-                                <div style="font-size: 0.72rem; color: var(--text-muted);">v${escapeHtml(n.version || '1.5.16')}</div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted);">v${escapeHtml(n.version || '1.6.5')}</div>
                             </div>
                         </div>
                     </td>
@@ -6101,15 +6119,22 @@ async function loadEdgeNodes() {
                         ${(n.logs_forwarded || 0).toLocaleString()}
                     </td>
                     <td>
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <code style="font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">${escapeHtml(maskedToken)}</code>
-                            <button class="btn btn-outline" style="padding: 2px 6px; font-size: 0.72rem;" onclick="copyToClipboard('${n.token}', '${t('token_copied', 'Token panoya kopyalandı!')}')" title="Copy Token">
-                                📋
-                            </button>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <code style="font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">${escapeHtml(tokenDisp)}</code>
+                                ${n.token ? `<button class="btn btn-outline" style="padding: 2px 6px; font-size: 0.72rem;" onclick="copyToClipboard('${n.token}', '${t('token_copied', 'Token panoya kopyalandı!')}')" title="Copy Token">📋</button>` : ''}
+                            </div>
+                            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                                ${expiryBadge}
+                                ${cidrBadge}
+                            </div>
                         </div>
                     </td>
                     <td style="text-align: right;">
-                        <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                        <div style="display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap;">
+                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem; color: #facc15; border-color: rgba(234,179,8,0.4);" onclick="openRotateEdgeKeyModal('${n.id}', '${escapeHtml(n.name)}')" title="${t('btn_rotate_key', 'Anahtarı Yenile')}">
+                                🔑 ${t('btn_rotate_key', 'Anahtarı Yenile')}
+                            </button>
                             ${isActPending ? `
                             <button class="btn btn-primary" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openActivateEdgeNodeModal('${n.id}')" title="Activate &amp; Configure">
                                 ${t('btn_activate', '⚡ Etkinleştir')}
@@ -6117,7 +6142,7 @@ async function loadEdgeNodes() {
                             <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openActivateEdgeNodeModal('${n.id}')" title="Settings">
                                 ${t('btn_settings', '⚙️ Ayarlar')}
                             </button>`}
-                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="copyNodeInstallCurl('${n.token}', '${escapeHtml(n.name)}')" title="Install Command">
+                            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="copyNodeInstallCurl('${n.token || ''}', '${escapeHtml(n.name)}')" title="Install Command">
                                 ${t('btn_install', '💻 Kurulum')}
                             </button>
                             <button class="btn btn-outline text-danger" style="padding: 3px 8px; font-size: 0.75rem;" onclick="deleteEdgeNode('${n.id}', '${escapeHtml(n.name)}')" title="Delete Node">
@@ -6168,6 +6193,8 @@ function openAddEdgeNodeModal() {
     document.getElementById('edge-new-admin-username').value = '';
     document.getElementById('edge-new-admin-pass').value = '';
     document.getElementById('edge-new-sync-interval').value = 'online';
+    if (document.getElementById('edge-new-allowed-cidrs')) document.getElementById('edge-new-allowed-cidrs').value = '';
+    if (document.getElementById('edge-new-key-expiry')) document.getElementById('edge-new-key-expiry').value = '0';
 
     document.getElementById('edge-form-container').style.display = 'block';
     document.getElementById('edge-create-success-box').style.display = 'none';
@@ -6196,6 +6223,8 @@ async function submitAddEdgeNode() {
     const adminUsernameInput = document.getElementById('edge-new-admin-username');
     const adminPassInput = document.getElementById('edge-new-admin-pass');
     const intervalInput = document.getElementById('edge-new-sync-interval');
+    const cidrsInput = document.getElementById('edge-new-allowed-cidrs');
+    const expiryInput = document.getElementById('edge-new-key-expiry');
     const saveBtn = document.getElementById('btn-save-edge-node');
 
     const name = nameInput.value.trim();
@@ -6208,6 +6237,8 @@ async function submitAddEdgeNode() {
     const tenant = tenantInput.value.trim() || 'default';
     const actStatus = actStatusInput.value || 'active';
     const interval = intervalInput.value || 'online';
+    const allowedCIDRs = cidrsInput ? cidrsInput.value.trim() : '';
+    const expiresDays = expiryInput ? (parseInt(expiryInput.value, 10) || 0) : 0;
 
     try {
         saveBtn.disabled = true;
@@ -6224,7 +6255,9 @@ async function submitAddEdgeNode() {
                 admin_email: adminEmailInput.value.trim(),
                 admin_username: adminUsernameInput.value.trim(),
                 admin_initial_pass: adminPassInput.value.trim(),
-                sync_interval: interval
+                sync_interval: interval,
+                allowed_cidrs: allowedCIDRs,
+                expires_days: expiresDays
             })
         });
 
@@ -6270,6 +6303,9 @@ function openActivateEdgeNodeModal(nodeId) {
     document.getElementById('act-edge-admin-username').value = node.admin_username || '';
     document.getElementById('act-edge-admin-pass').value = node.admin_initial_pass || '';
     document.getElementById('act-edge-sync-interval').value = node.sync_interval || 'online';
+    if (document.getElementById('act-edge-allowed-cidrs')) {
+        document.getElementById('act-edge-allowed-cidrs').value = node.allowed_cidrs || '';
+    }
 
     const ldap = node.ldap_config || {};
     document.getElementById('act-edge-ldap-enabled').checked = !!ldap.enabled;
@@ -6295,6 +6331,7 @@ async function submitActivateEdgeNode() {
     const adminUsername = document.getElementById('act-edge-admin-username').value.trim();
     const adminPass = document.getElementById('act-edge-admin-pass').value.trim();
     const syncInterval = document.getElementById('act-edge-sync-interval').value;
+    const allowedCIDRs = document.getElementById('act-edge-allowed-cidrs') ? document.getElementById('act-edge-allowed-cidrs').value.trim() : '';
 
     const ldapConfig = {
         enabled: document.getElementById('act-edge-ldap-enabled').checked,
@@ -6320,7 +6357,8 @@ async function submitActivateEdgeNode() {
                 admin_username: adminUsername,
                 admin_pass: adminPass,
                 sync_interval: syncInterval,
-                ldap_config: ldapConfig
+                ldap_config: ldapConfig,
+                allowed_cidrs: allowedCIDRs
             })
         });
 
@@ -6376,6 +6414,63 @@ async function deleteEdgeNode(nodeId, nodeName) {
     } catch (err) {
         alert('Düğüm silinemedi: ' + err.message);
     }
+}
+
+function openRotateEdgeKeyModal(nodeId, nodeName) {
+    const modal = document.getElementById('modal-rotate-edge-key');
+    if (!modal) return;
+    document.getElementById('rotate-edge-node-id').value = nodeId;
+    document.getElementById('rotate-edge-node-name-disp').value = nodeName;
+    document.getElementById('rotate-edge-key-expiry').value = '90';
+    document.getElementById('rotate-key-form-container').style.display = 'block';
+    document.getElementById('rotate-key-success-box').style.display = 'none';
+    const btn = document.getElementById('btn-submit-rotate-key');
+    if (btn) {
+        btn.disabled = false;
+        btn.style.display = 'inline-block';
+        btn.textContent = '🔄 Anahtarı Yenile';
+    }
+    modal.style.display = 'flex';
+}
+
+function closeRotateEdgeKeyModal() {
+    const modal = document.getElementById('modal-rotate-edge-key');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitRotateEdgeNodeKey() {
+    const nodeId = document.getElementById('rotate-edge-node-id').value;
+    const expiryDays = parseInt(document.getElementById('rotate-edge-key-expiry').value, 10) || 0;
+    const btn = document.getElementById('btn-submit-rotate-key');
+
+    try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Yenileniyor...'; }
+        const res = await fetch('/api/v1/settings/edge/nodes/rotate-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: nodeId, expires_days: expiryDays })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+
+        document.getElementById('rotate-key-form-container').style.display = 'none';
+        document.getElementById('rotate-key-success-box').style.display = 'block';
+        document.getElementById('rotate-result-token').value = data.token;
+        if (btn) btn.style.display = 'none';
+
+        if (typeof showToast === 'function') {
+            showToast('✓ Zero-Trust API anahtarı başarıyla yenilendi!', 'success');
+        }
+        loadEdgeNodes();
+    } catch (err) {
+        alert('Anahtar yenilenemedi: ' + err.message);
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 Anahtarı Yenile'; }
+    }
+}
+
+function copyRotateResultToken() {
+    const token = document.getElementById('rotate-result-token').value;
+    copyToClipboard(token, 'Yeni token panoya kopyalandı!');
 }
 
 // ==============================================================================

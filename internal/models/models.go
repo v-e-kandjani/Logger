@@ -237,6 +237,11 @@ type EdgeNode struct {
 	AdminUsername    string                 `json:"admin_username"`
 	AdminInitialPass string                 `json:"admin_initial_pass,omitempty"`
 	ActivationStatus string                 `json:"activation_status"` // "active", "pending_activation", "suspended"
+	TokenHash        string                 `json:"token_hash,omitempty"`
+	TokenPrefix      string                 `json:"token_prefix,omitempty"`
+	KeyExpiresAt     *time.Time             `json:"key_expires_at,omitempty"`
+	AllowedCIDRs     string                 `json:"allowed_cidrs"`
+	LastKeyRotatedAt *time.Time             `json:"last_key_rotated_at,omitempty"`
 	LDAPConfig       map[string]interface{} `json:"ldap_config,omitempty"`
 	MinSpecs         map[string]string      `json:"min_specs,omitempty"`
 	CreatedAt        time.Time              `json:"created_at"`

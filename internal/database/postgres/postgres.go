@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1984,12 +1986,55 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS activation_status VARCHAR(32) DEFAULT 'active';
 	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS ldap_config JSONB DEFAULT '{}'::jsonb;
 	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS min_specs JSONB DEFAULT '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb;
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS token_hash VARCHAR(64) DEFAULT '';
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS token_prefix VARCHAR(16) DEFAULT '';
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS key_expires_at TIMESTAMPTZ;
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS allowed_cidrs VARCHAR(256) DEFAULT '';
+	ALTER TABLE edge_nodes ADD COLUMN IF NOT EXISTS last_key_rotated_at TIMESTAMPTZ DEFAULT NOW();
 
 	CREATE INDEX IF NOT EXISTS idx_edge_nodes_token ON edge_nodes(token);
+	CREATE INDEX IF NOT EXISTS idx_edge_nodes_token_hash ON edge_nodes(token_hash);
 	CREATE INDEX IF NOT EXISTS idx_edge_nodes_tenant ON edge_nodes(tenant_name);
 	`
-	_, err := db.pool.Exec(ctx, schema)
-	return err
+	if _, err := db.pool.Exec(ctx, schema); err != nil {
+		return err
+	}
+
+	// Backfill token_hash & token_prefix for legacy edge nodes
+	if rows, err := db.pool.Query(ctx, "SELECT id, token FROM edge_nodes WHERE token_hash IS NULL OR token_hash = ''"); err == nil {
+		type legacyNode struct {
+			id    uuid.UUID
+			token string
+		}
+		var leg []legacyNode
+		for rows.Next() {
+			var ln legacyNode
+			if scanErr := rows.Scan(&ln.id, &ln.token); scanErr == nil {
+				leg = append(leg, ln)
+			}
+		}
+		rows.Close()
+		for _, ln := range leg {
+			th := HashEdgeToken(ln.token)
+			tp := MaskEdgeToken(ln.token)
+			_, _ = db.pool.Exec(ctx, "UPDATE edge_nodes SET token_hash = $1, token_prefix = $2 WHERE id = $3", th, tp, ln.id)
+		}
+	}
+	return nil
+}
+
+// HashEdgeToken returns the SHA-256 hex string of a secret edge token
+func HashEdgeToken(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
+}
+
+// MaskEdgeToken returns a safe prefix/suffix display representation
+func MaskEdgeToken(token string) string {
+	if len(token) > 14 {
+		return token[:10] + "..." + token[len(token)-4:]
+	}
+	return token
 }
 
 // ListTenants returns all customer tenant organizations
@@ -2181,6 +2226,7 @@ func (db *DB) ListEdgeNodes(ctx context.Context, tenantFilter string) ([]*models
 			       COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
 			       COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
 			       COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+			       COALESCE(token_hash, ''), COALESCE(token_prefix, ''), key_expires_at, COALESCE(allowed_cidrs, ''), last_key_rotated_at,
 			       created_at, updated_at
 			FROM edge_nodes
 			WHERE tenant_name = $1
@@ -2192,6 +2238,7 @@ func (db *DB) ListEdgeNodes(ctx context.Context, tenantFilter string) ([]*models
 			       COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
 			       COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
 			       COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+			       COALESCE(token_hash, ''), COALESCE(token_prefix, ''), key_expires_at, COALESCE(allowed_cidrs, ''), last_key_rotated_at,
 			       created_at, updated_at
 			FROM edge_nodes
 			ORDER BY created_at DESC`
@@ -2213,6 +2260,7 @@ func (db *DB) ListEdgeNodes(ctx context.Context, tenantFilter string) ([]*models
 			&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
 			&n.AdminName, &n.AdminEmail, &n.AdminUsername,
 			&n.ActivationStatus, &ldapJSON, &minSpecsJSON,
+			&n.TokenHash, &n.TokenPrefix, &n.KeyExpiresAt, &n.AllowedCIDRs, &n.LastKeyRotatedAt,
 			&n.CreatedAt, &n.UpdatedAt,
 		)
 		if err != nil {
@@ -2231,6 +2279,9 @@ func (db *DB) ListEdgeNodes(ctx context.Context, tenantFilter string) ([]*models
 				"min_disk": "2 GB",
 			}
 		}
+		if n.TokenPrefix == "" && n.Token != "" {
+			n.TokenPrefix = MaskEdgeToken(n.Token)
+		}
 
 		n.Status = computeEdgeNodeStatus(n.LastSeenAt, n.SyncInterval)
 		nodes = append(nodes, &n)
@@ -2245,6 +2296,7 @@ func (db *DB) GetEdgeNodeByID(ctx context.Context, id uuid.UUID) (*models.EdgeNo
 		       COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
 		       COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
 		       COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+		       COALESCE(token_hash, ''), COALESCE(token_prefix, ''), key_expires_at, COALESCE(allowed_cidrs, ''), last_key_rotated_at,
 		       created_at, updated_at
 		FROM edge_nodes
 		WHERE id = $1`
@@ -2256,6 +2308,7 @@ func (db *DB) GetEdgeNodeByID(ctx context.Context, id uuid.UUID) (*models.EdgeNo
 		&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
 		&n.AdminName, &n.AdminEmail, &n.AdminUsername,
 		&n.ActivationStatus, &ldapJSON, &minSpecsJSON,
+		&n.TokenHash, &n.TokenPrefix, &n.KeyExpiresAt, &n.AllowedCIDRs, &n.LastKeyRotatedAt,
 		&n.CreatedAt, &n.UpdatedAt,
 	)
 	if err != nil {
@@ -2270,28 +2323,34 @@ func (db *DB) GetEdgeNodeByID(ctx context.Context, id uuid.UUID) (*models.EdgeNo
 	if len(minSpecsJSON) > 0 {
 		_ = json.Unmarshal(minSpecsJSON, &n.MinSpecs)
 	}
+	if n.TokenPrefix == "" && n.Token != "" {
+		n.TokenPrefix = MaskEdgeToken(n.Token)
+	}
 	n.Status = computeEdgeNodeStatus(n.LastSeenAt, n.SyncInterval)
 	return &n, nil
 }
 
-// GetEdgeNodeByToken retrieves an edge node by its secret token
+// GetEdgeNodeByToken retrieves an edge node by its secret token using Zero-Trust hashed or raw token matching
 func (db *DB) GetEdgeNodeByToken(ctx context.Context, token string) (*models.EdgeNode, error) {
+	th := HashEdgeToken(token)
 	query := `
 		SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded,
 		       COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
 		       COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
 		       COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+		       COALESCE(token_hash, ''), COALESCE(token_prefix, ''), key_expires_at, COALESCE(allowed_cidrs, ''), last_key_rotated_at,
 		       created_at, updated_at
 		FROM edge_nodes
-		WHERE token = $1`
+		WHERE token_hash = $1 OR token = $2`
 	var n models.EdgeNode
 	var ldapJSON []byte
 	var minSpecsJSON []byte
-	err := db.pool.QueryRow(ctx, query, token).Scan(
+	err := db.pool.QueryRow(ctx, query, th, token).Scan(
 		&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
 		&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
 		&n.AdminName, &n.AdminEmail, &n.AdminUsername,
 		&n.ActivationStatus, &ldapJSON, &minSpecsJSON,
+		&n.TokenHash, &n.TokenPrefix, &n.KeyExpiresAt, &n.AllowedCIDRs, &n.LastKeyRotatedAt,
 		&n.CreatedAt, &n.UpdatedAt,
 	)
 	if err != nil {
@@ -2306,11 +2365,14 @@ func (db *DB) GetEdgeNodeByToken(ctx context.Context, token string) (*models.Edg
 	if len(minSpecsJSON) > 0 {
 		_ = json.Unmarshal(minSpecsJSON, &n.MinSpecs)
 	}
+	if n.TokenPrefix == "" && n.Token != "" {
+		n.TokenPrefix = MaskEdgeToken(n.Token)
+	}
 	n.Status = computeEdgeNodeStatus(n.LastSeenAt, n.SyncInterval)
 	return &n, nil
 }
 
-// CreateEdgeNode inserts a new edge proxy node
+// CreateEdgeNode inserts a new edge proxy node with Zero-Trust token hashing and CIDR configuration
 func (db *DB) CreateEdgeNode(ctx context.Context, node *models.EdgeNode) error {
 	if node.ID == uuid.Nil {
 		node.ID = uuid.New()
@@ -2323,6 +2385,16 @@ func (db *DB) CreateEdgeNode(ctx context.Context, node *models.EdgeNode) error {
 	}
 	if node.ActivationStatus == "" {
 		node.ActivationStatus = "active"
+	}
+	if node.TokenHash == "" {
+		node.TokenHash = HashEdgeToken(node.Token)
+	}
+	if node.TokenPrefix == "" {
+		node.TokenPrefix = MaskEdgeToken(node.Token)
+	}
+	if node.LastKeyRotatedAt == nil {
+		now := time.Now()
+		node.LastKeyRotatedAt = &now
 	}
 	node.Status = "pending"
 	node.CreatedAt = time.Now()
@@ -2343,13 +2415,17 @@ func (db *DB) CreateEdgeNode(ctx context.Context, node *models.EdgeNode) error {
 		INSERT INTO edge_nodes (
 			id, name, token, tenant_name, sync_interval, status,
 			admin_name, admin_email, admin_username, admin_initial_pass,
-			activation_status, ldap_config, min_specs, created_at, updated_at
+			activation_status, ldap_config, min_specs,
+			token_hash, token_prefix, key_expires_at, allowed_cidrs, last_key_rotated_at,
+			created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`
 	_, err := db.pool.Exec(ctx, query,
 		node.ID, node.Name, node.Token, node.TenantName, node.SyncInterval, node.Status,
 		node.AdminName, node.AdminEmail, node.AdminUsername, node.AdminInitialPass,
-		node.ActivationStatus, ldapBytes, specsBytes, node.CreatedAt, node.UpdatedAt)
+		node.ActivationStatus, ldapBytes, specsBytes,
+		node.TokenHash, node.TokenPrefix, node.KeyExpiresAt, node.AllowedCIDRs, node.LastKeyRotatedAt,
+		node.CreatedAt, node.UpdatedAt)
 	if err != nil {
 		return err
 	}
@@ -2375,12 +2451,72 @@ func (db *DB) CreateEdgeNode(ctx context.Context, node *models.EdgeNode) error {
 	return nil
 }
 
+// RotateEdgeNodeToken invalidates old token and assigns a newly generated token with updated hash and optional expiration
+func (db *DB) RotateEdgeNodeToken(ctx context.Context, id uuid.UUID, newToken string, expiresAt *time.Time) (*models.EdgeNode, error) {
+	tokenHash := HashEdgeToken(newToken)
+	tokenPrefix := MaskEdgeToken(newToken)
+	query := `
+		UPDATE edge_nodes
+		SET token = $1,
+		    token_hash = $2,
+		    token_prefix = $3,
+		    last_key_rotated_at = NOW(),
+		    key_expires_at = $4,
+		    updated_at = NOW()
+		WHERE id = $5
+		RETURNING id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded,
+		          COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
+		          COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
+		          COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+		          COALESCE(token_hash, ''), COALESCE(token_prefix, ''), key_expires_at, COALESCE(allowed_cidrs, ''), last_key_rotated_at,
+		          created_at, updated_at`
+	var n models.EdgeNode
+	var ldapJSON []byte
+	var minSpecsJSON []byte
+	err := db.pool.QueryRow(ctx, query, newToken, tokenHash, tokenPrefix, expiresAt, id).Scan(
+		&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
+		&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
+		&n.AdminName, &n.AdminEmail, &n.AdminUsername,
+		&n.ActivationStatus, &ldapJSON, &minSpecsJSON,
+		&n.TokenHash, &n.TokenPrefix, &n.KeyExpiresAt, &n.AllowedCIDRs, &n.LastKeyRotatedAt,
+		&n.CreatedAt, &n.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("rotating edge node token: %w", err)
+	}
+	if len(ldapJSON) > 0 {
+		_ = json.Unmarshal(ldapJSON, &n.LDAPConfig)
+	}
+	if len(minSpecsJSON) > 0 {
+		_ = json.Unmarshal(minSpecsJSON, &n.MinSpecs)
+	}
+	n.Status = computeEdgeNodeStatus(n.LastSeenAt, n.SyncInterval)
+	return &n, nil
+}
+
+// UpdateEdgeNodeCIDRs updates the Zero-Trust allowed source IP / CIDR whitelist for an edge node
+func (db *DB) UpdateEdgeNodeCIDRs(ctx context.Context, id uuid.UUID, allowedCIDRs string) error {
+	query := `
+		UPDATE edge_nodes
+		SET allowed_cidrs = $1, updated_at = NOW()
+		WHERE id = $2`
+	tag, err := db.pool.Exec(ctx, query, strings.TrimSpace(allowedCIDRs), id)
+	if err != nil {
+		return fmt.Errorf("updating allowed cidrs: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("edge node not found")
+	}
+	return nil
+}
+
 // ActivateEdgeNode enables a pending edge node and configures its admin user and LDAP settings
 func (db *DB) ActivateEdgeNode(
 	ctx context.Context,
 	id uuid.UUID,
 	adminName, adminEmail, adminUsername, adminPass, syncInterval string,
 	ldapConfig map[string]interface{},
+	allowedCIDRs string,
 ) error {
 	ldapBytes, _ := json.Marshal(ldapConfig)
 	if len(ldapBytes) == 0 {
@@ -2395,12 +2531,13 @@ func (db *DB) ActivateEdgeNode(
 		    admin_username = CASE WHEN $4 <> '' THEN $4 ELSE admin_username END,
 		    sync_interval = CASE WHEN $5 <> '' THEN $5 ELSE sync_interval END,
 		    ldap_config = $6,
+		    allowed_cidrs = CASE WHEN $7 <> '' THEN $7 ELSE allowed_cidrs END,
 		    updated_at = NOW()
 		WHERE id = $1
 		RETURNING tenant_name, name`
 
 	var tenantName, nodeName string
-	err := db.pool.QueryRow(ctx, query, id, adminName, adminEmail, adminUsername, syncInterval, ldapBytes).Scan(&tenantName, &nodeName)
+	err := db.pool.QueryRow(ctx, query, id, adminName, adminEmail, adminUsername, syncInterval, ldapBytes, strings.TrimSpace(allowedCIDRs)).Scan(&tenantName, &nodeName)
 	if err != nil {
 		return fmt.Errorf("activating edge node: %w", err)
 	}
@@ -2444,6 +2581,7 @@ func (db *DB) UpdateEdgeNodeInterval(ctx context.Context, id uuid.UUID, interval
 
 // UpdateEdgeNodeHeartbeat updates last_seen, ip, version and increments logs_forwarded
 func (db *DB) UpdateEdgeNodeHeartbeat(ctx context.Context, token, ip, ver string, addLogs int64) (*models.EdgeNode, error) {
+	th := HashEdgeToken(token)
 	query := `
 		UPDATE edge_nodes
 		SET last_seen_at = NOW(),
@@ -2452,18 +2590,22 @@ func (db *DB) UpdateEdgeNodeHeartbeat(ctx context.Context, token, ip, ver string
 		    status = 'online',
 		    logs_forwarded = logs_forwarded + $4,
 		    updated_at = NOW()
-		WHERE token = $1
+		WHERE token = $1 OR token_hash = $5
 		RETURNING id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded,
 		          COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
 		          COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
+		          COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+		          COALESCE(token_hash, ''), COALESCE(token_prefix, ''), key_expires_at, COALESCE(allowed_cidrs, ''), last_key_rotated_at,
 		          created_at, updated_at`
 	var n models.EdgeNode
 	var ldapJSON []byte
-	err := db.pool.QueryRow(ctx, query, token, ip, ver, addLogs).Scan(
+	var minSpecsJSON []byte
+	err := db.pool.QueryRow(ctx, query, token, ip, ver, addLogs, th).Scan(
 		&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
 		&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
 		&n.AdminName, &n.AdminEmail, &n.AdminUsername,
-		&n.ActivationStatus, &ldapJSON,
+		&n.ActivationStatus, &ldapJSON, &minSpecsJSON,
+		&n.TokenHash, &n.TokenPrefix, &n.KeyExpiresAt, &n.AllowedCIDRs, &n.LastKeyRotatedAt,
 		&n.CreatedAt, &n.UpdatedAt,
 	)
 	if err != nil {
@@ -2471,6 +2613,12 @@ func (db *DB) UpdateEdgeNodeHeartbeat(ctx context.Context, token, ip, ver string
 	}
 	if len(ldapJSON) > 0 {
 		_ = json.Unmarshal(ldapJSON, &n.LDAPConfig)
+	}
+	if len(minSpecsJSON) > 0 {
+		_ = json.Unmarshal(minSpecsJSON, &n.MinSpecs)
+	}
+	if n.TokenPrefix == "" && n.Token != "" {
+		n.TokenPrefix = MaskEdgeToken(n.Token)
 	}
 	n.Status = computeEdgeNodeStatus(n.LastSeenAt, n.SyncInterval)
 	return &n, nil

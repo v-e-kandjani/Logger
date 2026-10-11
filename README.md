@@ -260,6 +260,13 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.6.5** (Zero-Trust API Key Authentication for Distributed Forwarders & Granular Audit Logging):
+  - **Zero-Trust Edge Proxy Authentication**: Replaced plaintext token evaluation with cryptographically secure SHA-256 hashed lookups (`token_hash`) and masked prefix tracking (`token_prefix`), maintaining seamless backward compatibility with existing forwarders.
+  - **Granular Source IP / CIDR Whitelisting**: Added per-node Zero-Trust network boundary verification (`AllowedCIDRs`), restricting proxy heartbeats and log batches strictly to authorized corporate IP subnets (e.g., `10.0.0.0/8, 192.168.1.50`) and dropping unauthorized attempts with `403 Forbidden`.
+  - **Automated Key Expiration & Dynamic Key Rotation**: Introduced configurable API key lifetimes (`30d`, `90d`, `180d`, `365d`, or permanent) and dedicated 1-click token rotation endpoints (`/api/v1/settings/edge/nodes/rotate-key`) with instant revocation of compromised credentials.
+  - **Comprehensive Security Audit Trail**: Enriched security event auditing with dedicated actions (`EDGE_NODE_CREATED`, `EDGE_NODE_ACTIVATED`, `EDGE_NODE_DELETED`, `EDGE_KEY_ROTATED`, `EDGE_INTERVAL_UPDATED`, `EDGE_CIDR_UPDATED`, `EDGE_AUTH_FAILURE`, `EDGE_AUTH_EXPIRED`, `EDGE_IP_BLOCKED`) fully indexed and searchable in the Audit Trail panel.
+  - **Hardened Edge Forwarder Daemon & Management UI**: Upgraded `logseal-proxy` to v1.6.5; refreshed Settings Edge table with token security badges, key expiration countdowns, CIDR tags, and modal key rotation workflows.
+
 - **v1.6.4** (Tenant-Scoped Ingestion Auto-Discovery & Network Device Category Enrichment):
   - **Per-Tenant Ingestion Policy (`permissive` vs `strict`)**: Configurable ingestion policy per tenant allowing either automated discovery of unknown senders or strict whitelist-only drop enforcement with zero lock-in for the `default` root organization.
   - **Lock-Free Multi-Tenant Device Resolution**: Enhanced in-memory `DeviceCache` with composite `(IP, TenantSlug)` routing and atomic policy retrieval, preventing cross-tenant IP collisions and unauthorized sender spoofing.

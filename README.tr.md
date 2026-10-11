@@ -249,6 +249,13 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.6.5** (Dağıtık Forwarder'lar için Zero-Trust API Anahtarı Doğrulaması ve Kapsamlı Denetim İzi):
+  - **Zero-Trust Edge Proxy Kimlik Doğrulaması**: Düz metin token kontrolleri yerine SHA-256 hash araması (`token_hash`) ve maskeli önek takibi (`token_prefix`) geliştirilerek mevcut proxy düğümleriyle %100 geriye dönük uyumluluk korundu.
+  - **Granüler Kaynak IP / CIDR Beyaz Listesi**: Düğüm bazında Zero-Trust ağ sınırı doğrulaması (`AllowedCIDRs`) getirilerek proxy kalp atışları ve log paketleri yalnızca yetkili IP bloklarına (örn. `10.0.0.0/8, 192.168.1.50`) sınırlandırıldı; yabancı IP istekleri `403 Forbidden` ile engellenmektedir.
+  - **Otomatik Anahtar Geçerlilik Süresi ve Dinamik Anahtar Yenileme**: Yapılandırılabilir API anahtar ömürleri (`30 gün`, `90 gün`, `180 gün`, `365 gün` veya süresiz) ve tek tıkla anahtar rotasyon uç noktası (`/api/v1/settings/edge/nodes/rotate-key`) ile eski anahtarların anında iptal edilmesi sağlandı.
+  - **Gelişmiş Güvenlik Denetim İzi (Audit Trail)**: Düğüm yaşam döngüsü ve güvenlik olayları (`EDGE_NODE_CREATED`, `EDGE_NODE_ACTIVATED`, `EDGE_NODE_DELETED`, `EDGE_KEY_ROTATED`, `EDGE_INTERVAL_UPDATED`, `EDGE_CIDR_UPDATED`, `EDGE_AUTH_FAILURE`, `EDGE_AUTH_EXPIRED`, `EDGE_IP_BLOCKED`) denetim günlüğüne kaydedilmekte ve arayüzden filtrelenebilmektedir.
+  - **Güçlendirilmiş Edge Forwarder ve Yönetim Paneli**: `logseal-proxy` v1.6.5 sürümüne yükseltildi; Ayarlar tablosu token güvenlik rozetleri, anahtar geçerlilik geri sayımları, CIDR etiketleri ve modal anahtar rotasyonu arayüzü ile zenginleştirildi.
+
 - **v1.6.4** (Kiracı Bazlı Giriş Otomatik Keşfi & Ağ Cihazı Kategori Zenginleştirmesi):
   - **Kiracı Başına Giriş Politikası (`permissive` / `strict`)**: Her kiracı için bilinmeyen log kaynaklarını otomatik keşfetme (`permissive`) veya yalnızca kayıtlı beyaz listedeki cihazları kabul edip diğerlerini anında düşürme (`strict`) politikası eklendi.
   - **Kilitsiz Çok Kiracılı Cihaz Eşleme**: Bellek içi `DeviceCache` bileşik `(IP, TenantSlug)` haritası ve atomik politika sorgulama ile güçlendirilerek kiracılar arası IP çakışmaları ve izinsiz gönderici taklitleri engellendi.

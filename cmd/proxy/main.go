@@ -25,7 +25,7 @@ import (
 const (
 	DefaultConfigPath = "/etc/logseal/proxy.json"
 	FallbackConfig    = "./proxy.json"
-	ProxyVersion      = "1.5.12"
+	ProxyVersion      = "1.6.5"
 )
 
 // ProxyConfig stores local forwarder settings

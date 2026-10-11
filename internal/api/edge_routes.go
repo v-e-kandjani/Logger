@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/syslog-platform/logger/internal/cache"
+	"github.com/syslog-platform/logger/internal/database/postgres"
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 )
@@ -56,6 +57,55 @@ func getClientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
+// isIPAllowed checks whether clientIP satisfies the allowedCIDRs Zero-Trust whitelist
+func isIPAllowed(clientIP, allowedCIDRs string) bool {
+	allowedCIDRs = strings.TrimSpace(allowedCIDRs)
+	if allowedCIDRs == "" || allowedCIDRs == "*" {
+		return true
+	}
+	ip := net.ParseIP(strings.TrimSpace(clientIP))
+	if ip == nil {
+		return false
+	}
+	parts := strings.Split(allowedCIDRs, ",")
+	for _, p := range parts {
+		item := strings.TrimSpace(p)
+		if item == "" {
+			continue
+		}
+		if !strings.Contains(item, "/") {
+			if targetIP := net.ParseIP(item); targetIP != nil && targetIP.Equal(ip) {
+				return true
+			}
+			continue
+		}
+		if _, ipNet, err := net.ParseCIDR(item); err == nil && ipNet.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// extractEdgeToken retrieves authentication token from headers or request payload
+func extractEdgeToken(r *http.Request, bodyToken string) string {
+	t := strings.TrimSpace(bodyToken)
+	if t != "" {
+		return t
+	}
+	if auth := r.Header.Get("Authorization"); auth != "" {
+		if strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+			return strings.TrimSpace(auth[7:])
+		}
+	}
+	if t = strings.TrimSpace(r.Header.Get("X-Edge-Token")); t != "" {
+		return t
+	}
+	if t = strings.TrimSpace(r.Header.Get("X-API-Key")); t != "" {
+		return t
+	}
+	return ""
+}
+
 // EdgeHeartbeatRequest represents an edge forwarder check-in
 type EdgeHeartbeatRequest struct {
 	Token         string `json:"token"`
@@ -78,16 +128,14 @@ func (h *Handler) handleEdgeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := strings.TrimSpace(req.Token)
-	if token == "" {
-		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		token = strings.TrimSpace(token)
-	}
-	if token == "" {
-		token = strings.TrimSpace(r.Header.Get("X-Edge-Token"))
-	}
+	token := extractEdgeToken(r, req.Token)
+	clientIP := getClientIP(r)
 
 	if token == "" {
+		h.recordAudit(r, "EDGE_AUTH_FAILURE", "edge/heartbeat", "FAILED", map[string]interface{}{
+			"reason":    "missing token",
+			"client_ip": clientIP,
+		})
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "edge node token required"})
 		return
 	}
@@ -97,11 +145,41 @@ func (h *Handler) handleEdgeHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 	node, err := h.pgDB.GetEdgeNodeByToken(ctx, token)
 	if err != nil || node == nil {
+		h.recordAudit(r, "EDGE_AUTH_FAILURE", "edge/heartbeat", "FAILED", map[string]interface{}{
+			"reason":       "token not found or revoked",
+			"token_prefix": postgres.MaskEdgeToken(token),
+			"client_ip":    clientIP,
+		})
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized: edge node token not found or revoked"})
 		return
 	}
 
-	clientIP := getClientIP(r)
+	// Zero-Trust Expiration check
+	if node.KeyExpiresAt != nil && time.Now().After(*node.KeyExpiresAt) {
+		h.recordAudit(r, "EDGE_AUTH_EXPIRED", "edge/node/"+node.ID.String(), "FAILED", map[string]interface{}{
+			"node_name":   node.Name,
+			"tenant_name": node.TenantName,
+			"expired_at":  node.KeyExpiresAt.Format(time.RFC3339),
+			"client_ip":   clientIP,
+		})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized: edge node api key has expired"})
+		return
+	}
+
+	// Zero-Trust Source IP / CIDR check
+	if !isIPAllowed(clientIP, node.AllowedCIDRs) {
+		h.recordAudit(r, "EDGE_IP_BLOCKED", "edge/node/"+node.ID.String(), "BLOCKED", map[string]interface{}{
+			"node_name":     node.Name,
+			"tenant_name":   node.TenantName,
+			"client_ip":     clientIP,
+			"allowed_cidrs": node.AllowedCIDRs,
+		})
+		writeJSON(w, http.StatusForbidden, map[string]string{
+			"error": fmt.Sprintf("forbidden: client ip '%s' not in allowed cidrs whitelist", clientIP),
+		})
+		return
+	}
+
 	updatedNode, err := h.pgDB.UpdateEdgeNodeHeartbeat(ctx, token, clientIP, req.Version, 0)
 	if err != nil {
 		updatedNode = node
@@ -163,16 +241,14 @@ func (h *Handler) handleEdgeIngest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := strings.TrimSpace(req.Token)
-	if token == "" {
-		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		token = strings.TrimSpace(token)
-	}
-	if token == "" {
-		token = strings.TrimSpace(r.Header.Get("X-Edge-Token"))
-	}
+	token := extractEdgeToken(r, req.Token)
+	clientIP := getClientIP(r)
 
 	if token == "" {
+		h.recordAudit(r, "EDGE_AUTH_FAILURE", "edge/ingest", "FAILED", map[string]interface{}{
+			"reason":    "missing token",
+			"client_ip": clientIP,
+		})
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "edge node token required"})
 		return
 	}
@@ -182,7 +258,38 @@ func (h *Handler) handleEdgeIngest(w http.ResponseWriter, r *http.Request) {
 
 	node, err := h.pgDB.GetEdgeNodeByToken(ctx, token)
 	if err != nil || node == nil {
+		h.recordAudit(r, "EDGE_AUTH_FAILURE", "edge/ingest", "FAILED", map[string]interface{}{
+			"reason":       "unauthorized edge node",
+			"token_prefix": postgres.MaskEdgeToken(token),
+			"client_ip":    clientIP,
+		})
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized edge node"})
+		return
+	}
+
+	// Zero-Trust Expiration check
+	if node.KeyExpiresAt != nil && time.Now().After(*node.KeyExpiresAt) {
+		h.recordAudit(r, "EDGE_AUTH_EXPIRED", "edge/node/"+node.ID.String(), "FAILED", map[string]interface{}{
+			"node_name":   node.Name,
+			"tenant_name": node.TenantName,
+			"expired_at":  node.KeyExpiresAt.Format(time.RFC3339),
+			"client_ip":   clientIP,
+		})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized: edge node api key has expired"})
+		return
+	}
+
+	// Zero-Trust Source IP / CIDR check
+	if !isIPAllowed(clientIP, node.AllowedCIDRs) {
+		h.recordAudit(r, "EDGE_IP_BLOCKED", "edge/node/"+node.ID.String(), "BLOCKED", map[string]interface{}{
+			"node_name":     node.Name,
+			"tenant_name":   node.TenantName,
+			"client_ip":     clientIP,
+			"allowed_cidrs": node.AllowedCIDRs,
+		})
+		writeJSON(w, http.StatusForbidden, map[string]string{
+			"error": fmt.Sprintf("forbidden: client ip '%s' not in allowed cidrs whitelist", clientIP),
+		})
 		return
 	}
 
@@ -194,7 +301,6 @@ func (h *Handler) handleEdgeIngest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientIP := getClientIP(r)
 	count := int64(len(req.Events))
 
 	if h.quotaEnforcer != nil {
@@ -314,6 +420,8 @@ func (h *Handler) handleEdgeNodes(w http.ResponseWriter, r *http.Request) {
 			AdminUsername    string                 `json:"admin_username"`
 			AdminInitialPass string                 `json:"admin_initial_pass"`
 			ActivationStatus string                 `json:"activation_status"`
+			AllowedCIDRs     string                 `json:"allowed_cidrs"`
+			ExpiresDays      int                    `json:"expires_days"`
 			LDAPConfig       map[string]interface{} `json:"ldap_config"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -366,10 +474,23 @@ func (h *Handler) handleEdgeNodes(w http.ResponseWriter, r *http.Request) {
 			actStatus = "active"
 		}
 
+		var keyExpiresAt *time.Time
+		if req.ExpiresDays > 0 {
+			exp := time.Now().AddDate(0, 0, req.ExpiresDays)
+			keyExpiresAt = &exp
+		}
+
+		rawToken := generateEdgeToken()
+		now := time.Now()
 		node := &models.EdgeNode{
 			ID:               uuid.New(),
 			Name:             name,
-			Token:            generateEdgeToken(),
+			Token:            rawToken,
+			TokenHash:        postgres.HashEdgeToken(rawToken),
+			TokenPrefix:      postgres.MaskEdgeToken(rawToken),
+			KeyExpiresAt:     keyExpiresAt,
+			AllowedCIDRs:     strings.TrimSpace(req.AllowedCIDRs),
+			LastKeyRotatedAt: &now,
 			TenantName:       tenant,
 			SyncInterval:     interval,
 			AdminName:        strings.TrimSpace(req.AdminName),
@@ -384,9 +505,22 @@ func (h *Handler) handleEdgeNodes(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 
 		if err := h.pgDB.CreateEdgeNode(ctx, node); err != nil {
+			h.recordAudit(r, "EDGE_NODE_CREATED", "edge/node", "FAILED", map[string]interface{}{
+				"error":       err.Error(),
+				"node_name":   node.Name,
+				"tenant_name": node.TenantName,
+			})
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "creating edge node: " + err.Error()})
 			return
 		}
+
+		h.recordAudit(r, "EDGE_NODE_CREATED", "edge/node/"+node.ID.String(), "SUCCESS", map[string]interface{}{
+			"node_name":     node.Name,
+			"tenant_name":   node.TenantName,
+			"token_prefix":  node.TokenPrefix,
+			"allowed_cidrs": node.AllowedCIDRs,
+			"expires_days":  req.ExpiresDays,
+		})
 
 		writeJSON(w, http.StatusCreated, node)
 
@@ -427,9 +561,16 @@ func (h *Handler) handleEdgeNodeInterval(w http.ResponseWriter, r *http.Request)
 	defer cancel()
 
 	if err := h.pgDB.UpdateEdgeNodeInterval(ctx, nodeID, interval); err != nil {
+		h.recordAudit(r, "EDGE_INTERVAL_UPDATED", "edge/node/"+nodeID.String(), "FAILED", map[string]interface{}{
+			"error": err.Error(),
+		})
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+
+	h.recordAudit(r, "EDGE_INTERVAL_UPDATED", "edge/node/"+nodeID.String(), "SUCCESS", map[string]interface{}{
+		"sync_interval": interval,
+	})
 
 	updated, _ := h.pgDB.GetEdgeNodeByID(ctx, nodeID)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -465,9 +606,16 @@ func (h *Handler) handleEdgeNodeDelete(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := h.pgDB.DeleteEdgeNode(ctx, nodeID); err != nil {
+		h.recordAudit(r, "EDGE_NODE_DELETED", "edge/node/"+nodeID.String(), "FAILED", map[string]interface{}{
+			"error": err.Error(),
+		})
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+
+	h.recordAudit(r, "EDGE_NODE_DELETED", "edge/node/"+nodeID.String(), "SUCCESS", map[string]interface{}{
+		"node_id": nodeID.String(),
+	})
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
@@ -540,6 +688,7 @@ func (h *Handler) handleEdgeNodeActivate(w http.ResponseWriter, r *http.Request)
 		AdminUsername string                 `json:"admin_username"`
 		AdminPass     string                 `json:"admin_pass"`
 		SyncInterval  string                 `json:"sync_interval"`
+		AllowedCIDRs  string                 `json:"allowed_cidrs"`
 		LDAPConfig    map[string]interface{} `json:"ldap_config"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -570,16 +719,125 @@ func (h *Handler) handleEdgeNodeActivate(w http.ResponseWriter, r *http.Request)
 		strings.TrimSpace(req.AdminPass),
 		interval,
 		req.LDAPConfig,
+		strings.TrimSpace(req.AllowedCIDRs),
 	); err != nil {
+		h.recordAudit(r, "EDGE_NODE_ACTIVATED", "edge/node/"+nodeID.String(), "FAILED", map[string]interface{}{
+			"error": err.Error(),
+		})
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "activating node: " + err.Error()})
 		return
 	}
+
+	h.recordAudit(r, "EDGE_NODE_ACTIVATED", "edge/node/"+nodeID.String(), "SUCCESS", map[string]interface{}{
+		"node_id":       nodeID.String(),
+		"allowed_cidrs": req.AllowedCIDRs,
+	})
 
 	updated, _ := h.pgDB.GetEdgeNodeByID(ctx, nodeID)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "ok",
 		"message": "Edge proxy node successfully activated and preconfigured",
 		"node":    updated,
+	})
+}
+
+// handleEdgeRotateKey generates a new secure token and invalidates the previous one
+func (h *Handler) handleEdgeRotateKey(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodPut {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ID          string `json:"id"`
+		ExpiresDays int    `json:"expires_days"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	nodeID, err := uuid.Parse(strings.TrimSpace(req.ID))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid node id"})
+		return
+	}
+
+	var expiresAt *time.Time
+	if req.ExpiresDays > 0 {
+		exp := time.Now().AddDate(0, 0, req.ExpiresDays)
+		expiresAt = &exp
+	}
+
+	newToken := generateEdgeToken()
+
+	ctx, cancel := contextWithTimeout(r, 4*time.Second)
+	defer cancel()
+
+	updated, err := h.pgDB.RotateEdgeNodeToken(ctx, nodeID, newToken, expiresAt)
+	if err != nil {
+		h.recordAudit(r, "EDGE_KEY_ROTATED", "edge/node/"+nodeID.String(), "FAILED", map[string]interface{}{
+			"error": err.Error(),
+		})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "rotating token: " + err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "EDGE_KEY_ROTATED", "edge/node/"+nodeID.String(), "SUCCESS", map[string]interface{}{
+		"node_name":    updated.Name,
+		"token_prefix": updated.TokenPrefix,
+		"expires_days": req.ExpiresDays,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":       "ok",
+		"node_id":      updated.ID.String(),
+		"token":        newToken,
+		"token_prefix": updated.TokenPrefix,
+		"expires_at":   updated.KeyExpiresAt,
+	})
+}
+
+// handleEdgeNodeCIDRs updates allowed IP / CIDR whitelist for an edge forwarder
+func (h *Handler) handleEdgeNodeCIDRs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodPut {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ID           string `json:"id"`
+		AllowedCIDRs string `json:"allowed_cidrs"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	nodeID, err := uuid.Parse(strings.TrimSpace(req.ID))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid node id"})
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(r, 3*time.Second)
+	defer cancel()
+
+	if err := h.pgDB.UpdateEdgeNodeCIDRs(ctx, nodeID, req.AllowedCIDRs); err != nil {
+		h.recordAudit(r, "EDGE_CIDR_UPDATED", "edge/node/"+nodeID.String(), "FAILED", map[string]interface{}{
+			"error": err.Error(),
+		})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "updating allowed cidrs: " + err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "EDGE_CIDR_UPDATED", "edge/node/"+nodeID.String(), "SUCCESS", map[string]interface{}{
+		"allowed_cidrs": req.AllowedCIDRs,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":        "ok",
+		"allowed_cidrs": req.AllowedCIDRs,
 	})
 }
 
