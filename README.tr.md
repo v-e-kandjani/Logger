@@ -246,8 +246,17 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 ## Mimari ve Teknik Dokümantasyon
 
 - 📘 [**Kapsamlı Sistem Mimarisi Belgesi**](docs/ARCHITECTURE.md) — Çok katmanlı log toplama, çift veritabanlı depolama (ClickHouse + PostgreSQL), bellek içi korelasyon ve 5651 zaman damgası mimarisi.
+- ⚙️ [**Üretim Kaynak Profilleri ve Boyutlandırma Kılavuzu**](docs/operations/resource-profiles.md) — Donanım profilleri (500 - 20.000 EPS), bellek defterleri, cgroups dilimleme ve depolama hesaplama formülleri.
+- 📋 [**Operasyon ve Felaket Kurtarma Kılavuzu (Runbook)**](docs/operations/recovery-runbook.md) — Olay eskalasyon matrisi, sunucu çökme toparlanması, WAN disk kuyruğu oynatma ve çevrimdışı RFC 3161 doğrulama adımları.
+- 🧪 [**Kabul Testi Sonuçları ve Sertifikasyon Raporu**](docs/validation/acceptance-results.md) — 10 kabul senaryosu sonucu, SLO kıyaslama metrikleri ve üretim onay kaydı.
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
+
+- **v1.6.9** (Aşama 10 Boyutlandırma Profilleri, Operasyonel Kılavuzlar ve Kabul Sertifikasyonu):
+  - **Sertifikalı Donanım Profilleri (`docs/operations/resource-profiles.md`)**: 3 bağımsız sunucu profili (Giriş: 4 vCPU / 16 GiB @ 500 EPS, Orta: 16 vCPU / 64 GiB @ 5.000 EPS, Çekirdek: 32 vCPU / 128 GiB @ 20.000 EPS), ödünç almayan bellek defteri ($R = O + C + E + D$), cgroups v2 dilim şablonları (`siem-control.slice`, `siem-data.slice`) ve depolama boyutlandırma formülleri resmi olarak belgelendi.
+  - **Felaket Kurtarma ve Operasyon Kılavuzu (`docs/operations/recovery-runbook.md`)**: Ani konteyner/sunucu çökmeleri, WAN uç düğüm kuyruk oynatımı, TÜBİTAK KamuSM servis kesintileri, ClickHouse disk dolması ve çevrimdışı 5651 kanıt doğrulama adımları (`sha256sum` + `openssl ts -verify`) adım adım hazırlandı.
+  - **Kabul Sertifikasyonu ve SLO Uyumluluğu (`docs/validation/acceptance-results.md`)**: 10 kritik kabul senaryosunun tamamından geçildi; yerel yönetim API p95 < 250ms (ölçülen 18ms), aşırı yük altında harici SSH erişimi < 2s (ölçülen 1.1s) ve saatlik kanıt mühürleme gecikmesi < 2 dakika olarak tescillendi.
+  - **Kapsamlı Mimari Fark Analizi ve İlerleme Defteri**: Aşama 0'dan Aşama 10'a kadar olan tüm geliştirme evrelerini içeren `docs/development/logseal-gap-analysis.md` ve `docs/development/logseal-progress.md` yayınlandı.
 
 - **v1.6.8** (Aşama 9 Edge Proxy Güçlendirmesi, Dayanıklı Yeniden Oynatma ve SaaS Ölçekleme):
   - **Uç Düğüm Disk Kuyruğu Güvenilirliği (`logseal-proxy v1.6.8`)**: Periyodik fiziksel fsync (`Sync()`) taahhütleri, toplam disk kuyruğu kapasite denetimi (`max_spool_mb`) ve başlangıçta bekleyen çevrimdışı kuyrukları otomatik tarayıp oynatan çökme kurtarma mekanizması eklendi.

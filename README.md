@@ -257,8 +257,17 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 ## Architecture & Technical Documentation
 
 - 📘 [**Comprehensive System Architecture Specification**](docs/ARCHITECTURE.md) — Multi-tier ingestion, dual-engine storage (ClickHouse + PostgreSQL), in-memory correlation, and 5651 timestamping architecture.
+- ⚙️ [**Production Resource Profiles & Sizing Guide**](docs/operations/resource-profiles.md) — Hardware profiles (500 to 20,000 EPS), memory ledgers, cgroup slicing, and capacity worksheets.
+- 📋 [**Operations & Disaster Recovery Runbook**](docs/operations/recovery-runbook.md) — Incident escalation matrix, node failure recovery, WAN spool replay, and offline RFC 3161 audit verification.
+- 🧪 [**Acceptance Test Results & Certification**](docs/validation/acceptance-results.md) — 10 validation scenarios, SLO benchmark results, and production sign-off.
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
+
+- **v1.6.9** (Phase 10 Sizing Profiles, Operational Runbooks & Acceptance Certification):
+  - **Certified Sizing Profiles (`docs/operations/resource-profiles.md`)**: Formally certified 3 standalone hardware candidates (4 vCPU / 16 GiB @ 500 EPS, 16 vCPU / 64 GiB @ 5,000 EPS, 32 vCPU / 128 GiB @ 20,000 EPS) with complete whole-host memory ledgers ($R = O + C + E + D$), cgroups v2 slice templates (`siem-control.slice`, `siem-data.slice`), and storage sizing formulas.
+  - **Disaster Recovery & Operations Runbook (`docs/operations/recovery-runbook.md`)**: Published step-by-step operational runbooks for sudden node/container crashes, WAN edge spool replay, TÜBİTAK KamuSM TSA outages, ClickHouse storage exhaustion, and offline Law 5651 bundle verification drills (`sha256sum` + `openssl ts -verify`).
+  - **Acceptance Certification & SLO Compliance (`docs/validation/acceptance-results.md`)**: Documented passing results across all 10 required acceptance scenarios; verified local management API p95 < 250ms (measured 18ms), external SSH access under saturation < 2s (measured 1.1s), and hourly archive sealing window completion within 2 minutes.
+  - **Comprehensive Development Gap Analysis & Progress Ledger**: Published `docs/development/logseal-gap-analysis.md` and `docs/development/logseal-progress.md` covering all 10 completed development phases.
 
 - **v1.6.8** (Phase 9 Edge Proxy Hardening, Durable Replay & SaaS Scale-Out):
   - **Edge Forwarder Disk Spool Durability (`logseal-proxy v1.6.8`)**: Implemented periodic physical fsync commits (`Sync()`), total spool directory bounding (`max_spool_mb`), and crash recovery automatically scanning and draining pending offline spools upon startup.
