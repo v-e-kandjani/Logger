@@ -153,13 +153,32 @@ sudo systemctl enable --now syslog-platform
 
 ## 6. Updating the Standalone Application
 
-To update an existing bare-metal installation:
+### Option A: Automated CLI Upgrade (Recommended)
+Valtrivo LogSeal's unified upgrade engine automatically detects the standalone bare-metal architecture, creates a pre-upgrade database backup, pulls the latest code from GitHub, applies new SQL migrations, recompiles native binaries, synchronizes assets, and restarts the systemd service:
 
+```bash
+cd /opt/syslog-platform # or your cloned Logger directory
+sudo bash upgrade.sh
+# You can also explicitly specify: sudo bash upgrade.sh --baremetal
+```
+
+### Option B: 1-Click Web Dashboard Upgrade
+You can also upgrade directly from the Web UI:
+1. Log in as Super Administrator.
+2. Navigate to **System Administration** > **System Updates**.
+3. Click **Check for Updates** to compare against GitHub `origin/main`.
+4. Click **Apply Update**. The platform downloads updated source and asset files, downloads required Go libraries (`go mod download`), recompiles `/opt/syslog-platform/bin/syslog-platform`, reloads `syslog-platform.service`, and reconnects automatically.
+
+### Option C: Manual Step-by-Step Upgrade
 ```bash
 cd /path/to/Logger
 git pull origin main
+go mod download
 go build -trimpath -ldflags="-s -w" -o /opt/syslog-platform/bin/syslog-platform ./cmd/server/main.go
+go build -trimpath -ldflags="-s -w" -o /opt/syslog-platform/bin/logseal-proxy ./cmd/proxy/main.go
 sudo cp -r web/templates/* /opt/syslog-platform/web/templates/
 sudo cp -r web/static/* /opt/syslog-platform/web/static/
+sudo cp -r scripts/* /opt/syslog-platform/scripts/
+sudo cp -r migrations/* /opt/syslog-platform/migrations/
 sudo systemctl restart syslog-platform
 ```

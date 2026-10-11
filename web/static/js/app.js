@@ -7665,6 +7665,19 @@ function copyPortsFirewallFirewalld() {
     }
 }
 
+function copyBaremetalCommands() {
+    const cmd = "sudo systemctl status syslog-platform && sudo journalctl -u syslog-platform -f";
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(cmd).then(() => {
+            showToast('✓ Bare-metal systemd commands copied to clipboard!', 'success');
+        }).catch(() => {
+            showToast('Please copy the command manually.', 'info');
+        });
+    } else {
+        showToast('Clipboard access unavailable.', 'info');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('btn-open-ports-help');
     if (btn) {

@@ -280,6 +280,11 @@ if ! command -v go &> /dev/null; then
     }
 fi
 
+# Determine version metadata
+COMMIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "00fe77a")
+CURRENT_VER=$(grep -E 'Version\s*=\s*' internal/version/version.go 2>/dev/null | cut -d'"' -f2 || echo "v1.7.5")
+BUILD_DATE=$(date +%Y-%m-%d)
+
 # Create directory structure
 mkdir -p "${INSTALL_DIR}/bin" \
          "${INSTALL_DIR}/config" \
@@ -288,17 +293,40 @@ mkdir -p "${INSTALL_DIR}/bin" \
          "${INSTALL_DIR}/archive" \
          "${INSTALL_DIR}/data/spool" \
          "${INSTALL_DIR}/timestamp-client" \
-         "${INSTALL_DIR}/scripts"
+         "${INSTALL_DIR}/scripts" \
+         "${INSTALL_DIR}/migrations" \
+         "${INSTALL_DIR}/cmd" \
+         "${INSTALL_DIR}/internal" \
+         "${INSTALL_DIR}/docs"
 
-info "Compiling static Linux binaries..."
-CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/bin/syslog-platform" ./cmd/server/main.go
+info "Compiling static Linux binaries with version metadata (${CURRENT_VER} - ${COMMIT_SHA})..."
+CGO_ENABLED=0 go build -trimpath \
+    -ldflags="-s -w -X github.com/syslog-platform/logger/internal/version.CommitSHA=${COMMIT_SHA} -X github.com/syslog-platform/logger/internal/version.Version=${CURRENT_VER} -X github.com/syslog-platform/logger/internal/version.BuildDate=${BUILD_DATE}" \
+    -o "${INSTALL_DIR}/bin/syslog-platform" ./cmd/server/main.go
+
 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/bin/logseal-proxy" ./cmd/proxy/main.go
 chmod +x "${INSTALL_DIR}/bin/syslog-platform" "${INSTALL_DIR}/bin/logseal-proxy"
 
-# Copy assets
+# Write version metadata for dynamic runtime inspection
+cat << EOF > "${INSTALL_DIR}/config/.version_info"
+COMMIT_SHA=${COMMIT_SHA}
+VERSION=${CURRENT_VER}
+BUILD_DATE=${BUILD_DATE}
+UPDATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+UPDATED_BY=install_standalone
+EOF
+mkdir -p config
+cp "${INSTALL_DIR}/config/.version_info" config/.version_info 2>/dev/null || true
+
+# Copy assets and source files for in-place updates
 cp -r web/templates/* "${INSTALL_DIR}/web/templates/"
 cp -r web/static/* "${INSTALL_DIR}/web/static/"
 cp -r scripts/* "${INSTALL_DIR}/scripts/" 2>/dev/null || true
+cp -r migrations/* "${INSTALL_DIR}/migrations/" 2>/dev/null || true
+cp -r cmd/* "${INSTALL_DIR}/cmd/" 2>/dev/null || true
+cp -r internal/* "${INSTALL_DIR}/internal/" 2>/dev/null || true
+cp -r docs/* "${INSTALL_DIR}/docs/" 2>/dev/null || true
+cp go.mod go.sum "${INSTALL_DIR}/" 2>/dev/null || true
 
 # Copy timestamping client jar if available
 if [[ -f timestamp-client/tss-client-console-3.1.33.jar ]]; then

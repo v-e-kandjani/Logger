@@ -163,6 +163,27 @@ sudo firewall-cmd --list-ports
 
 ---
 
+### 5.3. Bare-Metal (Native Linux) Specific Port & Security Architecture
+
+When Valtrivo LogSeal is deployed in **Bare-Metal (No Docker)** mode via `install_standalone.sh`:
+- **Native PostgreSQL (`postgresql.service`)**:
+  - Bound to `127.0.0.1:5432` in `/etc/postgresql/<version>/main/postgresql.conf` (`listen_addresses = '127.0.0.1'`).
+  - UFW explicitly denies external connections (`ufw deny 5432/tcp`).
+- **Native ClickHouse Server (`clickhouse-server.service`)**:
+  - Bound to loopback via `/etc/clickhouse-server/config.d/listen_local.xml`:
+    ```xml
+    <clickhouse>
+        <listen_host>127.0.0.1</listen_host>
+        <listen_host>::1</listen_host>
+    </clickhouse>
+    ```
+  - Native port `9000` and HTTP port `8123` are unreachable from external interfaces (`ufw deny 9000/tcp`, `ufw deny 8123/tcp`).
+- **Native Application Daemon (`syslog-platform.service`)**:
+  - Runs with Linux capabilities `AmbientCapabilities=CAP_NET_BIND_SERVICE`, allowing the unprivileged process to bind privileged ports `514/udp` and `514/tcp` without requiring root permissions.
+  - Listens on `0.0.0.0:8080`, `0.0.0.0:8443`, `0.0.0.0:514`, `0.0.0.0:5514`, and `0.0.0.0:6514`.
+
+---
+
 ## 6. Connectivity Testing & Troubleshooting
 
 ### Test Syslog UDP Ingestion from Client:
@@ -182,7 +203,8 @@ echo "<14>$(date '+%b %d %H:%M:%S') test-host test-app: Valtrivo TCP Port 514 Te
 # Check that 5432, 8123, and 9000 are bound ONLY to 127.0.0.1
 ss -tulpn | grep -E ':(5432|8123|9000|8443|8080|514|5514)'
 ```
-Example expected output:
+
+#### Docker Deployment Output:
 ```text
 tcp   LISTEN 0      128        127.0.0.1:5432         0.0.0.0:*    users:(("docker-proxy"...))
 tcp   LISTEN 0      128        127.0.0.1:8123         0.0.0.0:*    users:(("docker-proxy"...))
@@ -192,4 +214,15 @@ tcp   LISTEN 0      128          0.0.0.0:8080         0.0.0.0:*    users:(("dock
 udp   UNCONN 0      0            0.0.0.0:514          0.0.0.0:*    users:(("docker-proxy"...))
 tcp   LISTEN 0      128          0.0.0.0:514          0.0.0.0:*    users:(("docker-proxy"...))
 ```
-Notice that `5432`, `8123`, and `9000` show `127.0.0.1`, guaranteeing zero external exposure.
+
+#### Bare-Metal (Native Systemd) Output:
+```text
+tcp   LISTEN 0      128        127.0.0.1:5432         0.0.0.0:*    users:(("postgres"...))
+tcp   LISTEN 0      128        127.0.0.1:8123         0.0.0.0:*    users:(("clickhouse-serv"...))
+tcp   LISTEN 0      128        127.0.0.1:9000         0.0.0.0:*    users:(("clickhouse-serv"...))
+tcp   LISTEN 0      128          0.0.0.0:8443         0.0.0.0:*    users:(("syslog-platform"...))
+tcp   LISTEN 0      128          0.0.0.0:8080         0.0.0.0:*    users:(("syslog-platform"...))
+udp   UNCONN 0      0            0.0.0.0:514          0.0.0.0:*    users:(("syslog-platform"...))
+tcp   LISTEN 0      128          0.0.0.0:514          0.0.0.0:*    users:(("syslog-platform"...))
+```
+In both architectures, `5432`, `8123`, and `9000` are bound exclusively to `127.0.0.1`, guaranteeing zero external exposure.

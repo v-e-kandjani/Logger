@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.4</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.5</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -2176,7 +2176,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.4</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.5</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -4045,20 +4045,22 @@
 
                 <!-- Section 4: Firewall Configuration Commands -->
                 <h4 style="margin: 0 0 10px 0; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
-                    <span>🛡️</span> 4. Güvenlik Duvarı Komutları (Hızlı Kurulum)
+                    <span>🛡️</span> 4. Güvenlik Duvarı &amp; Servis Komutları (Hızlı Kurulum)
                 </h4>
-                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
                     <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px;" onclick="copyPortsFirewallUFW()">📋 UFW Komutlarını Kopyala (Ubuntu/Debian)</button>
                     <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px;" onclick="copyPortsFirewallFirewalld()">📋 Firewalld Komutlarını Kopyala (RHEL/CentOS)</button>
+                    <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px;" onclick="copyBaremetalCommands()">📋 Bare-Metal Servis Komutları (systemd)</button>
                 </div>
                 <pre id="ports-firewall-code-block" style="background: #0f172a; color: #38bdf8; padding: 12px 14px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin: 0 0 16px 0; border: 1px solid #1e293b;"><code>sudo ufw allow 22/tcp && sudo ufw allow 8443/tcp && sudo ufw allow 8080/tcp && sudo ufw allow 514/udp && sudo ufw allow 514/tcp && sudo ufw allow 5514/udp && sudo ufw allow 5514/tcp && sudo ufw allow 6514/tcp</code></pre>
 
                 <!-- Documentation Links -->
                 <div style="border-top: 1px solid var(--border-color); padding-top: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                     <div style="font-size: 12px; color: var(--text-muted);">
-                        Detaylı dokümantasyon dosyaları: <code>docs/PORT_SPECIFICATIONS.md</code> &amp; <code>docs/HELP.md</code>
+                        Detaylı dokümantasyon dosyaları: <code>docs/PORT_SPECIFICATIONS.md</code>, <code>docs/HELP.md</code> &amp; <code>STANDALONE_INSTALL.md</code>
                     </div>
-                    <div style="display: flex; gap: 8px;">
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <a href="/STANDALONE_INSTALL.md" target="_blank" class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; text-decoration: none;">🖥️ Bare-Metal Kurulum (MD)</a>
                         <a href="/docs/PORT_SPECIFICATIONS.md" target="_blank" class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; text-decoration: none;">📄 Port Spesifikasyonu (MD)</a>
                         <a href="/docs/HELP.md" target="_blank" class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; text-decoration: none;">📖 Yardım Kılavuzu (MD)</a>
                     </div>
@@ -4070,7 +4072,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.7.4"></script>
-    <script src="/static/js/app.js?v=1.7.4"></script>
+    <script src="/static/js/translations.js?v=1.7.5"></script>
+    <script src="/static/js/app.js?v=1.7.5"></script>
 </body>
 </html>

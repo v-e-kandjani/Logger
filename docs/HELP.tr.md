@@ -94,7 +94,42 @@ NAT veya güvenlik duvarı arkasındaki şubeler, fabrikalar ve uzak lokasyonlar
 - Konteyner içinde Java 17 JRE kurulu olmalıdır (varsayılan imajda mevcuttur).
 - `timestamp-client/` klasöründe TÜBİTAK KamuSM `tss-client-console-*.jar` dosyasının ve Ayarlar menüsünde kullanıcı adı/parolanın geçerliliğini kontrol edin.
 
-### 3. Yeniden başlatma sonrası konteyner sağlıksız görünüyor
-- Logları inceleyin: `docker compose logs -f syslog-app`.
-- PostgreSQL durumunu kontrol edin: `docker compose ps postgres`.
-- ClickHouse durumunu kontrol edin: `docker compose ps clickhouse`.
+### 3. Yeniden başlatma sonrası servis veya konteyner sağlıksız görünüyor
+- **Docker**: Logları inceleyin `docker compose logs -f syslog-app`, durumları doğrulayın `docker compose ps`.
+- **Bare-Metal**: Servis durumunu kontrol edin `sudo systemctl status syslog-platform`, logları görüntüleyin `sudo journalctl -u syslog-platform -n 50 --no-pager` ve veritabanı servislerini doğrulayın (`sudo systemctl status postgresql`, `sudo systemctl status clickhouse-server`).
+
+---
+
+## 6. Bare-Metal (Docker Olmadan Doğrudan Linux) İşletim ve Yönetimi
+
+Docker kullanılmayan doğrudan fiziksel / sanal Linux sunucuları için:
+
+### 6.1. Hızlı Kurulum ve Dizin Yapısı
+```bash
+git clone https://github.com/v-e-kandjani/Logger.git
+cd Logger
+sudo bash install_standalone.sh -y
+```
+- Ana Dizin: `/opt/syslog-platform`
+- İkili Dosyalar: `/opt/syslog-platform/bin/syslog-platform` ve `logseal-proxy`
+- Yapılandırma: `/opt/syslog-platform/config/config.yaml`
+- Web Varlıkları: `/opt/syslog-platform/web/templates` ve `/opt/syslog-platform/web/static`
+
+### 6.2. Servis Yönetim Komutları
+```bash
+# Ana uygulama servisi
+sudo systemctl status syslog-platform
+sudo systemctl restart syslog-platform
+sudo journalctl -u syslog-platform -f
+
+# PostgreSQL servisi
+sudo systemctl status postgresql
+
+# ClickHouse Server servisi
+sudo systemctl status clickhouse-server
+```
+
+### 6.3. Bare-Metal Üzerinde Sürüm Yükseltme
+- **CLI**: `sudo bash upgrade.sh` (veya `sudo bash upgrade.sh --baremetal`) komutunu çalıştırın. Kodları otomatik çeker, SQL şemalarını günceller, yerel ikili dosyayı derler, `/opt/syslog-platform/` dizinine aktarır ve `syslog-platform.service` servisini yeniden başlatır.
+- **Web Paneli**: **Sistem Yönetimi** > **Sistem Güncelleme** menüsüne gidin ve **Güncellemeyi Uygula** butonuna tıklayın. Platform kendisini derleyerek `syslog-platform.service` servisini arka planda otomatik olarak yeniden yükler.
+

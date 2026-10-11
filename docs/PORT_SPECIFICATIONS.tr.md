@@ -153,6 +153,25 @@ sudo firewall-cmd --reload
 sudo firewall-cmd --list-ports
 ```
 
+### 5.3. Bare-Metal (Doğrudan Linux / Docker Olmadan) Özel Port ve Güvenlik Mimarisi
+
+Valtrivo LogSeal doğrudan sunucu üzerinde (`install_standalone.sh` ile) kurulduğunda:
+- **Yerel PostgreSQL (`postgresql.service`)**:
+  - `/etc/postgresql/<surum>/main/postgresql.conf` içerisinde `listen_addresses = '127.0.0.1'` olarak sınırlandırılır.
+  - UFW ile dış erişim tamamen engellenir (`ufw deny 5432/tcp`).
+- **Yerel ClickHouse Server (`clickhouse-server.service`)**:
+  - `/etc/clickhouse-server/config.d/listen_local.xml` ile yalnızca yerel döngü (loopback) dinler:
+    ```xml
+    <clickhouse>
+        <listen_host>127.0.0.1</listen_host>
+        <listen_host>::1</listen_host>
+    </clickhouse>
+    ```
+  - Port `9000` ve `8123` dış ağlardan erişilemez (`ufw deny 9000/tcp`, `ufw deny 8123/tcp`).
+- **Yerel Servis Daemon (`syslog-platform.service`)**:
+  - `AmbientCapabilities=CAP_NET_BIND_SERVICE` Linux yeteneği sayesinde `root` kullanıcısına ihtiyaç duymadan ayrıcalıklı `514/udp` ve `514/tcp` portlarını bağlar.
+  - `0.0.0.0:8080`, `0.0.0.0:8443`, `0.0.0.0:514`, `0.0.0.0:5514`, ve `0.0.0.0:6514` portlarını dinler.
+
 ---
 
 ## 6. Port Test ve Doğrulama Komutları
@@ -171,4 +190,26 @@ echo "<14>$(date '+%b %d %H:%M:%S') test-host test-app: Valtrivo TCP Port 514 Te
 ```bash
 ss -tulpn | grep -E ':(5432|8123|9000|8443|8080|514|5514)'
 ```
-Burada `5432`, `8123` ve `9000` portlarının yalnızca `127.0.0.1` dinlediği görülmelidir.
+
+#### Docker Kurulumu Çıktısı:
+```text
+tcp   LISTEN 0      128        127.0.0.1:5432         0.0.0.0:*    users:(("docker-proxy"...))
+tcp   LISTEN 0      128        127.0.0.1:8123         0.0.0.0:*    users:(("docker-proxy"...))
+tcp   LISTEN 0      128        127.0.0.1:9000         0.0.0.0:*    users:(("docker-proxy"...))
+tcp   LISTEN 0      128          0.0.0.0:8443         0.0.0.0:*    users:(("docker-proxy"...))
+tcp   LISTEN 0      128          0.0.0.0:8080         0.0.0.0:*    users:(("docker-proxy"...))
+udp   UNCONN 0      0            0.0.0.0:514          0.0.0.0:*    users:(("docker-proxy"...))
+tcp   LISTEN 0      128          0.0.0.0:514          0.0.0.0:*    users:(("docker-proxy"...))
+```
+
+#### Bare-Metal (Yerel Systemd) Çıktısı:
+```text
+tcp   LISTEN 0      128        127.0.0.1:5432         0.0.0.0:*    users:(("postgres"...))
+tcp   LISTEN 0      128        127.0.0.1:8123         0.0.0.0:*    users:(("clickhouse-serv"...))
+tcp   LISTEN 0      128        127.0.0.1:9000         0.0.0.0:*    users:(("clickhouse-serv"...))
+tcp   LISTEN 0      128          0.0.0.0:8443         0.0.0.0:*    users:(("syslog-platform"...))
+tcp   LISTEN 0      128          0.0.0.0:8080         0.0.0.0:*    users:(("syslog-platform"...))
+udp   UNCONN 0      0            0.0.0.0:514          0.0.0.0:*    users:(("syslog-platform"...))
+tcp   LISTEN 0      128          0.0.0.0:514          0.0.0.0:*    users:(("syslog-platform"...))
+```
+Her iki mimaride de `5432`, `8123` ve `9000` portları yalnızca `127.0.0.1` arayüzüne bağlıdır, dış ağa sızma riski bulunmaz.

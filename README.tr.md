@@ -254,6 +254,20 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.7.5** (Bütünleşik Bare-Metal ve Docker Desteği, Yerel Systemd Otomatik Algılama, Port İzolasyonu ve Yerinde Güncelleme):
+  - **Bütünleşik Çift Mimarili CLI Güncelleme Motoru (`upgrade.sh`)**:
+    - Kurulumun Docker Compose mu yoksa doğrudan fiziksel/sanal Linux (Bare-Metal `syslog-platform.service`) üzerinde mi çalıştığını otomatik olarak algılar.
+    - *Bare-Metal Güncelleme Hattı*: Yerel PostgreSQL yedeğini (`pg_dump`) otomatik alır, en son kodları çeker (`git pull origin main`), yerel PostgreSQL ve ClickHouse şemalarını günceller, sürüm bilgisini yazar, `go mod download` ile kütüphaneleri indirir, yerel Go ikili dosyalarını (`/opt/syslog-platform/bin/syslog-platform` ve `logseal-proxy`) sürüm etiketleriyle derler, web varlıklarını senkronize eder ve `syslog-platform.service` servisini yeniden başlatıp sağlık kontrolü yapar.
+    - İsteğe bağlı `--baremetal` ve `--docker` parametreleri ile manuel mimari seçimi desteklenir.
+  - **Bare-Metal Web Tek Tıkla Güncelleme & Kesintisiz Yeniden Başlatma**:
+    - `handleSystemUpdateApply` fonksiyonu hem `syslog-platform` (yerel systemd) hem de `syslog-app` (konteyner) servislerini yeniden başlatacak, gerekirse `syscall.Exec` ile süreç yenilemesi yapacak şekilde güçlendirildi.
+  - **Gelişmiş Standalone Linux Kurulum Betiği (`install_standalone.sh` & `scripts/install_standalone.sh`)**:
+    - Kurulum anında `config/.version_info` dosyasını oluşturur.
+    - `/opt/syslog-platform/` dizinine kaynak ağacını (`cmd/`, `internal/`, `migrations/`, `docs/`, `go.mod`, `go.sum`) kopyalayarak bare-metal sunucuda doğrudan yerinde web güncellemelerinin ve `go build` derlemelerinin sorunsuz çalışmasını sağlar.
+  - **Bare-Metal Port Spesifikasyonları ve Güvenlik Dokümantasyonu**:
+    - `docs/PORT_SPECIFICATIONS.md` ve `docs/PORT_SPECIFICATIONS.tr.md` içerisine Bare-Metal kurulumlar için yerel PostgreSQL (`127.0.0.1:5432`) ve ClickHouse (`127.0.0.1:9000/8123`) loopback yapılandırmaları, UFW kalkanlama kuralları ve Linux `AmbientCapabilities=CAP_NET_BIND_SERVICE` yetkisi eklendi.
+    - `docs/HELP.tr.md` ve Web Paneli "Ağ Portları & Mimari Rehberi" modalına Bare-Metal systemd servis komutları ve doküman bağlantıları entegre edildi.
+
 - **v1.7.4** (Güncelleme Eşitlik Hatası Düzeltmesi, Dinamik Go Modülü Eşitleme & Yeniden Başlatma, UI Buton Hizalama & Port Spesifikasyonları):
   - **CLI ve Web Güncellemeleri Arasındaki Tam Eşitlik**:
     - *CLI Güncelleme Durum Kalıcılığı*: CLI güncellemesi (`upgrade.sh`) yapıldıktan sonra Web Arayüzünün hâlâ güncelleme gerekiyor göstermesi hatası giderildi. `upgrade.sh` artık `config/.version_info` dosyasına güncel Git commit SHA'sını yazar, Docker derleme argümanlarını iletir ve çalışma zamanı sürümünü dinamik olarak günceller.

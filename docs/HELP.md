@@ -95,7 +95,42 @@ For branch offices, subsidiaries, or customer networks behind NAT/Firewall:
 - Ensure Java 17 JRE is installed (included in Docker container).
 - Check `timestamp-client/` directory for `tss-client-console-*.jar` and valid TÜBİTAK KamuSM credentials in Settings.
 
-### Issue 3: Container unhealthy after reboot
-- Check logs: `docker compose logs -f syslog-app`.
-- Verify PostgreSQL is healthy: `docker compose ps postgres`.
-- Verify ClickHouse is healthy: `docker compose ps clickhouse`.
+### Issue 3: Service or container unhealthy after reboot
+- **Docker**: Check logs `docker compose logs -f syslog-app`, verify `docker compose ps`.
+- **Bare-Metal**: Check service status `sudo systemctl status syslog-platform`, view logs `sudo journalctl -u syslog-platform -n 50 --no-pager`, and verify database services (`sudo systemctl status postgresql`, `sudo systemctl status clickhouse-server`).
+
+---
+
+## 6. Bare-Metal (No Docker) Operations & Administration
+
+For environments running directly on Linux without Docker:
+
+### 6.1. Quick Installation & Directory Layout
+```bash
+git clone https://github.com/v-e-kandjani/Logger.git
+cd Logger
+sudo bash install_standalone.sh -y
+```
+- Base directory: `/opt/syslog-platform`
+- Binaries: `/opt/syslog-platform/bin/syslog-platform` and `logseal-proxy`
+- Config: `/opt/syslog-platform/config/config.yaml`
+- Web assets: `/opt/syslog-platform/web/templates` and `/opt/syslog-platform/web/static`
+
+### 6.2. Service Management Commands
+```bash
+# Application service
+sudo systemctl status syslog-platform
+sudo systemctl restart syslog-platform
+sudo journalctl -u syslog-platform -f
+
+# PostgreSQL service
+sudo systemctl status postgresql
+
+# ClickHouse Server service
+sudo systemctl status clickhouse-server
+```
+
+### 6.3. Upgrades on Bare-Metal
+- **CLI**: Run `sudo bash upgrade.sh` (or `sudo bash upgrade.sh --baremetal`). It automatically pulls code, applies SQL migrations, compiles native binaries, updates `/opt/syslog-platform/`, and restarts `syslog-platform.service`.
+- **Web UI**: Navigate to **System Administration** > **System Updates** and click **Apply Update**. The platform recompiles itself in `/opt/syslog-platform/bin/` and restarts the systemd service automatically.
+

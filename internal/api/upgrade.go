@@ -594,7 +594,7 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 	_ = h.pgDB.InsertAuditLog(ctx, auditEntry)
 
 	msg := fmt.Sprintf("Upgrade completed successfully! System upgraded to %s (%s). Reloading platform...", version.Version, shortSHA)
-	cliCmd := "sudo bash upgrade.sh\n# or\ngit pull origin main && docker compose build syslog-app && docker compose up -d"
+	cliCmd := "sudo bash upgrade.sh\n# (Auto-detects Docker or Bare-Metal systemd mode)"
 
 	sendProgress(100, "COMPLETE", msg, true, true, map[string]interface{}{
 		"new_version":     version.Version,
@@ -622,8 +622,9 @@ func (h *Handler) handleSystemUpdateApply(w http.ResponseWriter, r *http.Request
 		time.Sleep(1500 * time.Millisecond)
 		log.Printf("[UPGRADE] Initiating automatic platform reload to activate %s (%s)...", version.Version, shortSHA)
 
-		// 1. Try systemd service restart if available
+		// 1. Try systemd service restart if available (handles bare-metal syslog-platform and container syslog-app)
 		if _, err := exec.LookPath("systemctl"); err == nil {
+			_ = exec.Command("systemctl", "restart", "syslog-platform").Run()
 			_ = exec.Command("systemctl", "restart", "syslog-app").Run()
 		}
 

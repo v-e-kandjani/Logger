@@ -265,6 +265,22 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.7.5** (Unified Bare-Metal & Docker Support, Native Systemd Auto-Detection, Standalone Port Isolation & In-Place Self-Updates):
+  - **Unified Dual-Architecture CLI Upgrade Engine (`upgrade.sh`)**:
+    - Automatically detects whether the deployment is running under Docker Compose or Bare-Metal Linux (`syslog-platform.service` under systemd).
+    - *Bare-Metal Upgrade Pipeline*: Automatically takes pre-upgrade native PostgreSQL backups (`pg_dump`), fetches latest code (`git pull origin main`), applies SQL migrations to native PostgreSQL & ClickHouse instances, writes runtime version metadata, runs `go mod download`, recompiles native Go binaries (`/opt/syslog-platform/bin/syslog-platform` and `logseal-proxy`) with embedded version ldflags, synchronizes assets and source files, and restarts `syslog-platform.service` with automated health check verification.
+    - Supports manual override flags: `sudo bash upgrade.sh --baremetal` or `sudo bash upgrade.sh --docker`.
+  - **Bare-Metal Web 1-Click Upgrade & Seamless Process Reload**:
+    - Enhanced `handleSystemUpdateApply` in `internal/api/upgrade.go` to restart both `syslog-platform` (native systemd) and `syslog-app` (container) services, falling back to in-place `syscall.Exec` binary replacement.
+  - **Enhanced Standalone Installer (`install_standalone.sh` & `scripts/install_standalone.sh`)**:
+    - Generates and writes `config/.version_info` upon installation.
+    - Copies source trees (`cmd/`, `internal/`, `migrations/`, `docs/`, `go.mod`, `go.sum`) into `/opt/syslog-platform/`, enabling seamless in-place `go build` and `go mod download` updates directly on bare-metal systems.
+    - Compiles static binaries with embedded version tags and commit hashes.
+  - **Bare-Metal Port Specifications & Security Documentation**:
+    - Added comprehensive Bare-Metal sections to `docs/PORT_SPECIFICATIONS.md` and `docs/PORT_SPECIFICATIONS.tr.md`, detailing native PostgreSQL (`127.0.0.1:5432`) and ClickHouse (`127.0.0.1:9000/8123`) loopback binding configurations, UFW shielding, Linux `AmbientCapabilities=CAP_NET_BIND_SERVICE` for privileged port 514 binding without root, and dual `ss -tulpn` verification outputs.
+    - Added Bare-Metal service management and troubleshooting guide to `docs/HELP.md` and `docs/HELP.tr.md`.
+    - Added Bare-Metal systemd commands button and direct documentation links into the Web UI "Ports & Architecture Help" modal.
+
 - **v1.7.4** (Update Parity Bug Fix, Dynamic Go Module Sync & Reload, UI Button Positioning & Port Specifications):
   - **Full Parity Between CLI and Web Upgrades**:
     - *CLI Update State Persistence*: Fixed issue where CLI upgrade (`upgrade.sh`) left the Web UI indicating an update was still required. `upgrade.sh` now synchronizes `config/.version_info` with the exact Git commit SHA, passes build args to Docker build, and injects runtime metadata.
