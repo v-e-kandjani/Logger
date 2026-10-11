@@ -6,10 +6,16 @@ import (
 	"strings"
 )
 
+const (
+	DefaultVersion   = "v1.7.4"
+	DefaultBuildDate = "2026-10-12"
+	DefaultCommitSHA = "56e542e"
+)
+
 var (
-	Version   = "v1.7.4"
-	BuildDate = "2026-10-12"
-	CommitSHA = "7c1b29c"
+	Version   = DefaultVersion
+	BuildDate = DefaultBuildDate
+	CommitSHA = DefaultCommitSHA
 	Platform  = "Valtrivo LogSeal"
 	Company   = "Valtrivo"
 	Tagline   = "Her kayıt, zamanıyla kanıt."
@@ -65,5 +71,16 @@ func ReloadRuntimeVersion() {
 		if s != "" && !strings.Contains(s, "fatal") && !strings.Contains(s, "error") {
 			CommitSHA = s
 		}
+	}
+
+	// 3. Fallbacks to prevent empty strings if compiled without ldflags or overrides
+	if Version == "" || Version == "unknown" {
+		Version = DefaultVersion
+	}
+	if BuildDate == "" || BuildDate == "unknown" {
+		BuildDate = DefaultBuildDate
+	}
+	if CommitSHA == "" || CommitSHA == "unknown" {
+		CommitSHA = DefaultCommitSHA
 	}
 }

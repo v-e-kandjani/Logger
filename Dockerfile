@@ -17,10 +17,14 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build static Linux binaries with embedded version metadata
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
-    -ldflags="-s -w -X github.com/syslog-platform/logger/internal/version.CommitSHA=${COMMIT_SHA} -X github.com/syslog-platform/logger/internal/version.Version=${VERSION} -X github.com/syslog-platform/logger/internal/version.BuildDate=${BUILD_DATE}" \
-    -o /app/bin/syslog-platform ./cmd/server/main.go
+# Build static Linux binaries (only inject ldflags when build args are specified)
+RUN if [ -n "$COMMIT_SHA" ] && [ -n "$VERSION" ] && [ -n "$BUILD_DATE" ]; then \
+        CGO_ENABLED=0 GOOS=linux go build -trimpath \
+        -ldflags="-s -w -X github.com/syslog-platform/logger/internal/version.CommitSHA=${COMMIT_SHA} -X github.com/syslog-platform/logger/internal/version.Version=${VERSION} -X github.com/syslog-platform/logger/internal/version.BuildDate=${BUILD_DATE}" \
+        -o /app/bin/syslog-platform ./cmd/server/main.go; \
+    else \
+        CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /app/bin/syslog-platform ./cmd/server/main.go; \
+    fi
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /app/bin/logseal-proxy ./cmd/proxy/main.go
 
 # Stage 2: Minimal runtime image with Git and Go toolchain for dynamic web & CLI upgrades
