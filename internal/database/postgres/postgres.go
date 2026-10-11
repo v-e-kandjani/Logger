@@ -393,6 +393,12 @@ func (db *DB) CreateArchiveRecord(ctx context.Context, a *models.LogArchive) err
 		INSERT INTO log_archives (archive_name, start_timestamp, end_timestamp, record_count,
 		                          archive_path, archive_size, hash_algorithm, hash_value, timestamp_status, tenant_slug)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (archive_name) DO UPDATE SET
+			record_count = EXCLUDED.record_count,
+			archive_path = EXCLUDED.archive_path,
+			archive_size = EXCLUDED.archive_size,
+			hash_value = EXCLUDED.hash_value,
+			timestamp_status = EXCLUDED.timestamp_status
 		RETURNING id, created_at`
 
 	return db.pool.QueryRow(ctx, query,
@@ -501,12 +507,12 @@ func (db *DB) CreateArchiveJob(ctx context.Context, job *models.ArchiveJob) erro
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
 		ON CONFLICT (idempotency_key) DO UPDATE
 		SET updated_at = NOW()
-		RETURNING id, created_at, updated_at`
+		RETURNING id, created_at, updated_at, state`
 
 	return db.pool.QueryRow(ctx, query,
 		tenant, job.RequestType, job.PeriodStart, job.PeriodEnd, job.TimeBasis,
 		job.IdempotencyKey, job.Requester, job.Reason, job.State,
-	).Scan(&job.ID, &job.CreatedAt, &job.UpdatedAt)
+	).Scan(&job.ID, &job.CreatedAt, &job.UpdatedAt, &job.State)
 }
 
 func (db *DB) GetArchiveJob(ctx context.Context, id uuid.UUID) (*models.ArchiveJob, error) {

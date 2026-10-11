@@ -111,10 +111,15 @@ func (s *EvidenceSealer) ProcessJob(ctx context.Context, job *models.ArchiveJob)
 	var recordCount int64
 	var rawBytesCount int64
 
+	timeCol := "received_at"
+	if job.TimeBasis == "event_time" {
+		timeCol = "event_timestamp"
+	}
+
 	// Query events from ClickHouse within receipt window
-	q := `SELECT timestamp, source, message FROM syslog_events 
-	      WHERE tenant = ? AND timestamp >= ? AND timestamp < ? 
-	      ORDER BY timestamp ASC`
+	q := fmt.Sprintf(`SELECT %s, IPv4NumToString(source_ip), message FROM %s.syslog_events 
+	      WHERE tenant = ? AND %s >= ? AND %s < ? 
+	      ORDER BY %s ASC`, timeCol, s.ch.Database(), timeCol, timeCol, timeCol)
 	rows, err := s.ch.QueryEvents(ctx, q, tenant, job.PeriodStart, job.PeriodEnd)
 	if err == nil {
 		defer rows.Close()
