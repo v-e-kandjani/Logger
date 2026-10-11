@@ -260,6 +260,14 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.6.7** (Phase 8 Combined Resource Governor, Operator Views & Threat Simulation Access Control):
+  - **Simulate Threat Root Super-Admin Role Restriction**: Restricted SOC threat attack simulation triggers exclusively to the Super Administrator of the root tenant (`default` organization). Enforced across backend (`handleSIEMSimulate` returns `403 Forbidden` for non-root or non-super-admin users) and UI (Simulate Threat button `#btn-open-siem-simulate` is hidden for all other users).
+  - **Memory Token Semaphores & Cold Query Admission**: Implemented conservative 128 MB query memory tokens per query against a dedicated query token pool (25% of data plane memory) and `MemoryHigh` headroom, preventing cold-cache query spikes from provoking out-of-memory crashes.
+  - **Aggressive Result Cache Eviction Under Resource Pressure**: Integrated automatic cache eviction (`cache.GetResultCache().EvictUnderPressure()`) triggered during `PRESSURE` and `CRITICAL` governor states to immediately reclaim memory and release heap pages back to the OS via `debug.FreeOSMemory()`.
+  - **Step-by-Step Recovery Slot Restoration**: Enhanced governor recovery state machine with hysteresis to ramp up allowed search concurrency one slot at a time rather than sudden concurrency shocks.
+  - **Holistic Operator Views Telemetry**: Exposed comprehensive operator view telemetry (`/api/v1/governor/status`) displaying physical memory ledger (Control Plane 2 GB, Data Plane current/max, Emergency reserve 1 GB, Query tokens in-use), ingestion queue runway time, loss packet counters, SIEM detection lag, TSA verification status, and RAM cache freshness.
+  - **Unified Operations Dashboard Banner**: Upgraded the Cgroups v2 Resource Governor banner with a live Memory Ledger and Operator View telemetry strip in pure CSS3/HTML5.
+
 - **v1.6.6** (Dynamic Tenant Data Retention & Storage Quotas with Automated ClickHouse Partition Dropping):
   - **Configurable Multi-Tenant Data Retention (`retention_days`)**: Granular per-tenant log retention policies allowing finite log life cycles (e.g. 30, 90, 180 days) while preserving indefinite storage (`retention_days = 0`) for root or compliance-mandated organizations.
   - **Storage Quota Enforcement (`max_storage_gb`)**: Real-time ClickHouse physical log volume tracking per tenant; automatically alerts on quota overflow and purges the oldest 24-hour log batch when customer tenants exceed designated storage limits.

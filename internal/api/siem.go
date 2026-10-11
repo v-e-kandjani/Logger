@@ -405,6 +405,14 @@ func (h *Handler) handleSIEMSimulate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	session, ok := h.getSession(r)
+	if !ok || session == nil || !session.IsRootOperator() || session.Role != "Super Administrator" {
+		writeJSON(w, http.StatusForbidden, map[string]string{
+			"error": "Only the Super Administrator of the root organization can simulate security threat scenarios.",
+		})
+		return
+	}
+
 	var req struct {
 		Scenario string `json:"scenario"` // brute-force, port-scan, priv-esc, threat
 	}

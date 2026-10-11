@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.6.6</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.6.7</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -238,7 +238,7 @@
                     </div>
                 </div>
 
-                <!-- Resource Governor & Cgroups v2 Policy Banner -->
+                <!-- Resource Governor & Cgroups v2 Policy Banner with Operator Views -->
                 <div class="panel" id="panel-resource-governor" style="margin-bottom: 24px; padding: 14px 18px; border-radius: 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color);">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
@@ -268,6 +268,24 @@
                                 <span style="color: var(--text-muted);" data-i18n="gov_mem_psi">Memory PSI:</span>
                                 <strong class="mono-code" id="gov-mem-psi" style="color: #a78bfa; margin-left: 4px;">0.0%</strong>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Operator View Ledger & Telemetry Strip -->
+                    <div id="gov-operator-view-strip" style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.07); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 0.8rem;">
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <span style="color: var(--text-muted); font-weight: 600;" data-i18n="gov_memory_ledger">Memory Ledger:</span>
+                            <span class="badge" id="gov-ledger-ctrl" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25);" title="Control Plane Envelope (PostgreSQL & API)">Ctrl: 2.0 GB</span>
+                            <span class="badge" id="gov-ledger-data" style="background: rgba(251, 191, 36, 0.12); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.25);" title="Data Plane Current / Max (ClickHouse, JVM, Ingestion)">Data: 0 MB / 11 GB</span>
+                            <span class="badge" id="gov-ledger-tokens" style="background: rgba(167, 139, 250, 0.12); color: #c084fc; border: 1px solid rgba(167, 139, 250, 0.25);" title="Active Cold Query Memory Tokens">Tokens: 0 / 256 MB</span>
+                            <span class="badge" id="gov-ledger-emerg" style="background: rgba(148, 163, 184, 0.12); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.25);" title="Emergency Host Headroom Reserve">Emerg: 1.0 GB</span>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <span style="color: var(--text-muted); font-weight: 600;" data-i18n="gov_operator_telemetry">Operator View:</span>
+                            <span class="badge" id="gov-op-runway" style="background: rgba(34, 197, 94, 0.12); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.25);" title="Queue Ingestion Buffer Runway Time">Runway: >120s</span>
+                            <span class="badge" id="gov-op-lag" style="background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.25);" title="SIEM Correlation & Ingestion Lag">Lag: &lt;20ms</span>
+                            <span class="badge" id="gov-op-tsa" style="background: rgba(236, 72, 153, 0.12); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.25);" title="5651 TSA Verification Engine Status">TSA: Zamane KS</span>
+                            <span class="badge" id="gov-op-cache" style="background: rgba(45, 212, 191, 0.12); color: #2dd4bf; border: 1px solid rgba(45, 212, 191, 0.25);" title="RAM Cache Hit Ratio & Storage">Cache: 0% Hit</span>
                         </div>
                     </div>
                 </div>
@@ -528,7 +546,7 @@
                         <button class="btn btn-outline" id="btn-open-siem-rules">
                             <span>⚙️</span> <span data-i18n="btn_siem_rules">Detection Rules</span>
                         </button>
-                        <button class="btn btn-primary" id="btn-open-siem-simulate">
+                        <button class="btn btn-primary" id="btn-open-siem-simulate" style="display: none;">
                             <span>⚡</span> <span data-i18n="btn_simulate_threat">Simulate Threat</span>
                         </button>
                         <button class="btn btn-outline" id="btn-refresh-siem">
@@ -1841,12 +1859,12 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.6.6</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.6.7</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">8e76e0c</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">d606128</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-11</div>
                     </div>
                     <div class="stat-card">
@@ -3548,7 +3566,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.6.6"></script>
-    <script src="/static/js/app.js?v=1.6.6"></script>
+    <script src="/static/js/translations.js?v=1.6.7"></script>
+    <script src="/static/js/app.js?v=1.6.7"></script>
 </body>
 </html>

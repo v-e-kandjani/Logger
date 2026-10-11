@@ -90,6 +90,13 @@ async function initAuthSession() {
         if (updatesTab) {
             updatesTab.style.display = data.role === 'Super Administrator' ? '' : 'none';
         }
+
+        // Only Super Administrator of the root tenant can simulate threats
+        const isRootSuperAdmin = (data.is_root !== false && (data.tenant_slug === 'default' || !data.tenant_slug)) && data.role === 'Super Administrator';
+        const simBtn = document.getElementById('btn-open-siem-simulate');
+        if (simBtn) {
+            simBtn.style.display = isRootSuperAdmin ? '' : 'none';
+        }
     } catch (e) {
         window.location.href = '/login';
     }
@@ -370,6 +377,46 @@ async function pollGovernorStatus() {
         if (wrkCpus) wrkCpus.textContent = `CPUs ${data.worker_cpus || '1-7'}`;
         if (admission) admission.textContent = `${data.active_queries || 0} / ${data.max_allowed_queries || 4} Active`;
         if (psi && data.metrics) psi.textContent = `${(data.metrics.memory_psi_avg60 || 0).toFixed(1)}%`;
+
+        // Update Memory Ledger badges
+        if (data.memory_ledger) {
+            const ml = data.memory_ledger;
+            const lCtrl = document.getElementById('gov-ledger-ctrl');
+            const lData = document.getElementById('gov-ledger-data');
+            const lTokens = document.getElementById('gov-ledger-tokens');
+            const lEmerg = document.getElementById('gov-ledger-emerg');
+            if (lCtrl) lCtrl.textContent = `Ctrl: ${(ml.control_plane_mb / 1024).toFixed(1)} GB`;
+            if (lData) lData.textContent = `Data: ${(ml.data_plane_current_mb).toFixed(0)} MB / ${(ml.data_plane_max_mb / 1024).toFixed(1)} GB`;
+            if (lTokens) lTokens.textContent = `Tokens: ${(ml.query_tokens_in_use_mb).toFixed(0)} / ${(ml.query_token_pool_mb).toFixed(0)} MB`;
+            if (lEmerg) lEmerg.textContent = `Emerg: ${(ml.emergency_margin_mb / 1024).toFixed(1)} GB`;
+        }
+
+        // Update Operator View badges
+        if (data.operator_view) {
+            const op = data.operator_view;
+            const opRunway = document.getElementById('gov-op-runway');
+            const opLag = document.getElementById('gov-op-lag');
+            const opTsa = document.getElementById('gov-op-tsa');
+            const opCache = document.getElementById('gov-op-cache');
+
+            if (opRunway) {
+                opRunway.textContent = `Runway: >${op.queue_runway_sec || 120}s`;
+                if (op.queue_loss_count > 0) {
+                    opRunway.textContent += ` (${op.queue_loss_count} drops)`;
+                    opRunway.style.color = '#f87171';
+                }
+            }
+            if (opLag) {
+                if (op.deferred_detection) {
+                    opLag.textContent = 'Detection: Deferred';
+                    opLag.style.color = '#fbbf24';
+                } else {
+                    opLag.textContent = `Lag: <${op.detection_lag_ms || 20}ms`;
+                }
+            }
+            if (opTsa) opTsa.textContent = `TSA: ${op.tsa_status || 'Zamane KS'}`;
+            if (opCache) opCache.textContent = `Cache: ${(op.cache_hit_ratio || 0).toFixed(0)}% Hit (${(op.cache_memory_mb || 0).toFixed(0)} MB)`;
+        }
     } catch (e) {
         // silent
     }
@@ -4480,6 +4527,11 @@ function initSIEMManagement() {
     const btnOpenSimulate = document.getElementById('btn-open-siem-simulate');
     if (btnOpenSimulate) {
         btnOpenSimulate.addEventListener('click', () => {
+            const isRootSuperAdmin = window.currentUser && (window.currentUser.is_root !== false && (window.currentUser.tenant_slug === 'default' || !window.currentUser.tenant_slug)) && window.currentUser.role === 'Super Administrator';
+            if (!isRootSuperAdmin) {
+                showToast('Yalnızca root organizasyonun Süper Yöneticisi tehdit simülasyonu gerçekleştirebilir.', 'error');
+                return;
+            }
             const modal = document.getElementById('siem-simulate-modal');
             if (modal) modal.style.display = 'flex';
         });
@@ -5016,7 +5068,10 @@ async function runSIEMSimulation(scenario) {
             body: JSON.stringify({ scenario }),
         });
 
-        if (!res.ok) throw new Error('Simulation failed');
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'Simulation failed');
+        }
 
         document.getElementById('siem-simulate-modal').style.display = 'none';
         showToast('Saldırı simülasyonu korelasyon motorunda başarıyla tetiklendi!', 'success');

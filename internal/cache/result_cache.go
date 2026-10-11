@@ -214,6 +214,23 @@ func (c *ResultCache) Clear() {
 	c.currentBytes = 0
 }
 
+// EvictUnderPressure forcefully evicts disposable query results when the resource governor
+// enters PRESSURE or CRITICAL state, releasing heap memory back to the OS.
+func (c *ResultCache) EvictUnderPressure() int {
+	c.mu.Lock()
+	count := len(c.items)
+	c.items = make(map[string]*CacheEntry)
+	c.currentBytes = 0
+	c.evictions.Add(uint64(count))
+	c.mu.Unlock()
+
+	debug.FreeOSMemory()
+	if count > 0 {
+		log.Printf("[ResultCache] Governor pressure trigger: evicted %d disposable query cache items", count)
+	}
+	return count
+}
+
 // SetEnabled toggles caching on or off
 func (c *ResultCache) SetEnabled(enabled bool) {
 	c.enabled.Store(enabled)

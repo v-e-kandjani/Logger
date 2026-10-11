@@ -249,6 +249,14 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.6.7** (Aşama 8 Birleşik Kaynak Yöneticisi, Operatör Görünümü ve Tehdit Simülasyonu Erişim Koruması):
+  - **Tehdit Simülasyonu Root Süper Yönetici Kısıtlaması**: SOC saldırı simülasyonu tetikleyicileri yalnızca root organizasyonun (`default`) Süper Yöneticisine sınırlandırıldı. Hem arka planda (`handleSIEMSimulate` yetkisiz isteklerde `403 Forbidden` döner) hem de kullanıcı arayüzünde (`#btn-open-siem-simulate` butonu diğer tüm roller için gizlenir) tam güvenlik sağlandı.
+  - **Bellek Belirteci Semaförleri ve Soğuk Sorgu Kabulü**: Soğuk sorgu yürütmelerinde aşırı RAM tüketimini ve OOM çökmelerini önlemek için sorgu başına muhafazakar 128 MB bellek belirteci ve %25 veri düzlemi belirteç havuzu denetimi uygulandı.
+  - **Kaynak Baskısında Agresif Önbellek Boşaltma**: Yöneticinin `PRESSURE` veya `CRITICAL` durumuna geçmesi halinde disposable önbellek kayıtlarını otomatik boşaltan (`cache.GetResultCache().EvictUnderPressure()`) ve `debug.FreeOSMemory()` ile belleği derhal işletim sistemine iade eden mekanizma entegre edildi.
+  - **Kademeli İyileşme Yuvası Yeniden Kazanımı**: Histerezisli toparlanma durumunda (`RECOVERY`), eşzamanlı sorgu yuvalarının ani yük oluşturmadan adım adım (her sağlıklı periyotta 1 yuva) geri açılması sağlandı.
+  - **Kapsamlı Operatör Görünümü Telemetrisi**: `/api/v1/governor/status` uç noktası üzerinden fiziksel bellek defteri (Yönetim düzlemi 2 GB, Veri düzlemi anlık/azami, Acil durum rezervi 1 GB, Aktif belirteçler), kuyruk pist süresi (runway), kayıp paket sayaçları, SIEM tespit gecikmesi, TSA zaman damgası durumu ve RAM önbellek tazeliği sunuldu.
+  - **Birleşik Operasyon Paneli Şeridi**: Arayüzdeki Cgroups v2 Kaynak Yöneticisi paneli, gerçek zamanlı Bellek Defteri ve Operatör Görünümü telemetri şeritleriyle zenginleştirildi.
+
 - **v1.6.6** (Dinamik Kiracı Veri Saklama Süreleri, Depolama Kotaları ve Otomatik ClickHouse Bölüm Düşürme):
   - **Yapılandırılabilir Çoklu Kiracı Veri Saklama Süresi (`retention_days`)**: Her müşteri/organizasyon için bağımsız saklama günleri (örn. 30, 90, 180 gün); root veya yasal saklama zorunluluğu olan kurumlar için süresiz (`retention_days = 0`) saklama güvencesi.
   - **Depolama Kotası Denetimi (`max_storage_gb`)**: Kiracı bazlı ClickHouse fiziksel disk alanı takibi; kota aşıldığında anlık uyarı verme ve kiracının en eski 24 saatlik log bloğunu otomatik temizleyerek kotayı koruma.
