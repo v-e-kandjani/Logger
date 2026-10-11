@@ -263,6 +263,21 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.7.0** (Multi-Tenant SIEM & SOC Reporting Engine & Dedicated Sidebar Workspace):
+  - **Separated Sidebar Menu & Workspace (`#nav-tab-reports`)**: Dedicated reports module with interactive report template selector, live visual preview canvas, customizable timeframes, classification tags, and generation history ledger.
+  - **5 Industry-Standard SOC & SIEM Templates**:
+    1. *Executive Threat Landscape & Security Posture*: High-level CISO metrics, MTTD/MTTR KPIs, top targeted assets, and risk reduction posture.
+    2. *Critical Incident Forensics & Root Cause Analysis (RCA)*: Deep-dive attack lifecycle, MITRE ATT&CK & D3FEND mappings, IOC intelligence, and corrective engineering directives.
+    3. *SOC Operational & Shift Handover*: Analyst context continuity across shifts, sensor ingestion EPS health, and detection tuning notes.
+    4. *Regulatory Compliance & Privileged Access Audit*: PCI-DSS v4.0, HIPAA, SOC 2, and Turkish Law No. 5651 compliance validation with privileged PAM inspection and KamuSM timestamp status.
+    5. *Vulnerability & Attack Surface Exposure*: Active SIEM correlation against known CVEs and high-priority mitigation guidance.
+  - **High-Fidelity Multi-Format Exporters**:
+    - *Forensic PDF*: Vectorized A4 layout via `gofpdf`, custom tenant logo embedding with fallback protocol, KPI stat cards, and cryptographic chain-of-custody table.
+    - *OpenXML DOCX*: Native ZIP archive builder injecting media assets and dynamic variable substitutions into `word/document.xml`.
+    - *RFC 4180 CSV*: Streaming export with structured audit comment headers (`#`), IOCs, and Law No. 5651 evidence verification details.
+    - *JSON & Plaintext*: Streamed structured JSON and pre-formatted text preview via Go `text/template`.
+  - **Multi-Tenant White-Labeling & Governor Protection**: Per-tenant logo resolution with graceful system fallback, strict tenant scoping across PostgreSQL and ClickHouse, and integration with `Governor.CanAdmitReport()` to prevent OOM under memory pressure.
+
 - **v1.6.9** (Phase 10 Sizing Profiles, Operational Runbooks & Acceptance Certification):
   - **Certified Sizing Profiles (`docs/operations/resource-profiles.md`)**: Formally certified 3 standalone hardware candidates (4 vCPU / 16 GiB @ 500 EPS, 16 vCPU / 64 GiB @ 5,000 EPS, 32 vCPU / 128 GiB @ 20,000 EPS) with complete whole-host memory ledgers ($R = O + C + E + D$), cgroups v2 slice templates (`siem-control.slice`, `siem-data.slice`), and storage sizing formulas.
   - **Disaster Recovery & Operations Runbook (`docs/operations/recovery-runbook.md`)**: Published step-by-step operational runbooks for sudden node/container crashes, WAN edge spool replay, TÜBİTAK KamuSM TSA outages, ClickHouse storage exhaustion, and offline Law 5651 bundle verification drills (`sha256sum` + `openssl ts -verify`).

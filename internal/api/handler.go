@@ -259,6 +259,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/siem/mitre/toggle-all", h.requireAuth(h.handleSIEMMitreToggleAll))
 	mux.HandleFunc("/api/v1/siem/mitre/optimize-devices", h.requireAuth(h.handleSIEMMitreOptimizeDevices))
 
+	// Protected SIEM & SOC Reporting Endpoints
+	mux.HandleFunc("/api/v1/reports/types", h.requireAuth(h.handleReportTypes))
+	mux.HandleFunc("/api/v1/reports/preview", h.requireAuth(h.handleReportPreview))
+	mux.HandleFunc("/api/v1/reports/export", h.requireAuth(h.handleReportExport))
+	mux.HandleFunc("/api/v1/reports/history", h.requireAuth(h.handleReportHistory))
+
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fs))

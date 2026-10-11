@@ -187,6 +187,7 @@ function switchTab(tab, targetSectionId = null) {
         if (tab === 'devices') loadDevices();
         if (tab === 'unregistered') loadUnregisteredSources();
         if (tab === 'archives') loadArchives();
+        if (tab === 'reports') loadReportsView();
         if (tab === 'health') loadHealthTelemetry();
         if (tab === 'settings') {
             loadSettings();
@@ -2966,6 +2967,8 @@ window.onLanguageChanged = (lang) => {
         if (typeof loadDevices === 'function') loadDevices();
     } else if (activeTab === 'unregistered') {
         if (typeof loadUnregisteredSources === 'function') loadUnregisteredSources();
+    } else if (activeTab === 'reports') {
+        if (typeof loadReportsView === 'function') loadReportsView();
     }
 };
 
@@ -7161,5 +7164,369 @@ async function loadAuditLogs() {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--danger); padding: 20px;">Denetim izleri alınamadı: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
+
+// ============================================================================
+// VALTRIVO LOGSEAL - MULTI-TENANT SIEM & SOC REPORTING ENGINE
+// ============================================================================
+
+let reportsInitialized = false;
+
+function loadReportsView() {
+    const badge = document.getElementById('reports-active-tenant-badge');
+    if (badge) {
+        const slug = (window.currentTenantSlug || 'default');
+        badge.textContent = `Aktif Kiracı: ${escapeHtml(slug.toUpperCase())}`;
+    }
+
+    if (!reportsInitialized) {
+        initReportsEventListeners();
+        reportsInitialized = true;
+    }
+
+    loadReportIncidents();
+    loadReportHistory();
+    generateReportPreview();
+}
+
+function initReportsEventListeners() {
+    // Template radio cards selection
+    const cards = document.querySelectorAll('.report-type-card');
+    cards.forEach(card => {
+        card.addEventListener('click', () => {
+            cards.forEach(c => {
+                c.classList.remove('active');
+                c.style.borderColor = 'var(--border-color)';
+            });
+            card.classList.add('active');
+            card.style.borderColor = 'var(--primary)';
+            const radio = card.querySelector('input[type="radio"]');
+            if (radio) {
+                radio.checked = true;
+                const incidentGroup = document.getElementById('report-incident-selector-group');
+                if (incidentGroup) {
+                    incidentGroup.style.display = (radio.value === 'incident_rca') ? 'block' : 'none';
+                }
+            }
+        });
+    });
+
+    // Timeframe selector
+    const timeframeSelect = document.getElementById('report-timeframe-select');
+    const customDateBox = document.getElementById('report-custom-date-container');
+    if (timeframeSelect && customDateBox) {
+        timeframeSelect.addEventListener('change', () => {
+            customDateBox.style.display = (timeframeSelect.value === 'custom') ? 'block' : 'none';
+        });
+    }
+
+    // Preview Mode Toggle (Visual vs Raw Text)
+    const btnVisual = document.getElementById('btn-preview-mode-visual');
+    const btnRaw = document.getElementById('btn-preview-mode-raw');
+    const canvasVisual = document.getElementById('report-visual-canvas');
+    const canvasRaw = document.getElementById('report-raw-canvas');
+
+    if (btnVisual && btnRaw && canvasVisual && canvasRaw) {
+        btnVisual.addEventListener('click', () => {
+            btnVisual.classList.add('active');
+            btnRaw.classList.remove('active');
+            canvasVisual.style.display = 'block';
+            canvasRaw.style.display = 'none';
+        });
+
+        btnRaw.addEventListener('click', () => {
+            btnRaw.classList.add('active');
+            btnVisual.classList.remove('active');
+            canvasVisual.style.display = 'none';
+            canvasRaw.style.display = 'block';
+        });
+    }
+
+    // Action buttons
+    document.getElementById('btn-report-preview')?.addEventListener('click', generateReportPreview);
+    document.getElementById('btn-report-export-pdf')?.addEventListener('click', () => exportReport('pdf'));
+    document.getElementById('btn-report-export-docx')?.addEventListener('click', () => exportReport('docx'));
+    document.getElementById('btn-report-export-csv')?.addEventListener('click', () => exportReport('csv'));
+    document.getElementById('btn-report-export-json')?.addEventListener('click', () => exportReport('json'));
+    document.getElementById('btn-report-export-txt')?.addEventListener('click', () => exportReport('txt'));
+    document.getElementById('btn-refresh-report-history')?.addEventListener('click', loadReportHistory);
+}
+
+function getReportFilterParams() {
+    const params = new URLSearchParams();
+
+    const selectedRadio = document.querySelector('input[name="report_template_type"]:checked');
+    params.set('type', selectedRadio ? selectedRadio.value : 'incident_rca');
+
+    const timeframe = document.getElementById('report-timeframe-select')?.value || '24h';
+    params.set('timeframe', timeframe);
+
+    if (timeframe === 'custom') {
+        const start = document.getElementById('report-custom-start')?.value;
+        const end = document.getElementById('report-custom-end')?.value;
+        if (start) params.set('start_time', start);
+        if (end) params.set('end_time', end);
+    }
+
+    const classification = document.getElementById('report-classification-select')?.value || 'TLP:AMBER / CONFIDENTIAL';
+    params.set('classification', classification);
+
+    const incident = document.getElementById('report-incident-select')?.value;
+    if (incident) params.set('incident_id', incident);
+
+    if (window.currentTenantSlug) {
+        params.set('tenant', window.currentTenantSlug);
+    }
+
+    return params;
+}
+
+async function generateReportPreview() {
+    const previewBtn = document.getElementById('btn-report-preview');
+    const summaryText = document.getElementById('report-preview-summary-text');
+    const rawText = document.getElementById('report-raw-text');
+
+    if (previewBtn) previewBtn.disabled = true;
+    if (summaryText) summaryText.textContent = 'Rapor verisi dinamik olarak derleniyor ve şifreli kanıt defteri sorgulanıyor...';
+
+    try {
+        const params = getReportFilterParams();
+        const res = await fetch(`/api/v1/reports/preview?${params.toString()}`);
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(errText || 'Önizleme oluşturulamadı');
+        }
+
+        const data = await res.json();
+        if (data.report) {
+            renderVisualReportPreview(data.report);
+        }
+        if (rawText && data.text_preview) {
+            rawText.textContent = data.text_preview;
+        }
+
+    } catch (err) {
+        console.error('Report preview error:', err);
+        if (summaryText) {
+            summaryText.innerHTML = `<span style="color: var(--danger);">Hata: ${escapeHtml(err.message)}</span>`;
+        }
+    } finally {
+        if (previewBtn) previewBtn.disabled = false;
+    }
+}
+
+function renderVisualReportPreview(report) {
+    if (!report) return;
+
+    // Header Strip
+    const titleEl = document.getElementById('report-preview-title');
+    if (titleEl) titleEl.textContent = report.title || 'SOC Raporu';
+
+    const metaEl = document.getElementById('report-preview-meta');
+    if (metaEl) {
+        metaEl.textContent = `Tenant: ${report.tenant?.tenant_name || 'Default'} [Slug: ${report.tenant?.tenant_slug || 'default'}] | Rapor ID: ${report.report_id} | Zaman Damgası: Doğrulandı`;
+    }
+
+    const classEl = document.getElementById('report-preview-classification');
+    if (classEl) {
+        classEl.textContent = report.classification || 'TLP:AMBER';
+    }
+
+    const windowEl = document.getElementById('report-preview-window');
+    if (windowEl) {
+        const startStr = report.start_time ? new Date(report.start_time).toUTCString() : '';
+        const endStr = report.end_time ? new Date(report.end_time).toUTCString() : '';
+        windowEl.textContent = `${startStr} - ${endStr}`;
+    }
+
+    // Summary & KPIs
+    const summaryText = document.getElementById('report-preview-summary-text');
+    if (summaryText) summaryText.textContent = report.executive_summary || 'Özet bulunmuyor.';
+
+    const kpiMTTD = document.getElementById('report-kpi-mttd');
+    if (kpiMTTD) kpiMTTD.textContent = `${report.mttd_minutes || 0} min`;
+
+    const kpiMTTA = document.getElementById('report-kpi-mtta');
+    if (kpiMTTA) kpiMTTA.textContent = `${report.mtta_minutes || 0} min`;
+
+    const kpiMTTR = document.getElementById('report-kpi-mttr');
+    if (kpiMTTR) kpiMTTR.textContent = `${report.mttr_minutes || 0} min`;
+
+    const kpiLegal = document.getElementById('report-kpi-legal');
+    if (kpiLegal) {
+        if (report.regulatory_impact?.law5651_relevant) {
+            kpiLegal.textContent = 'Mühürlendi (.zd)';
+            kpiLegal.style.color = 'var(--success)';
+        } else {
+            kpiLegal.textContent = 'Uyumlu';
+            kpiLegal.style.color = 'var(--text-main)';
+        }
+    }
+
+    // Threat Section (MITRE)
+    const threatBody = document.getElementById('report-preview-threat-body');
+    const threatSec = document.getElementById('report-preview-threat-section');
+    if (threatBody && threatSec) {
+        if (report.threat_mappings && report.threat_mappings.length > 0) {
+            threatSec.style.display = 'block';
+            threatBody.innerHTML = report.threat_mappings.map(m => `
+                <tr>
+                    <td><span class="badge badge-outline" style="font-size: 11px;">${escapeHtml(m.tactic_id)}</span></td>
+                    <td><code class="mono-code" style="color: #38bdf8; font-size: 11px;">${escapeHtml(m.technique_id)}</code></td>
+                    <td style="font-weight: 600;">${escapeHtml(m.name)}</td>
+                    <td style="color: var(--text-muted);">${escapeHtml(m.rule_name)}</td>
+                    <td><span class="badge badge-secondary" style="font-size: 10px;">${escapeHtml(m.d3fend_id || 'D3-IT')}</span></td>
+                </tr>
+            `).join('');
+        } else {
+            threatSec.style.display = 'none';
+        }
+    }
+
+    // IOC Section
+    const iocBody = document.getElementById('report-preview-ioc-body');
+    const iocSec = document.getElementById('report-preview-ioc-section');
+    if (iocBody && iocSec) {
+        if (report.iocs && report.iocs.length > 0) {
+            iocSec.style.display = 'block';
+            iocBody.innerHTML = report.iocs.map(ioc => `
+                <tr>
+                    <td><span class="badge badge-warning" style="font-size: 10px;">${escapeHtml(ioc.type)}</span></td>
+                    <td><code class="mono-code" style="color: #f87171; font-weight: 600; font-size: 11px;">${escapeHtml(ioc.value)}</code></td>
+                    <td><span class="badge badge-outline" style="font-size: 10px;">${escapeHtml(ioc.confidence)}</span></td>
+                    <td style="color: var(--text-muted);">${escapeHtml(ioc.reputation)}</td>
+                    <td><span class="badge badge-success" style="font-size: 10px;">${escapeHtml(ioc.action_taken)}</span></td>
+                </tr>
+            `).join('');
+        } else {
+            iocSec.style.display = 'none';
+        }
+    }
+
+    // Chain of Custody & Law 5651 Evidence Ledger
+    const custodyBody = document.getElementById('report-preview-custody-body');
+    const custodySec = document.getElementById('report-preview-custody-section');
+    if (custodyBody && custodySec) {
+        if (report.chain_of_custody && report.chain_of_custody.length > 0) {
+            custodySec.style.display = 'block';
+            custodyBody.innerHTML = report.chain_of_custody.map(ev => `
+                <tr>
+                    <td><strong class="mono-code" style="font-size: 11px;">${escapeHtml(ev.evidence_id)}</strong></td>
+                    <td style="font-size: 11px;">${escapeHtml(ev.artifact_type)}</td>
+                    <td style="font-size: 11px; color: var(--text-muted);">${escapeHtml(ev.source_host)}</td>
+                    <td><code class="mono-code" style="font-size: 10px; color: #818cf8;" title="${escapeHtml(ev.sha256_hash)}">${escapeHtml(ev.sha256_hash.substring(0, 18))}...</code></td>
+                    <td><span class="badge badge-success" style="font-size: 10px; font-weight: 600;">🔒 ${escapeHtml(ev.tsa_token_zd)}</span></td>
+                    <td style="font-size: 11px; color: var(--text-muted);">${escapeHtml(ev.custodian)}</td>
+                </tr>
+            `).join('');
+        } else {
+            custodySec.style.display = 'none';
+        }
+    }
+
+    // Root Cause & Actions
+    const rootCauseEl = document.getElementById('report-preview-root-cause');
+    const actionsListEl = document.getElementById('report-preview-actions-list');
+    const rcaSec = document.getElementById('report-preview-rca-section');
+
+    if (rcaSec && rootCauseEl && actionsListEl) {
+        if (report.root_cause || (report.remediation_plan && report.remediation_plan.length > 0)) {
+            rcaSec.style.display = 'block';
+            rootCauseEl.textContent = report.root_cause ? `Kök Neden Tespiti: ${report.root_cause}` : '';
+            actionsListEl.innerHTML = (report.remediation_plan || []).map(p => `<li>${escapeHtml(p)}</li>`).join('');
+        } else {
+            rcaSec.style.display = 'none';
+        }
+    }
+}
+
+function exportReport(format) {
+    const params = getReportFilterParams();
+    params.set('format', format);
+
+    // Provide visual feedback
+    const toastMsg = `Rapor (${format.toUpperCase()}) oluşturuluyor ve indiriliyor...`;
+    if (typeof showToast === 'function') {
+        showToast(toastMsg, 'info');
+    }
+
+    const downloadUrl = `/api/v1/reports/export?${params.toString()}`;
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Refresh history after generation
+    setTimeout(loadReportHistory, 1500);
+}
+
+async function loadReportHistory() {
+    const tbody = document.getElementById('report-history-body');
+    if (!tbody) return;
+
+    try {
+        const res = await fetch('/api/v1/reports/history');
+        if (!res.ok) throw new Error('Geçmiş alınamadı');
+
+        const data = await res.json();
+        const list = data.history || [];
+
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 16px;">Henüz oluşturulmuş rapor kaydı bulunmuyor.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = list.map(item => {
+            const dateStr = item.generated_at ? new Date(item.generated_at).toLocaleString() : '-';
+            const formatBadge = item.format === 'PDF' ? 'badge-danger' :
+                                item.format === 'DOCX' ? 'badge-info' :
+                                item.format === 'CSV' ? 'badge-success' : 'badge-secondary';
+
+            return `
+                <tr>
+                    <td><strong class="mono-code" style="font-size: 12px; color: var(--primary);">${escapeHtml(item.id)}</strong></td>
+                    <td style="font-weight: 500; font-size: 12px;">${escapeHtml(item.title || item.report_type)}</td>
+                    <td><span class="tenant-chip" style="font-size: 11px;">🏢 ${escapeHtml(item.tenant_slug || 'default')}</span></td>
+                    <td><span class="badge badge-outline" style="font-size: 10px;">${escapeHtml(item.classification)}</span></td>
+                    <td><span class="badge ${formatBadge}" style="font-size: 10px; font-weight: 700;">${escapeHtml(item.format)}</span></td>
+                    <td style="font-size: 12px; color: var(--text-muted);">👤 ${escapeHtml(item.generated_by || 'system')}</td>
+                    <td style="font-size: 11px; color: var(--text-muted);">${escapeHtml(dateStr)}</td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" style="font-size: 10px; padding: 2px 8px;" onclick="exportReport('${escapeHtml((item.format || 'pdf').toLowerCase())}')">
+                            İndir
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('Report history load error:', err);
+    }
+}
+
+async function loadReportIncidents() {
+    const select = document.getElementById('report-incident-select');
+    if (!select) return;
+
+    try {
+        const tenant = window.currentTenantSlug || '';
+        const res = await fetch(`/api/v1/siem/alerts?limit=15&tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const alerts = data.alerts || [];
+
+        let html = '<option value="" selected>En Son Kritik Olaylar (Otomatik)</option>';
+        alerts.forEach(a => {
+            html += `<option value="${escapeHtml(a.id)}">${escapeHtml(a.rule_name || a.summary)} [${escapeHtml(a.severity)}]</option>`;
+        });
+        select.innerHTML = html;
+    } catch (err) {
+        console.error('Failed to load SIEM incidents for report selector:', err);
+    }
+}
+
 
 

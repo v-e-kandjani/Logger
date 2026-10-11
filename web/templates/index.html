@@ -19,7 +19,7 @@
                     <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.6.9</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.0</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -72,6 +72,10 @@
                 <a href="#archives" class="nav-item" data-tab="archives">
                     <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                     <span data-i18n="nav_archives">Archives & Evidence</span>
+                </a>
+                <a href="#reports" class="nav-item" data-tab="reports" id="nav-tab-reports">
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <span data-i18n="nav_reports">SIEM & SOC Reports</span>
                 </a>
                 <a href="#health" class="nav-item" data-tab="health">
                     <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -771,6 +775,297 @@
                             <!-- Injected dynamically -->
                         </tbody>
                     </table>
+                </div>
+            </section>
+
+            <!-- TAB: SIEM & SOC Reports -->
+            <section class="tab-pane" id="pane-reports">
+                <div class="section-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
+                    <div style="margin-right: auto;">
+                        <h3 data-i18n="reports_header" style="margin: 0 0 4px 0;">SIEM & SOC Raporlama ve Adli Bilişim Merkezi</h3>
+                        <p class="subtitle" style="margin: 0; font-size: 12px; color: var(--text-muted);" data-i18n="reports_subheader">5 Standart SOC Şablonu, Adli Kanıt Zinciri, 5651 Zaman Damgası ve Çoklu Format Dışa Aktarma</p>
+                    </div>
+                    <span class="badge badge-outline" id="reports-active-tenant-badge" style="font-size: 11px;">Aktif Kiracı: Default</span>
+                    <span class="badge badge-info" style="font-size: 11px;">PDF • DOCX • CSV • JSON • TXT</span>
+                </div>
+
+                <!-- Report Generator Configuration Panel -->
+                <div class="panel" style="margin-bottom: 20px;">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            <span data-i18n="reports_config_title">Rapor Oluşturma ve Filtreleme Parametreleri</span>
+                        </h4>
+                        <span class="badge badge-secondary" data-i18n="reports_governor_safe">Kaynak Yöneticisi Korumalı (128 MB Tavan)</span>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Template Selector -->
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-weight: 600; font-size: 12px; margin-bottom: 8px;" data-i18n="reports_select_template">Rapor Şablonu Seçin:</label>
+                            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px;">
+                                <label class="stat-card report-type-card active" style="cursor: pointer; padding: 12px; border: 1px solid var(--primary); background: var(--bg-card); border-radius: 8px;">
+                                    <input type="radio" name="report_template_type" value="incident_rca" checked style="margin-right: 6px;">
+                                    <strong style="display: block; font-size: 13px; color: var(--text-main);" data-i18n="report_type_rca">Kritik Olay Adli Analizi & RCA</strong>
+                                    <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;" data-i18n="report_type_rca_desc">Kök neden analizi, IOC tehdit istihbaratı, 5651 kanıt zinciri.</span>
+                                </label>
+                                <label class="stat-card report-type-card" style="cursor: pointer; padding: 12px; border: 1px solid var(--border-color); background: var(--bg-card); border-radius: 8px;">
+                                    <input type="radio" name="report_template_type" value="exec_posture" style="margin-right: 6px;">
+                                    <strong style="display: block; font-size: 13px; color: var(--text-main);" data-i18n="report_type_exec">Yönetici Duruşu & Tehdit Özeti</strong>
+                                    <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;" data-i18n="report_type_exec_desc">Haftalık güvenlik duruşu, MTTD/MTTR verimliliği, CISO risk özeti.</span>
+                                </label>
+                                <label class="stat-card report-type-card" style="cursor: pointer; padding: 12px; border: 1px solid var(--border-color); background: var(--bg-card); border-radius: 8px;">
+                                    <input type="radio" name="report_template_type" value="shift_handover" style="margin-right: 6px;">
+                                    <strong style="display: block; font-size: 13px; color: var(--text-main);" data-i18n="report_type_handover">SOC Vardiya Devir Teslim</strong>
+                                    <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;" data-i18n="report_type_handover_desc">Analist devri, çözümlenmemiş biletler, sensör ve kural sağlık durumu.</span>
+                                </label>
+                                <label class="stat-card report-type-card" style="cursor: pointer; padding: 12px; border: 1px solid var(--border-color); background: var(--bg-card); border-radius: 8px;">
+                                    <input type="radio" name="report_template_type" value="compliance_audit" style="margin-right: 6px;">
+                                    <strong style="display: block; font-size: 13px; color: var(--text-main);" data-i18n="report_type_compliance">5651 Yasal Uyum & Denetim İzi</strong>
+                                    <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;" data-i18n="report_type_compliance_desc">5651 zaman damgası geçerliliği, PAM ayrıcalıklı erişim denetimi.</span>
+                                </label>
+                                <label class="stat-card report-type-card" style="cursor: pointer; padding: 12px; border: 1px solid var(--border-color); background: var(--bg-card); border-radius: 8px;">
+                                    <input type="radio" name="report_template_type" value="vuln_exposure" style="margin-right: 6px;">
+                                    <strong style="display: block; font-size: 13px; color: var(--text-main);" data-i18n="report_type_vuln">Zafiyet & Saldırı Yüzeyi</strong>
+                                    <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;" data-i18n="report_type_vuln_desc">Dış çevre maruziyeti ve CVE zafiyetlerinin SIEM alarmlarıyla korelasyonu.</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Parameters Form Row -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;" data-i18n="reports_timeframe_label">Zaman Aralığı:</label>
+                                <select class="form-control" id="report-timeframe-select">
+                                    <option value="24h" selected data-i18n="opt_last_24h">Son 24 Saat</option>
+                                    <option value="7d" data-i18n="opt_last_7d">Son 7 Gün</option>
+                                    <option value="30d" data-i18n="opt_last_30d">Son 30 Gün</option>
+                                    <option value="custom" data-i18n="opt_custom">Özel Tarih Aralığı...</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" id="report-custom-date-container" style="display: none; margin: 0;">
+                                <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;" data-i18n="reports_custom_range_label">Başlangıç - Bitiş (UTC):</label>
+                                <div style="display: flex; gap: 6px;">
+                                    <input type="datetime-local" class="form-control" id="report-custom-start" style="font-size: 11px;">
+                                    <input type="datetime-local" class="form-control" id="report-custom-end" style="font-size: 11px;">
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;" data-i18n="reports_classification_label">Gizlilik ve Sınıflandırma Etiketi:</label>
+                                <select class="form-control" id="report-classification-select">
+                                    <option value="TLP:AMBER / CONFIDENTIAL" selected>TLP:AMBER / CONFIDENTIAL</option>
+                                    <option value="TLP:GREEN / INTERNAL ONLY">TLP:GREEN / INTERNAL ONLY</option>
+                                    <option value="TLP:RED / RESTRICTED">TLP:RED / RESTRICTED</option>
+                                    <option value="TLP:WHITE / PUBLIC">TLP:WHITE / PUBLIC</option>
+                                    <option value="LAW NO. 5651 LEGAL EVIDENCE">5651 SAYILI KANUN ADLİ KANIT</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="margin: 0;" id="report-incident-selector-group">
+                                <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;" data-i18n="reports_incident_select_label">İlişkili SIEM Olayı (Opsiyonel):</label>
+                                <select class="form-control" id="report-incident-select">
+                                    <option value="" selected data-i18n="opt_all_incidents">En Son Kritik Olaylar (Otomatik)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Action Toolbar -->
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                            <button class="btn btn-primary" id="btn-report-preview" style="display: flex; align-items: center; gap: 6px;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <span data-i18n="btn_generate_preview">Canlı Rapor Önizlemesi Oluştur</span>
+                            </button>
+
+                            <div style="margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button class="btn btn-danger" id="btn-report-export-pdf" style="display: flex; align-items: center; gap: 6px; font-weight: 600;" title="Adli PDF Olarak İndir">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                    <span>PDF İndir</span>
+                                </button>
+                                <button class="btn btn-outline" id="btn-report-export-docx" style="display: flex; align-items: center; gap: 6px; border-color: #2563eb; color: #3b82f6;" title="Microsoft Word Olarak İndir">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                                    <span>Word (DOCX)</span>
+                                </button>
+                                <button class="btn btn-outline" id="btn-report-export-csv" style="display: flex; align-items: center; gap: 6px; border-color: #059669; color: #10b981;" title="RFC 4180 CSV Olarak İndir">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>
+                                    <span>CSV İndir</span>
+                                </button>
+                                <button class="btn btn-outline" id="btn-report-export-json" style="display: flex; align-items: center; gap: 6px;" title="Yapılandırılmış JSON Olarak İndir">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                                    <span>JSON</span>
+                                </button>
+                                <button class="btn btn-outline" id="btn-report-export-txt" style="display: flex; align-items: center; gap: 6px;" title="Düz Metin Olarak İndir">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/></svg>
+                                    <span>TXT</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Report Live Preview Canvas & Container -->
+                <div class="panel" id="report-preview-panel" style="margin-bottom: 24px;">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <span class="live-dot" style="background: var(--success);"></span>
+                            <span data-i18n="reports_preview_title">Canlı Rapor Önizleme Alanı</span>
+                        </h4>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn btn-outline btn-sm active" id="btn-preview-mode-visual" style="font-size: 11px;">Görsel Düzen</button>
+                            <button class="btn btn-outline btn-sm" id="btn-preview-mode-raw" style="font-size: 11px;">Ham Metin (Terminal)</button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Visual Preview Canvas -->
+                        <div id="report-visual-canvas" style="background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px;">
+                            <!-- Header Strip -->
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--border-color); padding-bottom: 14px; margin-bottom: 18px;">
+                                <div style="display: flex; align-items: center; gap: 14px;">
+                                    <img src="/static/img/logseal_logo.png" id="report-preview-logo" width="48" height="48" alt="Logo" style="border-radius: 6px; background: rgba(0,0,0,0.2); padding: 4px;">
+                                    <div>
+                                        <h3 id="report-preview-title" style="margin: 0 0 4px 0; font-size: 18px; color: var(--text-main);">Kritik Olay Adli Analizi ve Kök Neden Raporu</h3>
+                                        <span id="report-preview-meta" style="font-size: 12px; color: var(--text-muted);">Tenant: Default | ID: LS-DEFAULT-001 | Zaman Damgası: Doğrulandı</span>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span class="badge badge-danger" id="report-preview-classification" style="font-size: 12px; font-weight: 700;">TLP:AMBER / CONFIDENTIAL</span>
+                                    <div id="report-preview-window" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">2026-10-11 00:00 - 2026-10-12 00:00 UTC</div>
+                                </div>
+                            </div>
+
+                            <!-- Executive Summary & SLA Metrics -->
+                            <div style="margin-bottom: 20px;">
+                                <h5 style="margin: 0 0 8px 0; font-size: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;" data-i18n="reports_sec_summary">1. Yönetici Özeti ve Operasyonel SLA Metrikleri</h5>
+                                <p id="report-preview-summary-text" style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+                                    Rapor verisi yükleniyor... Önizlemeyi güncellemek için yukarıdaki "Canlı Rapor Önizlemesi Oluştur" düğmesine tıklayın.
+                                </p>
+                                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+                                    <div class="stat-card" style="padding: 10px;">
+                                        <div class="stat-header" style="font-size: 11px;">MTTD (Tespit)</div>
+                                        <div class="stat-value" id="report-kpi-mttd" style="font-size: 1.3rem;">4 min</div>
+                                    </div>
+                                    <div class="stat-card" style="padding: 10px;">
+                                        <div class="stat-header" style="font-size: 11px;">MTTA (Müdahale)</div>
+                                        <div class="stat-value" id="report-kpi-mtta" style="font-size: 1.3rem;">8 min</div>
+                                    </div>
+                                    <div class="stat-card" style="padding: 10px;">
+                                        <div class="stat-header" style="font-size: 11px;">MTTR (İyileştirme)</div>
+                                        <div class="stat-value" id="report-kpi-mttr" style="font-size: 1.3rem;">18 min</div>
+                                    </div>
+                                    <div class="stat-card" style="padding: 10px;">
+                                        <div class="stat-header" style="font-size: 11px;">5651 Yasal Durum</div>
+                                        <div class="stat-value" id="report-kpi-legal" style="font-size: 1.1rem; color: var(--success);">Mühürlendi (.zd)</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Threat Mappings Table -->
+                            <div style="margin-bottom: 20px;" id="report-preview-threat-section">
+                                <h5 style="margin: 0 0 8px 0; font-size: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;" data-i18n="reports_sec_mitre">2. Taktiksel Tehdit Haritalama (MITRE ATT&CK & D3FEND)</h5>
+                                <div class="table-container">
+                                    <table class="data-table" style="font-size: 12px;">
+                                        <thead>
+                                            <tr>
+                                                <th>Taktik</th>
+                                                <th>Teknik ID</th>
+                                                <th>Teknik Adı</th>
+                                                <th>SIEM Algılama Kuralı</th>
+                                                <th>D3FEND Savunma</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="report-preview-threat-body">
+                                            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Veri yükleniyor...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- IOCs Table -->
+                            <div style="margin-bottom: 20px;" id="report-preview-ioc-section">
+                                <h5 style="margin: 0 0 8px 0; font-size: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;" data-i18n="reports_sec_iocs">3. Tehdit Göstergeleri ve IOC İstihbaratı</h5>
+                                <div class="table-container">
+                                    <table class="data-table" style="font-size: 12px;">
+                                        <thead>
+                                            <tr>
+                                                <th>Tür</th>
+                                                <th>Gösterge / Değer</th>
+                                                <th>Güvenilirlik</th>
+                                                <th>İtibar / Besleme</th>
+                                                <th>Alınan Aksiyon</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="report-preview-ioc-body">
+                                            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Veri yükleniyor...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Law 5651 Chain of Custody Table -->
+                            <div style="margin-bottom: 20px;" id="report-preview-custody-section">
+                                <h5 style="margin: 0 0 8px 0; font-size: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;" data-i18n="reports_sec_evidence">4. Adli Kanıt Zinciri & 5651 Sayılı Kanun Zaman Damgası Defteri</h5>
+                                <div class="table-container">
+                                    <table class="data-table" style="font-size: 12px;">
+                                        <thead>
+                                            <tr>
+                                                <th>Kanıt ID</th>
+                                                <th>Eser Türü</th>
+                                                <th>Kaynak / Cihaz</th>
+                                                <th>SHA-256 Özeti</th>
+                                                <th>TSA Zaman Damgası (.zd)</th>
+                                                <th>Muhafız</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="report-preview-custody-body">
+                                            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Veri yükleniyor...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Root Cause & Actions -->
+                            <div id="report-preview-rca-section">
+                                <h5 style="margin: 0 0 8px 0; font-size: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;" data-i18n="reports_sec_rca">5. Kök Neden Analizi & Önleyici Aksiyon Planı</h5>
+                                <p id="report-preview-root-cause" style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;"></p>
+                                <ol id="report-preview-actions-list" style="font-size: 12px; color: var(--text-muted); padding-left: 20px; line-height: 1.6;"></ol>
+                            </div>
+                        </div>
+
+                        <!-- Raw Text Container (Terminal style) -->
+                        <div id="report-raw-canvas" style="display: none; background: #0b0f19; border: 1px solid var(--border-color); border-radius: 8px; padding: 16px;">
+                            <pre id="report-raw-text" style="font-family: var(--font-mono); font-size: 12px; color: #38bdf8; white-space: pre-wrap; margin: 0; max-height: 500px; overflow-y: auto;"></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Generated Reports History Table -->
+                <div class="panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span data-i18n="reports_history_title">Oluşturulan Rapor Geçmişi & İndirmeler</span>
+                        </h4>
+                        <button class="btn btn-outline btn-sm" id="btn-refresh-report-history" style="font-size: 11px;">Yenile</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="report-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Rapor ID</th>
+                                    <th>Şablon Türü</th>
+                                    <th>Kiracı</th>
+                                    <th>Sınıflandırma</th>
+                                    <th>Format</th>
+                                    <th>Oluşturan</th>
+                                    <th>Tarih (UTC)</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-history-body">
+                                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Henüz oluşturulmuş rapor kaydı bulunmuyor.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
@@ -1859,12 +2154,12 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.6.9</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.0</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">26825ea</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">8fb0b14</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-12</div>
                     </div>
                     <div class="stat-card">
@@ -3566,7 +3861,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.6.9"></script>
-    <script src="/static/js/app.js?v=1.6.9"></script>
+    <script src="/static/js/translations.js?v=1.7.0"></script>
+    <script src="/static/js/app.js?v=1.7.0"></script>
 </body>
 </html>

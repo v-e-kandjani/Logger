@@ -252,6 +252,21 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.7.0** (Çok Kiracılı SIEM & SOC Raporlama Motoru ve Ayrılmış Yan Menü Çalışma Alanı):
+  - **Ayrılmış Yan Menü ve Raporlama Alanı (`#nav-tab-reports`)**: Dinamik rapor şablonu seçicisi, canlı görsel önizleme alanı, tarih aralığı filtreleri, gizlilik sınıflandırma etiketleri ve geçmiş raporlar tablosu içeren bağımsız çalışma alanı.
+  - **5 Endüstri Standardı SOC & SIEM Şablonu**:
+    1. *Yönetici Tehdit Görünümü ve Güvenlik Duruşu*: Üst yönetim (CISO/CIO) için genel duruş seviyesi, MTTD/MTTR verimlilik KPI'ları, en çok hedeflenen varlıklar ve risk trendleri.
+    2. *Kritik Olay Adli Bilişim ve Kök Neden Analizi (RCA)*: Olay yaşam döngüsü, MITRE ATT&CK ve D3FEND taktik eşleştirmeleri, IoC tehdit istihbaratı ve mühendislik aksiyon planı.
+    3. *SOC Operasyonel ve Vardiya Devir Raporu*: Vardiyalar arası açık bilet takibi, sensör alım EPS sağlık tablosu ve kural iyileştirme notları.
+    4. *Mevzuata Uygunluk ve Yetkili Erişim Denetimi*: 5651 Sayılı Kanun, PCI-DSS v4.0, HIPAA ve SOC 2 uyumluluk teyidi, PAM erişim örneklemesi ve KamuSM zaman damgası doğrulama beyanı.
+    5. *Zafiyet ve Saldırı Yüzeyi Maruziyet Raporu*: SIEM korelasyon alarmlarıyla eşleştirilen CVE açıkları, CVSS risk skorları ve öncelikli yama talimatları.
+  - **Yüksek Sadakatli Çok Formatlı Dışa Aktarıcılar**:
+    - *Adli Bilişim PDF*: `gofpdf` ile A4 mizanpajı, kiracı özel logosu ve otomatik LogSeal yedekleme protokolü, KPI kartları, MITRE matrisi ve 5651 kanıt zinciri tablosu.
+    - *OpenXML DOCX*: Word şablonuna dinamik değişken ve kurum logosu enjekte eden yerel ZIP paketleyicisi.
+    - *RFC 4180 CSV*: `#` ile yapılandırılmış meta veri başlıkları, IoC listeleri ve adli kanıt kayıtları içeren akışlı CSV dışa aktarımı.
+    - *JSON ve Düz Metin (TXT)*: Denetim için ham yapılandırılmış JSON ve Go `text/template` motoruyla biçimlendirilmiş önizleme metni.
+  - **Beyaz Etiketleme (White-Labeling) ve Bellek Yöneticisi Koruması**: Kuruma özel logo ayrıştırma (`ResolveTenantBranding`), PostgreSQL ve ClickHouse üzerinde sıkı kiracı izolasyonu ve bellek baskısı altında OOM oluşmasını engelleyen `Governor.CanAdmitReport()` denetimi.
+
 - **v1.6.9** (Aşama 10 Boyutlandırma Profilleri, Operasyonel Kılavuzlar ve Kabul Sertifikasyonu):
   - **Sertifikalı Donanım Profilleri (`docs/operations/resource-profiles.md`)**: 3 bağımsız sunucu profili (Giriş: 4 vCPU / 16 GiB @ 500 EPS, Orta: 16 vCPU / 64 GiB @ 5.000 EPS, Çekirdek: 32 vCPU / 128 GiB @ 20.000 EPS), ödünç almayan bellek defteri ($R = O + C + E + D$), cgroups v2 dilim şablonları (`siem-control.slice`, `siem-data.slice`) ve depolama boyutlandırma formülleri resmi olarak belgelendi.
   - **Felaket Kurtarma ve Operasyon Kılavuzu (`docs/operations/recovery-runbook.md`)**: Ani konteyner/sunucu çökmeleri, WAN uç düğüm kuyruk oynatımı, TÜBİTAK KamuSM servis kesintileri, ClickHouse disk dolması ve çevrimdışı 5651 kanıt doğrulama adımları (`sha256sum` + `openssl ts -verify`) adım adım hazırlandı.
