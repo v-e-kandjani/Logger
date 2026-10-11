@@ -2143,14 +2143,7 @@ func (db *DB) ListEdgeNodes(ctx context.Context, tenantFilter string) ([]*models
 			}
 		}
 
-		// Dynamically compute online status if last_seen_at was within 90 seconds
-		if n.LastSeenAt != nil && time.Since(*n.LastSeenAt) < 90*time.Second {
-			n.Status = "online"
-		} else if n.LastSeenAt == nil {
-			n.Status = "pending"
-		} else {
-			n.Status = "offline"
-		}
+		n.Status = computeEdgeNodeStatus(n.LastSeenAt, n.SyncInterval)
 		nodes = append(nodes, &n)
 	}
 	return nodes, rows.Err()
@@ -2188,13 +2181,7 @@ func (db *DB) GetEdgeNodeByID(ctx context.Context, id uuid.UUID) (*models.EdgeNo
 	if len(minSpecsJSON) > 0 {
 		_ = json.Unmarshal(minSpecsJSON, &n.MinSpecs)
 	}
-	if n.LastSeenAt != nil && time.Since(*n.LastSeenAt) < 90*time.Second {
-		n.Status = "online"
-	} else if n.LastSeenAt == nil {
-		n.Status = "pending"
-	} else {
-		n.Status = "offline"
-	}
+	n.Status = computeEdgeNodeStatus(n.LastSeenAt, n.SyncInterval)
 	return &n, nil
 }
 
@@ -2230,6 +2217,7 @@ func (db *DB) GetEdgeNodeByToken(ctx context.Context, token string) (*models.Edg
 	if len(minSpecsJSON) > 0 {
 		_ = json.Unmarshal(minSpecsJSON, &n.MinSpecs)
 	}
+	n.Status = computeEdgeNodeStatus(n.LastSeenAt, n.SyncInterval)
 	return &n, nil
 }
 
@@ -2395,7 +2383,84 @@ func (db *DB) UpdateEdgeNodeHeartbeat(ctx context.Context, token, ip, ver string
 	if len(ldapJSON) > 0 {
 		_ = json.Unmarshal(ldapJSON, &n.LDAPConfig)
 	}
+	n.Status = computeEdgeNodeStatus(n.LastSeenAt, n.SyncInterval)
 	return &n, nil
+}
+
+// computeEdgeNodeStatus determines if a node is online, degraded, offline, or pending based on its heartbeat interval
+func computeEdgeNodeStatus(lastSeenAt *time.Time, syncInterval string) string {
+	if lastSeenAt == nil {
+		return "pending"
+	}
+	intervalSec := 30
+	switch syncInterval {
+	case "online":
+		intervalSec = 30
+	case "every 60 second":
+		intervalSec = 60
+	case "every 5 min":
+		intervalSec = 300
+	case "every 15 min":
+		intervalSec = 900
+	case "every 30 min":
+		intervalSec = 1800
+	case "every hour":
+		intervalSec = 3600
+	}
+
+	elapsed := time.Since(*lastSeenAt)
+	if elapsed <= time.Duration(intervalSec*2)*time.Second {
+		return "online"
+	} else if elapsed <= time.Duration(intervalSec*3)*time.Second {
+		return "degraded"
+	}
+	return "offline"
+}
+
+// CheckEdgeNodeHealth scans all active edge nodes, updates status in the database when dead,
+// and returns nodes that newly transitioned to offline for Dead Man's Switch alerts.
+func (db *DB) CheckEdgeNodeHealth(ctx context.Context) ([]*models.EdgeNode, error) {
+	query := `
+		SELECT id, name, token, tenant_name, sync_interval, last_seen_at, last_ip, version, status, logs_forwarded,
+		       COALESCE(admin_name, ''), COALESCE(admin_email, ''), COALESCE(admin_username, ''),
+		       COALESCE(activation_status, 'active'), COALESCE(ldap_config, '{}'::jsonb),
+		       COALESCE(min_specs, '{"min_cpu":"1 vCPU","min_ram":"512 MB","min_disk":"2 GB"}'::jsonb),
+		       created_at, updated_at
+		FROM edge_nodes
+		WHERE activation_status = 'active'`
+
+	rows, err := db.pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var newlyDark []*models.EdgeNode
+	for rows.Next() {
+		var n models.EdgeNode
+		var ldapJSON, minSpecsJSON []byte
+		err := rows.Scan(
+			&n.ID, &n.Name, &n.Token, &n.TenantName, &n.SyncInterval,
+			&n.LastSeenAt, &n.LastIP, &n.Version, &n.Status, &n.LogsForwarded,
+			&n.AdminName, &n.AdminEmail, &n.AdminUsername,
+			&n.ActivationStatus, &ldapJSON, &minSpecsJSON,
+			&n.CreatedAt, &n.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+
+		currentStatus := computeEdgeNodeStatus(n.LastSeenAt, n.SyncInterval)
+		if currentStatus == "offline" && n.Status != "offline" && n.LastSeenAt != nil {
+			_, _ = db.pool.Exec(ctx, "UPDATE edge_nodes SET status = 'offline', updated_at = NOW() WHERE id = $1", n.ID)
+			n.Status = "offline"
+			newlyDark = append(newlyDark, &n)
+		} else if currentStatus == "degraded" && n.Status != "degraded" && n.Status != "offline" {
+			_, _ = db.pool.Exec(ctx, "UPDATE edge_nodes SET status = 'degraded', updated_at = NOW() WHERE id = $1", n.ID)
+		}
+	}
+
+	return newlyDark, nil
 }
 
 // DeleteEdgeNode removes an edge node

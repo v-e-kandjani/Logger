@@ -186,8 +186,34 @@ func (h *Handler) handleEdgeIngest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Active Tenant & Node Status Enforcement (Phase 4)
+	if node.ActivationStatus != "active" {
+		writeJSON(w, http.StatusForbidden, map[string]string{
+			"error": fmt.Sprintf("edge node '%s' is not active (status: %s)", node.Name, node.ActivationStatus),
+		})
+		return
+	}
+
 	clientIP := getClientIP(r)
 	count := int64(len(req.Events))
+
+	if h.quotaEnforcer != nil {
+		allowed, curEPS, maxEPS, qErr := h.quotaEnforcer.CheckIngestQuota(ctx, node.TenantName, int(count))
+		if !allowed {
+			if qErr != nil && strings.Contains(qErr.Error(), "suspended") {
+				writeJSON(w, http.StatusForbidden, map[string]string{
+					"error": qErr.Error(),
+				})
+				return
+			}
+			writeJSON(w, http.StatusTooManyRequests, map[string]interface{}{
+				"error":       fmt.Sprintf("tenant '%s' EPS quota exceeded: current %.1f EPS > max %d EPS limit", node.TenantName, curEPS, maxEPS),
+				"current_eps": curEPS,
+				"max_eps":     maxEPS,
+			})
+			return
+		}
+	}
 
 	// Ingest each packet into high-performance pipeline
 	for _, evt := range req.Events {
@@ -586,11 +612,14 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 
 		type tenantView struct {
 			*models.Tenant
-			Unlimited   bool    `json:"unlimited"`
-			NodeCount   int     `json:"node_count"`
-			DeviceCount int     `json:"device_count"`
-			LogCount    uint64  `json:"log_count"`
-			CurrentEPS  float64 `json:"current_eps"`
+			Unlimited        bool    `json:"unlimited"`
+			NodeCount        int     `json:"node_count"`
+			DeviceCount      int     `json:"device_count"`
+			LogCount         uint64  `json:"log_count"`
+			CurrentEPS       float64 `json:"current_eps"`
+			NodeQuotaPercent float64 `json:"node_quota_percent"`
+			EPSQuotaPercent  float64 `json:"eps_quota_percent"`
+			QuotaExceeded    bool    `json:"quota_exceeded"`
 		}
 		views := make([]tenantView, 0, len(tenants))
 		var totalNodes, totalDevices int
@@ -610,6 +639,14 @@ func (h *Handler) handleTenants(w http.ResponseWriter, r *http.Request) {
 				v.LogCount = logCounts[t.Slug]
 			}
 			v.CurrentEPS = epsByTenant[t.Slug]
+			if t.MaxNodes > 0 {
+				v.NodeQuotaPercent = float64(v.NodeCount) / float64(t.MaxNodes) * 100.0
+			}
+			if t.MaxEPS > 0 {
+				v.EPSQuotaPercent = v.CurrentEPS / float64(t.MaxEPS) * 100.0
+			}
+			v.QuotaExceeded = (t.MaxNodes > 0 && v.NodeCount >= t.MaxNodes) || (t.MaxEPS > 0 && v.CurrentEPS >= float64(t.MaxEPS))
+
 			totalNodes += v.NodeCount
 			totalDevices += v.DeviceCount
 			totalLogs += v.LogCount

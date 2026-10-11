@@ -26,6 +26,7 @@ import (
 	"github.com/syslog-platform/logger/internal/https"
 	"github.com/syslog-platform/logger/internal/metrics"
 	"github.com/syslog-platform/logger/internal/models"
+	"github.com/syslog-platform/logger/internal/quota"
 	"github.com/syslog-platform/logger/internal/siem/mitre"
 	"github.com/syslog-platform/logger/internal/syslog/detector"
 	"github.com/syslog-platform/logger/internal/syslog/listener"
@@ -55,6 +56,7 @@ type Handler struct {
 	httpsMgr         *https.Manager
 	resultCache      *cache.ResultCache
 	evidenceSealer   *archive.EvidenceSealer
+	quotaEnforcer    *quota.QuotaEnforcer
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
@@ -102,6 +104,7 @@ func NewHandler(
 		sessions:         NewSessionManager(),
 		mfaTickets:       NewMFATicketManager(),
 		resultCache:      cache.GetResultCache(),
+		quotaEnforcer:    quota.NewQuotaEnforcer(pg),
 	}
 
 	if ae != nil {
@@ -1911,4 +1914,65 @@ func (h *Handler) handleAnalyticsTimeseriesAPI(w http.ResponseWriter, r *http.Re
 		"buckets": len(metrics),
 		"series":  metrics,
 	})
+}
+
+// StartEdgeHealthMonitor runs background edge proxy node health checks and Dead Man's Switch alerts
+func (h *Handler) StartEdgeHealthMonitor(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Second)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+				darkNodes, err := h.pgDB.CheckEdgeNodeHealth(checkCtx)
+				if err == nil && len(darkNodes) > 0 {
+					for _, node := range darkNodes {
+						log.Printf("[DeadManSwitch] Edge proxy node '%s' (tenant: %s) went OFFLINE (last seen: %v)", node.Name, node.TenantName, node.LastSeenAt)
+						// Insert Audit Trail log
+						_ = h.pgDB.InsertAuditLog(checkCtx, &models.AuditLog{
+							UserID:     nil,
+							Username:   "system-monitor",
+							SourceIP:   node.LastIP,
+							Action:     "EDGE_NODE_OFFLINE",
+							Resource:   "edge_node/" + node.Name,
+							Result:     "WARNING",
+							Details: map[string]interface{}{
+								"node_id":       node.ID.String(),
+								"node_name":     node.Name,
+								"sync_interval": node.SyncInterval,
+								"status":        "offline",
+							},
+							TenantSlug: node.TenantName,
+						})
+						// Trigger SIEM Security Alert
+						now := time.Now()
+						_, _ = h.pgDB.CreateOrUpdateSIEMAlert(checkCtx, &models.SIEMAlert{
+							ID:             uuid.New(),
+							RuleID:         "EDG-DEAD-MAN-001",
+							RuleName:       "Edge Proxy Node Offline (Dead Man's Switch)",
+							Severity:       "HIGH",
+							RiskScore:      75,
+							Category:       "Infrastructure Security",
+							Status:         "NEW",
+							SourceIP:       node.LastIP,
+							DeviceName:     node.Name,
+							EventCount:     1,
+							FirstSeen:      now,
+							LastSeen:       now,
+							MitreTactic:    "Impact",
+							MitreTechnique: "Service Stop",
+							Summary:        fmt.Sprintf("Edge proxy forwarder node '%s' for tenant '%s' missed check-in interval and went dark", node.Name, node.TenantName),
+							Tenant:         node.TenantName,
+							CreatedAt:      now,
+							UpdatedAt:      now,
+						})
+					}
+				}
+				cancel()
+			}
+		}
+	}()
 }

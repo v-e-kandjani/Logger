@@ -260,6 +260,12 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.6.3** (Edge Node Heartbeats, Health Checks, Dead Man's Switch & Active Tenant-Level Quota Enforcer):
+  - **Dynamic Edge Node Heartbeat Health Checks**: Replaced rigid timeouts with adaptive status calculation (`online` 🟢, `degraded` 🟡, `offline` 🔴, `pending` ⏳) keyed to configured sync intervals (`online`/30s, 60s, 5m, 15m, 30m, 1h).
+  - **Dead Man's Switch Background Monitor**: Added automated edge forwarder health supervisor (`StartEdgeHealthMonitor`) executing every 30 seconds; automatically records audit trails and fires high-severity SIEM security alerts (`EDG-DEAD-MAN-001`) whenever an active node stops reporting.
+  - **Real-Time Sliding Window Quota Enforcer (`internal/quota/enforcer.go`)**: Built dynamic tenant-level quota enforcement tracking rolling per-second ingestion rates (`MaxEPS`), verifying tenant status (`active` vs `suspended`), and maintaining fail-open DB resiliency while granting unlimited quota (`0 = ∞`) to the root `default` tenant.
+  - **Hardened Edge Ingestion Pipeline**: Integrated quota checks into `/api/v1/edge/ingest` with `429 Too Many Requests` (burst limit exceeded) and `403 Forbidden` (suspended tenant/inactive node); enriched tenant settings with real-time quota utilization badges.
+
 - **v1.6.2** (ClickHouse 1-Minute Materialized Views & Sub-Millisecond Time-Series Analytics):
   - **1-Minute Materialized Views (`events_1m` & `mv_events_1m`)**: Implemented pre-aggregated `SummingMergeTree((event_count, total_bytes))` partitioned by `toYYYYMM(minute)` and ordered by `(tenant, minute, device_id, vendor, product, severity, facility)`, automatically populated on log ingestion.
   - **Ultra-Fast Time-Series API**: Added `/api/v1/analytics/timeseries` endpoint providing sub-millisecond historical minute-by-minute metrics without scanning billions of raw log events.

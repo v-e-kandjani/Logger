@@ -249,6 +249,12 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.6.3** (Edge Node Kalp Atışı Takibi, Sağlık Denetimleri, Dead Man's Switch & Aktif Kiracı Kota Denetleyicisi):
+  - **Dinamik Edge Node Kalp Atışı Sağlık Denetimleri**: Sabit zaman aşımları yerine düğümün yapılandırılmış senkronizasyon aralığına (`online`/30sn, 60sn, 5dk, 15dk, 30dk, 1sa) göre uyarlanabilir durum hesaplaması (`online` 🟢, `degraded` 🟡, `offline` 🔴, `pending` ⏳) entegre edildi.
+  - **Dead Man's Switch Arka Plan Gözlemcisi**: Her 30 saniyede bir çalışan otomatik proxy sağlık denetçisi (`StartEdgeHealthMonitor`) eklendi; belirlenen aralıkta sinyal göndermeyen düğümler için otomatik denetim izi kaydı ve yüksek öncelikli SIEM güvenlik alarmı (`EDG-DEAD-MAN-001`) üretilmektedir.
+  - **Kayan Pencere Gerçek Zamanlı Kota Denetleyicisi (`internal/quota/enforcer.go`)**: Kiracı bazlı saniye başına log oranlarını (`MaxEPS`) anlık izleyen, kiracı durumunu (`active` / `suspended`) doğrulayan, root `default` kiracıya sınırsız kota (`0 = ∞`) tanıyan ve veritabanı kesintilerinde veri kaybını önleyen (fail-open) kota motoru geliştirildi.
+  - **Güçlendirilmiş Edge Log Aktarım Hattı**: `/api/v1/edge/ingest` uç noktasına kota denetimleri entegre edildi (`429 Too Many Requests` ve `403 Forbidden`); kiracı ve edge yönetim panellerine gerçek zamanlı kota kullanım oranları ve uyarı rozetleri eklendi.
+
 - **v1.6.2** (ClickHouse 1 Dakikalık Materialized View & Milisaniye-Altı Zaman Serisi Analitiği):
   - **1 Dakikalık Önceden Hesaplanmış Görünümler (`events_1m` & `mv_events_1m`)**: Log girişi sırasında otomatik toplanan, `toYYYYMM(minute)` bölümlendirmeli ve `(tenant, minute, device_id, vendor, product, severity, facility)` sıralamalı `SummingMergeTree((event_count, total_bytes))` yapısı geliştirildi.
   - **Yüksek Hızlı Zaman Serisi API'si**: Milyarlarca ham log kaydını taramadan milisaniye altı sürede saatlik ve günlük eğilimleri sunan `/api/v1/analytics/timeseries` uç noktası eklendi.

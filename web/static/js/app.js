@@ -5787,8 +5787,16 @@ async function loadTenants() {
                 const unlimited = isDefault || t.unlimited;
                 const nodeQuota = unlimited || !t.max_nodes ? '∞' : t.max_nodes;
                 const epsQuota = unlimited || !t.max_eps ? '∞' : Number(t.max_eps).toLocaleString();
+                const isExceeded = !!t.quota_exceeded;
+                const isWarning = !unlimited && ((t.node_quota_percent && t.node_quota_percent >= 80) || (t.eps_quota_percent && t.eps_quota_percent >= 80));
+                let quotaBadge = '';
+                if (isExceeded) {
+                    quotaBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.7rem; margin-bottom: 3px; display: inline-block;">⚠️ Kota Aşıldı</span><br>`;
+                } else if (isWarning) {
+                    quotaBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 0.7rem; margin-bottom: 3px; display: inline-block;">⚠️ %80+ Kota Kullanımı</span><br>`;
+                }
                 const limitsStr = `<div style="font-size: 0.78rem; line-height: 1.5;">
-                        ${unlimited ? '<span class="tenant-meta-pill is-root" style="margin-bottom:3px;">∞ Sınırsız (Root)</span><br>' : ''}
+                        ${unlimited ? '<span class="tenant-meta-pill is-root" style="margin-bottom:3px;">∞ Sınırsız (Root)</span><br>' : quotaBadge}
                         Node: <strong>${t.node_count || 0}</strong> / ${nodeQuota}
                         &nbsp;|&nbsp; EPS: <strong>${Math.round(t.current_eps || 0).toLocaleString()}</strong> / ${epsQuota}
                         <div style="font-size: 0.7rem; color: var(--text-muted);">${t.device_count || 0} kayıtlı cihaz</div>
@@ -5971,12 +5979,15 @@ async function loadEdgeNodes() {
         let html = '';
         currentEdgeNodes.forEach(n => {
             const isOnline = (n.status === 'online');
+            const isDegraded = (n.status === 'degraded');
             const isPending = (n.status === 'pending');
             const statusBadge = isOnline
                 ? `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-weight: 600;">${t('status_online', '● Online')}</span>`
-                : (isPending
-                    ? `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);">${t('status_pending', '⏳ Bekliyor')}</span>`
-                    : `<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3);">${t('status_offline', '○ Çevrimdışı')}</span>`);
+                : (isDegraded
+                    ? `<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); font-weight: 600;">${t('status_degraded', '⚠️ Gecikmeli')}</span>`
+                    : (isPending
+                        ? `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);">${t('status_pending', '⏳ Bekliyor')}</span>`
+                        : `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3);">${t('status_offline', '○ Çevrimdışı')}</span>`));
 
             const isActPending = (n.activation_status === 'pending_activation');
             const actBadge = isActPending
