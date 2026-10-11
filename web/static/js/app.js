@@ -6070,6 +6070,8 @@ async function submitGenerateDebugBundle() {
     const incSettings = document.getElementById('debug-opt-settings') ? document.getElementById('debug-opt-settings').checked : true;
     const incTelemetry = document.getElementById('debug-opt-telemetry') ? document.getElementById('debug-opt-telemetry').checked : true;
     const incLogs = document.getElementById('debug-opt-logs') ? document.getElementById('debug-opt-logs').checked : true;
+    const incDBLogs = document.getElementById('debug-opt-db-logs') ? document.getElementById('debug-opt-db-logs').checked : true;
+    const incSIEMEvents = document.getElementById('debug-opt-siem-events') ? document.getElementById('debug-opt-siem-events').checked : true;
 
     if (btn) {
         btn.disabled = true;
@@ -6082,7 +6084,9 @@ async function submitGenerateDebugBundle() {
             contact_email: email,
             include_settings: incSettings,
             include_telemetry: incTelemetry,
-            include_logs: incLogs
+            include_logs: incLogs,
+            include_db_logs: incDBLogs,
+            include_siem_events: incSIEMEvents
         };
 
         const res = await fetch('/api/v1/debug/bundle', {

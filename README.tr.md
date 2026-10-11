@@ -249,6 +249,11 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.5.20** (Destek Paketi İçin Veritabanı Son 1.000 Log ve SIEM Olay Dökümü):
+  - **ClickHouse Son 1.000 Syslog Kaydı Dökümü**: Destek paketine ClickHouse (`syslog_events`) üzerindeki son 1.000 ham ve ayrıştırılmış log kaydını dahil eden seçilebilir seçenek (`include_db_logs` / `database_last_1000_logs.json`) eklendi.
+  - **SIEM Güvenlik Olayları & Alarm Geçmişi**: PostgreSQL üzerindeki son güvenlik alarmlarını ve SIEM vakalarını (`siem_alerts`) pakete ekleyen seçilebilir seçenek (`include_siem_events` / `siem_security_activity.json`) eklendi.
+  - **Esnek Paket Kapsamı Seçimi**: Destek ve Tanılama sayfasındaki (`#pane-support`) form genişletilerek operatörlerin veritabanı loglarını ve SIEM olaylarını diledikleri gibi seçip indirebilmeleri sağlandı.
+
 - **v1.5.19** (Bağımsız Kenar Çubuğu Destek Menüsü & Ayrılmış Tanılama Merkezi):
   - **Bağımsız Üst Düzey Destek ve Tanılama Menüsü (`#support`)**: Sistem destek ve hata ayıklama modülü Ayarlar sayfasındaki gömülü panelden çıkarılarak, doğrudan kenar çubuğunda birinci sınıf bağımsız bir menü öğesi (`#nav-tab-support`) ve tam genişlikli özel bir sekme paneli (`#pane-support`) haline getirildi.
   - **Temiz Menü ve Navigasyon Ayrımı**: Sistem konfigürasyon ayarları (`#pane-settings`) ile destek paketi oluşturma ve geçmiş paketler tablosu birbirinden tamamen ayrılarak her iki sayfa sadeleştirildi.

@@ -260,6 +260,11 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.5.20** (Diagnostic Support Database Last 1,000 Logs & SIEM Security Activity Export):
+  - **ClickHouse Last 1,000 Syslog Events Extraction**: Added selectable option (`include_db_logs`) to query and include the latest 1,000 raw and parsed events from ClickHouse (`syslog_events`) directly into `database_last_1000_logs.json` inside the `.tar.gz` diagnostic bundle, with tenant scoping support.
+  - **SIEM Security Activity & Incident Records Extraction**: Added selectable option (`include_siem_events`) to extract recent security incidents and detection activity from PostgreSQL (`siem_alerts`) into `siem_security_activity.json` inside the diagnostic bundle.
+  - **Granular Diagnostic Generator UI**: Expanded the Support & Diagnostics panel (`#pane-support`) with checkboxes for both ClickHouse database events and SIEM incident history alongside system settings, host telemetry, and service log tails.
+
 - **v1.5.19** (Standalone Sidebar Support Menu & Dedicated Diagnostics Hub):
   - **Dedicated Top-Level Support & Diagnostics Menu (`#support`)**: Promoted the diagnostic support module from an embedded panel in Settings to a first-class, standalone sidebar menu item (`#nav-tab-support`) and dedicated full-width tab pane (`#pane-support`), ensuring immediate, 1-click access for operators seeking technical support.
   - **Clean Navigation Separation**: Completely decoupled diagnostic bundle generation and history cataloging from system configuration settings (`#pane-settings`), streamlining both views.

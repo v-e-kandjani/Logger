@@ -50,7 +50,7 @@ func (h *Handler) handleCreateSupportBundle(w http.ResponseWriter, r *http.Reque
 	// Gather health metrics
 	healthStats := h.gatherDiagnosticHealth(r)
 
-	gen := debug.NewGenerator(h.pgDB, "")
+	gen := debug.NewGenerator(h.pgDB, h.chClient, "")
 	res, err := gen.Generate(r.Context(), req, healthStats)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to generate support bundle: " + err.Error()})

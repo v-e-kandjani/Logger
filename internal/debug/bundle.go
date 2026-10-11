@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/notification/smtp"
@@ -24,14 +25,16 @@ import (
 
 // BundleRequest represents parameters for generating a debug support bundle
 type BundleRequest struct {
-	RequestedBy      string `json:"requested_by"`
-	TenantSlug       string `json:"tenant_slug"`
-	IssueDescription string `json:"issue_description"`
-	ContactEmail     string `json:"contact_email"`
-	IncludeLogs      bool   `json:"include_logs"`
-	IncludeSettings  bool   `json:"include_settings"`
-	IncludeTelemetry bool   `json:"include_telemetry"`
-	BaseURL          string `json:"base_url"`
+	RequestedBy       string `json:"requested_by"`
+	TenantSlug        string `json:"tenant_slug"`
+	IssueDescription  string `json:"issue_description"`
+	ContactEmail      string `json:"contact_email"`
+	IncludeLogs       bool   `json:"include_logs"`
+	IncludeSettings   bool   `json:"include_settings"`
+	IncludeTelemetry  bool   `json:"include_telemetry"`
+	IncludeDBLogs     bool   `json:"include_db_logs"`
+	IncludeSIEMEvents bool   `json:"include_siem_events"`
+	BaseURL           string `json:"base_url"`
 }
 
 // BundleResult represents the generated support package info
@@ -46,10 +49,11 @@ type BundleResult struct {
 // Generator builds and packages system diagnostics into secure tar.gz archives
 type Generator struct {
 	pgDB        *postgres.DB
+	chClient    *clickhouse.Client
 	storagePath string
 }
 
-func NewGenerator(pgDB *postgres.DB, storagePath string) *Generator {
+func NewGenerator(pgDB *postgres.DB, chClient *clickhouse.Client, storagePath string) *Generator {
 	if storagePath == "" {
 		if _, err := os.Stat("/opt/syslog-platform"); err == nil {
 			storagePath = "/opt/syslog-platform/data/support_bundles"
@@ -60,6 +64,7 @@ func NewGenerator(pgDB *postgres.DB, storagePath string) *Generator {
 	_ = os.MkdirAll(storagePath, 0750)
 	return &Generator{
 		pgDB:        pgDB,
+		chClient:    chClient,
 		storagePath: storagePath,
 	}
 }
@@ -110,16 +115,21 @@ func (g *Generator) Generate(ctx context.Context, req BundleRequest, healthStats
 
 	// 1. Manifest
 	manifest := map[string]any{
-		"bundle_id":         bundleID,
-		"created_at":        now.Format(time.RFC3339),
-		"platform":          version.Platform,
-		"version":           version.Version,
-		"build_date":        version.BuildDate,
-		"commit_sha":        version.CommitSHA,
-		"requested_by":      req.RequestedBy,
-		"tenant_slug":       req.TenantSlug,
-		"contact_email":     req.ContactEmail,
-		"issue_description": req.IssueDescription,
+		"bundle_id":           bundleID,
+		"created_at":          now.Format(time.RFC3339),
+		"platform":            version.Platform,
+		"version":             version.Version,
+		"build_date":          version.BuildDate,
+		"commit_sha":          version.CommitSHA,
+		"requested_by":        req.RequestedBy,
+		"tenant_slug":         req.TenantSlug,
+		"contact_email":       req.ContactEmail,
+		"issue_description":   req.IssueDescription,
+		"include_settings":    req.IncludeSettings,
+		"include_telemetry":   req.IncludeTelemetry,
+		"include_logs":        req.IncludeLogs,
+		"include_db_logs":     req.IncludeDBLogs,
+		"include_siem_events": req.IncludeSIEMEvents,
 	}
 	if b, err := json.MarshalIndent(manifest, "", "  "); err == nil {
 		_ = writeTarFile("manifest.json", b)
@@ -230,6 +240,83 @@ func (g *Generator) Generate(ctx context.Context, req BundleRequest, healthStats
 		logDump := fmt.Sprintf("=== VALTRIVO LOGSEAL DIAGNOSTIC LOG TAIL ===\nCaptured At: %s\nPlatform: %s %s (%s)\nUptime Session Log Summary:\n[INFO] Daemon active on %s\n[INFO] Ingestion listener running on 514 UDP/TCP, 5514 UDP/TCP\n[INFO] Storage pipeline health: OK\n[INFO] Support diagnostic requested by operator '%s' (Tenant: %s)\n",
 			now.Format(time.RFC3339), version.Platform, version.Version, version.BuildDate, hostname, req.RequestedBy, req.TenantSlug)
 		_ = writeTarFile("recent_application_logs.txt", []byte(logDump))
+	}
+
+	// 8. Database Last 1,000 Logs (ClickHouse)
+	if req.IncludeDBLogs && g.chClient != nil {
+		where := ""
+		var args []any
+		if req.TenantSlug != "" && req.TenantSlug != "all" && req.TenantSlug != "global" {
+			where = "WHERE tenant = ?"
+			args = append(args, req.TenantSlug)
+		}
+		q := fmt.Sprintf(`
+			SELECT internal_id, event_timestamp, source_ip, source_port, transport_protocol,
+			       device_name, vendor, severity, facility, hostname, application_name, message, raw_message, tenant
+			FROM %s.syslog_events
+			%s
+			ORDER BY event_timestamp DESC
+			LIMIT 1000
+		`, g.chClient.Database(), where)
+
+		rows, err := g.chClient.QueryEvents(ctx, q, args...)
+		if err == nil && rows != nil {
+			var events []map[string]any
+			for rows.Next() {
+				var (
+					id      string
+					evTime  time.Time
+					srcIP   net.IP
+					srcPort uint16
+					proto   string
+					devName string
+					vendor  string
+					sev     string
+					fac     string
+					host    string
+					app     string
+					msg     string
+					rawMsg  string
+					tenant  string
+				)
+				if err := rows.Scan(&id, &evTime, &srcIP, &srcPort, &proto, &devName, &vendor, &sev, &fac, &host, &app, &msg, &rawMsg, &tenant); err == nil {
+					events = append(events, map[string]any{
+						"internal_id": id,
+						"timestamp":   evTime.Format(time.RFC3339Nano),
+						"source_ip":   srcIP.String(),
+						"port":        srcPort,
+						"protocol":    proto,
+						"device_name": devName,
+						"vendor":      vendor,
+						"severity":    sev,
+						"facility":    fac,
+						"hostname":    host,
+						"application": app,
+						"message":     msg,
+						"raw_message": rawMsg,
+						"tenant":      tenant,
+					})
+				}
+			}
+			rows.Close()
+			if b, err := json.MarshalIndent(events, "", "  "); err == nil {
+				_ = writeTarFile("database_last_1000_logs.json", b)
+			}
+		}
+	}
+
+	// 9. SIEM Security Activity & Incidents
+	if req.IncludeSIEMEvents && g.pgDB != nil {
+		filterTenant := req.TenantSlug
+		if filterTenant == "all" || filterTenant == "global" {
+			filterTenant = ""
+		}
+		alerts, _, err := g.pgDB.ListSIEMAlerts(ctx, filterTenant, "", "", "", 200, 0)
+		if err == nil {
+			if b, err := json.MarshalIndent(alerts, "", "  "); err == nil {
+				_ = writeTarFile("siem_security_activity.json", b)
+			}
+		}
 	}
 
 	_ = tw.Close()
