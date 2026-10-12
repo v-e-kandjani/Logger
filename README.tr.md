@@ -254,6 +254,18 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.7.7** (Yalnızca Kenar Çubuğu Yardım Menüsü, Doğrudan Markdown Doküman İndirmeleri & Kiracı Marka Logosu Yükleme):
+  - **Doğrudan Markdown Dokümantasyon İndirme ve Görüntüleme Uç Noktaları**:
+    - Kullanıcıların Markdown kılavuzlarını (`STANDALONE_INSTALL.md`, `PORT_SPECIFICATIONS.md`, `HELP.md`, `MITRE_ATTACK_GUIDE.md` vb.) güvenli şekilde doğrudan bilgisayarlarına indirebilmesi (`Content-Disposition: attachment`) ve tarayıcıda inceleyebilmesi için `/api/v1/docs/download` ve `/api/v1/docs/view` uç noktaları geliştirildi.
+  - **Yalnızca Kenar Çubuğunda Yer Alan Zengin Yardım Sekmesi**:
+    - Kullanıcı isteği doğrultusunda üst başlıktaki (header) buton kaldırıldı ve Yardım bölümü yalnızca ana sol menüde (`#nav-tab-help`) konumlandırıldı.
+    - Doğrudan Markdown indirme kartları, tam ağ port spesifikasyonu, PostgreSQL ve ClickHouse 127.0.0.1 loopback izolasyon tabloları ve güvenlik duvarı komutları tek bir `#pane-help` sekmesinde birleştirildi.
+  - **Kök (Default) Dahil Tüm Kiracılar İçin Marka Logosu Yükleme Desteği**:
+    - Ayarlar > Kiracı Yönetimi panelinde, Kök (`default`) organizasyon da dahil olmak üzere her kiracı için özel logo yükleme imkanı sağlandı.
+    - Çok parçalı (multipart) logo yükleme (`POST /api/v1/tenants/logo`), servis etme (`GET /api/v1/tenants/logo`) ve sıfırlama (`DELETE /api/v1/tenants/logo`) API uç noktaları yazıldı.
+    - Logolar `data/branding/{slug}/` altında (ve Docker `syslog_branding` kalıcı biriminde) saklanacak ve veritabanına `logo_url` olarak işlenecek şekilde yapılandırıldı.
+    - Canlı önizleme modalı, kiracılar tablosunda logo küçük resimleri ve aktif kiracı değiştiğinde sol üst marka logosunun dinamik güncellenmesi sağlandı.
+
 - **v1.7.6** (Ağ Portları Modalı Görünürlük Düzeltmesi ve Eksiksiz Çift Dilli Yerelleştirme):
   - **Bölüm 1 ve Bölüm 2 Port Tablolarının Çökme Sorununun Giderilmesi**:
     - WebKit/Chromium tarayıcılarında flex sütun kapsayıcısı içindeki `overflow-x: auto` öğelerinin (tablo ve kod blokları) 0 yüksekliğe çökmesine yol açan flexbox hesaplama sorunu giderildi.

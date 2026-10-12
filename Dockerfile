@@ -43,11 +43,13 @@ ENV GOPATH=/root/go
 RUN mkdir -p /opt/syslog-platform/bin \
              /opt/syslog-platform/config \
              /opt/syslog-platform/data/spool \
+             /opt/syslog-platform/data/branding \
              /opt/syslog-platform/archive \
              /opt/syslog-platform/timestamp-client \
              /opt/syslog-platform/web/templates \
              /opt/syslog-platform/web/static \
              /opt/syslog-platform/scripts \
+             /opt/syslog-platform/docs \
              /opt/syslog-platform/cmd \
              /opt/syslog-platform/internal \
              /opt/syslog-platform/migrations
@@ -62,8 +64,10 @@ COPY cmd/ /opt/syslog-platform/cmd/
 COPY internal/ /opt/syslog-platform/internal/
 COPY migrations/ /opt/syslog-platform/migrations/
 
-# Copy scripts & web assets
+# Copy scripts, web assets, and documentation
 COPY scripts/ /opt/syslog-platform/scripts/
+COPY docs/ /opt/syslog-platform/docs/
+COPY *.md /opt/syslog-platform/
 COPY web/templates/ /opt/syslog-platform/web/templates/
 COPY web/static/ /opt/syslog-platform/web/static/
 

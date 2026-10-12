@@ -1908,6 +1908,7 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 	ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ingest_policy VARCHAR(32) NOT NULL DEFAULT 'permissive';
 	ALTER TABLE tenants ADD COLUMN IF NOT EXISTS retention_days INT NOT NULL DEFAULT 0;
 	ALTER TABLE tenants ADD COLUMN IF NOT EXISTS max_storage_gb INT NOT NULL DEFAULT 0;
+	ALTER TABLE tenants ADD COLUMN IF NOT EXISTS logo_url VARCHAR(255) NOT NULL DEFAULT '';
 
 	INSERT INTO tenants (slug, name, description, admin_name, admin_email, admin_username, status)
 	VALUES ('default', 'Default Organization (Root)', 'Primary root tenant', 'Root Super Admin', 'admin@syslog.local', 'admin', 'active')
@@ -2084,7 +2085,7 @@ func MaskEdgeToken(token string) string {
 // ListTenants returns all customer tenant organizations
 func (db *DB) ListTenants(ctx context.Context) ([]*models.Tenant, error) {
 	query := `
-		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, coalesce(ingest_policy, 'permissive'), max_nodes, max_eps, coalesce(retention_days, 0), coalesce(max_storage_gb, 0), created_at, updated_at
+		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, coalesce(ingest_policy, 'permissive'), max_nodes, max_eps, coalesce(retention_days, 0), coalesce(max_storage_gb, 0), coalesce(logo_url, ''), created_at, updated_at
 		FROM tenants
 		ORDER BY created_at ASC`
 	rows, err := db.pool.Query(ctx, query)
@@ -2100,7 +2101,7 @@ func (db *DB) ListTenants(ctx context.Context) ([]*models.Tenant, error) {
 			&t.ID, &t.Slug, &t.Name, &t.Description,
 			&t.AdminName, &t.AdminEmail, &t.AdminUsername,
 			&t.Status, &t.IngestPolicy, &t.MaxNodes, &t.MaxEPS,
-			&t.RetentionDays, &t.MaxStorageGB,
+			&t.RetentionDays, &t.MaxStorageGB, &t.LogoURL,
 			&t.CreatedAt, &t.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -2113,7 +2114,7 @@ func (db *DB) ListTenants(ctx context.Context) ([]*models.Tenant, error) {
 // GetTenantBySlug returns a tenant by its unique slug identifier
 func (db *DB) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
 	query := `
-		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, coalesce(ingest_policy, 'permissive'), max_nodes, max_eps, coalesce(retention_days, 0), coalesce(max_storage_gb, 0), created_at, updated_at
+		SELECT id, slug, name, description, admin_name, admin_email, admin_username, status, coalesce(ingest_policy, 'permissive'), max_nodes, max_eps, coalesce(retention_days, 0), coalesce(max_storage_gb, 0), coalesce(logo_url, ''), created_at, updated_at
 		FROM tenants
 		WHERE slug = $1`
 	var t models.Tenant
@@ -2121,7 +2122,7 @@ func (db *DB) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant,
 		&t.ID, &t.Slug, &t.Name, &t.Description,
 		&t.AdminName, &t.AdminEmail, &t.AdminUsername,
 		&t.Status, &t.IngestPolicy, &t.MaxNodes, &t.MaxEPS,
-		&t.RetentionDays, &t.MaxStorageGB,
+		&t.RetentionDays, &t.MaxStorageGB, &t.LogoURL,
 		&t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
@@ -2231,6 +2232,19 @@ func (db *DB) UpdateTenantIngestPolicy(ctx context.Context, slug, policy string)
 	query := `UPDATE tenants SET ingest_policy = $1, updated_at = NOW() WHERE slug = $2`
 	_, err := db.pool.Exec(ctx, query, p, slug)
 	return err
+}
+
+// UpdateTenantLogo updates the branding logo URL or relative path for a tenant
+func (db *DB) UpdateTenantLogo(ctx context.Context, slug, logoURL string) error {
+	query := `UPDATE tenants SET logo_url = $1, updated_at = NOW() WHERE slug = $2`
+	tag, err := db.pool.Exec(ctx, query, strings.TrimSpace(logoURL), slug)
+	if err != nil {
+		return fmt.Errorf("updating tenant logo: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("tenant %q not found", slug)
+	}
+	return nil
 }
 
 // TenantUsage summarizes resources consumed by a tenant

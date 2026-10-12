@@ -16,10 +16,10 @@
         <aside class="sidebar">
             <div class="brand">
                 <div class="brand-icon" style="background: transparent; border: none; padding: 0;">
-                    <img src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
+                    <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.6</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.7</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -154,6 +154,10 @@
                     <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/></svg>
                     <span data-i18n="nav_support">Destek &amp; Hata Ayıklama</span>
                 </a>
+                <a href="#help" class="nav-item" data-tab="help" id="nav-tab-help">
+                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <span data-i18n="nav_help">Yardım &amp; Kılavuzlar</span>
+                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -184,12 +188,6 @@
                         <button class="lang-btn" id="lang-btn-en" onclick="i18n.setLanguage('en')">🇬🇧 EN</button>
                     </div>
 
-                    <!-- Network Ports & Help Guide Button -->
-                    <button class="btn btn-outline btn-top-compact" id="btn-open-ports-help" title="Network Ports & Architecture Documentation">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                        <span class="btn-label-long" data-i18n="btn_ports_help">Ağ Portları &amp; Yardım</span>
-                        <span class="btn-label-short" style="display: none;">Yardım</span>
-                    </button>
 
                     <button class="btn btn-primary btn-top-compact" id="btn-open-custom-export">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -2176,7 +2174,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.6</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.7</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -2395,6 +2393,281 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: Help & Architecture Documentation (Sidebar-only) -->
+            <section class="tab-pane" id="pane-help">
+                <div class="section-actions" style="margin-bottom: 20px;">
+                    <div>
+                        <h3 data-i18n="view_title_help">Yardım, Ağ Portları &amp; Mimari Dokümantasyonu</h3>
+                        <p class="subtitle" data-i18n="view_subtitle_help">Çift motorlu mimari, ağ portu gereksinimleri, doğrudan Markdown kılavuz indirmeleri ve güvenlik duvarı komutları</p>
+                    </div>
+                </div>
+
+                <!-- Documentation Markdown Download Cards -->
+                <div class="panel" style="margin-bottom: 24px;">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h3 data-i18n="help_docs_card_title">📚 Resmi Sistem Kılavuzları &amp; Dokümantasyon İndirme</h3>
+                            <p class="subtitle" style="margin-top: 4px; font-size: 0.85rem;" data-i18n="help_docs_card_sub">Tüm kılavuz ve teknik şartnameleri doğrudan Markdown (.md) biçiminde yerel bilgisayarınıza indirin veya tarayıcıda görüntüleyin.</p>
+                        </div>
+                        <span class="badge badge-primary">Markdown (.md)</span>
+                    </div>
+                    <div class="panel-body">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                            <!-- Doc 1: Bare-Metal Installation -->
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                        <span style="font-size: 20px;">🖥️</span>
+                                        <strong style="color: var(--text-main); font-size: 0.95rem;">STANDALONE_INSTALL.md</strong>
+                                    </div>
+                                    <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;" data-i18n="doc_desc_standalone">
+                                        Docker harici doğrudan Linux (Ubuntu/Debian, RHEL/Rocky) üzerinde PostgreSQL 16, ClickHouse ve KamuSM ile çıplak donanım (bare-metal) kurulum kılavuzu.
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn btn-primary" style="font-size: 0.78rem; padding: 5px 10px;" onclick="downloadDoc('STANDALONE_INSTALL.md')">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        <span data-i18n="btn_download_md">İndir (.md)</span>
+                                    </button>
+                                    <button class="btn btn-outline" style="font-size: 0.78rem; padding: 5px 10px;" onclick="viewDocInline('STANDALONE_INSTALL.md')">
+                                        <span data-i18n="btn_view_md">İncele</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Doc 2: Network Ports & Specs -->
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                        <span style="font-size: 20px;">🌐</span>
+                                        <strong style="color: var(--text-main); font-size: 0.95rem;">PORT_SPECIFICATIONS.md</strong>
+                                    </div>
+                                    <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;" data-i18n="doc_desc_ports">
+                                        Merkez sunucu, PostgreSQL &amp; ClickHouse 127.0.0.1 döngüsel (loopback) izolasyonu ve uzak proxy düğümleri iletişim portları detay matrisi.
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn btn-primary" style="font-size: 0.78rem; padding: 5px 10px;" onclick="downloadDoc('PORT_SPECIFICATIONS.md')">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        <span data-i18n="btn_download_md">İndir (.md)</span>
+                                    </button>
+                                    <button class="btn btn-outline" style="font-size: 0.78rem; padding: 5px 10px;" onclick="viewDocInline('PORT_SPECIFICATIONS.md')">
+                                        <span data-i18n="btn_view_md">İncele</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Doc 3: Operation & User Guide -->
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                        <span style="font-size: 20px;">📖</span>
+                                        <strong style="color: var(--text-main); font-size: 0.95rem;">HELP.md</strong>
+                                    </div>
+                                    <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;" data-i18n="doc_desc_help">
+                                        Kapsamlı operasyon el kitabı: 5651 sayılı kanun damgalama döngüsü, SIEM tespit kuralları, çoklu kiracı MSSP kota yönetimi ve felaket kurtarma.
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn btn-primary" style="font-size: 0.78rem; padding: 5px 10px;" onclick="downloadDoc('HELP.md')">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        <span data-i18n="btn_download_md">İndir (.md)</span>
+                                    </button>
+                                    <button class="btn btn-outline" style="font-size: 0.78rem; padding: 5px 10px;" onclick="viewDocInline('HELP.md')">
+                                        <span data-i18n="btn_view_md">İncele</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Doc 4: MITRE ATT&CK SIEM Guide -->
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                        <span style="font-size: 20px;">🎯</span>
+                                        <strong style="color: var(--text-main); font-size: 0.95rem;">MITRE_ATTACK_GUIDE.md</strong>
+                                    </div>
+                                    <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;" data-i18n="doc_desc_mitre">
+                                        14 taktik, Enterprise teknikleri ve LogSeal SIEM korelasyon motoruna entegre ön tanımlı kuralların referans kataloğu.
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn btn-primary" style="font-size: 0.78rem; padding: 5px 10px;" onclick="downloadDoc('MITRE_ATTACK_GUIDE.md')">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        <span data-i18n="btn_download_md">İndir (.md)</span>
+                                    </button>
+                                    <button class="btn btn-outline" style="font-size: 0.78rem; padding: 5px 10px;" onclick="viewDocInline('MITRE_ATTACK_GUIDE.md')">
+                                        <span data-i18n="btn_view_md">İncele</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Ports & Architecture Matrix Panel -->
+                <div class="panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h3 data-i18n="modal_ports_title">🌐 Ağ Portları &amp; İletişim Spesifikasyonu</h3>
+                            <p class="subtitle" style="margin-top: 4px; font-size: 0.85rem;" data-i18n="modal_ports_subtitle">Merkez Sunucu, Veritabanları (PostgreSQL &amp; ClickHouse) ve Proxy Düğümleri İletişim Spesifikasyonu</p>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Quick Info Alert -->
+                        <div style="background: rgba(59, 130, 246, 0.08); border-left: 4px solid var(--primary); padding: 12px 16px; border-radius: 4px; margin-bottom: 20px; font-size: 13px;" data-i18n-html="modal_ports_alert">
+                            💡 <strong>Çift Motorlu Güvenlik Mimarisi:</strong> Veritabanları (PostgreSQL 5432 ve ClickHouse 8123/9000) kesinlikle yalnızca <code>127.0.0.1</code> (loopback) dinler ve dış ağa kapalıdır. Uzak şube proxy düğümleri ise merkeze sadece çıkış yönünde (outbound) <strong>HTTPS 8443/tcp</strong> üzerinden bağlanır; şubede hiçbir port açılması gerekmez.
+                        </div>
+
+                        <!-- Section 1: Central Public & Ingestion Ports -->
+                        <h4 style="margin: 0 0 10px 0; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                            <span>📡</span> <span data-i18n="modal_ports_sec1_title">1. Merkez Sunucu Açık Portları (Web, API &amp; Syslog Toplama)</span>
+                        </h4>
+                        <div class="table-container" style="margin-bottom: 24px; display: block; width: 100%; overflow-x: auto; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-surface);">
+                            <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 680px; font-size: 13px;">
+                                <thead>
+                                    <tr>
+                                        <th style="background-color: var(--bg-surface-elevated); padding: 10px 14px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px;" data-i18n="th_port">Port</th>
+                                        <th style="background-color: var(--bg-surface-elevated); padding: 10px 14px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px;" data-i18n="th_proto">Protokol</th>
+                                        <th style="background-color: var(--bg-surface-elevated); padding: 10px 14px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px;" data-i18n="th_service">Servis</th>
+                                        <th style="background-color: var(--bg-surface-elevated); padding: 10px 14px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px;" data-i18n="th_direction">Yön</th>
+                                        <th style="background-color: var(--bg-surface-elevated); padding: 10px 14px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px;" data-i18n="th_scope_purpose">Erişim Kapsamı &amp; Amaç</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong style="color: #38bdf8;">8443</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-primary">TCP</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong data-i18n="port_8443_service">HTTPS Web &amp; Edge API</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-success" data-i18n="lbl_inbound">Giriş (Inbound)</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;" data-i18n="port_8443_desc">Önerilen güvenli web arayüzü ve Proxy Düğüm telemetri/toplu log aktarımı (TLS 1.3).</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong>8080</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-outline">TCP</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span data-i18n="port_8080_service">HTTP Web Dashboard</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-success" data-i18n="lbl_inbound">Giriş (Inbound)</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;" data-i18n="port_8080_desc">Dahili HTTP erişimi veya HTTPS yönlendirmesi.</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong style="color: #10b981;">514</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-success">UDP</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span data-i18n="port_514_udp_service">Syslog Receiver</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-success" data-i18n="lbl_inbound">Giriş (Inbound)</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;" data-i18n="port_514_udp_desc">Standart RFC 3164 / RFC 5424 UDP log dinleyicisi (Switch, Router, Firewall).</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong style="color: #10b981;">514</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-success">TCP</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span data-i18n="port_514_tcp_service">Syslog Stream</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-success" data-i18n="lbl_inbound">Giriş (Inbound)</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;" data-i18n="port_514_tcp_desc">Bağlantı temelli güvenilir TCP syslog teslimi.</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong>5514</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-outline">UDP / TCP</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span data-i18n="port_5514_service">Syslog Alt Port</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-success" data-i18n="lbl_inbound">Giriş (Inbound)</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;" data-i18n="port_5514_desc">Yüksek hacimli güvenlik duvarı trafiğini ayrıştırmak için alternatif dinleyici.</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong>6514</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-warning">TLS TCP</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span data-i18n="port_6514_service">Syslog TLS (RFC 5425)</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-success" data-i18n="lbl_inbound">Giriş (Inbound)</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;" data-i18n="port_6514_desc">Karşılıklı istemci sertifikası doğrulamalı (mTLS) şifreli syslog.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Section 2: Database Internal Loopback Isolation -->
+                        <h4 style="margin: 0 0 10px 0; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                            <span>🔒</span> <span data-i18n="modal_ports_sec2_title">2. Veritabanı Portları (Kesinlikle 127.0.0.1 Loopback İzolasyonu)</span>
+                        </h4>
+                        <div class="table-container" style="margin-bottom: 24px; display: block; width: 100%; overflow-x: auto; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-surface);">
+                            <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 680px; font-size: 13px;">
+                                <thead>
+                                    <tr>
+                                        <th style="background-color: var(--bg-surface-elevated); padding: 10px 14px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px;" data-i18n="th_port">Port</th>
+                                        <th style="background-color: var(--bg-surface-elevated); padding: 10px 14px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px;" data-i18n="th_proto">Protokol</th>
+                                        <th style="background-color: var(--bg-surface-elevated); padding: 10px 14px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px;" data-i18n="th_database">Veritabanı</th>
+                                        <th style="background-color: var(--bg-surface-elevated); padding: 10px 14px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px;" data-i18n="th_listen_iface">Dinleme Arayüzü</th>
+                                        <th style="background-color: var(--bg-surface-elevated); padding: 10px 14px; color: var(--text-muted); font-weight: 600; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 12px;" data-i18n="th_data_scope_sec">Saklanan Veri Kapsamı &amp; Güvenlik</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong style="color: #6366f1;">5432</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-primary">TCP</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong>PostgreSQL 16</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-danger" data-i18n="lbl_loopback">127.0.0.1 (Loopback İzolasyonu)</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;" data-i18n="port_5432_desc">Kiracılar, Cihaz Envanteri, RBAC Kullanıcılar, SIEM Kuralları, Denetim İzleri ve 5651 Arşivleri. Dış ağa kapalıdır.</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong style="color: #f59e0b;">9000</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-warning">Native TCP</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong>ClickHouse 24.3</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-danger" data-i18n="lbl_loopback">127.0.0.1 (Loopback İzolasyonu)</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;" data-i18n="port_9000_desc">Go motorunun 100.000+ EPS hızında vektörize blok yazma yaptığı ikili protokol. Dış ağa kapalıdır.</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><strong style="color: #f59e0b;">8123</strong></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-outline">HTTP</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;">ClickHouse HTTP</td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;"><span class="badge badge-danger" data-i18n="lbl_loopback">127.0.0.1 (Loopback İzolasyonu)</span></td>
+                                        <td style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 13px; vertical-align: middle;" data-i18n="port_8123_desc">Konteyner sağlık testi ve analitik şema göçleri. Dış ağa kapalıdır.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Section 3: Proxy Nodes & NAT Traversal -->
+                        <h4 style="margin: 0 0 10px 0; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                            <span>🔄</span> <span data-i18n="modal_ports_sec3_title">3. Uzak Proxy Düğümleri (logseal-proxy) &amp; NAT Geçişi</span>
+                        </h4>
+                        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                                <div>
+                                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;" data-i18n="sec3_lan_title">Şube İçi Yerel Giriş (LAN)</div>
+                                    <div style="font-size: 13px;" data-i18n-html="sec3_lan_desc">
+                                        <strong>UDP/TCP 514 &amp; 5514:</strong> Şube içindeki firewall, switch ve router'lar loglarını doğrudan proxy düğümünün yerel IP'sine gönderir.
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;" data-i18n="sec3_wan_title">Merkeze Çıkış (WAN Egress)</div>
+                                    <div style="font-size: 13px;" data-i18n-html="sec3_wan_desc">
+                                        <strong>HTTPS 8443/tcp:</strong> Proxy, merkeze TLS 1.3 şifreli çıkış başlatır. Kalp atışı (heartbeat) ve gzip sıkıştırmalı log paketleri iletilir.
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;" data-i18n="sec3_zero_title">Sıfır Port Açma (Zero Inbound)</div>
+                                    <div style="font-size: 13px; color: #10b981;" data-i18n-html="sec3_zero_desc">
+                                        ✓ <strong>Şube firewall'unda hiçbir inbound port açılmaz.</strong> Tüm oturumlar proxy tarafından dışa doğru başlatılır.
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;" data-i18n="sec3_spool_title">Hat Kesintisi Koruması (Spool)</div>
+                                    <div style="font-size: 13px;" data-i18n="sec3_spool_desc">
+                                        İnternet kesilirse loglar yerel SQLite disk kuyruğuna yazılır, bağlantı sağlandığında sıfır kayıpla aktarılır.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 4: Firewall Configuration Commands -->
+                        <h4 style="margin: 0 0 10px 0; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                            <span>🛡️</span> <span data-i18n="modal_ports_sec4_title">4. Güvenlik Duvarı &amp; Servis Komutları (Hızlı Kurulum)</span>
+                        </h4>
+                        <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px;" onclick="copyPortsFirewallUFW()" data-i18n="btn_copy_ufw">📋 UFW Komutlarını Kopyala (Ubuntu/Debian)</button>
+                            <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px;" onclick="copyPortsFirewallFirewalld()" data-i18n="btn_copy_firewalld">📋 Firewalld Komutlarını Kopyala (RHEL/CentOS)</button>
+                            <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px;" onclick="copyBaremetalCommands()" data-i18n="btn_copy_baremetal">📋 Bare-Metal Servis Komutları (systemd)</button>
+                        </div>
+                        <pre id="ports-firewall-code-block" style="background: #0f172a; color: #38bdf8; padding: 12px 14px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin: 0; border: 1px solid #1e293b; display: block; min-height: 48px; line-height: 1.5; font-family: var(--font-mono); white-space: pre-wrap; word-break: break-all;"><code>sudo ufw allow 22/tcp && sudo ufw allow 8443/tcp && sudo ufw allow 8080/tcp && sudo ufw allow 514/udp && sudo ufw allow 514/tcp && sudo ufw allow 5514/udp && sudo ufw allow 5514/tcp && sudo ufw allow 6514/tcp</code></pre>
                     </div>
                 </div>
             </section>
@@ -3888,6 +4161,54 @@
         </div>
     </div>
 
+    <!-- MODAL: Upload Tenant Logo -->
+    <div class="modal-backdrop" id="modal-upload-tenant-logo" style="display: none;">
+        <div class="modal" style="max-width: 520px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="background: rgba(56, 189, 248, 0.1); padding: 8px; border-radius: 8px; font-size: 1.3rem;">🖼️</div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_logo_title">Kiracı Marka Logosu Yükle</h3>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);" id="modal-logo-tenant-subtitle">Organizasyon logosunu özelleştirin</div>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeUploadTenantLogoModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <input type="hidden" id="upload-logo-tenant-slug" value="">
+                
+                <!-- Current / Preview Area -->
+                <div style="text-align: center; margin-bottom: 20px; padding: 20px; background: rgba(255,255,255,0.02); border: 2px dashed var(--border-color); border-radius: 10px;">
+                    <div style="margin-bottom: 10px; font-size: 0.85rem; color: var(--text-muted);" data-i18n="lbl_logo_preview">Logo Önizleme</div>
+                    <div style="display: inline-block; padding: 12px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <img id="upload-logo-preview" src="/static/images/logo.svg" alt="Tenant Logo Preview" style="max-width: 180px; max-height: 80px; object-fit: contain; display: block; margin: 0 auto;">
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">
+                        PNG, JPG, SVG veya WebP (Önerilen: Şeffaf PNG / SVG, maks 5 MB)
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px;" data-i18n="lbl_select_logo_file">Yeni Logo Dosyası Seç</label>
+                    <input type="file" id="upload-logo-input" accept="image/png,image/jpeg,image/svg+xml,image/webp" class="input" style="padding: 6px 10px;" onchange="handleTenantLogoFileChange(event)">
+                </div>
+
+                <div id="upload-logo-msg" style="display: none; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem; margin-bottom: 12px;"></div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px;">
+                <button type="button" class="btn btn-outline text-danger" id="btn-reset-tenant-logo" onclick="resetTenantLogo()" data-i18n="btn_reset_default_logo">
+                    Varsayılana Sıfırla
+                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-outline" onclick="closeUploadTenantLogoModal()" data-i18n="btn_cancel">İptal</button>
+                    <button type="button" class="btn btn-primary" id="btn-submit-tenant-logo" onclick="submitTenantLogo()">
+                        <span data-i18n="btn_upload_save_logo">Logoyu Kaydet</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: Network Ports & Architecture Guide -->
     <div class="modal-backdrop" id="ports-help-modal" style="display: none;">
         <div class="modal modal-wide" style="max-width: 960px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
@@ -4072,7 +4393,7 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.7.6"></script>
-    <script src="/static/js/app.js?v=1.7.6"></script>
+    <script src="/static/js/translations.js?v=1.7.7"></script>
+    <script src="/static/js/app.js?v=1.7.7"></script>
 </body>
 </html>

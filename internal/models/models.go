@@ -218,6 +218,7 @@ type Tenant struct {
 	MaxEPS        int       `json:"max_eps"`
 	RetentionDays int       `json:"retention_days"` // 0 = unlimited / system default (e.g. 365)
 	MaxStorageGB  int       `json:"max_storage_gb"` // 0 = unlimited
+	LogoURL       string    `json:"logo_url,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

@@ -182,7 +182,7 @@ fi
 
 # 3.5. Write version metadata & export build args
 NEW_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-CURRENT_VER=$(grep -E 'Version\s*=\s*' internal/version/version.go 2>/dev/null | cut -d'"' -f2 || echo "v1.7.6")
+CURRENT_VER=$(grep -E 'Version\s*=\s*' internal/version/version.go 2>/dev/null | cut -d'"' -f2 || echo "v1.7.7")
 BUILD_DATE=$(date +%Y-%m-%d)
 mkdir -p config
 cat << EOF > config/.version_info

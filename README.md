@@ -265,6 +265,18 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.7.7** (Sidebar-Only Help Navigation, Direct Markdown Document Downloads & Multi-Tenant Branding Logo Customization):
+  - **Direct Markdown Documentation Download & Inline View Endpoints**:
+    - Implemented secure documentation endpoints (`/api/v1/docs/download` and `/api/v1/docs/view`) with sanitized filename resolution to reliably serve and download Markdown guides (`STANDALONE_INSTALL.md`, `PORT_SPECIFICATIONS.md`, `HELP.md`, `MITRE_ATTACK_GUIDE.md`, etc.) with `Content-Disposition: attachment`.
+  - **Dedicated Sidebar Help Navigation Pane**:
+    - Relocated the Help section exclusively into the primary sidebar menu (`#nav-tab-help`), eliminating redundant top-bar header buttons.
+    - Added dedicated `#pane-help` view featuring direct Markdown download cards, full dual-engine network port matrices, database loopback isolation specs, edge proxy NAT traversal guides, and one-click firewall commands.
+  - **Multi-Tenant & Root Organization Branding Logo Upload**:
+    - Added full branding logo customization in Settings > Tenants for all organizations, explicitly including the Root (`default`) tenant.
+    - Built multipart logo upload API (`POST /api/v1/tenants/logo`), serving endpoint (`GET /api/v1/tenants/logo`), and default reset (`DELETE /api/v1/tenants/logo`).
+    - Stored logos in persistent `data/branding/{slug}/` (backed by Docker volume `syslog_branding`) and updated database `tenants.logo_url`.
+    - Integrated live logo preview modal, tenant table logo thumbnails, and dynamic sidebar branding logo synchronization upon active tenant switching.
+
 - **v1.7.6** (Network Ports Modal Visibility Bugfix & Complete Bilingual Localization):
   - **Fixed Collapsed Section 1 & Section 2 Ingestion/Database Port Tables**:
     - Resolved WebKit/Chromium flex column layout bug where `.table-container` and `<pre>` elements with `overflow-x: auto` collapsed to 0 height inside `.modal-body` flexbox.

@@ -242,6 +242,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Multi-Tenant Governance Endpoints
 	mux.HandleFunc("/api/v1/tenants", h.requireAuth(h.handleTenants))
 	mux.HandleFunc("/api/v1/tenants/prune", h.requireAuth(h.handleTenantPrune))
+	mux.HandleFunc("/api/v1/tenants/logo", h.handleTenantLogo)
+
+	// Documentation & Manuals Endpoints
+	mux.HandleFunc("/api/v1/docs/download", h.requireAuth(h.handleDocDownload))
+	mux.HandleFunc("/api/v1/docs/view", h.requireAuth(h.handleDocView))
 
 	// Protected SIEM & SOC Endpoints
 	mux.HandleFunc("/api/v1/siem/overview", h.requireAuth(h.handleSIEMOverview))

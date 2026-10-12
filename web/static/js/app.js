@@ -5790,12 +5790,20 @@ let currentEdgeNodes = [];
 let tenantSessionIsRoot = true;
 let tenantTotals = null;
 
+function updateSidebarBrandLogo(slug) {
+    const logoImg = document.getElementById('sidebar-brand-logo');
+    if (!logoImg) return;
+    const targetSlug = (slug && slug !== 'all') ? slug : 'default';
+    logoImg.src = `/api/v1/tenants/logo?slug=${encodeURIComponent(targetSlug)}&t=${Date.now()}`;
+}
+
 function setTenantContext(slug, { silent = false } = {}) {
     currentTenantContext = slug || 'all';
     localStorage.setItem('active_tenant_slug', currentTenantContext);
     const sel = document.getElementById('tenant-context-selector');
     if (sel && sel.value !== currentTenantContext) sel.value = currentTenantContext;
     renderTenantSidebarMeta();
+    updateSidebarBrandLogo(currentTenantContext);
     if (!silent) refreshTenantScopedViews();
 }
 
@@ -6006,8 +6014,13 @@ async function loadTenants() {
                     <tr>
                         <td><code style="background: rgba(0,0,0,0.3); padding: 3px 6px; border-radius: 4px; font-size: 0.8rem;">${escapeHtml(t.slug)}</code></td>
                         <td>
-                            <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(t.name)}</div>
-                            <div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(t.description || '')}</div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <img src="/api/v1/tenants/logo?slug=${encodeURIComponent(t.slug)}" alt="${escapeHtml(t.name)}" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); padding: 2px; flex-shrink: 0;" onerror="this.src='/static/images/logo.svg'">
+                                <div>
+                                    <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(t.name)}</div>
+                                    <div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(t.description || '')}</div>
+                                </div>
+                            </div>
                         </td>
                         <td>${adminInfo}</td>
                         <td>${statusBadge}</td>
@@ -6019,6 +6032,9 @@ async function loadTenants() {
                             <div style="display: flex; justify-content: flex-end; gap: 6px;">
                                 <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="switchTenantContext('${escapeHtml(t.slug)}')">
                                     🔍 Seç
+                                </button>
+                                <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openUploadTenantLogoModal('${escapeHtml(t.slug)}', '${escapeHtml(t.name)}')" title="Marka Logosunu Düzenle / Yükle">
+                                    🖼️ Logo
                                 </button>
                                 ${tenantSessionIsRoot ? `
                                 <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openEditTenantQuotasModal('${escapeHtml(t.slug)}')" title="Limitleri ve Saklama Süresini Düzenle">
@@ -7692,22 +7708,182 @@ function copyBaremetalCommands() {
     }
 }
 
+function downloadDoc(fileName) {
+    if (!fileName) return;
+    const cleanName = encodeURIComponent(fileName);
+    window.location.href = `/api/v1/docs/download?file=${cleanName}`;
+}
+
+function viewDocInline(fileName) {
+    if (!fileName) return;
+    const cleanName = encodeURIComponent(fileName);
+    window.open(`/api/v1/docs/view?file=${cleanName}`, '_blank');
+}
+
 function showDocsTab(docType) {
     closePortsHelpModal();
     if (docType === 'baremetal') {
-        window.open('/STANDALONE_INSTALL.md', '_blank');
+        downloadDoc('STANDALONE_INSTALL.md');
     } else if (docType === 'ports') {
-        window.open('/docs/PORT_SPECIFICATIONS.md', '_blank');
+        downloadDoc('PORT_SPECIFICATIONS.md');
+    } else if (docType === 'mitre') {
+        downloadDoc('MITRE_ATTACK_GUIDE.md');
     } else {
-        window.open('/docs/HELP.md', '_blank');
+        downloadDoc('HELP.md');
+    }
+}
+
+// ==========================================
+// Tenant Branding Logo Management (Settings)
+// ==========================================
+let selectedTenantLogoFile = null;
+
+function openUploadTenantLogoModal(slug, name) {
+    const modal = document.getElementById('modal-upload-tenant-logo');
+    if (!modal) return;
+
+    selectedTenantLogoFile = null;
+    const slugInput = document.getElementById('upload-logo-tenant-slug');
+    const subtitle = document.getElementById('modal-logo-tenant-subtitle');
+    const preview = document.getElementById('upload-logo-preview');
+    const fileInput = document.getElementById('upload-logo-input');
+    const msg = document.getElementById('upload-logo-msg');
+
+    const effectiveSlug = slug || 'default';
+    if (slugInput) slugInput.value = effectiveSlug;
+    if (subtitle) {
+        const isRoot = (effectiveSlug === 'default');
+        subtitle.textContent = isRoot 
+            ? `${name || 'Default Organization'} (Root Kök Sistem Logosu)` 
+            : `${name || effectiveSlug} (${effectiveSlug})`;
+    }
+    if (fileInput) fileInput.value = '';
+    if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
+
+    if (preview) {
+        preview.src = `/api/v1/tenants/logo?slug=${encodeURIComponent(effectiveSlug)}&t=${Date.now()}`;
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeUploadTenantLogoModal() {
+    const modal = document.getElementById('modal-upload-tenant-logo');
+    if (modal) modal.style.display = 'none';
+    selectedTenantLogoFile = null;
+}
+
+function handleTenantLogoFileChange(event) {
+    const file = event.target.files && event.target.files[0];
+    const preview = document.getElementById('upload-logo-preview');
+    const msg = document.getElementById('upload-logo-msg');
+
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+        if (msg) {
+            msg.style.display = 'block';
+            msg.style.background = 'rgba(239, 68, 68, 0.15)';
+            msg.style.color = '#f87171';
+            msg.textContent = (window.i18n && window.i18n.t('err_file_too_large')) || 'Dosya boyutu 5 MB sınırını aşıyor.';
+        }
+        event.target.value = '';
+        return;
+    }
+
+    selectedTenantLogoFile = file;
+    if (msg) msg.style.display = 'none';
+
+    // Live preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        if (preview) preview.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+async function submitTenantLogo() {
+    const slugInput = document.getElementById('upload-logo-tenant-slug');
+    const slug = slugInput ? slugInput.value : 'default';
+    const msg = document.getElementById('upload-logo-msg');
+    const saveBtn = document.getElementById('btn-submit-tenant-logo');
+
+    if (!selectedTenantLogoFile) {
+        if (msg) {
+            msg.style.display = 'block';
+            msg.style.background = 'rgba(239, 68, 68, 0.15)';
+            msg.style.color = '#f87171';
+            msg.textContent = (window.i18n && window.i18n.t('err_select_logo_file')) || 'Lütfen yüklenecek bir logo dosyası seçin.';
+        }
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('slug', slug);
+    formData.append('logo', selectedTenantLogoFile);
+
+    try {
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = '...';
+        }
+
+        const res = await fetch(`/api/v1/tenants/logo?slug=${encodeURIComponent(slug)}`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Yükleme başarısız');
+
+        showToast((window.i18n && window.i18n.t('toast_logo_updated')) || '✓ Marka logosu başarıyla güncellendi.', 'success');
+        closeUploadTenantLogoModal();
+
+        // Refresh views
+        if (typeof loadTenants === 'function') loadTenants();
+        updateSidebarBrandLogo(currentTenantContext);
+    } catch (err) {
+        if (msg) {
+            msg.style.display = 'block';
+            msg.style.background = 'rgba(239, 68, 68, 0.15)';
+            msg.style.color = '#f87171';
+            msg.textContent = err.message;
+        }
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = (window.i18n && window.i18n.t('btn_upload_save_logo')) || 'Logoyu Kaydet';
+        }
+    }
+}
+
+async function resetTenantLogo() {
+    const slugInput = document.getElementById('upload-logo-tenant-slug');
+    const slug = slugInput ? slugInput.value : 'default';
+
+    const confirmMsg = (window.i18n && window.i18n.t('confirm_reset_logo')) || 'Bu kiracının logosu sistem varsayılanına sıfırlansın mı?';
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await fetch(`/api/v1/tenants/logo?slug=${encodeURIComponent(slug)}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Sıfırlama başarısız');
+
+        showToast((window.i18n && window.i18n.t('toast_logo_reset')) || '✓ Logo varsayılan durumuna getirildi.', 'success');
+        closeUploadTenantLogoModal();
+
+        if (typeof loadTenants === 'function') loadTenants();
+        updateSidebarBrandLogo(currentTenantContext);
+    } catch (err) {
+        showToast(err.message, 'error');
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('btn-open-ports-help');
-    if (btn) {
-        btn.addEventListener('click', openPortsHelpModal);
-    }
+    // Initial sync of sidebar brand logo
+    updateSidebarBrandLogo(localStorage.getItem('active_tenant_slug') || 'default');
 });
 
 

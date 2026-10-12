@@ -12,10 +12,17 @@ func ResolveTenantBranding(tenantSlug, tenantName string) models.TenantBranding 
 		TenantSlug: tenantSlug,
 		TenantName: tenantName,
 	}
-	if tenantSlug != "" && tenantSlug != "default" {
-		customPath := "/var/lib/logseal/tenants/" + tenantSlug + "/branding/logo.png"
-		if _, err := os.Stat(customPath); err == nil {
-			branding.CustomLogoPath = customPath
+	if tenantSlug != "" {
+		candidates := []string{
+			"data/branding/" + tenantSlug + "/logo.png",
+			"/opt/syslog-platform/data/branding/" + tenantSlug + "/logo.png",
+			"/var/lib/logseal/tenants/" + tenantSlug + "/branding/logo.png",
+		}
+		for _, cp := range candidates {
+			if _, err := os.Stat(cp); err == nil {
+				branding.CustomLogoPath = cp
+				break
+			}
 		}
 	}
 	// Fallback to default
