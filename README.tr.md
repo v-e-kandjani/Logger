@@ -254,6 +254,13 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.7.9** (CLI Otomatik Güncelleme Derleme Parametresi İyileştirmesi & Dockerfile Güçlendirmesi):
+  - **`upgrade.sh` Betiğinde Tek Satırlı Sürüm Çıkarma Düzeltmesi**:
+    - `internal/version/version.go` dosyasından `grep` ile sürüm okunurken çok satırlı çıktı oluşması ve `--build-arg VERSION=...` içerisine satır sonu (`\n`) karakterlerinin kaçarak Dockerfile 21. satırındaki `/bin/sh` koşulunu bozması (çıkış kodu 1) engellendi.
+    - `upgrade.sh`, `install_standalone.sh` ve `scripts/install_standalone.sh` betiklerindeki tüm derleme argümanları tek satır ve temiz dizgi (`head -n1 | tr -d '\r\n'`) olacak şekilde normalize edildi.
+  - **Dockerfile Derleme Argümanı Güvenliği**:
+    - `Dockerfile` aşama 1 derleme adımına `COMMIT_SHA`, `VERSION` ve `BUILD_DATE` parametrelerini derleme öncesi normalize eden arındırma adımı eklendi.
+
 - **v1.7.8** (Gelişmiş Markdown Dokümantasyon Görüntüleyici & Tablo Render Motoru):
   - **Çevrim Dışı (Air-Gapped) Markdown Ayrıştırıcı & Tipografi Sistemi**:
     - Dış CDN bağlantısına ihtiyaç duymadan, %100 yerel ve izole ortamlarda çalışabilmesi için `marked.min.js` (v15.0.12) kütüphanesi yerel statik dosyalara entegre edildi.

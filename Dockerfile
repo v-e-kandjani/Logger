@@ -17,8 +17,11 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build static Linux binaries (only inject ldflags when build args are specified)
-RUN if [ -n "$COMMIT_SHA" ] && [ -n "$VERSION" ] && [ -n "$BUILD_DATE" ]; then \
+# Build static Linux binaries (sanitize build args to prevent multiline shell syntax errors)
+RUN COMMIT_SHA="$(printf '%s' "$COMMIT_SHA" | head -n1 | tr -d '\r\n')"; \
+    VERSION="$(printf '%s' "$VERSION" | head -n1 | tr -d '\r\n')"; \
+    BUILD_DATE="$(printf '%s' "$BUILD_DATE" | head -n1 | tr -d '\r\n')"; \
+    if [ -n "$COMMIT_SHA" ] && [ -n "$VERSION" ] && [ -n "$BUILD_DATE" ]; then \
         CGO_ENABLED=0 GOOS=linux go build -trimpath \
         -ldflags="-s -w -X github.com/syslog-platform/logger/internal/version.CommitSHA=${COMMIT_SHA} -X github.com/syslog-platform/logger/internal/version.Version=${VERSION} -X github.com/syslog-platform/logger/internal/version.BuildDate=${BUILD_DATE}" \
         -o /app/bin/syslog-platform ./cmd/server/main.go; \

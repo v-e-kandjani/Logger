@@ -4,7 +4,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Aktif Kiracı",
-        app_version: "v1.7.8",
+        app_version: "v1.7.9",
         btn_ports_help: "Ağ Portları & Yardım",
         nav_help: "Yardım & Kılavuzlar",
         view_title_help: "Yardım, Ağ Portları & Mimari Dokümantasyonu",
@@ -803,7 +803,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Active Tenant",
-        app_version: "v1.7.8",
+        app_version: "v1.7.9",
         btn_ports_help: "Network Ports & Help",
         nav_help: "Help & Manuals",
         view_title_help: "Help, Network Ports & Architecture Documentation",

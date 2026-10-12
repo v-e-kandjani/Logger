@@ -281,9 +281,12 @@ if ! command -v go &> /dev/null; then
 fi
 
 # Determine version metadata
-COMMIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "00fe77a")
-CURRENT_VER=$(grep -E 'Version\s*=\s*' internal/version/version.go 2>/dev/null | cut -d'"' -f2 || echo "v1.7.8")
-BUILD_DATE=$(date +%Y-%m-%d)
+COMMIT_SHA=$(git rev-parse --short HEAD 2>/dev/null | head -n1 | tr -d '\r\n' || echo "00fe77a")
+CURRENT_VER=$(grep -E '(Default)?Version\s*=\s*"[^"]+"' internal/version/version.go 2>/dev/null | head -n1 | cut -d'"' -f2 | tr -d '\r\n')
+if [ -z "$CURRENT_VER" ]; then
+    CURRENT_VER="v1.7.9"
+fi
+BUILD_DATE=$(date +%Y-%m-%d | head -n1 | tr -d '\r\n')
 
 # Create directory structure
 mkdir -p "${INSTALL_DIR}/bin" \

@@ -265,6 +265,13 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.7.9** (CLI Automated Upgrade Build-Arg Sanitization & Dockerfile Hardening):
+  - **Single-Line Version Extraction Fix in `upgrade.sh`**:
+    - Resolved a critical bug where multi-line `grep` output from `internal/version/version.go` injected trailing newlines into `--build-arg VERSION=...`, causing `/bin/sh` syntax parsing failures (exit code 1) in Dockerfile line 21 during CLI updates.
+    - Added resilient single-line string sanitization (`head -n1 | tr -d '\r\n'`) across `upgrade.sh`, `install_standalone.sh`, and `scripts/install_standalone.sh`.
+  - **Dockerfile Build-Arg Hardening**:
+    - Hardened `Dockerfile` stage 1 build step to sanitize all incoming build args (`COMMIT_SHA`, `VERSION`, `BUILD_DATE`) prior to evaluating shell conditionals and compiling Go binaries.
+
 - **v1.7.8** (Rich Markdown Documentation Viewer & Table Rendering Engine):
   - **Offline-First Markdown Parser & Typography Engine**:
     - Vendored lightweight, offline-compatible `marked.min.js` (v15.0.12) to ensure 100% air-gapped on-premise SIEM documentation rendering without external CDN dependencies.
