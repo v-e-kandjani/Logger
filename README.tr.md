@@ -254,6 +254,16 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.7.8** (Gelişmiş Markdown Dokümantasyon Görüntüleyici & Tablo Render Motoru):
+  - **Çevrim Dışı (Air-Gapped) Markdown Ayrıştırıcı & Tipografi Sistemi**:
+    - Dış CDN bağlantısına ihtiyaç duymadan, %100 yerel ve izole ortamlarda çalışabilmesi için `marked.min.js` (v15.0.12) kütüphanesi yerel statik dosyalara entegre edildi.
+    - Metinler için `Plus Jakarta Sans`, kod blokları için `JetBrains Mono` yazı tipleri, optimize edilmiş paragraf ve satır yükseklikleri (`line-height: 1.75`), blok alıntıları ve hiyerarşik başlık çizgileri tasarlandı.
+  - **Duyarlı ve Kusursuz Tablo Render Altyapısı**:
+    - Tüm Markdown tabloları otomatik olarak `.table-responsive` sarmalayıcısına alınarak yatay kaydırma güvenliği, koyu arayüz başlıkları (`#111827`), mavi/camgöbeği kenarlıklar, zebra satır renklendirmesi (`rgba(255, 255, 255, 0.02)`) ve üzerine gelindiğinde (hover) vurgu efektleri kazandırıldı.
+  - **Çift Modlu Doküman Görüntüleme Deneyimi (Modal & Bağımsız Sayfa)**:
+    - LogSeal arayüzünden ayrılmadan kılavuzları inceleme imkanı tanıyan `#modal-doc-viewer` modalı eklendi; tek tıkla kod kopyalama, doğrudan `.md` indirme ve yeni sekmede açma desteği sunuldu.
+    - `/api/v1/docs/view` uç noktası koyu/açık tema değiştirici, yazdırma/PDF desteği (`window.print()`) ve ham metin seçeneği (`?raw=true`) içeren bağımsız bir doküman okuyucusuna dönüştürüldü.
+
 - **v1.7.7** (Yalnızca Kenar Çubuğu Yardım Menüsü, Doğrudan Markdown Doküman İndirmeleri & Kiracı Marka Logosu Yükleme):
   - **Doğrudan Markdown Dokümantasyon İndirme ve Görüntüleme Uç Noktaları**:
     - Kullanıcıların Markdown kılavuzlarını (`STANDALONE_INSTALL.md`, `PORT_SPECIFICATIONS.md`, `HELP.md`, `MITRE_ATTACK_GUIDE.md` vb.) güvenli şekilde doğrudan bilgisayarlarına indirebilmesi (`Content-Disposition: attachment`) ve tarayıcıda inceleyebilmesi için `/api/v1/docs/download` ve `/api/v1/docs/view` uç noktaları geliştirildi.

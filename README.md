@@ -265,6 +265,16 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.7.8** (Rich Markdown Documentation Viewer & Table Rendering Engine):
+  - **Offline-First Markdown Parser & Typography Engine**:
+    - Vendored lightweight, offline-compatible `marked.min.js` (v15.0.12) to ensure 100% air-gapped on-premise SIEM documentation rendering without external CDN dependencies.
+    - Designed full Markdown typography system featuring `Plus Jakarta Sans` for body text, `JetBrains Mono` for code blocks, optimized line heights (`line-height: 1.75`), paragraph margins, blockquotes, and hierarchical heading border accents.
+  - **Pixel-Perfect Responsive Table Rendering**:
+    - Added automated `.table-responsive` wrapping for all Markdown tables with horizontal scrolling, elevated dark headers (`#111827`), cyan border dividers, zebra row striping (`rgba(255, 255, 255, 0.02)`), and hover highlights (`rgba(59, 130, 246, 0.08)`).
+  - **Dual Document Viewing Experience (Modal & Standalone)**:
+    - Integrated in-app `#modal-doc-viewer` allowing immediate in-dashboard documentation reading, one-click code copying, direct `.md` downloading, and "Open in New Tab" navigation.
+    - Upgraded `/api/v1/docs/view` into a rich standalone document page complete with dark/light theme switching, print media styling (`window.print()`), and raw fallback (`?raw=true`).
+
 - **v1.7.7** (Sidebar-Only Help Navigation, Direct Markdown Document Downloads & Multi-Tenant Branding Logo Customization):
   - **Direct Markdown Documentation Download & Inline View Endpoints**:
     - Implemented secure documentation endpoints (`/api/v1/docs/download` and `/api/v1/docs/view`) with sanitized filename resolution to reliably serve and download Markdown guides (`STANDALONE_INSTALL.md`, `PORT_SPECIFICATIONS.md`, `HELP.md`, `MITRE_ATTACK_GUIDE.md`, etc.) with `Content-Disposition: attachment`.

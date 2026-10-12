@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.7</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.7.8</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -2174,7 +2174,7 @@
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.7</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.7.8</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -4381,9 +4381,9 @@
                         <span data-i18n="lbl_docs_files">Detaylı dokümantasyon dosyaları:</span> <code>docs/PORT_SPECIFICATIONS.md</code>, <code>docs/HELP.md</code> &amp; <code>STANDALONE_INSTALL.md</code>
                     </div>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; cursor: pointer;" onclick="showDocsTab('baremetal')" data-i18n="link_baremetal_md">🖥️ Bare-Metal Kurulum (MD)</button>
-                        <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; cursor: pointer;" onclick="showDocsTab('ports')" data-i18n="link_ports_md">📄 Port Spesifikasyonu (MD)</button>
-                        <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; cursor: pointer;" onclick="showDocsTab('help')" data-i18n="link_help_md">📖 Yardım Kılavuzu (MD)</button>
+                        <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; cursor: pointer;" onclick="viewDocInline('STANDALONE_INSTALL.md')" data-i18n="link_baremetal_md">🖥️ Bare-Metal Kurulum (MD)</button>
+                        <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; cursor: pointer;" onclick="viewDocInline('PORT_SPECIFICATIONS.md')" data-i18n="link_ports_md">📄 Port Spesifikasyonu (MD)</button>
+                        <button class="btn btn-outline" style="font-size: 12px; padding: 4px 10px; cursor: pointer;" onclick="viewDocInline('HELP.md')" data-i18n="link_help_md">📖 Yardım Kılavuzu (MD)</button>
                     </div>
                 </div>
             </div>
@@ -4393,7 +4393,51 @@
         </div>
     </div>
 
-    <script src="/static/js/translations.js?v=1.7.7"></script>
-    <script src="/static/js/app.js?v=1.7.7"></script>
+    <!-- MODAL: Markdown Documentation Viewer -->
+    <div class="modal-backdrop" id="modal-doc-viewer" style="display: none;">
+        <div class="modal modal-wide" style="max-width: 1040px; width: 95%; max-height: 92vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; padding: 14px 20px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 6px 10px; font-size: 1.25rem;">📄</div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h3 style="margin: 0; font-size: 1.15rem; color: var(--text-main);" id="doc-viewer-modal-title">STANDALONE_INSTALL.md</h3>
+                            <span class="badge badge-primary" style="font-size: 10px; font-family: var(--font-mono);">MARKDOWN</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" data-i18n="doc_viewer_subtitle">Valtrivo LogSeal Dokümantasyon Kılavuzu</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="btn btn-outline" id="btn-doc-viewer-newtab" style="font-size: 12px; padding: 6px 12px;" onclick="openCurrentDocInNewTab()" title="Yeni Sekmede Aç">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; vertical-align: middle;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        <span data-i18n="btn_open_new_tab">Yeni Sekmede Aç</span>
+                    </button>
+                    <button class="btn btn-primary" id="btn-doc-viewer-download" style="font-size: 12px; padding: 6px 12px;" onclick="downloadCurrentDoc()" title="İndir (.md)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span data-i18n="btn_download_md">İndir (.md)</span>
+                    </button>
+                    <button class="btn-close" onclick="closeDocViewerModal()">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding: 24px; overflow-y: auto; flex: 1; display: block; background: var(--bg-surface);">
+                <div id="doc-viewer-modal-content" class="markdown-body">
+                    <div style="text-align: center; padding: 50px 20px; color: var(--text-muted);">
+                        <span class="live-dot" style="display: inline-block; margin-right: 8px;"></span>
+                        <span data-i18n="lbl_doc_loading">Doküman yükleniyor...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; flex-shrink: 0; background: var(--bg-surface-elevated); border-top: 1px solid var(--border-color);">
+                <div style="font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono);" id="doc-viewer-footer-path">
+                    docs/STANDALONE_INSTALL.md
+                </div>
+                <button class="btn btn-outline" onclick="closeDocViewerModal()" data-i18n="btn_close">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/marked.min.js?v=1.7.8"></script>
+    <script src="/static/js/translations.js?v=1.7.8"></script>
+    <script src="/static/js/app.js?v=1.7.8"></script>
 </body>
 </html>

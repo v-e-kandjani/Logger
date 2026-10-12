@@ -7708,6 +7708,11 @@ function copyBaremetalCommands() {
     }
 }
 
+// ==========================================
+// Documentation Viewer & Markdown Rendering
+// ==========================================
+let currentViewingDoc = '';
+
 function downloadDoc(fileName) {
     if (!fileName) return;
     const cleanName = encodeURIComponent(fileName);
@@ -7716,20 +7721,123 @@ function downloadDoc(fileName) {
 
 function viewDocInline(fileName) {
     if (!fileName) return;
-    const cleanName = encodeURIComponent(fileName);
-    window.open(`/api/v1/docs/view?file=${cleanName}`, '_blank');
+    openDocViewerModal(fileName);
+}
+
+function openDocViewerModal(fileName) {
+    currentViewingDoc = fileName;
+    const modal = document.getElementById('modal-doc-viewer');
+    if (!modal) {
+        window.open(`/api/v1/docs/view?file=${encodeURIComponent(fileName)}`, '_blank');
+        return;
+    }
+    const titleEl = document.getElementById('doc-viewer-modal-title');
+    const pathEl = document.getElementById('doc-viewer-footer-path');
+    const contentEl = document.getElementById('doc-viewer-modal-content');
+    if (titleEl) titleEl.textContent = fileName;
+    if (pathEl) pathEl.textContent = 'docs/' + fileName;
+    if (contentEl) {
+        const loadingText = (typeof t === 'function' ? t('lbl_doc_loading') : null) || 'Doküman yükleniyor...';
+        contentEl.innerHTML = `<div style="text-align: center; padding: 50px 20px; color: var(--text-muted);"><span class="live-dot" style="display:inline-block; margin-right:8px;"></span> ${loadingText}</div>`;
+    }
+    modal.style.display = 'flex';
+
+    fetch(`/api/v1/docs/view?file=${encodeURIComponent(fileName)}&raw=true`)
+        .then(res => {
+            if (!res.ok) throw new Error('Doküman alınamadı (' + res.status + ')');
+            return res.text();
+        })
+        .then(md => {
+            renderMarkdownInto(contentEl, md);
+        })
+        .catch(err => {
+            if (contentEl) {
+                contentEl.innerHTML = `<div class="alert alert-danger" style="margin: 20px 0;"><strong>Hata:</strong> ${err.message}</div>`;
+            }
+        });
+}
+
+function closeDocViewerModal() {
+    const modal = document.getElementById('modal-doc-viewer');
+    if (modal) modal.style.display = 'none';
+}
+
+function openCurrentDocInNewTab() {
+    if (!currentViewingDoc) return;
+    window.open(`/api/v1/docs/view?file=${encodeURIComponent(currentViewingDoc)}`, '_blank');
+}
+
+function downloadCurrentDoc() {
+    if (!currentViewingDoc) return;
+    downloadDoc(currentViewingDoc);
+}
+
+function renderMarkdownInto(container, md) {
+    if (!container) return;
+    if (window.marked && typeof window.marked.parse === 'function') {
+        container.innerHTML = window.marked.parse(md);
+    } else {
+        container.innerHTML = '<pre style="white-space: pre-wrap; font-family: var(--font-mono);">' + 
+            md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + 
+            '</pre>';
+        return;
+    }
+
+    // Wrap tables in .table-responsive for seamless scrolling
+    container.querySelectorAll('table').forEach(table => {
+        if (!table.parentElement.classList.contains('table-responsive')) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'table-responsive';
+            table.parentNode.insertBefore(wrapper, table);
+            wrapper.appendChild(table);
+        }
+    });
+
+    // Wrap pre code blocks with code header and copy button
+    container.querySelectorAll('pre').forEach(pre => {
+        if (!pre.parentElement.classList.contains('code-block-wrapper')) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'code-block-wrapper';
+            const header = document.createElement('div');
+            header.className = 'code-block-header';
+            const code = pre.querySelector('code');
+            let lang = 'CODE';
+            if (code && code.className) {
+                const m = code.className.match(/language-([a-zA-Z0-9_-]+)/);
+                if (m) lang = m[1].toUpperCase();
+            }
+            const copyLabel = (typeof t === 'function' ? t('btn_copy') : null) || 'Kopyala';
+            header.innerHTML = `<span>${lang}</span><button class="btn-copy-code" onclick="copyDocCode(this)">📋 ${copyLabel}</button>`;
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(header);
+            wrapper.appendChild(pre);
+        }
+    });
+}
+
+function copyDocCode(btn) {
+    const pre = btn.closest('.code-block-wrapper')?.querySelector('pre');
+    if (!pre) return;
+    navigator.clipboard.writeText(pre.innerText).then(() => {
+        const orig = btn.textContent;
+        const copiedLabel = (typeof t === 'function' ? t('lbl_copied') : null) || 'Kopyalandı!';
+        btn.textContent = '✓ ' + copiedLabel;
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+    }).catch(() => {
+        btn.textContent = 'Hata!';
+    });
 }
 
 function showDocsTab(docType) {
     closePortsHelpModal();
     if (docType === 'baremetal') {
-        downloadDoc('STANDALONE_INSTALL.md');
+        viewDocInline('STANDALONE_INSTALL.md');
     } else if (docType === 'ports') {
-        downloadDoc('PORT_SPECIFICATIONS.md');
+        viewDocInline('PORT_SPECIFICATIONS.md');
     } else if (docType === 'mitre') {
-        downloadDoc('MITRE_ATTACK_GUIDE.md');
+        viewDocInline('MITRE_ATTACK_GUIDE.md');
     } else {
-        downloadDoc('HELP.md');
+        viewDocInline('HELP.md');
     }
 }
 

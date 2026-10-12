@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	DefaultVersion   = "v1.7.7"
+	DefaultVersion   = "v1.7.8"
 	DefaultBuildDate = "2026-10-12"
-	DefaultCommitSHA = "af3ae51"
+	DefaultCommitSHA = "ce7353a"
 )
 
 var (

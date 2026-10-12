@@ -282,7 +282,7 @@ fi
 
 # Determine version metadata
 COMMIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "00fe77a")
-CURRENT_VER=$(grep -E 'Version\s*=\s*' internal/version/version.go 2>/dev/null | cut -d'"' -f2 || echo "v1.7.7")
+CURRENT_VER=$(grep -E 'Version\s*=\s*' internal/version/version.go 2>/dev/null | cut -d'"' -f2 || echo "v1.7.8")
 BUILD_DATE=$(date +%Y-%m-%d)
 
 # Create directory structure
