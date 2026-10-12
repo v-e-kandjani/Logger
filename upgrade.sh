@@ -50,8 +50,9 @@ CH_DB="${CLICKHOUSE_DATABASE:-syslog}"
 CH_USER="${CLICKHOUSE_USER:-default}"
 INSTALL_DIR="/opt/syslog-platform"
 
-# Detect or parse deployment mode (--docker or --baremetal)
+# Detect or parse deployment mode (--docker or --baremetal) and flags
 DEPLOY_MODE="auto"
+FORCE_REBUILD=false
 for arg in "$@"; do
     case "$arg" in
         --baremetal|--bare-metal)
@@ -60,8 +61,11 @@ for arg in "$@"; do
         --docker)
             DEPLOY_MODE="docker"
             ;;
+        --force|-f|--yes|-y)
+            FORCE_REBUILD=true
+            ;;
         --help|-h)
-            echo "Usage: sudo bash upgrade.sh [--docker | --baremetal]"
+            echo "Usage: sudo bash upgrade.sh [--docker | --baremetal] [--force]"
             exit 0
             ;;
     esac
@@ -127,11 +131,18 @@ REMOTE_HASH=$(git rev-parse origin/main)
 
 if [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
     success "Local repository is already up to date with origin/main (${PREV_COMMIT})."
-    echo ""
-    read -rp "Force rebuild anyway? [y/N]: " force_rebuild
-    if [[ ! "$force_rebuild" =~ ^[Yy] ]]; then
-        info "Upgrade process finished. No changes required."
+    if [ "$FORCE_REBUILD" = "true" ]; then
+        info "Proceeding with force rebuild (--force specified)."
+    elif [ ! -t 0 ]; then
+        info "Running in non-interactive environment and repository is up to date. Exiting."
         exit 0
+    else
+        echo ""
+        read -rp "Force rebuild anyway? [y/N]: " force_rebuild
+        if [[ ! "$force_rebuild" =~ ^[Yy] ]]; then
+            info "Upgrade process finished. No changes required."
+            exit 0
+        fi
     fi
 else
     git pull origin main
