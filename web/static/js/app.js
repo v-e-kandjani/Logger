@@ -7631,7 +7631,12 @@ async function loadReportIncidents() {
 // Network Ports & Architecture Guide Modal Controller
 function openPortsHelpModal() {
     const modal = document.getElementById('ports-help-modal');
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+        if (window.i18n && typeof window.i18n.applyTranslations === 'function') {
+            window.i18n.applyTranslations();
+        }
+        modal.style.display = 'flex';
+    }
 }
 
 function closePortsHelpModal() {
@@ -7641,9 +7646,12 @@ function closePortsHelpModal() {
 
 function copyPortsFirewallUFW() {
     const cmd = "sudo ufw allow 22/tcp && sudo ufw allow 8443/tcp && sudo ufw allow 8080/tcp && sudo ufw allow 514/udp && sudo ufw allow 514/tcp && sudo ufw allow 5514/udp && sudo ufw allow 5514/tcp && sudo ufw allow 6514/tcp";
+    const block = document.getElementById('ports-firewall-code-block');
+    if (block) block.innerHTML = `<code>${cmd}</code>`;
     if (navigator.clipboard) {
         navigator.clipboard.writeText(cmd).then(() => {
-            showToast('✓ UFW Firewall commands copied to clipboard!', 'success');
+            const msg = (window.i18n && window.i18n.t('toast_ufw_copied')) || '✓ UFW Firewall commands copied to clipboard!';
+            showToast(msg, 'success');
         }).catch(() => {
             showToast('Please copy the command manually.', 'info');
         });
@@ -7654,9 +7662,12 @@ function copyPortsFirewallUFW() {
 
 function copyPortsFirewallFirewalld() {
     const cmd = "sudo firewall-cmd --permanent --add-port=8443/tcp --add-port=8080/tcp --add-port=514/udp --add-port=514/tcp --add-port=5514/udp --add-port=5514/tcp --add-port=6514/tcp && sudo firewall-cmd --reload";
+    const block = document.getElementById('ports-firewall-code-block');
+    if (block) block.innerHTML = `<code>${cmd}</code>`;
     if (navigator.clipboard) {
         navigator.clipboard.writeText(cmd).then(() => {
-            showToast('✓ Firewalld commands copied to clipboard!', 'success');
+            const msg = (window.i18n && window.i18n.t('toast_firewalld_copied')) || '✓ Firewalld commands copied to clipboard!';
+            showToast(msg, 'success');
         }).catch(() => {
             showToast('Please copy the command manually.', 'info');
         });
@@ -7667,14 +7678,28 @@ function copyPortsFirewallFirewalld() {
 
 function copyBaremetalCommands() {
     const cmd = "sudo systemctl status syslog-platform && sudo journalctl -u syslog-platform -f";
+    const block = document.getElementById('ports-firewall-code-block');
+    if (block) block.innerHTML = `<code>${cmd}</code>`;
     if (navigator.clipboard) {
         navigator.clipboard.writeText(cmd).then(() => {
-            showToast('✓ Bare-metal systemd commands copied to clipboard!', 'success');
+            const msg = (window.i18n && window.i18n.t('toast_baremetal_copied')) || '✓ Bare-metal systemd commands copied to clipboard!';
+            showToast(msg, 'success');
         }).catch(() => {
             showToast('Please copy the command manually.', 'info');
         });
     } else {
         showToast('Clipboard access unavailable.', 'info');
+    }
+}
+
+function showDocsTab(docType) {
+    closePortsHelpModal();
+    if (docType === 'baremetal') {
+        window.open('/STANDALONE_INSTALL.md', '_blank');
+    } else if (docType === 'ports') {
+        window.open('/docs/PORT_SPECIFICATIONS.md', '_blank');
+    } else {
+        window.open('/docs/HELP.md', '_blank');
     }
 }
 

@@ -265,6 +265,17 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.7.6** (Network Ports Modal Visibility Bugfix & Complete Bilingual Localization):
+  - **Fixed Collapsed Section 1 & Section 2 Ingestion/Database Port Tables**:
+    - Resolved WebKit/Chromium flex column layout bug where `.table-container` and `<pre>` elements with `overflow-x: auto` collapsed to 0 height inside `.modal-body` flexbox.
+    - Set `#ports-help-modal .modal-body` to explicit `display: block`, ensuring standard block formatting context, full table visibility, explicit cell padding, responsive width (`min-width: 680px`), and clean scrollable tables.
+    - Added multiline word-wrap to Section 4 firewall/service commands code block (`#ports-firewall-code-block`).
+  - **Comprehensive Bilingual Localization (TR & EN) for Network Ports Guide**:
+    - Added complete English and Turkish translation keys across the entire modal: subtitle, dual-engine security architecture alert, section titles, table column headers, port service descriptions, direction badges, proxy node ingress/egress cards, firewall action buttons, and documentation links.
+    - Connected `openPortsHelpModal()` with `window.i18n.applyTranslations()` to guarantee instant reactive translation when switching between English (`🇬🇧 EN`) and Turkish (`🇹🇷 TR`).
+  - **Updated Installers & Scripts Version References**:
+    - Synced version strings to `v1.7.6` across `internal/version/version.go`, `upgrade.sh`, `install_standalone.sh`, and `scripts/install_standalone.sh`.
+
 - **v1.7.5** (Unified Bare-Metal & Docker Support, Native Systemd Auto-Detection, Standalone Port Isolation & In-Place Self-Updates):
   - **Unified Dual-Architecture CLI Upgrade Engine (`upgrade.sh`)**:
     - Automatically detects whether the deployment is running under Docker Compose or Bare-Metal Linux (`syslog-platform.service` under systemd).

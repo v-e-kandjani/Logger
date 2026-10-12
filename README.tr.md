@@ -254,6 +254,17 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.7.6** (Ağ Portları Modalı Görünürlük Düzeltmesi ve Eksiksiz Çift Dilli Yerelleştirme):
+  - **Bölüm 1 ve Bölüm 2 Port Tablolarının Çökme Sorununun Giderilmesi**:
+    - WebKit/Chromium tarayıcılarında flex sütun kapsayıcısı içindeki `overflow-x: auto` öğelerinin (tablo ve kod blokları) 0 yüksekliğe çökmesine yol açan flexbox hesaplama sorunu giderildi.
+    - `#ports-help-modal .modal-body` öğesine açık `display: block` tanımlandı; tabloların tam görünürlüğü, net hücre aralıkları, duyarlı genişlik (`min-width: 680px`) ve kaydırma güvenliği sağlandı.
+    - Bölüm 4 güvenlik duvarı ve servis komutları önizleme alanına çok satırlı metin sarma eklendi (`#ports-firewall-code-block`).
+  - **Ağ Portları Kılavuzu İçin Eksiksiz Çift Dilli (TR & EN) Yerelleştirme**:
+    - Modal içerisindeki tüm başlıklar, alt başlıklar, çift motorlu güvenlik mimarisi uyarı kutusu, tablo sütun başlıkları, port servis açıklamaları, yön etiketleri, proxy düğüm LAN/WAN kartları, butonlar ve dokümantasyon bağlantıları için Türkçe ve İngilizce sözlük anahtarları eklendi.
+    - `openPortsHelpModal()` fonksiyonu `window.i18n.applyTranslations()` ile entegre edilerek `🇬🇧 EN` ve `🇹🇷 TR` dil seçimlerinde modalın anında dinamik olarak çevrilmesi sağlandı.
+  - **Kurulum ve Güncelleme Betiklerinin Sürüm Senkronizasyonu**:
+    - `internal/version/version.go`, `upgrade.sh`, `install_standalone.sh` ve `scripts/install_standalone.sh` dosyalarındaki sürüm referansları `v1.7.6` olarak güncellendi.
+
 - **v1.7.5** (Bütünleşik Bare-Metal ve Docker Desteği, Yerel Systemd Otomatik Algılama, Port İzolasyonu ve Yerinde Güncelleme):
   - **Bütünleşik Çift Mimarili CLI Güncelleme Motoru (`upgrade.sh`)**:
     - Kurulumun Docker Compose mu yoksa doğrudan fiziksel/sanal Linux (Bare-Metal `syslog-platform.service`) üzerinde mi çalıştığını otomatik olarak algılar.
