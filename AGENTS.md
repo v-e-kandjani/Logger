@@ -30,6 +30,15 @@ Whenever code, configuration, templates, or scripts in this project are modified
   docker compose build syslog-app && docker compose up -d
   ```
 
+## 4. Deployment Server (10.34.33.40)
+- **Target Host**: `10.34.33.40`
+- **Username**: `Logger`
+- **Update & Deploy Command**:
+  ```bash
+  git pull origin main
+  docker compose build syslog-app && docker compose up -d
+  ```
+
 ---
 
 ## 5. Architectural Standards & Cross-Project Synergy
