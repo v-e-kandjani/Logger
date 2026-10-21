@@ -7,13 +7,13 @@ import (
 )
 
 const (
-	DefaultVersion   = "v1.8.0"
+	DefaultVersion   = "v1.8.1"
 	DefaultBuildDate = "2026-10-21"
 	DefaultCommitSHA = "324f698"
 )
 
 var (
-	Version   = "v1.8.0"
+	Version   = "v1.8.1"
 	BuildDate = "2026-10-21"
 	CommitSHA = "324f698"
 	Platform  = "Valtrivo LogSeal"

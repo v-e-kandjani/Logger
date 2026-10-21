@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=3.3">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=3.4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.0</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.1</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -896,9 +896,88 @@
                             </select>
                             <button class="btn btn-secondary" id="btn-ep-agents-filter-apply">Filtrele</button>
                         </div>
-                        <div style="display: flex; gap: 8px;">
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                             <button class="btn btn-outline" id="btn-ep-agents-refresh" onclick="loadEndpointAgents()">🔄 Yenile</button>
+                            <button class="btn btn-outline" id="btn-ep-quick-steps-toggle" onclick="toggleQuickStepCard()" style="border-color: rgba(59, 130, 246, 0.4); color: var(--accent);">
+                                <span data-i18n="btn_quick_step_guide">⚡ 3 Adımda Hızlı Kurulum</span>
+                            </button>
                             <button class="btn btn-primary" id="btn-ep-open-token-modal" onclick="openNewTokenModal()" data-i18n="btn_new_token">+ Yeni Kurulum Belirteci</button>
+                        </div>
+                    </div>
+
+                    <!-- QUICK STEP-BY-STEP INSTALLATION BANNER -->
+                    <div class="panel" id="ep-quick-step-card" style="padding: 16px 20px; margin-bottom: 20px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(16, 185, 129, 0.03) 100%); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 18px;">⚡</span>
+                                <div>
+                                    <h4 style="margin: 0; font-size: 13.5px; font-weight: 700; color: var(--text-main);" data-i18n="lbl_quick_step_title">Uç Noktalara Ajan Kurulumu: 3 Kolay Adım</h4>
+                                    <span style="font-size: 11.5px; color: var(--text-muted);" data-i18n="lbl_quick_step_sub">Uç noktanıza göre platformu seçin, komutu yapıştırın, panoda doğrulayın.</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <button class="ep-quick-platform-btn active" data-quick-platform="windows" onclick="switchQuickPlatform('windows')">🪟 Windows</button>
+                                <button class="ep-quick-platform-btn" data-quick-platform="macos" onclick="switchQuickPlatform('macos')">🍏 macOS</button>
+                                <button class="ep-quick-platform-btn" data-quick-platform="linux" onclick="switchQuickPlatform('linux')">🐧 Linux</button>
+                                <button class="btn-close" onclick="toggleQuickStepCard()" title="Gizle" style="margin-left: 8px;">&times;</button>
+                            </div>
+                        </div>
+
+                        <!-- 3 Step Cards Grid -->
+                        <div class="ep-quick-steps-grid">
+                            <!-- Step 1 -->
+                            <div class="ep-quick-step-item">
+                                <div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                        <span class="ep-step-badge">1</span>
+                                        <strong style="font-size: 12.5px;" id="quick-step1-title">Yönetici PowerShell Açın</strong>
+                                    </div>
+                                    <p style="font-size: 11.5px; color: var(--text-muted); margin: 0; line-height: 1.5;" id="quick-step1-desc">
+                                        Windows Başlat menüsüne sağ tıklayın &gt; <strong>Windows PowerShell (Yönetici)</strong> seçeneğini çalıştırın.
+                                    </p>
+                                </div>
+                                <div style="margin-top: 10px; font-size: 11px; color: var(--accent); font-family: var(--font-mono);" id="quick-step1-hint">
+                                    Yetki: Administrator
+                                </div>
+                            </div>
+
+                            <!-- Step 2 -->
+                            <div class="ep-quick-step-item" style="border-color: rgba(59, 130, 246, 0.35);">
+                                <div>
+                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                                        <div style="display: flex; align-items: center;">
+                                            <span class="ep-step-badge">2</span>
+                                            <strong style="font-size: 12.5px;" id="quick-step2-title" data-i18n="lbl_quick_step2_title">Komutu Kopyalayıp Çalıştırın</strong>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline" onclick="copyQuickStepCmd()" style="padding: 2px 8px; font-size: 11px;">📋 Kopyala</button>
+                                    </div>
+                                    <div class="ep-code-box" style="margin: 4px 0; max-height: 60px; padding: 8px 10px;">
+                                        <pre id="quick-step-cmd-box" style="font-size: 11px;">Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr -useb http://localhost:8080/static/scripts/install-agent.ps1 -OutFile "$env:TEMP\install-agent.ps1"; &amp; "$env:TEMP\install-agent.ps1" -Server "http://localhost:8080" -Token "&lt;TOKEN&gt;"</pre>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted);" id="quick-step2-desc">
+                                    Otomatik olarak arka plan servisi kurulur ve başlatılır.
+                                </div>
+                            </div>
+
+                            <!-- Step 3 -->
+                            <div class="ep-quick-step-item">
+                                <div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                        <span class="ep-step-badge" style="background: var(--success); box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);">3</span>
+                                        <strong style="font-size: 12.5px;" id="quick-step3-title" data-i18n="lbl_quick_step3_title">Durumu Doğrulayın</strong>
+                                    </div>
+                                    <p style="font-size: 11.5px; color: var(--text-muted); margin: 0 0 8px 0; line-height: 1.5;" id="quick-step3-sub">
+                                        Uç noktada servis kontrol komutunu çalıştırın:
+                                    </p>
+                                    <div class="ep-code-box" style="margin: 0; padding: 6px 10px;">
+                                        <pre id="quick-step3-verify" style="font-size: 11px;">Get-Service LoggerAgent</pre>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 8px; font-size: 11px; color: var(--success); font-weight: 500;" id="quick-step3-desc">
+                                    ✓ Aşağıdaki tabloda yeşil (Online) görünür.
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -2818,7 +2897,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.0</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.1</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -5243,8 +5322,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.8.0"></script>
-    <script src="/static/js/translations.js?v=1.8.0"></script>
-    <script src="/static/js/app.js?v=1.8.0"></script>
+    <script src="/static/js/marked.min.js?v=1.8.1"></script>
+    <script src="/static/js/translations.js?v=1.8.1"></script>
+    <script src="/static/js/app.js?v=1.8.1"></script>
 </body>
 </html>

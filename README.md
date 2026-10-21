@@ -265,6 +265,18 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.8.1** (Interactive 3-Step Endpoint Installation Guide & Decoupled Native Agent Versioning):
+  - **Quick Step-by-Step Installation UI**:
+    - Added interactive 3-step setup banner (`#ep-quick-step-card`) directly above the Agents table with live platform toggles for Windows, macOS, and Linux.
+    - Dynamically generates one-liner deployment commands injected with the active enrollment token and central server address.
+    - Provides instant terminal copy shortcuts, privilege prerequisites (Admin/Root), and endpoint verification commands (`Get-Service LoggerAgent`, `launchctl`, `systemctl`).
+  - **Standalone Native Agent Versioning**:
+    - Decoupled `logger-agent` semantic versioning (`v0.1.0`) with independent build date and commit SHA tracking under `agent/internal/version/version.go`.
+    - Added CLI version inspection flags (`-version`, `-v`) and User-Agent telemetry (`LOGGER-Agent/vX.Y.Z`).
+  - **Production Endpoint Installers & Manuals**:
+    - Released official bash installer `install-agent.sh` for Linux (systemd) / macOS (launchd) and PowerShell installer `install-agent.ps1` for Windows services.
+    - Published official documentation manuals `docs/AGENT_INSTALLATION.md` and `docs/AGENT_INSTALLATION.tr.md`.
+
 - **v1.8.0** (Endpoint Security Subsystem & Cross-Platform LOGGER Agent - Phase A):
   - **Cross-Platform LOGGER Agent Daemon**:
     - Introduced standalone, lightweight native agent daemon (`agent/cmd/logger-agent`) with stable UUID generation, persistent host fingerprinting, outbound HTTPS/HTTP2 transport, and jittered heartbeat scheduling.

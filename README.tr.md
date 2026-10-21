@@ -254,6 +254,18 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.8.1** (Etkileşimli 3 Adımda Uç Nokta Kurulum Rehberi & Bağımsız Yerel Ajan Sürümleme):
+  - **Uygulama İçi 3 Adımda Hızlı Kurulum Arayüzü**:
+    - Ajanlar tablosunun hemen üzerine Windows, macOS ve Linux işletim sistemleri için dinamik platform seçicili 3 adımlı hızlı kurulum paneli (`#ep-quick-step-card`) eklendi.
+    - Seçili aktif kayıt belirteci ve sunucu adresiyle otomatik hazırlanan tek satırlık indirme ve kurulum komutları üretir.
+    - Tek tıkla komut kopyalama, gerekli yetki seviyeleri (Administrator / Root) ve servis doğrulama komutları (`Get-Service LoggerAgent`, `launchctl`, `systemctl`) sunar.
+  - **Bağımsız Yerel Ajan Sürümleme Modeli**:
+    - `logger-agent` ajan servisi için `agent/internal/version/version.go` altında bağımsız anlamsal sürümleme (`v0.1.0`), derleme tarihi ve commit takibi yapılandırıldı.
+    - CLI sürüm parametreleri (`-version`, `-v`) ve HTTP User-Agent telemetrisi (`LOGGER-Agent/vX.Y.Z`) eklendi.
+  - **Resmi Uç Nokta Kurulum Betikleri & Kılavuzlar**:
+    - Linux (systemd) ve macOS (launchd) için `install-agent.sh`, Windows servisleri için `install-agent.ps1` resmi kurulum betikleri yayınlandı.
+    - Sistem içi Markdown kılavuzları `docs/AGENT_INSTALLATION.md` ve `docs/AGENT_INSTALLATION.tr.md` hazırlandı.
+
 - **v1.8.0** (Uç Nokta Güvenlik Alt Sistemi & Çok Platformlu LOGGER Ajanı - Aşama A):
   - **Çok Platformlu LOGGER Ajan Arka Plan Servisi (Daemon)**:
     - Bağımsız, hafif ve Go tabanlı yerel ajan servisi (`agent/cmd/logger-agent`) geliştirildi; kalıcı ve kararlı UUID oluşturma, donanım parmak izi, giden yönlü (outbound) HTTPS/HTTP2 iletişimi ve rastgele sapmalı (jittered) kalp atışı zamanlayıcısı eklendi.

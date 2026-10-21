@@ -8071,6 +8071,7 @@ function switchEndpointSubSection(targetId) {
 
     if (targetId === 'endpoint-sec-agents') {
         loadEndpointAgents();
+        if (typeof switchQuickPlatform === 'function') switchQuickPlatform(currentQuickPlatform);
     } else if (targetId === 'endpoint-sec-tokens') {
         loadEndpointTokens();
     } else if (targetId === 'endpoint-sec-dashboard') {
@@ -8303,6 +8304,14 @@ async function loadEndpointTokens() {
                 tokens.filter(t => !t.revoked_at).map(t => `<option value="${escapeHtml(t.token_prefix)}...">🔑 ${escapeHtml(t.name)} (${escapeHtml(t.token_prefix)}...)</option>`).join('');
             if (curVal && curVal !== '<TOKEN>') select.value = curVal;
         }
+
+        if (tokens && tokens.length > 0 && activeQuickToken === '<TOKEN>') {
+            const firstActive = tokens.find(t => !t.revoked_at);
+            if (firstActive) {
+                activeQuickToken = `${firstActive.token_prefix}...`;
+                switchQuickPlatform(currentQuickPlatform);
+            }
+        }
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 20px; color: var(--danger);">${escapeHtml(err.message)}</td></tr>`;
     }
@@ -8369,6 +8378,7 @@ async function submitCreateToken() {
 }
 
 function updateQuickInstallCommandTokens(token) {
+    activeQuickToken = token;
     const host = window.location.origin;
     const linEl = document.getElementById('ep-code-linux');
     if (linEl) {
@@ -8377,6 +8387,9 @@ function updateQuickInstallCommandTokens(token) {
     const winEl = document.getElementById('ep-code-windows');
     if (winEl) {
         winEl.textContent = `iwr -useb ${host}/static/scripts/install-agent.ps1 | iex; Start-LoggerAgent -Token "${token}" -Server "${host}"`;
+    }
+    if (typeof switchQuickPlatform === 'function') {
+        switchQuickPlatform(currentQuickPlatform);
     }
 }
 
@@ -8473,7 +8486,13 @@ function initEndpointGuide() {
 
     const tokenSelect = document.getElementById('guide-token-select');
     if (tokenSelect) {
-        tokenSelect.onchange = () => syncGuideCommands();
+        tokenSelect.onchange = () => {
+            if (tokenSelect.value) {
+                activeQuickToken = tokenSelect.value;
+                if (typeof switchQuickPlatform === 'function') switchQuickPlatform(currentQuickPlatform);
+            }
+            syncGuideCommands();
+        };
     }
     if (serverUrlInput) {
         serverUrlInput.oninput = () => syncGuideCommands();
@@ -8603,6 +8622,101 @@ function updateModalTokenCommands() {
     const doc = document.getElementById('modal-token-cmd-docker');
     if (doc) doc.textContent = `docker run -d --name logger-agent --restart unless-stopped --net=host --pid=host -v /etc/logger-agent:/etc/logger-agent logger-agent:latest -server "${serverUrl}" -token "${token}"`;
 }
+
+// Quick 3-Step Agent Installation Banner Logic
+let currentQuickPlatform = 'windows';
+let activeQuickToken = '<TOKEN>';
+
+function toggleQuickStepCard() {
+    const card = document.getElementById('ep-quick-step-card');
+    if (!card) return;
+    const isHidden = card.style.display === 'none';
+    card.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+        switchQuickPlatform(currentQuickPlatform);
+    }
+}
+
+function switchQuickPlatform(platform) {
+    currentQuickPlatform = platform || 'windows';
+
+    // Update active state on platform switcher buttons
+    document.querySelectorAll('.ep-quick-platform-btn').forEach(btn => {
+        if (btn.getAttribute('data-quick-platform') === currentQuickPlatform) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    const isEn = (window.i18n && window.i18n.currentLang === 'en') || localStorage.getItem('logseal_lang') === 'en';
+    const serverUrl = window.location.origin.replace(/\/$/, '');
+    const token = activeQuickToken || '<TOKEN>';
+
+    const s1Title = document.getElementById('quick-step1-title');
+    const s1Desc = document.getElementById('quick-step1-desc');
+    const s1Hint = document.getElementById('quick-step1-hint');
+    const s2Title = document.getElementById('quick-step2-title');
+    const s2Desc = document.getElementById('quick-step2-desc');
+    const cmdBox = document.getElementById('quick-step-cmd-box');
+    const s3Title = document.getElementById('quick-step3-title');
+    const s3Sub = document.getElementById('quick-step3-sub');
+    const verifyBox = document.getElementById('quick-step3-verify');
+    const s3Desc = document.getElementById('quick-step3-desc');
+
+    if (currentQuickPlatform === 'windows') {
+        if (s1Title) s1Title.textContent = isEn ? 'Open PowerShell as Administrator' : 'Yönetici PowerShell Açın';
+        if (s1Desc) s1Desc.innerHTML = isEn ? 'Right-click the Windows Start button &gt; select <strong>Windows PowerShell (Admin)</strong> or <strong>Terminal (Admin)</strong>.' : 'Windows Başlat menüsüne sağ tıklayın &gt; <strong>Windows PowerShell (Yönetici)</strong> veya <strong>Terminal (Yönetici)</strong> seçeneğini çalıştırın.';
+        if (s1Hint) s1Hint.textContent = isEn ? 'Privilege: Administrator' : 'Yetki: Administrator';
+
+        if (s2Title) s2Title.textContent = isEn ? 'Copy & Run Command' : 'Komutu Kopyalayıp Çalıştırın';
+        if (s2Desc) s2Desc.textContent = isEn ? 'Automatically installs to C:\\Program Files\\LOGGER Agent and registers the LoggerAgent Windows Service.' : 'Otomatik olarak C:\\Program Files\\LOGGER Agent dizinine kurulur ve LoggerAgent Windows Servisi başlatılır.';
+        if (cmdBox) cmdBox.textContent = `Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr -useb "${serverUrl}/static/scripts/install-agent.ps1" -OutFile "$env:TEMP\\install-agent.ps1"; & "$env:TEMP\\install-agent.ps1" -Server "${serverUrl}" -Token "${token}"`;
+
+        if (s3Title) s3Title.textContent = isEn ? 'Verify Status' : 'Durumu Doğrulayın';
+        if (s3Sub) s3Sub.textContent = isEn ? 'Run the service verification command on the endpoint:' : 'Uç noktada servis kontrol komutunu çalıştırın:';
+        if (verifyBox) verifyBox.textContent = 'Get-Service LoggerAgent';
+        if (s3Desc) s3Desc.textContent = isEn ? '✓ Appears healthy (Online) in the table below.' : '✓ Aşağıdaki tabloda yeşil (Online) görünür.';
+    } else if (currentQuickPlatform === 'macos') {
+        if (s1Title) s1Title.textContent = isEn ? 'Open Terminal App' : 'Terminal Uygulamasını Açın';
+        if (s1Desc) s1Desc.innerHTML = isEn ? 'Press Spotlight (Cmd + Space) and launch <strong>Terminal</strong> or iTerm2.' : 'Spotlight (Cmd + Boşluk) ile <strong>Terminal</strong> uygulamasını başlatın veya iTerm2 açın.';
+        if (s1Hint) s1Hint.textContent = isEn ? 'Privilege: Sudo / Root' : 'Yetki: Sudo / Root';
+
+        if (s2Title) s2Title.textContent = isEn ? 'Copy & Run Command' : 'Komutu Kopyalayıp Çalıştırın';
+        if (s2Desc) s2Desc.textContent = isEn ? 'Automatically installs to /opt/logger-agent and starts the launchd daemon background service.' : 'Otomatik olarak /opt/logger-agent dizinine kurulur ve launchd Daemon servisi başlatılır.';
+        if (cmdBox) cmdBox.textContent = `curl -sSL ${serverUrl}/static/scripts/install-agent.sh | sudo bash -s -- --server "${serverUrl}" --token "${token}"`;
+
+        if (s3Title) s3Title.textContent = isEn ? 'Verify Status' : 'Durumu Doğrulayın';
+        if (s3Sub) s3Sub.textContent = isEn ? 'Run the daemon check command in Terminal:' : 'Uç noktada daemon servis kontrol komutunu çalıştırın:';
+        if (verifyBox) verifyBox.textContent = 'sudo launchctl list | grep logger';
+        if (s3Desc) s3Desc.textContent = isEn ? '✓ Appears healthy (Online) in the table below.' : '✓ Aşağıdaki tabloda yeşil (Online) görünür.';
+    } else if (currentQuickPlatform === 'linux') {
+        if (s1Title) s1Title.textContent = isEn ? 'Open Root / Sudo Shell' : 'Kök / Sudo Terminali Açın';
+        if (s1Desc) s1Desc.innerHTML = isEn ? 'Open a root shell or SSH into your Linux host with sudo privileges.' : 'Linux sunucu veya istemci konsoluna SSH yapın ya da terminal açın.';
+        if (s1Hint) s1Hint.textContent = isEn ? 'Privilege: Root or sudo access' : 'Yetki: Root veya sudo ayrıcalığı';
+
+        if (s2Title) s2Title.textContent = isEn ? 'Copy & Run Command' : 'Komutu Kopyalayıp Çalıştırın';
+        if (s2Desc) s2Desc.textContent = isEn ? 'Automatically installs to /opt/logger-agent and starts the systemd logger-agent service.' : 'Otomatik olarak /opt/logger-agent dizinine kurulur ve systemd logger-agent servisi başlatılır.';
+        if (cmdBox) cmdBox.textContent = `curl -sSL ${serverUrl}/static/scripts/install-agent.sh | sudo bash -s -- --server "${serverUrl}" --token "${token}"`;
+
+        if (s3Title) s3Title.textContent = isEn ? 'Verify Status' : 'Durumu Doğrulayın';
+        if (s3Sub) s3Sub.textContent = isEn ? 'Run the systemd service check command:' : 'Uç noktada systemd servis durumunu kontrol edin:';
+        if (verifyBox) verifyBox.textContent = 'systemctl status logger-agent';
+        if (s3Desc) s3Desc.textContent = isEn ? '✓ Appears healthy (Online) in the table below.' : '✓ Aşağıdaki tabloda yeşil (Online) görünür.';
+    }
+}
+
+function copyQuickStepCmd() {
+    const el = document.getElementById('quick-step-cmd-box');
+    if (!el) return;
+    const text = el.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('✓ Komut panoya kopyalandı.', 'success');
+    }).catch(() => {
+        showToast('Kopyalama başarısız oldu.', 'error');
+    });
+}
+
 
 
 
