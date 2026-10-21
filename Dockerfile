@@ -6,29 +6,40 @@ FROM golang:alpine AS builder
 
 WORKDIR /app
 
+RUN apk add --no-cache ca-certificates git
+
 ARG COMMIT_SHA=""
 ARG VERSION=""
 ARG BUILD_DATE=""
 
-# Cache dependencies
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy source code
+# Copy source code including vendor if vendored
 COPY . .
+
+# Download dependencies only if vendor directory is not present
+RUN if [ ! -d "vendor" ] || [ ! -f "vendor/modules.txt" ]; then \
+        echo "No vendor directory found, running go mod download..."; \
+        go mod download; \
+    else \
+        echo "Vendor directory detected. Building offline with -mod=vendor..."; \
+    fi
 
 # Build static Linux binaries (sanitize build args to prevent multiline shell syntax errors)
 RUN COMMIT_SHA="$(printf '%s' "$COMMIT_SHA" | head -n1 | tr -d '\r\n')"; \
     VERSION="$(printf '%s' "$VERSION" | head -n1 | tr -d '\r\n')"; \
     BUILD_DATE="$(printf '%s' "$BUILD_DATE" | head -n1 | tr -d '\r\n')"; \
+    if [ -d "vendor" ] && [ -f "vendor/modules.txt" ]; then \
+        MOD_FLAG="-mod=vendor"; \
+    else \
+        MOD_FLAG=""; \
+    fi; \
     if [ -n "$COMMIT_SHA" ] && [ -n "$VERSION" ] && [ -n "$BUILD_DATE" ]; then \
-        CGO_ENABLED=0 GOOS=linux go build -trimpath \
+        CGO_ENABLED=0 GOOS=linux go build $MOD_FLAG -trimpath \
         -ldflags="-s -w -X github.com/syslog-platform/logger/internal/version.CommitSHA=${COMMIT_SHA} -X github.com/syslog-platform/logger/internal/version.Version=${VERSION} -X github.com/syslog-platform/logger/internal/version.BuildDate=${BUILD_DATE}" \
         -o /app/bin/syslog-platform ./cmd/server/main.go; \
     else \
-        CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /app/bin/syslog-platform ./cmd/server/main.go; \
-    fi
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /app/bin/logseal-proxy ./cmd/proxy/main.go
+        CGO_ENABLED=0 GOOS=linux go build $MOD_FLAG -trimpath -ldflags="-s -w" -o /app/bin/syslog-platform ./cmd/server/main.go; \
+    fi; \
+    CGO_ENABLED=0 GOOS=linux go build $MOD_FLAG -trimpath -ldflags="-s -w" -o /app/bin/logseal-proxy ./cmd/proxy/main.go
 
 # Stage 2: Minimal runtime image with Git and Go toolchain for dynamic web & CLI upgrades
 FROM alpine:3.20
