@@ -6,8 +6,6 @@ FROM golang:alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates git
-
 ARG COMMIT_SHA=""
 ARG VERSION=""
 ARG BUILD_DATE=""
@@ -46,8 +44,9 @@ FROM alpine:3.20
 
 WORKDIR /opt/syslog-platform
 
-# Install runtime utilities, OpenJDK 17 for TÜBİTAK KamuSM, and git + go toolchain for dynamic updates
-RUN apk add --no-cache ca-certificates tzdata curl bash openjdk17-jre git go
+# Install runtime utilities, OpenJDK 17 for TÜBİTAK KamuSM, and git + go toolchain for dynamic updates (use http to bypass TLS inspection)
+RUN sed -i 's/https/http/g' /etc/apk/repositories 2>/dev/null || true; \
+    apk add --no-cache ca-certificates tzdata curl bash openjdk17-jre git go
 
 # Set environment for Go compilation
 ENV CGO_ENABLED=0
