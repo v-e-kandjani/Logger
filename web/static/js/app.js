@@ -190,6 +190,16 @@ function switchTab(tab, targetSectionId = null) {
         }
     }
 
+    // Manage endpoint nav group open state
+    const endpointGroup = document.getElementById('nav-group-endpoint');
+    if (endpointGroup) {
+        if (tab === 'endpoint') {
+            endpointGroup.classList.add('open');
+        } else {
+            endpointGroup.classList.remove('open');
+        }
+    }
+
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     const targetPane = document.getElementById(`pane-${tab}`);
     if (targetPane) targetPane.classList.add('active');
@@ -201,6 +211,12 @@ function switchTab(tab, targetSectionId = null) {
         if (tab === 'dashboard') fetchAndRenderTelemetryCharts();
         if (tab === 'search') document.getElementById('btn-search-exec')?.click();
         if (tab === 'siem') loadSIEMData();
+        if (tab === 'endpoint') {
+            loadEndpointDashboard();
+            loadEndpointAgents();
+            loadEndpointTokens();
+            if (targetSectionId) switchEndpointSubSection(targetSectionId);
+        }
         if (tab === 'devices') loadDevices();
         if (tab === 'unregistered') loadUnregisteredSources();
         if (tab === 'archives') loadArchives();
@@ -228,7 +244,7 @@ function displaySettingsSection(targetId) {
     currentSettingsSection = targetId;
 
     const panels = document.querySelectorAll('#pane-settings .panel');
-    const isAll = (targetId === 'all');
+    const isAll = targetId === 'all';
 
     panels.forEach(p => {
         if (isAll || p.id === targetId) {
@@ -245,7 +261,7 @@ function displaySettingsSection(targetId) {
     });
 
     // Sync active classes on sidebar subitems and settings pill buttons
-    document.querySelectorAll('.nav-subitem').forEach(sub => {
+    document.querySelectorAll('#nav-submenu-settings .nav-subitem').forEach(sub => {
         sub.classList.toggle('active', sub.getAttribute('data-target') === targetId);
     });
     document.querySelectorAll('.settings-subnav-btn').forEach(btn => {
@@ -279,12 +295,19 @@ function initNavigation() {
                     return;
                 }
             }
+            if (tab === 'endpoint') {
+                const group = document.getElementById('nav-group-endpoint');
+                if (group && item.classList.contains('active')) {
+                    group.classList.toggle('open');
+                    return;
+                }
+            }
             switchTab(tab);
         });
     });
 
     // 2. Sidebar Submenu Items
-    const subItems = document.querySelectorAll('.nav-subitem');
+    const subItems = document.querySelectorAll('#nav-submenu-settings .nav-subitem');
     subItems.forEach(sub => {
         sub.addEventListener('click', (e) => {
             e.preventDefault();
@@ -293,13 +316,31 @@ function initNavigation() {
         });
     });
 
-    // 3. Settings In-Pane Subnav Buttons
+    const epSubItems = document.querySelectorAll('#nav-submenu-endpoint .nav-subitem');
+    epSubItems.forEach(sub => {
+        sub.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = sub.getAttribute('data-endpoint-target');
+            switchTab('endpoint', targetId);
+        });
+    });
+
+    // 3. In-Pane Subnav Buttons
     const subnavBtns = document.querySelectorAll('.settings-subnav-btn');
     subnavBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             const targetId = btn.getAttribute('data-target');
             displaySettingsSection(targetId);
+        });
+    });
+
+    const epNavBtns = document.querySelectorAll('.endpoint-nav-btn');
+    epNavBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = btn.getAttribute('data-target');
+            switchEndpointSubSection(targetId);
         });
     });
 
@@ -7992,7 +8033,409 @@ async function resetTenantLogo() {
 document.addEventListener('DOMContentLoaded', () => {
     // Initial sync of sidebar brand logo
     updateSidebarBrandLogo(localStorage.getItem('active_tenant_slug') || 'default');
+
+    // Endpoint Security search & filter bindings
+    document.getElementById('btn-ep-agents-filter-apply')?.addEventListener('click', () => {
+        loadEndpointAgents();
+    });
+    document.getElementById('ep-agents-search')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') loadEndpointAgents();
+    });
+    document.getElementById('ep-agents-os-filter')?.addEventListener('change', () => {
+        loadEndpointAgents();
+    });
+    document.getElementById('ep-agents-status-filter')?.addEventListener('change', () => {
+        loadEndpointAgents();
+    });
 });
+
+// --- Endpoint Security UI Logic ---
+
+let currentEndpointSection = 'endpoint-sec-dashboard';
+
+function switchEndpointSubSection(targetId) {
+    if (!targetId) targetId = 'endpoint-sec-dashboard';
+    currentEndpointSection = targetId;
+
+    document.querySelectorAll('.endpoint-section').forEach(sec => {
+        sec.style.display = (sec.id === targetId) ? 'block' : 'none';
+    });
+
+    document.querySelectorAll('.endpoint-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-target') === targetId);
+    });
+
+    document.querySelectorAll('#nav-submenu-endpoint .nav-subitem').forEach(sub => {
+        sub.classList.toggle('active', sub.getAttribute('data-endpoint-target') === targetId);
+    });
+
+    if (targetId === 'endpoint-sec-agents') {
+        loadEndpointAgents();
+    } else if (targetId === 'endpoint-sec-tokens') {
+        loadEndpointTokens();
+    } else if (targetId === 'endpoint-sec-dashboard') {
+        loadEndpointDashboard();
+    }
+}
+
+async function loadEndpointDashboard() {
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/dashboard?tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Top Stat Cards
+        document.getElementById('ep-stat-total-agents').textContent = (data.total_agents || 0).toLocaleString();
+        document.getElementById('ep-stat-total-badge').textContent = (data.total_agents || 0);
+        document.getElementById('ep-stat-online').textContent = data.online_agents || 0;
+        document.getElementById('ep-stat-offline').textContent = data.offline_agents || 0;
+        document.getElementById('ep-stat-stale').textContent = data.stale_agents || 0;
+
+        document.getElementById('ep-stat-linux').textContent = data.linux_agents || 0;
+        document.getElementById('ep-stat-windows').textContent = data.windows_agents || 0;
+        document.getElementById('ep-stat-darwin').textContent = data.darwin_agents || 0;
+
+        document.getElementById('ep-stat-crit-vulns').textContent = (data.critical_vulns || 0).toLocaleString();
+        document.getElementById('ep-stat-crit-badge').textContent = `${data.critical_vulns || 0} CRIT`;
+        document.getElementById('ep-stat-high-vulns').textContent = data.high_vulns || 0;
+        document.getElementById('ep-stat-kev-vulns').textContent = data.cisa_kev_vulns || 0;
+
+        const pct = (data.patch_compliance_pct != null) ? data.patch_compliance_pct.toFixed(1) : '100.0';
+        document.getElementById('ep-stat-patch-comp').textContent = `%${pct}`;
+        document.getElementById('ep-stat-comp-badge').textContent = `%${pct}`;
+        document.getElementById('ep-stat-need-reboot').textContent = data.endpoints_need_reboot || 0;
+
+        // Render Top Vulnerable Agents
+        const agentsTbody = document.getElementById('ep-dash-top-agents-body');
+        if (agentsTbody) {
+            if (!data.top_vulnerable_agents || data.top_vulnerable_agents.length === 0) {
+                agentsTbody.innerHTML = `<tr><td colspan="4" class="text-center" style="color: var(--text-muted); padding: 20px;">Henüz kritik zafiyet tespit edilen uç nokta yok.</td></tr>`;
+            } else {
+                agentsTbody.innerHTML = data.top_vulnerable_agents.map(a => `
+                    <tr>
+                        <td><strong>${escapeHtml(a.hostname)}</strong></td>
+                        <td>${renderOSBadge(a.os_type)}</td>
+                        <td><span class="badge badge-danger">${a.critical_count}</span></td>
+                        <td>${a.total_vulns}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Render Top CVEs
+        const cvesTbody = document.getElementById('ep-dash-top-cves-body');
+        if (cvesTbody) {
+            if (!data.top_cves || data.top_cves.length === 0) {
+                cvesTbody.innerHTML = `<tr><td colspan="4" class="text-center" style="color: var(--text-muted); padding: 20px;">Aktif kritik CVE tespiti bulunmuyor.</td></tr>`;
+            } else {
+                cvesTbody.innerHTML = data.top_cves.map(c => `
+                    <tr>
+                        <td><span style="font-family: var(--font-mono); color: var(--accent);">${escapeHtml(c.cve_id)}</span></td>
+                        <td><span class="badge badge-danger">${c.cvss_score.toFixed(1)}</span></td>
+                        <td>${c.cisa_kev ? '<span class="badge badge-danger" style="background: #9d174d;">KEV</span>' : '<span style="color: var(--text-muted);">-</span>'}</td>
+                        <td>${c.affected_count} Uç Nokta</td>
+                    </tr>
+                `).join('');
+            }
+        }
+    } catch (err) {
+        console.error('Error loading endpoint dashboard:', err);
+    }
+}
+
+async function loadEndpointAgents() {
+    const tbody = document.getElementById('ep-agents-tbody');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const osType = document.getElementById('ep-agents-os-filter')?.value || '';
+        const status = document.getElementById('ep-agents-status-filter')?.value || '';
+        const search = document.getElementById('ep-agents-search')?.value || '';
+
+        const url = `/api/v1/endpoint/agents?tenant=${encodeURIComponent(tenant)}&os=${encodeURIComponent(osType)}&status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Ajanlar yüklenemedi');
+        const data = await res.json();
+        const agents = data.agents || [];
+
+        if (agents.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 32px; color: var(--text-muted);">Kayıtlı uç nokta ajanı bulunamadı. "Yeni Kurulum Belirteci" oluşturarak bir ajan kurabilirsiniz.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = agents.map(a => {
+            const osBadge = renderOSBadge(a.os_type, a.os_name);
+            const statusBadge = renderAgentStatusBadge(a.status, a.last_seen);
+            const relativeTime = formatRelativeTime(a.last_seen);
+            const critVulnBadge = a.critical_vulns_count > 0 
+                ? `<span class="badge badge-danger" style="margin-right: 4px;">${a.critical_vulns_count} Crit</span>` 
+                : '';
+            const totalVulnBadge = a.open_vulns_count > 0
+                ? `<span class="badge badge-secondary">${a.open_vulns_count} Toplam</span>`
+                : '<span style="color: var(--success); font-size: 11px;">Temiz</span>';
+            const patchBadge = a.missing_patches_count > 0
+                ? `<span class="badge badge-warning">${a.missing_patches_count} Eksik</span>`
+                : '<span style="color: var(--success); font-size: 11px;">Güncel</span>';
+            const rebootBadge = a.reboot_required
+                ? `<span class="badge badge-warning" style="margin-left: 4px;" title="Yeniden başlatma gerekiyor">🔄 Reboot</span>`
+                : '';
+
+            return `
+                <tr>
+                    <td>
+                        <div style="font-weight: 600;">${escapeHtml(a.hostname || 'Bilinmiyor')}</div>
+                        <div style="font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(a.agent_uuid)}</div>
+                    </td>
+                    <td>
+                        <div>${escapeHtml(a.ip_address || '-')}</div>
+                        <div style="font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(a.mac_address || '-')}</div>
+                    </td>
+                    <td>${osBadge}</td>
+                    <td><span class="badge badge-secondary" style="font-family: var(--font-mono); font-size: 10.5px;">v${escapeHtml(a.agent_version || '1.0.0')}</span></td>
+                    <td>${statusBadge}</td>
+                    <td>${critVulnBadge}${totalVulnBadge}</td>
+                    <td>${patchBadge}${rebootBadge}</td>
+                    <td style="font-size: 11.5px; color: var(--text-muted);">${relativeTime}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline" onclick="inspectEndpointAgent('${a.id}')">İncele</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 24px; color: var(--danger);">${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function renderOSBadge(osType, osName = '') {
+    osType = (osType || '').toLowerCase();
+    let icon = '💻';
+    let label = osName || osType.toUpperCase();
+    if (osType.includes('linux')) icon = '🐧';
+    if (osType.includes('windows')) icon = '🪟';
+    if (osType.includes('darwin') || osType.includes('mac')) icon = '🍏';
+
+    return `<span title="${escapeHtml(label)}" style="display: inline-flex; align-items: center; gap: 4px;">
+        <span style="font-size: 14px;">${icon}</span>
+        <span style="font-size: 11.5px;">${escapeHtml(label.length > 20 ? label.substring(0, 18) + '...' : label)}</span>
+    </span>`;
+}
+
+function renderAgentStatusBadge(status, lastSeen) {
+    status = (status || 'healthy').toLowerCase();
+    if (status === 'healthy') {
+        return `<span class="badge badge-success" style="display: inline-flex; align-items: center; gap: 4px;"><span class="live-dot" style="background: #22c55e;"></span> Sağlıklı</span>`;
+    } else if (status === 'warning') {
+        return `<span class="badge badge-warning">Uyarı</span>`;
+    } else {
+        return `<span class="badge badge-secondary">Çevrimdışı</span>`;
+    }
+}
+
+function formatRelativeTime(dateStr) {
+    if (!dateStr) return 'Hiç bağlanmadı';
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return `${diffSec} sn önce`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} dk önce`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour} sa önce`;
+    const diffDay = Math.floor(diffHour / 24);
+    return `${diffDay} gün önce`;
+}
+
+async function loadEndpointTokens() {
+    const tbody = document.getElementById('ep-tokens-tbody');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/enrollment/tokens?tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) throw new Error('Belirteçler yüklenemedi');
+        const tokens = await res.json();
+
+        if (!tokens || tokens.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 24px; color: var(--text-muted);">Aktif kurulum belirteci bulunamadı. "+ Yeni Kurulum Belirteci" butonu ile oluşturabilirsiniz.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = tokens.map(t => {
+            const isRevoked = !!t.revoked_at;
+            const isExpired = t.expires_at && new Date(t.expires_at) < new Date();
+            let statusBadge = '<span class="badge badge-success">Aktif</span>';
+            if (isRevoked) statusBadge = '<span class="badge badge-danger">İptal Edildi</span>';
+            else if (isExpired) statusBadge = '<span class="badge badge-secondary">Süresi Doldu</span>';
+
+            const usesStr = `${t.current_uses} / ${t.max_uses > 0 ? t.max_uses : '∞'}`;
+            const platforms = (t.allowed_os && t.allowed_os.length > 0) ? t.allowed_os.join(', ') : 'Tümü (*)';
+            const expStr = t.expires_at ? new Date(t.expires_at).toLocaleString('tr-TR') : 'Süresiz';
+
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(t.name)}</strong></td>
+                    <td><code style="font-family: var(--font-mono); color: #86efac;">${escapeHtml(t.token_prefix)}...</code></td>
+                    <td><span class="badge badge-secondary">${escapeHtml(t.tenant_slug)}</span></td>
+                    <td>${usesStr}</td>
+                    <td>${escapeHtml(platforms)}</td>
+                    <td style="font-size: 11.5px; color: var(--text-muted);">${expStr}</td>
+                    <td>${escapeHtml(t.created_by)}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        ${!isRevoked ? `<button class="btn btn-sm btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4);" onclick="revokeEndpointToken('${t.id}')">İptal Et</button>` : '<span style="color: var(--text-muted);">-</span>'}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 20px; color: var(--danger);">${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function openNewTokenModal() {
+    const modal = document.getElementById('modal-endpoint-new-token');
+    if (!modal) return;
+    document.getElementById('token-form-name').value = '';
+    document.getElementById('token-form-max-uses').value = '0';
+    document.getElementById('token-form-expires-h').value = '72';
+    document.getElementById('token-form-one-time').checked = false;
+    document.getElementById('token-result-container').style.display = 'none';
+    modal.classList.add('active');
+}
+
+function closeNewTokenModal() {
+    document.getElementById('modal-endpoint-new-token')?.classList.remove('active');
+}
+
+async function submitCreateToken() {
+    const name = document.getElementById('token-form-name')?.value.trim();
+    const maxUses = parseInt(document.getElementById('token-form-max-uses')?.value || '0', 10);
+    const expiresInH = parseInt(document.getElementById('token-form-expires-h')?.value || '0', 10);
+    const isOneTime = document.getElementById('token-form-one-time')?.checked || false;
+
+    const btn = document.getElementById('btn-submit-create-token');
+    if (btn) btn.disabled = true;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/enrollment/tokens?tenant=${encodeURIComponent(tenant)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: name || 'Endpoint Enrollment Token',
+                max_uses: maxUses,
+                is_one_time: isOneTime,
+                expires_in_hours: expiresInH,
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Belirteç oluşturulamadı');
+
+        // Show token in result container
+        const resBox = document.getElementById('token-result-container');
+        const tokenVal = document.getElementById('token-result-val');
+        if (resBox && tokenVal) {
+            tokenVal.textContent = data.token;
+            resBox.style.display = 'block';
+        }
+
+        // Update quick install commands on page with this token
+        updateQuickInstallCommandTokens(data.token);
+
+        showToast('✓ Belirteç başarıyla üretildi.', 'success');
+        loadEndpointTokens();
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function updateQuickInstallCommandTokens(token) {
+    const host = window.location.origin;
+    const linEl = document.getElementById('ep-code-linux');
+    if (linEl) {
+        linEl.textContent = `curl -sSL ${host}/static/scripts/install-agent.sh | sudo bash -s -- --token=${token} --server=${host}`;
+    }
+    const winEl = document.getElementById('ep-code-windows');
+    if (winEl) {
+        winEl.textContent = `iwr -useb ${host}/static/scripts/install-agent.ps1 | iex; Start-LoggerAgent -Token "${token}" -Server "${host}"`;
+    }
+}
+
+function copyTokenResult() {
+    const val = document.getElementById('token-result-val')?.textContent;
+    if (val) {
+        navigator.clipboard.writeText(val);
+        showToast('✓ Belirteç panoya kopyalandı.', 'success');
+    }
+}
+
+function copyDeployCmd(elemId) {
+    const val = document.getElementById(elemId)?.textContent;
+    if (val) {
+        navigator.clipboard.writeText(val);
+        showToast('✓ Kurulum komutu panoya kopyalandı.', 'success');
+    }
+}
+
+async function revokeEndpointToken(id) {
+    if (!confirm('Bu kurulum belirtecini iptal etmek istediğinizden emin misiniz?')) return;
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/enrollment/tokens/${encodeURIComponent(id)}?tenant=${encodeURIComponent(tenant)}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) throw new Error('İptal işlemi başarısız');
+        showToast('✓ Belirteç iptal edildi.', 'success');
+        loadEndpointTokens();
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+async function inspectEndpointAgent(agentId) {
+    const modal = document.getElementById('modal-endpoint-agent-detail');
+    if (!modal) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/agents/${encodeURIComponent(agentId)}?tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) throw new Error('Ajan detayı alınamadı');
+        const agent = await res.json();
+
+        document.getElementById('agent-detail-hostname').textContent = agent.hostname || 'Uç Nokta';
+        document.getElementById('agent-detail-uuid').textContent = `UUID: ${agent.agent_uuid} • Tenant: ${agent.tenant_slug}`;
+        document.getElementById('detail-card-os').innerHTML = renderOSBadge(agent.os_type, agent.os_name);
+        document.getElementById('detail-card-net').textContent = `${agent.ip_address || '-'} / ${agent.mac_address || '-'}`;
+        document.getElementById('detail-card-ver').textContent = `v${agent.agent_version || '1.0.0'} (${agent.architecture})`;
+        document.getElementById('detail-card-health').textContent = `${agent.health_score || 100} / 100`;
+
+        document.getElementById('detail-card-policy').textContent = agent.policy_name || 'Default Balanced Policy';
+        document.getElementById('detail-card-policy-rev').textContent = `Rev ${agent.policy_revision || 1}`;
+        document.getElementById('detail-card-reboot').textContent = agent.reboot_required ? '⚠️ Yeniden Başlatma Bekliyor' : 'Gerekmiyor';
+        document.getElementById('detail-card-last-seen').textContent = formatRelativeTime(agent.last_seen);
+
+        // Resource usage
+        if (agent.resource_usage) {
+            let resObj = (typeof agent.resource_usage === 'string') ? JSON.parse(agent.resource_usage) : agent.resource_usage;
+            document.getElementById('detail-card-cpu').textContent = `${(resObj.cpu_percent || 0.5).toFixed(1)}%`;
+            document.getElementById('detail-card-ram').textContent = formatBytes(resObj.ram_rss_bytes || 0);
+        }
+
+        modal.classList.add('active');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+function closeAgentDetailModal() {
+    document.getElementById('modal-endpoint-agent-detail')?.classList.remove('active');
+}
+
 
 
 

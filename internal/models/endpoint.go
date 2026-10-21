@@ -1,0 +1,303 @@
+package models
+
+import (
+	"encoding/json"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// EndpointAgent represents an enrolled endpoint running the LOGGER Agent daemon
+type EndpointAgent struct {
+	ID                     uuid.UUID       `json:"id"`
+	TenantSlug             string          `json:"tenant_slug"`
+	AgentUUID              string          `json:"agent_uuid"`
+	Hostname               string          `json:"hostname"`
+	FQDN                   string          `json:"fqdn"`
+	OSType                 string          `json:"os_type"`     // windows, darwin, linux
+	OSFamily               string          `json:"os_family"`   // ubuntu, debian, rhel, rocky, etc.
+	OSName                 string          `json:"os_name"`     // e.g. "Ubuntu 22.04.4 LTS"
+	OSVersion              string          `json:"os_version"`  // e.g. "22.04"
+	OSBuild                string          `json:"os_build"`    // e.g. "22631.3007"
+	KernelVersion          string          `json:"kernel_version"`
+	Architecture           string          `json:"architecture"` // amd64, arm64
+	AgentVersion           string          `json:"agent_version"`
+	IPAddress              string          `json:"ip_address"`
+	MACAddress             string          `json:"mac_address"`
+	Status                 string          `json:"status"` // healthy, warning, offline, stale, updating, error, unenrolled
+	HealthScore            int             `json:"health_score"`
+	PolicyID               *uuid.UUID      `json:"policy_id,omitempty"`
+	PolicyName             string          `json:"policy_name,omitempty"`
+	PolicyRevision         int             `json:"policy_revision"`
+	GroupID                *uuid.UUID      `json:"group_id,omitempty"`
+	GroupName              string          `json:"group_name,omitempty"`
+	LastSeen               *time.Time      `json:"last_seen,omitempty"`
+	LastInventory          *time.Time      `json:"last_inventory,omitempty"`
+	LastPatchScan          *time.Time      `json:"last_patch_scan,omitempty"`
+	LastVulnScan           *time.Time      `json:"last_vuln_scan,omitempty"`
+	ClientCertSerial       string          `json:"client_cert_serial,omitempty"`
+	ClientCertFingerprint  string          `json:"client_cert_fingerprint,omitempty"`
+	Tags                   []string        `json:"tags"`
+	Labels                 json.RawMessage `json:"labels,omitempty"`
+	ResourceUsage          json.RawMessage `json:"resource_usage,omitempty"`
+	OpenVulnsCount         int             `json:"open_vulns_count"`
+	CriticalVulnsCount     int             `json:"critical_vulns_count"`
+	MissingPatchesCount    int             `json:"missing_patches_count"`
+	RebootRequired         bool            `json:"reboot_required"`
+	CreatedAt              time.Time       `json:"created_at"`
+	UpdatedAt              time.Time       `json:"updated_at"`
+}
+
+// EndpointAgentGroup represents a logical or dynamic cluster of agents
+type EndpointAgentGroup struct {
+	ID          uuid.UUID  `json:"id"`
+	TenantSlug  string     `json:"tenant_slug"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	QueryFilter string     `json:"query_filter"`
+	PolicyID    *uuid.UUID `json:"policy_id,omitempty"`
+	PolicyName  string     `json:"policy_name,omitempty"`
+	AgentCount  int        `json:"agent_count"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// EndpointEnrollmentToken represents a cryptographic secret allowing agent self-enrollment
+type EndpointEnrollmentToken struct {
+	ID          uuid.UUID  `json:"id"`
+	TenantSlug  string     `json:"tenant_slug"`
+	Token       string     `json:"token,omitempty"` // Only exposed at generation time
+	TokenHash   string     `json:"token_hash"`
+	TokenPrefix string     `json:"token_prefix"`
+	Name        string     `json:"name"`
+	GroupID     *uuid.UUID `json:"group_id,omitempty"`
+	GroupName   string     `json:"group_name,omitempty"`
+	MaxUses     int        `json:"max_uses"` // 0 = unlimited
+	CurrentUses int        `json:"current_uses"`
+	IsOneTime   bool       `json:"is_one_time"`
+	AllowedOS   []string   `json:"allowed_os"`
+	Labels      json.RawMessage `json:"labels,omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	RevokedAt   *time.Time `json:"revoked_at,omitempty"`
+	CreatedBy   string     `json:"created_by"`
+	CreatedAt   time.Time  `json:"created_at"`
+}
+
+// EndpointPolicy defines intervals, throttling, and collection rules for agents
+type EndpointPolicy struct {
+	ID          uuid.UUID       `json:"id"`
+	TenantSlug  string          `json:"tenant_slug"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Revision    int             `json:"revision"`
+	Config      json.RawMessage `json:"config"`
+	IsDefault   bool            `json:"is_default"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+}
+
+// EndpointPolicyConfig defines the strongly-typed settings stored in Config JSON
+type EndpointPolicyConfig struct {
+	HeartbeatIntervalSec int      `json:"heartbeat_interval_sec"`
+	InventoryIntervalSec int      `json:"inventory_interval_sec"`
+	PatchScanIntervalSec int      `json:"patch_scan_interval_sec"`
+	VulnScanIntervalSec  int      `json:"vuln_scan_interval_sec"`
+	MaxCPUPercent        int      `json:"max_cpu_percent"`
+	MaxRAMMB             int      `json:"max_ram_mb"`
+	SpoolMaxDiskMB       int      `json:"spool_max_disk_mb"`
+	SpoolMaxAgeHours     int      `json:"spool_max_age_hours"`
+	LogCollectionEnabled bool     `json:"log_collection_enabled"`
+	EventChannels        []string `json:"event_channels"`
+	OsqueryEnabled       bool     `json:"osquery_enabled"`
+	UpdateChannel        string   `json:"update_channel"` // stable, beta, development
+}
+
+// EndpointSoftware represents a normalized software package installed on an endpoint
+type EndpointSoftware struct {
+	ID              uuid.UUID `json:"id"`
+	AgentID         uuid.UUID `json:"agent_id"`
+	TenantSlug      string    `json:"tenant_slug"`
+	Name            string    `json:"name"`
+	Vendor          string    `json:"vendor"`
+	Version         string    `json:"version"`
+	Arch            string    `json:"arch"`
+	PackageType     string    `json:"package_type"` // deb, rpm, msi, apk, pkg, app, etc.
+	PackageName     string    `json:"package_name"`
+	InstallLocation string    `json:"install_location"`
+	PURL            string    `json:"purl"`
+	CPE             string    `json:"cpe"`
+	FirstSeen       time.Time `json:"first_seen"`
+	LastSeen        time.Time `json:"last_seen"`
+}
+
+// EndpointCVE represents a normalized Common Vulnerabilities and Exposures record
+type EndpointCVE struct {
+	CVEID           string          `json:"cve_id"`
+	Title           string          `json:"title"`
+	Description     string          `json:"description"`
+	PublishedAt     *time.Time      `json:"published_at,omitempty"`
+	ModifiedAt      *time.Time      `json:"modified_at,omitempty"`
+	CVSSVersion     string          `json:"cvss_version"`
+	CVSSScore       float64         `json:"cvss_score"`
+	CVSSVector      string          `json:"cvss_vector"`
+	Severity        string          `json:"severity"` // CRITICAL, HIGH, MEDIUM, LOW, UNKNOWN
+	CWE             string          `json:"cwe"`
+	References      json.RawMessage `json:"references_json,omitempty"`
+	CPECriteria     json.RawMessage `json:"cpe_criteria_json,omitempty"`
+	CISAKEV         bool            `json:"cisa_kev"`
+	KEVDateAdded    *time.Time      `json:"kev_date_added,omitempty"`
+	KEVDueDate      *time.Time      `json:"kev_due_date,omitempty"`
+	EPSSProbability float64         `json:"epss_probability"`
+	EPSSPercentile  float64         `json:"epss_percentile"`
+	ExploitStatus   string          `json:"exploit_status"`
+	Source          string          `json:"source"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+}
+
+// EndpointFinding represents a detected vulnerability on a specific endpoint
+type EndpointFinding struct {
+	ID              uuid.UUID       `json:"id"`
+	TenantSlug      string          `json:"tenant_slug"`
+	AgentID         uuid.UUID       `json:"agent_id"`
+	AgentHostname   string          `json:"agent_hostname,omitempty"`
+	AgentIP         string          `json:"agent_ip,omitempty"`
+	AgentOS         string          `json:"agent_os,omitempty"`
+	CVEID           string          `json:"cve_id"`
+	CVETitle        string          `json:"cve_title,omitempty"`
+	CVSSScore       float64         `json:"cvss_score"`
+	Severity        string          `json:"severity"`
+	CISAKEV         bool            `json:"cisa_kev"`
+	EPSSProbability float64         `json:"epss_probability"`
+	SoftwareID      *uuid.UUID      `json:"software_id,omitempty"`
+	SoftwareName    string          `json:"software_name,omitempty"`
+	Status          string          `json:"status"` // open, fixed, not_affected, accepted_risk, false_positive, suppressed
+	DetectedVersion string          `json:"detected_version"`
+	FixedVersion    string          `json:"fixed_version"`
+	PatchAvailable  bool            `json:"patch_available"`
+	PatchID         string          `json:"patch_id,omitempty"`
+	Priority        string          `json:"priority"` // CRITICAL, HIGH, MEDIUM, LOW
+	RebootRequired  bool            `json:"reboot_required"`
+	DetectionSource string          `json:"detection_source"`
+	Evidence        json.RawMessage `json:"evidence_json,omitempty"`
+	FirstSeen       time.Time       `json:"first_seen"`
+	LastSeen        time.Time       `json:"last_seen"`
+	ResolvedAt      *time.Time      `json:"resolved_at,omitempty"`
+}
+
+// EndpointPatch represents a missing or installed patch on an endpoint
+type EndpointPatch struct {
+	ID             uuid.UUID `json:"id"`
+	TenantSlug     string    `json:"tenant_slug"`
+	AgentID        uuid.UUID `json:"agent_id"`
+	PatchID        string    `json:"patch_id"`
+	Title          string    `json:"title"`
+	Vendor         string    `json:"vendor"`
+	KBID           string    `json:"kb_id"`
+	Severity       string    `json:"severity"`
+	CVEIDs         []string  `json:"cve_ids"`
+	RequiresReboot bool      `json:"requires_reboot"`
+	Status         string    `json:"status"` // missing, installed, pending_reboot
+	InstalledAt    *time.Time `json:"installed_at,omitempty"`
+	DetectedAt     time.Time  `json:"detected_at"`
+}
+
+// EndpointDashboardSummary aggregates high-level metrics for the Endpoint Security overview
+type EndpointDashboardSummary struct {
+	TotalAgents          int                    `json:"total_agents"`
+	OnlineAgents         int                    `json:"online_agents"`
+	OfflineAgents        int                    `json:"offline_agents"`
+	StaleAgents          int                    `json:"stale_agents"`
+	WindowsAgents        int                    `json:"windows_agents"`
+	LinuxAgents          int                    `json:"linux_agents"`
+	DarwinAgents         int                    `json:"darwin_agents"`
+	CriticalVulns        int                    `json:"critical_vulns"`
+	HighVulns            int                    `json:"high_vulns"`
+	MediumVulns          int                    `json:"medium_vulns"`
+	LowVulns             int                    `json:"low_vulns"`
+	CISAKEVVulns         int                    `json:"cisa_kev_vulns"`
+	HighEPSSVulns        int                    `json:"high_epss_vulns"`
+	EndpointsWithCrit    int                    `json:"endpoints_with_crit"`
+	EndpointsNeedReboot  int                    `json:"endpoints_need_reboot"`
+	PatchCompliancePct   float64                `json:"patch_compliance_pct"`
+	FullyPatchedAgents   int                    `json:"fully_patched_agents"`
+	MissingSecPatchAgents int                   `json:"missing_sec_patch_agents"`
+	TopVulnerableAgents  []EndpointAgentSummary `json:"top_vulnerable_agents"`
+	TopCVEs              []EndpointCVESummary   `json:"top_cves"`
+}
+
+type EndpointAgentSummary struct {
+	AgentID       uuid.UUID `json:"agent_id"`
+	Hostname      string    `json:"hostname"`
+	IPAddress     string    `json:"ip_address"`
+	OSType        string    `json:"os_type"`
+	CriticalCount int       `json:"critical_count"`
+	HighCount     int       `json:"high_count"`
+	TotalVulns    int       `json:"total_vulns"`
+}
+
+type EndpointCVESummary struct {
+	CVEID         string  `json:"cve_id"`
+	Title         string  `json:"title"`
+	CVSSScore     float64 `json:"cvss_score"`
+	Severity      string  `json:"severity"`
+	CISAKEV       bool    `json:"cisa_kev"`
+	EPSSScore     float64 `json:"epss_score"`
+	AffectedCount int     `json:"affected_count"`
+}
+
+// Agent Protocol Payloads
+type AgentEnrollRequest struct {
+	EnrollmentToken string          `json:"enrollment_token"`
+	AgentUUID       string          `json:"agent_uuid"`
+	Hostname        string          `json:"hostname"`
+	FQDN            string          `json:"fqdn"`
+	OSType          string          `json:"os_type"`
+	OSFamily        string          `json:"os_family"`
+	OSName          string          `json:"os_name"`
+	OSVersion       string          `json:"os_version"`
+	OSBuild         string          `json:"os_build"`
+	KernelVersion   string          `json:"kernel_version"`
+	Architecture    string          `json:"architecture"`
+	AgentVersion    string          `json:"agent_version"`
+	IPAddress       string          `json:"ip_address"`
+	MACAddress      string          `json:"mac_address"`
+	DeviceFingerprint string        `json:"device_fingerprint"`
+	Labels          json.RawMessage `json:"labels,omitempty"`
+}
+
+type AgentEnrollResponse struct {
+	AgentID        uuid.UUID             `json:"agent_id"`
+	TenantSlug     string                `json:"tenant_slug"`
+	AuthToken      string                `json:"auth_token"`
+	ServerTime     time.Time             `json:"server_time"`
+	PolicyRevision int                   `json:"policy_revision"`
+	Policy         *EndpointPolicyConfig `json:"policy"`
+}
+
+type AgentHeartbeatRequest struct {
+	AgentUUID      string                 `json:"agent_uuid"`
+	Hostname       string                 `json:"hostname"`
+	AgentVersion   string                 `json:"agent_version"`
+	Status         string                 `json:"status"`
+	PolicyRevision int                    `json:"policy_revision"`
+	IPAddress      string                 `json:"ip_address"`
+	MACAddress     string                 `json:"mac_address"`
+	RebootRequired bool                   `json:"reboot_required"`
+	Metrics        AgentResourceMetrics   `json:"metrics"`
+}
+
+type AgentResourceMetrics struct {
+	CPUPercent     float64 `json:"cpu_percent"`
+	RAMRSSBytes    uint64  `json:"ram_rss_bytes"`
+	SpoolDiskBytes uint64  `json:"spool_disk_bytes"`
+	QueueDepth     int     `json:"queue_depth"`
+	EPSOut         float64 `json:"eps_out"`
+}
+
+type AgentHeartbeatResponse struct {
+	Ack                   bool       `json:"ack"`
+	ServerTime            time.Time  `json:"server_time"`
+	CurrentPolicyRevision int        `json:"current_policy_revision"`
+	PolicyNeedsUpdate     bool       `json:"policy_needs_update"`
+	PendingTasksCount     int        `json:"pending_tasks_count"`
+}

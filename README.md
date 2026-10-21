@@ -265,6 +265,18 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.8.0** (Endpoint Security Subsystem & Cross-Platform LOGGER Agent - Phase A):
+  - **Cross-Platform LOGGER Agent Daemon**:
+    - Introduced standalone, lightweight native agent daemon (`agent/cmd/logger-agent`) with stable UUID generation, persistent host fingerprinting, outbound HTTPS/HTTP2 transport, and jittered heartbeat scheduling.
+  - **Secure Self-Enrollment & Token Engine**:
+    - Designed `endpoint_enrollment_tokens` with cryptographic SHA-256 token hashing (`lp_ea_...`), maximum usage limits, single-use enforcement, platform restrictions (Linux, Windows, macOS), and TTL expiration.
+  - **Dual-Engine Schema Migrations**:
+    - Implemented PostgreSQL migration `003_endpoint_security.sql` with auto-migration (`EnsureEndpointSchema`) covering agents, groups, policies, inventory, software, CVE intelligence, active findings, patches, and tasks.
+    - Implemented ClickHouse migration `004_endpoint_telemetry.sql` for high-throughput time-series endpoint events and agent resource metrics.
+  - **Unified "Endpoint Security" UI & Dashboard**:
+    - Built dedicated top-level sidebar module with submenus for Overview Dashboard, Agents, Asset Inventory, Vulnerability CVEs, Patches, Policies, and Deployment Tokens.
+    - Added interactive stat cards, high-risk host matrices, agent inspection drawer, quick deployment one-liners, and bilingual localization (TR/EN).
+
 - **v1.7.9** (CLI Automated Upgrade Build-Arg Sanitization & Dockerfile Hardening):
   - **Single-Line Version Extraction Fix in `upgrade.sh`**:
     - Resolved a critical bug where multi-line `grep` output from `internal/version/version.go` injected trailing newlines into `--build-arg VERSION=...`, causing `/bin/sh` syntax parsing failures (exit code 1) in Dockerfile line 21 during CLI updates.

@@ -254,6 +254,18 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.8.0** (Uç Nokta Güvenlik Alt Sistemi & Çok Platformlu LOGGER Ajanı - Aşama A):
+  - **Çok Platformlu LOGGER Ajan Arka Plan Servisi (Daemon)**:
+    - Bağımsız, hafif ve Go tabanlı yerel ajan servisi (`agent/cmd/logger-agent`) geliştirildi; kalıcı ve kararlı UUID oluşturma, donanım parmak izi, giden yönlü (outbound) HTTPS/HTTP2 iletişimi ve rastgele sapmalı (jittered) kalp atışı zamanlayıcısı eklendi.
+  - **Güvenli Kendi Kendine Kayıt (Self-Enrollment) & Belirteç Motoru**:
+    - Kriptografik SHA-256 belirteç özeti (`lp_ea_...`), maksimum kullanım sınırı, tek kullanımlık modu, platform kısıtlaması (Linux, Windows, macOS) ve süre aşımı (TTL) desteğine sahip `endpoint_enrollment_tokens` altyapısı kuruldu.
+  - **Çift Motorlu Veritabanı Şema Geçişleri**:
+    - PostgreSQL tarafında ajanlar, gruplar, ilkeler, envanter, yazılımlar, CVE kataloğu, aktif bulgular, yamalar ve görevleri kapsayan `003_endpoint_security.sql` ve otomatik geçiş (`EnsureEndpointSchema`) fonksiyonu uygulandı.
+    - ClickHouse tarafında yüksek hacimli zaman serisi uç nokta günlükleri ve ajan kaynak telemetrisi için `004_endpoint_telemetry.sql` şeması oluşturuldu.
+  - **Birleşik "Uç Nokta Güvenliği" Arayüzü & Genel Bakış Paneli**:
+    - Sol kenar çubuğunda Genel Bakış, Ajanlar, Varlık Envanteri, Zafiyetler (CVEs), Yamalar, İlkeler ve Kurulum Belirteçleri alt menülerini barındıran üst düzey `Endpoint Security` modülü geliştirildi.
+    - Duyarlı istatistik kartları, riskli uç nokta matrisi, ajan inceleme çekmecesi, hızlı kurulum komutları ve tam çift dilli (TR/EN) yerelleştirme sağlandı.
+
 - **v1.7.9** (CLI Otomatik Güncelleme Derleme Parametresi İyileştirmesi & Dockerfile Güçlendirmesi):
   - **`upgrade.sh` Betiğinde Tek Satırlı Sürüm Çıkarma Düzeltmesi**:
     - `internal/version/version.go` dosyasından `grep` ile sürüm okunurken çok satırlı çıktı oluşması ve `--build-arg VERSION=...` içerisine satır sonu (`\n`) karakterlerinin kaçarak Dockerfile 21. satırındaki `/bin/sh` koşulunu bozması (çıkış kodu 1) engellendi.

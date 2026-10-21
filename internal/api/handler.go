@@ -270,6 +270,18 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/reports/export", h.requireAuth(h.handleReportExport))
 	mux.HandleFunc("/api/v1/reports/history", h.requireAuth(h.handleReportHistory))
 
+	// Endpoint Security & Cross-Platform Agent Gateway Endpoints
+	mux.HandleFunc("/api/agent/v1/enroll", h.handleAgentEnroll)
+	mux.HandleFunc("/api/agent/v1/heartbeat", h.handleAgentHeartbeat)
+	mux.HandleFunc("/api/agent/v1/config", h.handleAgentConfig)
+
+	// Protected Endpoint Security Administrative Endpoints
+	mux.HandleFunc("/api/v1/endpoint/dashboard", h.requireAuth(h.handleEndpointDashboard))
+	mux.HandleFunc("/api/v1/endpoint/agents", h.requireAuth(h.handleEndpointAgents))
+	mux.HandleFunc("/api/v1/endpoint/agents/", h.requireAuth(h.handleEndpointAgentDetail))
+	mux.HandleFunc("/api/v1/endpoint/enrollment/tokens", h.requireAuth(h.handleEndpointEnrollmentTokens))
+	mux.HandleFunc("/api/v1/endpoint/enrollment/tokens/", h.requireAuth(h.handleEndpointEnrollmentTokenRevoke))
+
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fs))

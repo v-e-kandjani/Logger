@@ -92,6 +92,13 @@ func main() {
 		log.Println("[PostgreSQL] Edge proxy nodes schema verified")
 	}
 
+	// Verify & auto-migrate Endpoint Security schema
+	if err := pgDB.EnsureEndpointSchema(context.Background()); err != nil {
+		log.Printf("[PostgreSQL] Warning ensuring Endpoint Security schema: %v", err)
+	} else {
+		log.Println("[PostgreSQL] Endpoint Security tables, policies, and feed catalog verified")
+	}
+
 	// 2. Initialize in-memory Device Cache
 	deviceCache := postgres.NewDeviceCache(pgDB)
 	log.Println("[DeviceCache] Initialized active device lookup cache")

@@ -1763,6 +1763,43 @@ input:checked + .slider:before {
     display: block;
 }
 
+/* Endpoint Security Subsystem Styles */
+.endpoint-subnav {
+    display: flex;
+    gap: 8px;
+    padding-bottom: 6px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.endpoint-nav-btn {
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+}
+
+.endpoint-nav-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.endpoint-nav-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+}
+
+.endpoint-section {
+    animation: fadeInSlide 0.2s ease forwards;
+}
+
 
 
 
