@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/syslog-platform/logger/agent/internal/version"
 )
 
 // Client handles secure HTTP/2 communication with the LOGGER server
@@ -64,7 +66,7 @@ func (c *Client) PostJSON(ctx context.Context, endpoint string, reqData any, res
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "LOGGER-Agent/1.0.0")
+	req.Header.Set("User-Agent", version.UserAgent())
 
 	if c.authToken != "" {
 		req.Header.Set("Authorization", "Bearer "+c.authToken)
@@ -99,7 +101,7 @@ func (c *Client) GetJSON(ctx context.Context, endpoint string, respData any) err
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "LOGGER-Agent/1.0.0")
+	req.Header.Set("User-Agent", version.UserAgent())
 
 	if c.authToken != "" {
 		req.Header.Set("Authorization", "Bearer "+c.authToken)

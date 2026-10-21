@@ -3,12 +3,19 @@
 Whenever code, configuration, templates, or scripts in this project are modified:
 
 ## 1. Version Management (MANDATORY)
-- Whenever any changes, fixes, or new features are introduced, **bump the semantic version** (e.g. `v1.2.1` -> `v1.2.2`).
-- Update:
-  - `internal/version/version.go`: Increment `Version`, update `BuildDate` to current date (`YYYY-MM-DD`), and set `CommitSHA`.
-  - `web/templates/index.html`: Update `#brand-version`, `#upd-current-version`, `#upd-build-date`, and cache buster query parameters (`?v=...`).
-  - `web/static/js/translations.js`: Update `app_version` in both Turkish (`tr`) and English (`en`).
-  - `README.md` & `README.tr.md`: Document changes under Release History.
+- **LogSeal Platform Versioning**:
+  - Whenever server, web dashboard, API, or database core features change, bump the platform version (e.g. `v1.8.0` -> `v1.8.1`).
+  - Update:
+    - `internal/version/version.go`: Increment `Version`, update `BuildDate` to current date (`YYYY-MM-DD`), and set `CommitSHA`.
+    - `web/templates/index.html`: Update `#brand-version`, `#upd-current-version`, `#upd-build-date`, and cache buster query parameters (`?v=...`).
+    - `web/static/js/translations.js`: Update `app_version` in both Turkish (`tr`) and English (`en`).
+    - `README.md` & `README.tr.md`: Document changes under Release History.
+- **LOGGER Agent Standalone Versioning (`logger-agent`)**:
+  - The native cross-platform agent daemon (`agent/`) maintains its own independent semantic versioning starting at `v0.1.0`.
+  - Update:
+    - `agent/internal/version/version.go`: Increment `Version`, update `BuildDate`, and set `CommitSHA`.
+    - Agent versions are reported via CLI (`logger-agent -v`), HTTP User-Agent (`LOGGER-Agent/vX.Y.Z`), heartbeat telemetry, and endpoint UI tables.
+    - Agent updates do not force platform version bumps unless the API schema or transport protocol changes.
 
 ## 2. Synchronize to GitHub
 - Ensure tests and builds pass (`go test ./...`).

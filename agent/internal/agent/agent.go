@@ -11,6 +11,7 @@ import (
 	"github.com/syslog-platform/logger/agent/internal/config"
 	"github.com/syslog-platform/logger/agent/internal/identity"
 	"github.com/syslog-platform/logger/agent/internal/transport"
+	"github.com/syslog-platform/logger/agent/internal/version"
 	"github.com/syslog-platform/logger/internal/models"
 )
 
@@ -100,7 +101,7 @@ func (a *Agent) enroll(ctx context.Context) error {
 		OSBuild:           a.identity.OSBuild,
 		KernelVersion:     a.identity.KernelVersion,
 		Architecture:      a.identity.Architecture,
-		AgentVersion:      "1.0.0",
+		AgentVersion:      version.Version,
 		IPAddress:         a.identity.IPAddress,
 		MACAddress:        a.identity.MACAddress,
 		DeviceFingerprint: a.identity.DeviceFingerprint,
@@ -134,7 +135,7 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 	req := models.AgentHeartbeatRequest{
 		AgentUUID:      a.identity.AgentUUID,
 		Hostname:       a.identity.Hostname,
-		AgentVersion:   "1.0.0",
+		AgentVersion:   version.Version,
 		Status:         "healthy",
 		PolicyRevision: a.policyRev,
 		IPAddress:      a.identity.IPAddress,
