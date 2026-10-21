@@ -1800,6 +1800,119 @@ input:checked + .slider:before {
     animation: fadeInSlide 0.2s ease forwards;
 }
 
+/* Endpoint Installation Guide Styles */
+.ep-guide-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.ep-guide-tab-btn {
+    font-size: 12.5px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.ep-guide-tab-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ep-guide-tab-btn.active {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: var(--primary);
+    color: #93c5fd;
+    font-weight: 600;
+}
+
+.ep-step-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    position: relative;
+    transition: border-color 0.2s ease;
+}
+
+.ep-step-card:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.ep-step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.ep-step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ep-code-box {
+    position: relative;
+    background: #090d16;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 8px 0;
+    overflow-x: auto;
+}
+
+.ep-code-box pre {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    color: #a5f3fc;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.ep-copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-main);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.ep-copy-btn:hover {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+
+
 
 
 

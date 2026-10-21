@@ -97,6 +97,10 @@
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                             <span data-i18n="nav_ep_tokens">Kurulum &amp; Belirteçler</span>
                         </a>
+                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-guide">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            <span data-i18n="nav_ep_guide">Kurulum Kılavuzu</span>
+                        </a>
                     </div>
                 </div>
                 <a href="#devices" class="nav-item" data-tab="devices">
@@ -763,6 +767,9 @@
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-tokens">
                         <span data-i18n="nav_ep_tokens">Kurulum &amp; Belirteçler</span>
                     </button>
+                    <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-guide">
+                        <span data-i18n="nav_ep_guide">📘 Kurulum Kılavuzu</span>
+                    </button>
                 </div>
 
                 <!-- 1. DASHBOARD VIEW -->
@@ -1014,6 +1021,324 @@
                                 <tr><td colspan="9" class="text-center" style="padding: 20px; color: var(--text-muted);">Belirteçler yükleniyor...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- 8. AGENT INSTALLATION & DEPLOYMENT GUIDE VIEW -->
+                <div class="endpoint-section" id="endpoint-sec-guide" style="display: none;">
+                    <div class="section-actions" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
+                        <div>
+                            <h4 style="font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                <span>📖</span>
+                                <span data-i18n="ep_guide_title">Uç Nokta Ajan Kurulum &amp; Dağıtım Kılavuzu</span>
+                                <span class="badge badge-secondary" style="font-size: 10.5px;">Agent v0.1.0</span>
+                            </h4>
+                            <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;" data-i18n="ep_guide_subtitle">
+                                Linux, Windows, macOS ve Docker platformlarında yerel LOGGER Ajanı kurulum yönergeleri, servis yapılandırması ve doğrulama adımları
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-outline btn-sm" onclick="openDocViewerModal('AGENT_INSTALLATION.md')" style="display: flex; align-items: center; gap: 6px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <span data-i18n="btn_view_full_md">📄 Tam Dokümantasyon (MD)</span>
+                            </button>
+                            <a href="/static/scripts/install-agent.sh" download="install-agent.sh" class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;">
+                                <span>⬇️ install-agent.sh</span>
+                            </a>
+                            <a href="/static/scripts/install-agent.ps1" download="install-agent.ps1" class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;">
+                                <span>⬇️ install-agent.ps1</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Token & Server Configuration Bar -->
+                    <div class="panel" style="padding: 16px 20px; margin-bottom: 24px; background: rgba(59, 130, 246, 0.04); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px;">
+                        <div style="font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                            <span data-i18n="lbl_guide_inject_settings">Komutlara Otomatik Eklenecek Bağlantı &amp; Belirteç Ayarları:</span>
+                        </div>
+                        <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center;">
+                            <div style="flex: 1; min-width: 240px;">
+                                <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;" data-i18n="lbl_guide_select_token">🔑 Aktif Kurulum Belirteci (Token):</label>
+                                <select id="guide-token-select" class="form-control" style="font-family: var(--font-mono); font-size: 12px; width: 100%;">
+                                    <option value="&lt;TOKEN&gt;">-- Belirteç Seçiniz (Varsayılan Yer Tutucu) --</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 240px;">
+                                <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;" data-i18n="lbl_guide_server_url">🌐 LogSeal Sunucu Adresi (Server URL):</label>
+                                <input type="text" id="guide-server-url" class="form-control" style="font-family: var(--font-mono); font-size: 12px; width: 100%;" value="">
+                            </div>
+                            <div style="padding-top: 18px;">
+                                <button class="btn btn-secondary btn-sm" onclick="syncGuideCommands()" style="height: 34px;">🔄 Komutları Güncelle</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Platform Switcher Pills -->
+                    <div class="ep-guide-tabs">
+                        <button class="ep-guide-tab-btn active" data-platform="linux">
+                            <span>🐧</span> <span>Linux (Ubuntu / Debian / RHEL / Rocky / Alpine)</span>
+                        </button>
+                        <button class="ep-guide-tab-btn" data-platform="windows">
+                            <span>🪟</span> <span>Windows (10/11 &amp; Server 2016-2025)</span>
+                        </button>
+                        <button class="ep-guide-tab-btn" data-platform="macos">
+                            <span>🍏</span> <span>macOS (Darwin ARM64 / Intel)</span>
+                        </button>
+                        <button class="ep-guide-tab-btn" data-platform="docker">
+                            <span>🐳</span> <span>Docker &amp; Container Host</span>
+                        </button>
+                        <button class="ep-guide-tab-btn" data-platform="network">
+                            <span>🔍</span> <span>Ağ, Doğrulama &amp; Kaldırma</span>
+                        </button>
+                    </div>
+
+                    <!-- PLATFORM CONTENT: LINUX -->
+                    <div class="ep-platform-pane" id="ep-pane-linux">
+                        <div class="ep-step-card">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num">1</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;" data-i18n="lbl_guide_linux_method1">Yöntem 1: Tek Komutla Otomatik Kurulum (Önerilen)</h5>
+                                <span class="badge badge-success" style="font-size: 10px; margin-left: auto;">systemd otomatik</span>
+                            </div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                                Hedef Linux sunucusunda root veya sudo yetkisiyle aşağıdaki komutu çalıştırınız. Betik mimariyi (x86_64/arm64) otomatik algılar, dizinleri oluşturur, systemd servisini kaydeder ve başlatır:
+                            </p>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-linux-auto')">Kopyala</button>
+                                <pre id="code-linux-auto">curl -sSL http://localhost:8080/static/scripts/install-agent.sh | sudo bash -s -- --server "http://localhost:8080" --token "&lt;TOKEN&gt;"</pre>
+                            </div>
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 6px;">
+                                💡 <em>Kendinden imzalı HTTPS sertifikası kullanıyorsanız komutun sonuna <code>--insecure</code> ve curl parametresine <code>-k</code> ekleyiniz.</em>
+                            </div>
+                        </div>
+
+                        <div class="ep-step-card">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num">2</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;">Yöntem 2: Manuel Kurulum &amp; Systemd Servisi Yapılandırması</h5>
+                            </div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                                Air-gapped (çevrimdışı) veya özel dağıtımlar için manuel kurulum adımları:
+                            </p>
+                            
+                            <div style="font-size: 12px; font-weight: 600; margin-top: 10px; margin-bottom: 4px;">Adım A: Dizinleri ve İkili Dosyayı Hazırlama</div>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-linux-manual-dirs')">Kopyala</button>
+                                <pre id="code-linux-manual-dirs">sudo mkdir -p /opt/logger-agent/bin /etc/logger-agent /var/log/logger-agent
+sudo cp logger-agent /opt/logger-agent/bin/logger-agent
+sudo chmod +x /opt/logger-agent/bin/logger-agent</pre>
+                            </div>
+
+                            <div style="font-size: 12px; font-weight: 600; margin-top: 10px; margin-bottom: 4px;">Adım B: Yapılandırma Dosyası (/etc/logger-agent/config.json)</div>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-linux-config')">Kopyala</button>
+                                <pre id="code-linux-config">sudo tee /etc/logger-agent/config.json &gt; /dev/null &lt;&lt; 'EOF'
+{
+  "server_url": "http://localhost:8080",
+  "enrollment_token": "&lt;TOKEN&gt;",
+  "insecure_tls": false,
+  "log_level": "info",
+  "data_dir": "/opt/logger-agent/data",
+  "heartbeat_interval_sec": 30,
+  "identity_file": "/etc/logger-agent/identity.json"
+}
+EOF
+sudo chmod 600 /etc/logger-agent/config.json</pre>
+                            </div>
+
+                            <div style="font-size: 12px; font-weight: 600; margin-top: 10px; margin-bottom: 4px;">Adım C: Systemd Servisini Oluşturma ve Başlatma</div>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-linux-service')">Kopyala</button>
+                                <pre id="code-linux-service">sudo tee /etc/systemd/system/logger-agent.service &gt; /dev/null &lt;&lt; 'EOF'
+[Unit]
+Description=Valtrivo LogSeal Native Endpoint Security Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/opt/logger-agent/bin/logger-agent -config /etc/logger-agent/config.json
+Restart=always
+RestartSec=5s
+LimitNOFILE=65536
+StandardOutput=append:/var/log/logger-agent/agent.log
+StandardError=append:/var/log/logger-agent/agent-error.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now logger-agent
+sudo systemctl status logger-agent</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PLATFORM CONTENT: WINDOWS -->
+                    <div class="ep-platform-pane" id="ep-pane-windows" style="display: none;">
+                        <div class="ep-step-card">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num">1</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;">Yöntem 1: PowerShell ile Otomatik Kurulum (Administrator)</h5>
+                                <span class="badge badge-success" style="font-size: 10px; margin-left: auto;">Windows Service Otomatik</span>
+                            </div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                                <strong>Yönetici Olarak (Run as Administrator)</strong> açılmış bir PowerShell penceresine aşağıdaki komutu yapıştırınız:
+                            </p>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-win-auto')">Kopyala</button>
+                                <pre id="code-win-auto">Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr -useb "http://localhost:8080/static/scripts/install-agent.ps1" -OutFile "$env:TEMP\install-agent.ps1"; &amp; "$env:TEMP\install-agent.ps1" -Server "http://localhost:8080" -Token "&lt;TOKEN&gt;"</pre>
+                            </div>
+                        </div>
+
+                        <div class="ep-step-card">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num">2</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;">Yöntem 2: Windows Service (sc.exe) Olarak Manuel Kurulum</h5>
+                            </div>
+                            <div style="font-size: 12px; font-weight: 600; margin-top: 6px; margin-bottom: 4px;">Adım A: Dizin ve Yapılandırma Dosyası</div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                                <code>C:\Program Files\LOGGER Agent\</code> dizinini oluşturunuz, <code>logger-agent.exe</code> dosyasını kopyalayınız ve <code>config.json</code> dosyasını oluşturunuz:
+                            </p>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-win-config')">Kopyala</button>
+                                <pre id="code-win-config">{
+  "server_url": "http://localhost:8080",
+  "enrollment_token": "&lt;TOKEN&gt;",
+  "insecure_tls": false,
+  "log_level": "info",
+  "data_dir": "C:\\Program Files\\LOGGER Agent\\data",
+  "heartbeat_interval_sec": 30,
+  "identity_file": "C:\\Program Files\\LOGGER Agent\\identity.json"
+}</pre>
+                            </div>
+
+                            <div style="font-size: 12px; font-weight: 600; margin-top: 10px; margin-bottom: 4px;">Adım B: sc.exe ile Servis Oluşturma ve Başlatma (CMD / PowerShell)</div>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-win-sc')">Kopyala</button>
+                                <pre id="code-win-sc">sc.exe create LoggerAgent binPath= "\"C:\Program Files\LOGGER Agent\logger-agent.exe\" -config \"C:\Program Files\LOGGER Agent\config.json\"" start= auto DisplayName= "LogSeal Endpoint Security Agent"
+sc.exe description LoggerAgent "Valtrivo LogSeal Endpoint Security and Telemetry Daemon"
+sc.exe failure LoggerAgent reset= 86400 actions= restart/5000/restart/10000/restart/60000
+net start LoggerAgent
+Get-Service LoggerAgent</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PLATFORM CONTENT: MACOS -->
+                    <div class="ep-platform-pane" id="ep-pane-macos" style="display: none;">
+                        <div class="ep-step-card">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num">1</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;">macOS Otomatik Kurulum (Apple Silicon M1/M2/M3/M4 &amp; Intel)</h5>
+                                <span class="badge badge-success" style="font-size: 10px; margin-left: auto;">launchd Daemon</span>
+                            </div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                                Terminal uygulamasında aşağıdaki komutu sudo yetkisiyle çalıştırınız:
+                            </p>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-mac-auto')">Kopyala</button>
+                                <pre id="code-mac-auto">curl -sSL http://localhost:8080/static/scripts/install-agent.sh | sudo bash -s -- --server "http://localhost:8080" --token "&lt;TOKEN&gt;"</pre>
+                            </div>
+                            <div style="font-size: 12px; font-weight: 600; margin-top: 14px; margin-bottom: 4px;">Servis Kontrol Komutları:</div>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-mac-cmds')">Kopyala</button>
+                                <pre id="code-mac-cmds">sudo launchctl list | grep logger
+tail -f /var/log/logger-agent/agent.log</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PLATFORM CONTENT: DOCKER -->
+                    <div class="ep-platform-pane" id="ep-pane-docker" style="display: none;">
+                        <div class="ep-step-card">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num">1</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;">Docker Konteyner Olarak Çalıştırma</h5>
+                            </div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                                Konteyner ana makinelerini izlemek için ana makine PID ve Ağ ad alanları ile çalıştırma:
+                            </p>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-docker-run')">Kopyala</button>
+                                <pre id="code-docker-run">docker run -d \
+  --name logger-agent \
+  --restart unless-stopped \
+  --net=host \
+  --pid=host \
+  -v /etc/logger-agent:/etc/logger-agent \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  logger-agent:latest \
+  -server "http://localhost:8080" \
+  -token "&lt;TOKEN&gt;"</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PLATFORM CONTENT: NETWORK & VERIFICATION -->
+                    <div class="ep-platform-pane" id="ep-pane-network" style="display: none;">
+                        <div class="ep-step-card">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num">⚡</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;">Ağ İletişim Profili &amp; Güvenlik Duvarı Kuralları</h5>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 12px; font-size: 12px;">
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                    <strong>İletişim Yönü:</strong> <span style="color: var(--success);">%100 Dışa Doğru (Outbound Only)</span>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                    <strong>Hedef Port:</strong> <code>8080 (HTTP)</code> veya <code>8443 (HTTPS)</code>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                    <strong>Gelen Port:</strong> <span style="color: var(--accent);">Gerekmiyor (Zero Inbound Open Ports)</span>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                    <strong>Protokol:</strong> HTTP/2 JSON REST &amp; Bearer JWT
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ep-step-card">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num">🔍</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;">Ajan Doğrulama &amp; Sürüm Kontrolü</h5>
+                            </div>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-verify-cmds')">Kopyala</button>
+                                <pre id="code-verify-cmds"># Ajan Sürümünü Kontrol Etme
+logger-agent -v
+# Beklenen Çıktı: LOGGER Agent v0.1.0 (Commit: 324f698, Built: 2026-10-21, ...)
+
+# Servis Günlüklerini Canlı İzleme (Linux)
+tail -f /var/log/logger-agent/agent.log
+
+# Beklenen Başarılı Kayıt Günlüğü:
+# [LOGGER Agent] Enrollment successful! Assigned to tenant 'default'
+# [LOGGER Agent] Heartbeat sent successfully (status: 200)</pre>
+                            </div>
+                        </div>
+
+                        <div class="ep-step-card">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num">🗑️</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;">Ajanı Tamamen Kaldırma (Uninstall)</h5>
+                            </div>
+                            <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Linux Sistemlerde:</div>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-uninstall-linux')">Kopyala</button>
+                                <pre id="code-uninstall-linux">sudo systemctl stop logger-agent &amp;&amp; sudo systemctl disable logger-agent
+sudo rm -f /etc/systemd/system/logger-agent.service &amp;&amp; sudo systemctl daemon-reload
+sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
+                            </div>
+                            <div style="font-size: 12px; font-weight: 600; margin-top: 10px; margin-bottom: 4px;">Windows Sistemlerde (PowerShell Admin):</div>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-uninstall-win')">Kopyala</button>
+                                <pre id="code-uninstall-win">Stop-Service LoggerAgent -Force; &amp; sc.exe delete LoggerAgent; Remove-Item -Recurse -Force "C:\Program Files\LOGGER Agent"</pre>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -4855,6 +5180,65 @@
             </div>
             <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); flex-shrink: 0;">
                 <button class="btn btn-outline" onclick="closeAgentDetailModal()" data-i18n="btn_close">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Token Quick Install Commands -->
+    <div class="modal-overlay" id="modal-endpoint-token-install">
+        <div class="modal" style="max-width: 780px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem;" id="modal-token-install-title">📋 Kurulum Komutları</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" id="modal-token-install-sub">Belirteç: -</div>
+                </div>
+                <button class="btn-close" onclick="closeTokenInstallModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1;">
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">LogSeal Sunucu Adresi (Server URL):</label>
+                    <input type="text" id="modal-token-server-url" class="form-control" style="font-family: var(--font-mono); font-size: 12px; width: 100%;" oninput="updateModalTokenCommands()">
+                </div>
+
+                <!-- Linux -->
+                <div style="margin-bottom: 16px;">
+                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">🐧 Linux (Ubuntu / Debian / RHEL / Rocky / Alpine / SUSE):</div>
+                    <div class="ep-code-box">
+                        <button class="ep-copy-btn" onclick="copyCodeFromBox('modal-token-cmd-linux')">Kopyala</button>
+                        <pre id="modal-token-cmd-linux">curl -sSL ...</pre>
+                    </div>
+                </div>
+
+                <!-- Windows -->
+                <div style="margin-bottom: 16px;">
+                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">🪟 Windows (PowerShell Administrator):</div>
+                    <div class="ep-code-box">
+                        <button class="ep-copy-btn" onclick="copyCodeFromBox('modal-token-cmd-windows')">Kopyala</button>
+                        <pre id="modal-token-cmd-windows">iwr -useb ...</pre>
+                    </div>
+                </div>
+
+                <!-- macOS -->
+                <div style="margin-bottom: 16px;">
+                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">🍏 macOS (Apple Silicon &amp; Intel):</div>
+                    <div class="ep-code-box">
+                        <button class="ep-copy-btn" onclick="copyCodeFromBox('modal-token-cmd-macos')">Kopyala</button>
+                        <pre id="modal-token-cmd-macos">curl -sSL ...</pre>
+                    </div>
+                </div>
+
+                <!-- Docker -->
+                <div>
+                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">🐳 Docker Container Host:</div>
+                    <div class="ep-code-box">
+                        <button class="ep-copy-btn" onclick="copyCodeFromBox('modal-token-cmd-docker')">Kopyala</button>
+                        <pre id="modal-token-cmd-docker">docker run -d ...</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); flex-shrink: 0;">
+                <button class="btn btn-outline btn-sm" onclick="closeTokenInstallModal(); switchEndpointSubnav('endpoint-sec-guide');">📖 Kılavuzu Aç</button>
+                <button class="btn btn-primary btn-sm" onclick="closeTokenInstallModal()">Kapat</button>
             </div>
         </div>
     </div>

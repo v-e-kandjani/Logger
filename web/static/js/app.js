@@ -8075,6 +8075,8 @@ function switchEndpointSubSection(targetId) {
         loadEndpointTokens();
     } else if (targetId === 'endpoint-sec-dashboard') {
         loadEndpointDashboard();
+    } else if (targetId === 'endpoint-sec-guide') {
+        initEndpointGuide();
     }
 }
 
@@ -8284,11 +8286,23 @@ async function loadEndpointTokens() {
                     <td>${escapeHtml(t.created_by)}</td>
                     <td>${statusBadge}</td>
                     <td>
-                        ${!isRevoked ? `<button class="btn btn-sm btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4);" onclick="revokeEndpointToken('${t.id}')">İptal Et</button>` : '<span style="color: var(--text-muted);">-</span>'}
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            ${!isRevoked ? `<button class="btn btn-sm btn-outline" style="color: var(--accent); border-color: rgba(59, 130, 246, 0.4); font-size: 11px;" onclick="openTokenInstallModal('${t.id}', '${escapeHtml(t.name)}', '${escapeHtml(t.token_prefix)}')" title="Kurulum Komutlarını Görüntüle">📋 Komut Al</button>` : ''}
+                            ${!isRevoked ? `<button class="btn btn-sm btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4); font-size: 11px;" onclick="revokeEndpointToken('${t.id}')">İptal Et</button>` : '<span style="color: var(--text-muted);">-</span>'}
+                        </div>
                     </td>
                 </tr>
             `;
         }).join('');
+
+        // Populate token selector in Guide if present
+        const select = document.getElementById('guide-token-select');
+        if (select && tokens) {
+            const curVal = select.value;
+            select.innerHTML = '<option value="<TOKEN>">-- Belirteç Seçiniz (Varsayılan Yer Tutucu) --</option>' + 
+                tokens.filter(t => !t.revoked_at).map(t => `<option value="${escapeHtml(t.token_prefix)}...">🔑 ${escapeHtml(t.name)} (${escapeHtml(t.token_prefix)}...)</option>`).join('');
+            if (curVal && curVal !== '<TOKEN>') select.value = curVal;
+        }
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 20px; color: var(--danger);">${escapeHtml(err.message)}</td></tr>`;
     }
@@ -8435,6 +8449,161 @@ async function inspectEndpointAgent(agentId) {
 function closeAgentDetailModal() {
     document.getElementById('modal-endpoint-agent-detail')?.classList.remove('active');
 }
+
+// -----------------------------------------------------------------------------
+// Endpoint Agent Installation Guide & Interactive Helpers
+// -----------------------------------------------------------------------------
+
+function initEndpointGuide() {
+    const serverUrlInput = document.getElementById('guide-server-url');
+    if (serverUrlInput && !serverUrlInput.value) {
+        serverUrlInput.value = window.location.origin;
+    }
+
+    // Platform switcher tab buttons
+    document.querySelectorAll('.ep-guide-tab-btn').forEach(btn => {
+        btn.onclick = () => {
+            const platform = btn.getAttribute('data-platform');
+            document.querySelectorAll('.ep-guide-tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+            document.querySelectorAll('.ep-platform-pane').forEach(p => {
+                p.style.display = (p.id === `ep-pane-${platform}`) ? 'block' : 'none';
+            });
+        };
+    });
+
+    const tokenSelect = document.getElementById('guide-token-select');
+    if (tokenSelect) {
+        tokenSelect.onchange = () => syncGuideCommands();
+    }
+    if (serverUrlInput) {
+        serverUrlInput.oninput = () => syncGuideCommands();
+    }
+
+    // Populate active tokens if empty
+    loadEndpointTokens();
+    syncGuideCommands();
+}
+
+function syncGuideCommands() {
+    const serverUrl = (document.getElementById('guide-server-url')?.value || window.location.origin).replace(/\/$/, '');
+    const token = document.getElementById('guide-token-select')?.value || '<TOKEN>';
+
+    // Linux auto
+    const linAuto = document.getElementById('code-linux-auto');
+    if (linAuto) {
+        linAuto.textContent = `curl -sSL ${serverUrl}/static/scripts/install-agent.sh | sudo bash -s -- --server "${serverUrl}" --token "${token}"`;
+    }
+
+    // Linux manual config
+    const linCfg = document.getElementById('code-linux-config');
+    if (linCfg) {
+        linCfg.textContent = `sudo tee /etc/logger-agent/config.json > /dev/null << 'EOF'
+{
+  "server_url": "${serverUrl}",
+  "enrollment_token": "${token}",
+  "insecure_tls": false,
+  "log_level": "info",
+  "data_dir": "/opt/logger-agent/data",
+  "heartbeat_interval_sec": 30,
+  "identity_file": "/etc/logger-agent/identity.json"
+}
+EOF
+sudo chmod 600 /etc/logger-agent/config.json`;
+    }
+
+    // Windows auto
+    const winAuto = document.getElementById('code-win-auto');
+    if (winAuto) {
+        winAuto.textContent = `Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr -useb "${serverUrl}/static/scripts/install-agent.ps1" -OutFile "$env:TEMP\\install-agent.ps1"; & "$env:TEMP\\install-agent.ps1" -Server "${serverUrl}" -Token "${token}"`;
+    }
+
+    // Windows config
+    const winCfg = document.getElementById('code-win-config');
+    if (winCfg) {
+        winCfg.textContent = `{
+  "server_url": "${serverUrl}",
+  "enrollment_token": "${token}",
+  "insecure_tls": false,
+  "log_level": "info",
+  "data_dir": "C:\\\\Program Files\\\\LOGGER Agent\\\\data",
+  "heartbeat_interval_sec": 30,
+  "identity_file": "C:\\\\Program Files\\\\LOGGER Agent\\\\identity.json"
+}`;
+    }
+
+    // macOS auto
+    const macAuto = document.getElementById('code-mac-auto');
+    if (macAuto) {
+        macAuto.textContent = `curl -sSL ${serverUrl}/static/scripts/install-agent.sh | sudo bash -s -- --server "${serverUrl}" --token "${token}"`;
+    }
+
+    // Docker run
+    const dockerRun = document.getElementById('code-docker-run');
+    if (dockerRun) {
+        dockerRun.textContent = `docker run -d \\
+  --name logger-agent \\
+  --restart unless-stopped \\
+  --net=host \\
+  --pid=host \\
+  -v /etc/logger-agent:/etc/logger-agent \\
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \\
+  logger-agent:latest \\
+  -server "${serverUrl}" \\
+  -token "${token}"`;
+    }
+}
+
+function copyCodeFromBox(elemId) {
+    const el = document.getElementById(elemId);
+    if (!el) return;
+    const text = el.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('✓ Komut panoya kopyalandı.', 'success');
+    }).catch(() => {
+        showToast('Kopyalama başarısız oldu.', 'error');
+    });
+}
+
+let activeModalToken = '<TOKEN>';
+
+function openTokenInstallModal(tokenId, tokenName, tokenPrefix) {
+    const modal = document.getElementById('modal-endpoint-token-install');
+    if (!modal) return;
+
+    activeModalToken = `${tokenPrefix}...`;
+    document.getElementById('modal-token-install-title').textContent = `📋 Kurulum Komutları: ${tokenName}`;
+    document.getElementById('modal-token-install-sub').textContent = `Önek: ${tokenPrefix}... • ID: ${tokenId}`;
+
+    const serverUrlInput = document.getElementById('modal-token-server-url');
+    if (serverUrlInput) {
+        serverUrlInput.value = window.location.origin;
+    }
+
+    updateModalTokenCommands();
+    modal.classList.add('active');
+}
+
+function closeTokenInstallModal() {
+    document.getElementById('modal-endpoint-token-install')?.classList.remove('active');
+}
+
+function updateModalTokenCommands() {
+    const serverUrl = (document.getElementById('modal-token-server-url')?.value || window.location.origin).replace(/\/$/, '');
+    const token = activeModalToken;
+
+    const lin = document.getElementById('modal-token-cmd-linux');
+    if (lin) lin.textContent = `curl -sSL ${serverUrl}/static/scripts/install-agent.sh | sudo bash -s -- --server "${serverUrl}" --token "${token}"`;
+
+    const win = document.getElementById('modal-token-cmd-windows');
+    if (win) win.textContent = `Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr -useb "${serverUrl}/static/scripts/install-agent.ps1" -OutFile "$env:TEMP\\install-agent.ps1"; & "$env:TEMP\\install-agent.ps1" -Server "${serverUrl}" -Token "${token}"`;
+
+    const mac = document.getElementById('modal-token-cmd-macos');
+    if (mac) mac.textContent = `curl -sSL ${serverUrl}/static/scripts/install-agent.sh | sudo bash -s -- --server "${serverUrl}" --token "${token}"`;
+
+    const doc = document.getElementById('modal-token-cmd-docker');
+    if (doc) doc.textContent = `docker run -d --name logger-agent --restart unless-stopped --net=host --pid=host -v /etc/logger-agent:/etc/logger-agent logger-agent:latest -server "${serverUrl}" -token "${token}"`;
+}
+
 
 
 
