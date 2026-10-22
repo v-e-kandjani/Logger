@@ -8100,6 +8100,11 @@ function switchEndpointSubSection(targetId) {
         sub.classList.toggle('active', sub.getAttribute('data-endpoint-target') === targetId);
     });
 
+    // Translate any static labels in the newly visible section
+    if (window.i18n && typeof window.i18n.applyTranslations === 'function') {
+        window.i18n.applyTranslations();
+    }
+
     if (targetId === 'endpoint-sec-agents') {
         loadEndpointAgents();
         if (typeof switchQuickPlatform === 'function') switchQuickPlatform(currentQuickPlatform);
@@ -8147,11 +8152,13 @@ async function loadEndpointDashboard() {
         document.getElementById('ep-stat-comp-badge').textContent = `%${pct}`;
         document.getElementById('ep-stat-need-reboot').textContent = data.endpoints_need_reboot || 0;
 
+        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+
         // Render Top Vulnerable Agents
         const agentsTbody = document.getElementById('ep-dash-top-agents-body');
         if (agentsTbody) {
             if (!data.top_vulnerable_agents || data.top_vulnerable_agents.length === 0) {
-                agentsTbody.innerHTML = `<tr><td colspan="4" class="text-center" style="color: var(--text-muted); padding: 20px;">Henüz kritik zafiyet tespit edilen uç nokta yok.</td></tr>`;
+                agentsTbody.innerHTML = `<tr><td colspan="4" class="text-center" style="color: var(--text-muted); padding: 20px;">${t('ep_no_top_risk_agents')}</td></tr>`;
             } else {
                 agentsTbody.innerHTML = data.top_vulnerable_agents.map(a => `
                     <tr>
@@ -8168,14 +8175,14 @@ async function loadEndpointDashboard() {
         const cvesTbody = document.getElementById('ep-dash-top-cves-body');
         if (cvesTbody) {
             if (!data.top_cves || data.top_cves.length === 0) {
-                cvesTbody.innerHTML = `<tr><td colspan="4" class="text-center" style="color: var(--text-muted); padding: 20px;">Aktif kritik CVE tespiti bulunmuyor.</td></tr>`;
+                cvesTbody.innerHTML = `<tr><td colspan="4" class="text-center" style="color: var(--text-muted); padding: 20px;">${t('ep_no_top_cves')}</td></tr>`;
             } else {
                 cvesTbody.innerHTML = data.top_cves.map(c => `
                     <tr>
                         <td><span style="font-family: var(--font-mono); color: var(--accent);">${escapeHtml(c.cve_id)}</span></td>
                         <td><span class="badge badge-danger">${c.cvss_score.toFixed(1)}</span></td>
                         <td>${c.cisa_kev ? '<span class="badge badge-danger" style="background: #9d174d;">KEV</span>' : '<span style="color: var(--text-muted);">-</span>'}</td>
-                        <td>${c.affected_count} Uç Nokta</td>
+                        <td>${c.affected_count} ${c.affected_count === 1 ? t('lbl_endpoint_single') : t('lbl_endpoint_plural')}</td>
                     </tr>
                 `).join('');
             }
@@ -8201,8 +8208,9 @@ async function loadEndpointAgents() {
         const data = await res.json();
         const agents = data.agents || [];
 
+        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
         if (agents.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 32px; color: var(--text-muted);">Kayıtlı uç nokta ajanı bulunamadı. "Yeni Kurulum Belirteci" oluşturarak bir ajan kurabilirsiniz.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 32px; color: var(--text-muted);">${t('ep_no_agents')}</td></tr>`;
             return;
         }
 
@@ -8299,27 +8307,41 @@ function renderOSBadge(osType, osName = '') {
 }
 
 function renderAgentStatusBadge(status, lastSeen) {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
     status = (status || 'healthy').toLowerCase();
     if (status === 'healthy') {
-        return `<span class="badge badge-success" style="display: inline-flex; align-items: center; gap: 4px;"><span class="live-dot" style="background: #22c55e;"></span> Sağlıklı</span>`;
+        return `<span class="badge badge-success" style="display: inline-flex; align-items: center; gap: 4px;"><span class="live-dot" style="background: #22c55e;"></span> ${t('status_healthy')}</span>`;
     } else if (status === 'warning') {
-        return `<span class="badge badge-warning">Uyarı</span>`;
+        return `<span class="badge badge-warning">${t('status_warning')}</span>`;
     } else {
-        return `<span class="badge badge-secondary">Çevrimdışı</span>`;
+        return `<span class="badge badge-secondary">${t('ep_stat_offline')}</span>`;
+    }
+}
+
+function formatDateTime(isoStr) {
+    if (!isoStr) return '-';
+    try {
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return String(isoStr);
+        const lang = (window.i18n && window.i18n.currentLang === 'en') ? 'en-US' : 'tr-TR';
+        return d.toLocaleString(lang);
+    } catch (e) {
+        return String(isoStr);
     }
 }
 
 function formatRelativeTime(dateStr) {
-    if (!dateStr) return 'Hiç bağlanmadı';
+    const isEn = (window.i18n && window.i18n.currentLang === 'en');
+    if (!dateStr) return isEn ? 'Never connected' : 'Hiç bağlanmadı';
     const diffMs = Date.now() - new Date(dateStr).getTime();
     const diffSec = Math.floor(diffMs / 1000);
-    if (diffSec < 60) return `${diffSec} sn önce`;
+    if (diffSec < 60) return isEn ? `${diffSec}s ago` : `${diffSec} sn önce`;
     const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return `${diffMin} dk önce`;
+    if (diffMin < 60) return isEn ? `${diffMin}m ago` : `${diffMin} dk önce`;
     const diffHour = Math.floor(diffMin / 60);
-    if (diffHour < 24) return `${diffHour} sa önce`;
+    if (diffHour < 24) return isEn ? `${diffHour}h ago` : `${diffHour} sa önce`;
     const diffDay = Math.floor(diffHour / 24);
-    return `${diffDay} gün önce`;
+    return isEn ? `${diffDay}d ago` : `${diffDay} gün önce`;
 }
 
 async function loadEndpointTokens() {
@@ -8331,26 +8353,27 @@ async function loadEndpointTokens() {
         const res = await fetch(`/api/v1/endpoint/enrollment/tokens?tenant=${encodeURIComponent(tenant)}`);
         if (!res.ok) throw new Error('Belirteçler yüklenemedi');
         const tokens = await res.json();
+        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
 
         if (!tokens || tokens.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 24px; color: var(--text-muted);">Aktif kurulum belirteci bulunamadı. "+ Yeni Kurulum Belirteci" butonu ile oluşturabilirsiniz.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 24px; color: var(--text-muted);">${t('ep_no_tokens')}</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = tokens.map(t => {
-            const isRevoked = !!t.revoked_at;
-            const isExpired = t.expires_at && new Date(t.expires_at) < new Date();
-            const isFullyUsed = t.max_uses > 0 && t.current_uses >= t.max_uses;
+        tbody.innerHTML = tokens.map(tok => {
+            const isRevoked = !!tok.revoked_at;
+            const isExpired = tok.expires_at && new Date(tok.expires_at) < new Date();
+            const isFullyUsed = tok.max_uses > 0 && tok.current_uses >= tok.max_uses;
             const isInactive = isRevoked || isExpired || isFullyUsed;
 
-            let statusBadge = '<span class="badge badge-success">Aktif</span>';
-            if (isRevoked) statusBadge = '<span class="badge badge-danger">İptal Edildi</span>';
-            else if (isExpired) statusBadge = '<span class="badge badge-secondary">Süresi Doldu</span>';
-            else if (isFullyUsed) statusBadge = '<span class="badge badge-warning">Tükendi</span>';
+            let statusBadge = `<span class="badge badge-success">${t('status_active')}</span>`;
+            if (isRevoked) statusBadge = `<span class="badge badge-danger">${t('status_revoked')}</span>`;
+            else if (isExpired) statusBadge = `<span class="badge badge-secondary">${t('status_expired')}</span>`;
+            else if (isFullyUsed) statusBadge = `<span class="badge badge-warning">${t('status_exhausted')}</span>`;
 
-            const usesStr = `${t.current_uses} / ${t.max_uses > 0 ? t.max_uses : '∞'}`;
-            const platforms = (t.allowed_os && t.allowed_os.length > 0) ? t.allowed_os.join(', ') : 'Tümü (*)';
-            const expStr = t.expires_at ? new Date(t.expires_at).toLocaleString('tr-TR') : 'Süresiz';
+            const usesStr = `${tok.current_uses} / ${tok.max_uses > 0 ? tok.max_uses : '∞'}`;
+            const platforms = (tok.allowed_os && tok.allowed_os.length > 0) ? tok.allowed_os.join(', ') : t('lbl_all_platforms');
+            const expStr = tok.expires_at ? formatDateTime(tok.expires_at) : t('lbl_never_expires');
 
             return `
                 <tr>
@@ -8981,14 +9004,13 @@ async function loadEndpointPatches() {
         if (rebootEl) rebootEl.textContent = (summary.endpoints_need_reboot || 0).toLocaleString();
 
         const countEl = document.getElementById('ep-patches-total-count');
-        if (countEl) countEl.textContent = `${(data.total || patches.length).toLocaleString()} Yama Kaydı`;
+        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+        if (countEl) countEl.textContent = `${(data.total || patches.length).toLocaleString()} ${t('lbl_patch_count')}`;
 
         if (patches.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 28px;">Kayıtlı yama bulunmuyor. Uç noktalardan yama envanteri toplanması bekleniyor.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 28px;">${t('ep_no_patches')}</td></tr>`;
             return;
         }
-
-        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
         tbody.innerHTML = patches.map(p => {
             const isInstalled = (p.status === 'installed');
             const statusBadge = isInstalled
@@ -9084,11 +9106,12 @@ async function loadEndpointInventory() {
 
         const data = await res.json();
         const items = data.software || [];
+        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
         const countEl = document.getElementById('ep-inv-total-count');
-        if (countEl) countEl.textContent = `${(data.total || items.length).toLocaleString()} Yazılım`;
+        if (countEl) countEl.textContent = `${(data.total || items.length).toLocaleString()} ${t('lbl_software_count')}`;
 
         if (items.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 28px;">Henüz kayıtlı yazılım envanteri bulunmuyor. Ajanların envanter taraması bekleniyor.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 28px;">${t('ep_no_inventory')}</td></tr>`;
             return;
         }
 
@@ -9271,12 +9294,13 @@ async function loadEndpointVulnerabilities() {
 
         const data = await res.json();
         const findings = data.findings || [];
+        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
         const countEl = document.getElementById('ep-vulns-total-count');
-        if (countEl) countEl.textContent = `${(data.total || findings.length).toLocaleString()} Zafiyet`;
+        if (countEl) countEl.textContent = `${(data.total || findings.length).toLocaleString()} ${t('lbl_vuln_count')}`;
 
         if (findings.length === 0) {
             tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 28px;">
-                🎉 Harika! Uç noktalarda aktif tespit edilmiş zafiyet bulunmuyor.
+                ${t('ep_no_vulns')}
             </td></tr>`;
             return;
         }
@@ -9284,18 +9308,18 @@ async function loadEndpointVulnerabilities() {
         tbody.innerHTML = findings.map(f => {
             let sevBadge = `<span class="badge" style="background: rgba(148, 163, 184, 0.2); color: #94a3b8;">${escapeHtml(f.severity)}</span>`;
             if (f.severity === 'CRITICAL') {
-                sevBadge = `<span class="badge" style="background: #991b1b; color: #fff; font-weight: 700;">KRİTİK</span>`;
+                sevBadge = `<span class="badge" style="background: #991b1b; color: #fff; font-weight: 700;">${t('lbl_crit_badge')}</span>`;
             } else if (f.severity === 'HIGH') {
-                sevBadge = `<span class="badge" style="background: #ea580c; color: #fff; font-weight: 600;">YÜKSEK</span>`;
+                sevBadge = `<span class="badge" style="background: #ea580c; color: #fff; font-weight: 600;">${t('lbl_high_badge')}</span>`;
             } else if (f.severity === 'MEDIUM') {
-                sevBadge = `<span class="badge" style="background: #ca8a04; color: #fff;">ORTA</span>`;
+                sevBadge = `<span class="badge" style="background: #ca8a04; color: #fff;">${t('lbl_medium_badge')}</span>`;
             } else if (f.severity === 'LOW') {
-                sevBadge = `<span class="badge" style="background: #2563eb; color: #fff;">DÜŞÜK</span>`;
+                sevBadge = `<span class="badge" style="background: #2563eb; color: #fff;">${t('lbl_low_badge')}</span>`;
             }
 
             const cvssScore = (f.cvss_score != null) ? f.cvss_score.toFixed(1) : '-';
             const kevBadge = f.is_exploited ?
-                `<span class="badge" style="background: #b91c1c; color: #fff; font-weight: 700;" title="CISA Known Exploited Vulnerability">⚡ KEV (İstismarda)</span>` :
+                `<span class="badge" style="background: #b91c1c; color: #fff; font-weight: 700;" title="CISA Known Exploited Vulnerability">${t('lbl_kev_badge')}</span>` :
                 `<span style="color: var(--text-muted); font-size: 11px;">-</span>`;
 
             return `

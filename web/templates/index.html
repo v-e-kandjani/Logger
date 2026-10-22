@@ -843,7 +843,7 @@
                                             <th data-i18n="th_agent_hostname">Uç Nokta</th>
                                             <th data-i18n="th_agent_os">İşletim Sistemi</th>
                                             <th data-i18n="ep_stat_crit_vulns">Kritik CVE</th>
-                                            <th data-i18n="status_total">Toplam Zafiyet</th>
+                                            <th data-i18n="th_total_vulns">Toplam Zafiyet</th>
                                         </tr>
                                     </thead>
                                     <tbody id="ep-dash-top-agents-body">
@@ -954,7 +954,7 @@
                                         </div>
                                         <div style="display: flex; gap: 4px; align-items: center;">
                                             <a id="quick-step-installer-btn" href="/static/downloads/logger-agent-setup.exe" download="logger-agent-setup.exe" class="btn btn-sm btn-primary" style="padding: 2px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">⬇️ <span id="quick-step-installer-text">.exe İndir</span></a>
-                                            <button class="btn btn-sm btn-outline" onclick="copyQuickStepCmd()" style="padding: 2px 8px; font-size: 11px;">📋 Kopyala</button>
+                                            <button class="btn btn-sm btn-outline" onclick="copyQuickStepCmd()" style="padding: 2px 8px; font-size: 11px;">📋 <span data-i18n="lbl_copy_cmd">Kopyala</span></button>
                                         </div>
                                     </div>
                                     <div class="ep-code-box" style="margin: 4px 0; max-height: 60px; padding: 8px 10px;">
@@ -994,13 +994,13 @@
                                     <th data-i18n="th_agent_hostname">Uç Nokta / Hostname</th>
                                     <th data-i18n="th_agent_os">İşletim Sistemi</th>
                                     <th data-i18n="th_agent_version">Ajan Sürümü</th>
-                                    <th>Cihaz Sağlığı</th>
-                                    <th>Donanım Kullanımı (CPU / RAM / Disk)</th>
+                                    <th data-i18n="th_agent_health">Cihaz Sağlığı</th>
+                                    <th data-i18n="th_agent_hardware">Donanım Kullanımı (CPU / RAM / Disk)</th>
                                     <th data-i18n="th_agent_status">Durum</th>
                                     <th data-i18n="th_agent_vulns">Zafiyetler</th>
                                     <th data-i18n="th_agent_patches">Yamalar</th>
                                     <th data-i18n="th_agent_last_seen">Son İletişim</th>
-                                    <th>İşlemler</th>
+                                    <th data-i18n="th_actions">İşlemler</th>
                                 </tr>
                             </thead>
                             <tbody id="ep-agents-tbody">
@@ -1014,12 +1014,12 @@
                 <div class="endpoint-section" id="endpoint-sec-inventory" style="display: none;">
                     <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                         <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 600px;">
-                            <input type="text" id="ep-inv-search" class="form-control" placeholder="Yazılım, üretici veya uç nokta ara..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointInventory();">
-                            <button class="btn btn-secondary" onclick="loadEndpointInventory()">Filtrele</button>
+                            <input type="text" id="ep-inv-search" class="form-control" placeholder="Yazılım, üretici veya uç nokta ara..." data-i18n-placeholder="cve_search_placeholder" style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointInventory();">
+                            <button class="btn btn-secondary" onclick="loadEndpointInventory()" data-i18n="btn_filter">Filtrele</button>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <span style="font-size: 12px; color: var(--text-muted);" id="ep-inv-total-count">0 Yazılım</span>
-                            <button class="btn btn-outline" onclick="loadEndpointInventory()">🔄 Yenile</button>
+                            <button class="btn btn-outline" onclick="loadEndpointInventory()" data-i18n="btn_refresh">🔄 Yenile</button>
                         </div>
                     </div>
 
@@ -1027,12 +1027,12 @@
                         <table class="data-table" id="ep-inventory-table">
                             <thead>
                                 <tr>
-                                    <th>Uç Nokta</th>
-                                    <th>Yazılım Adı</th>
-                                    <th>Sürüm</th>
-                                    <th>Üretici / Yayıncı</th>
-                                    <th>Kurulum Konumu / ID</th>
-                                    <th>Son Güncelleme</th>
+                                    <th data-i18n="th_affected_endpoint">Uç Nokta</th>
+                                    <th data-i18n="th_software_name">Yazılım Adı</th>
+                                    <th data-i18n="th_software_version">Sürüm</th>
+                                    <th data-i18n="th_publisher">Üretici / Yayıncı</th>
+                                    <th data-i18n="th_install_location">Kurulum Konumu / ID</th>
+                                    <th data-i18n="th_last_update">Son Güncelleme</th>
                                 </tr>
                             </thead>
                             <tbody id="ep-inventory-tbody">
@@ -1082,19 +1082,19 @@
                     <!-- Vulnerabilities Filter & Search Bar -->
                     <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                         <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 650px;">
-                            <input type="text" id="ep-vuln-search" class="form-control" placeholder="CVE ID, yazılım veya uç nokta ara..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointVulnerabilities();">
+                            <input type="text" id="ep-vuln-search" class="form-control" placeholder="CVE ID, yazılım veya uç nokta ara..." data-i18n-placeholder="cve_search_placeholder" style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointVulnerabilities();">
                             <select id="ep-vuln-severity-filter" class="form-control" style="width: 140px;" onchange="loadEndpointVulnerabilities()">
-                                <option value="">Tüm Dereceler</option>
+                                <option value="" data-i18n="opt_all_severities">Tüm Dereceler</option>
                                 <option value="CRITICAL">🔴 Kritik (CRITICAL)</option>
                                 <option value="HIGH">🟠 Yüksek (HIGH)</option>
                                 <option value="MEDIUM">🟡 Orta (MEDIUM)</option>
                                 <option value="LOW">🔵 Düşük (LOW)</option>
                             </select>
-                            <button class="btn btn-secondary" onclick="loadEndpointVulnerabilities()">Filtrele</button>
+                            <button class="btn btn-secondary" onclick="loadEndpointVulnerabilities()" data-i18n="btn_filter">Filtrele</button>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <span style="font-size: 12px; color: var(--text-muted);" id="ep-vulns-total-count">0 Zafiyet</span>
-                            <button class="btn btn-outline" onclick="loadCVEStatus(); loadEndpointVulnerabilities();">🔄 Yenile</button>
+                            <button class="btn btn-outline" onclick="loadCVEStatus(); loadEndpointVulnerabilities();" data-i18n="btn_refresh">🔄 Yenile</button>
                         </div>
                     </div>
 
@@ -1102,14 +1102,14 @@
                         <table class="data-table" id="ep-vulns-table">
                             <thead>
                                 <tr>
-                                    <th>Uç Nokta</th>
-                                    <th>Etkilenen Yazılım</th>
-                                    <th>CVE Tanımı</th>
-                                    <th>CVSS Skoru</th>
-                                    <th>Önem</th>
-                                    <th>İstismar (KEV)</th>
-                                    <th>Açıklama / Çözüm</th>
-                                    <th>Tespit Tarihi</th>
+                                    <th data-i18n="th_affected_endpoint">Uç Nokta</th>
+                                    <th data-i18n="th_affected_software">Etkilenen Yazılım</th>
+                                    <th data-i18n="th_cve_desc">CVE Tanımı</th>
+                                    <th data-i18n="th_cvss_score">CVSS Skoru</th>
+                                    <th data-i18n="th_severity">Önem</th>
+                                    <th data-i18n="th_kev">İstismar (KEV)</th>
+                                    <th data-i18n="th_solution">Açıklama / Çözüm</th>
+                                    <th data-i18n="th_detected_date">Tespit Tarihi</th>
                                 </tr>
                             </thead>
                             <tbody id="ep-vulns-tbody">
@@ -1153,19 +1153,19 @@
                     <!-- Filter & Actions Bar -->
                     <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                         <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 650px;">
-                            <input type="text" id="ep-patches-search" class="form-control" placeholder="KB ID, yama adı veya uç nokta ara..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointPatches();">
+                            <input type="text" id="ep-patches-search" class="form-control" placeholder="KB ID, yama adı veya uç nokta ara..." data-i18n-placeholder="patch_search_placeholder" style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointPatches();">
                             <select id="ep-patches-status-filter" class="form-control" style="width: 150px;" onchange="loadEndpointPatches()">
-                                <option value="">Tüm Durumlar</option>
-                                <option value="installed">🟢 Yüklü (Installed)</option>
-                                <option value="missing">🟠 Eksik (Missing)</option>
-                                <option value="pending_reboot">🔴 Reboot Bekleyen</option>
+                                <option value="" data-i18n="lbl_filter_status">Tüm Durumlar</option>
+                                <option value="installed" data-i18n="patch_opt_installed">🟢 Yüklü (Installed)</option>
+                                <option value="missing" data-i18n="patch_opt_missing">🟠 Eksik (Missing)</option>
+                                <option value="pending_reboot" data-i18n="patch_opt_reboot">🔴 Reboot Bekleyen</option>
                             </select>
-                            <button class="btn btn-secondary" onclick="loadEndpointPatches()">Filtrele</button>
+                            <button class="btn btn-secondary" onclick="loadEndpointPatches()" data-i18n="btn_filter">Filtrele</button>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <span style="font-size: 12px; color: var(--text-muted);" id="ep-patches-total-count">0 Yama</span>
-                            <button class="btn btn-outline" onclick="loadEndpointPatches()">🔄 Yenile</button>
-                            <button class="btn btn-primary" onclick="triggerPatchScan()">⚡ Şimdi Yama Taraması Başlat</button>
+                            <button class="btn btn-outline" onclick="loadEndpointPatches()" data-i18n="btn_refresh">🔄 Yenile</button>
+                            <button class="btn btn-primary" onclick="triggerPatchScan()" data-i18n="btn_scan_patches_now">⚡ Şimdi Yama Taraması Başlat</button>
                         </div>
                     </div>
 
@@ -1173,14 +1173,14 @@
                         <table class="data-table" id="ep-patches-table">
                             <thead>
                                 <tr>
-                                    <th>Uç Nokta</th>
-                                    <th>Yama / KB ID</th>
-                                    <th>Açıklama &amp; Başlık</th>
-                                    <th>Önem Seviyesi</th>
-                                    <th>İlişkili CVE</th>
-                                    <th>Durum</th>
-                                    <th>Yeniden Başlatma</th>
-                                    <th>Tespit / Yükleme Tarihi</th>
+                                    <th data-i18n="th_affected_endpoint">Uç Nokta</th>
+                                    <th data-i18n="th_patch_id">Yama / KB ID</th>
+                                    <th data-i18n="th_patch_title">Açıklama &amp; Başlık</th>
+                                    <th data-i18n="th_severity">Önem Seviyesi</th>
+                                    <th data-i18n="th_patch_cve">İlişkili CVE</th>
+                                    <th data-i18n="th_agent_status">Durum</th>
+                                    <th data-i18n="th_reboot_required">Yeniden Başlatma</th>
+                                    <th data-i18n="th_install_date">Tespit / Yükleme Tarihi</th>
                                 </tr>
                             </thead>
                             <tbody id="ep-patches-tbody">
@@ -1242,15 +1242,15 @@
                         <table class="data-table" id="ep-tokens-table">
                             <thead>
                                 <tr>
-                                    <th>Belirteç Adı</th>
-                                    <th>Önek (Prefix)</th>
-                                    <th>Kiracı</th>
-                                    <th>Kullanım</th>
-                                    <th>Platformlar</th>
-                                    <th>Son Geçerlilik</th>
-                                    <th>Oluşturan</th>
-                                    <th>Durum</th>
-                                    <th>İşlem</th>
+                                    <th data-i18n="th_token_name">Belirteç Adı</th>
+                                    <th data-i18n="th_token_prefix">Önek (Prefix)</th>
+                                    <th data-i18n="th_tenant">Kiracı</th>
+                                    <th data-i18n="th_uses">Kullanım</th>
+                                    <th data-i18n="th_platforms">Platformlar</th>
+                                    <th data-i18n="th_expires_at">Son Geçerlilik</th>
+                                    <th data-i18n="th_created_by">Oluşturan</th>
+                                    <th data-i18n="th_agent_status">Durum</th>
+                                    <th data-i18n="th_actions">İşlem</th>
                                 </tr>
                             </thead>
                             <tbody id="ep-tokens-tbody">
