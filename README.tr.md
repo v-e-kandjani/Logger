@@ -254,6 +254,17 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.8.3** (Uç Nokta Güvenliği Modal Pencere Görünürlüğü, Menü Senkronizasyonu & pgx ErrNoRows İyileştirmesi):
+  - **Uç Nokta Belirteç ve Ajan Pencereleri Düzeltmesi**:
+    - Yeni Kurulum Belirteci (`#modal-endpoint-new-token`), Ajan İnceleme (`#modal-endpoint-agent-detail`) ve Hızlı Kurulum Komutları (`#modal-endpoint-token-install`) pencereleri `.modal-backdrop` standardına getirilerek açılmama ve görünmez kalma sorunu giderildi.
+    - `dashboard.css` içerisine `.modal-overlay` ve `.modal-backdrop.active` / `.modal-overlay.active` için `display: flex !important` kuralları eklendi.
+    - Tüm uç nokta pencerelerine arka plana tıklayarak kapatma (backdrop dismiss) desteği eklendi.
+  - **Yan Menü ve Alt Bölüm Senkronizasyonu**:
+    - Uç Nokta Güvenliği sekmesine tıklandığında (`switchTab('endpoint')`) aktif alt bölüm ve menü öğelerinin tutarlı açılması sağlandı.
+    - Eksik global `switchEndpointSubnav = switchEndpointSubSection` takma adı tanımlandı.
+  - **Veritabanı Hata Yönetimi Sağlamlaştırması**:
+    - `internal/database/postgres/endpoint.go` içerisindeki belirteç doğrulama, kalp atışı ve ajan detay sorgularında pgx v5 `pgx.ErrNoRows` desteği eklendi.
+
 - **v1.8.2** (Windows .exe ve macOS .dmg Yerel Ajan Yükleyicileri):
   - **Bağımsız Windows Kurulum Sihirbazı (`logger-agent-setup.exe`)**:
     - `logger-agent.exe` ikili dosyasını kendi bünyesine gömen Go tabanlı yerel yükleyici (`agent/cmd/installer-windows`) geliştirildi.

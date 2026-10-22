@@ -999,7 +999,8 @@ body.dark-theme {
 .log-msg { color: #F1F5F9; flex: 1; word-break: break-all; }
 
 /* Modal */
-.modal-backdrop {
+.modal-backdrop,
+.modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -1010,6 +1011,11 @@ body.dark-theme {
     align-items: center;
     justify-content: center;
     z-index: 1000;
+}
+
+.modal-backdrop.active,
+.modal-overlay.active {
+    display: flex !important;
 }
 
 .modal {

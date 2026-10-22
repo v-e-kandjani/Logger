@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/syslog-platform/logger/internal/models"
 )
 
@@ -465,7 +466,7 @@ func (db *DB) ValidateAndConsumeEnrollmentToken(ctx context.Context, rawToken, o
 		&id, &tSlug, &gID, &maxUses, &currentUses, &isOneTime, &allowedOS, &expiresAt, &revokedAt,
 	)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return "", nil, errors.New("invalid enrollment token")
 		}
 		return "", nil, fmt.Errorf("querying token: %w", err)
@@ -585,7 +586,7 @@ func (db *DB) UpdateAgentHeartbeat(ctx context.Context, hb models.AgentHeartbeat
 		hb.AgentUUID, hb.Status, hb.AgentVersion, hb.IPAddress, hb.MACAddress, metricsJSON,
 	).Scan(&currentRevision)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("agent not found or unenrolled")
 		}
 		return nil, fmt.Errorf("updating heartbeat: %w", err)
@@ -713,7 +714,7 @@ func (db *DB) GetAgentByID(ctx context.Context, id uuid.UUID, tenantSlug string)
 		&a.OpenVulnsCount, &a.CriticalVulnsCount, &a.MissingPatchesCount, &a.RebootRequired,
 	)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("agent not found")
 		}
 		return nil, err

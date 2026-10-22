@@ -215,7 +215,7 @@ function switchTab(tab, targetSectionId = null) {
             loadEndpointDashboard();
             loadEndpointAgents();
             loadEndpointTokens();
-            if (targetSectionId) switchEndpointSubSection(targetSectionId);
+            switchEndpointSubSection(targetSectionId || currentEndpointSection || 'endpoint-sec-dashboard');
         }
         if (tab === 'devices') loadDevices();
         if (tab === 'unregistered') loadUnregisteredSources();
@@ -342,6 +342,19 @@ function initNavigation() {
             const targetId = btn.getAttribute('data-target');
             switchEndpointSubSection(targetId);
         });
+    });
+
+    // 4. Endpoint Modals Backdrop Click Dismissal
+    ['modal-endpoint-new-token', 'modal-endpoint-agent-detail', 'modal-endpoint-token-install'].forEach(id => {
+        const modal = document.getElementById(id);
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                    modal.style.display = 'none';
+                }
+            });
+        }
     });
 
     updateViewHeader('dashboard');
@@ -8320,20 +8333,30 @@ async function loadEndpointTokens() {
 function openNewTokenModal() {
     const modal = document.getElementById('modal-endpoint-new-token');
     if (!modal) return;
-    document.getElementById('token-form-name').value = '';
-    document.getElementById('token-form-max-uses').value = '0';
-    document.getElementById('token-form-expires-h').value = '72';
-    document.getElementById('token-form-one-time').checked = false;
-    document.getElementById('token-result-container').style.display = 'none';
+    const nameEl = document.getElementById('token-form-name');
+    if (nameEl) nameEl.value = '';
+    const maxUsesEl = document.getElementById('token-form-max-uses');
+    if (maxUsesEl) maxUsesEl.value = '0';
+    const expiresEl = document.getElementById('token-form-expires-h');
+    if (expiresEl) expiresEl.value = '72';
+    const oneTimeEl = document.getElementById('token-form-one-time');
+    if (oneTimeEl) oneTimeEl.checked = false;
+    const resBox = document.getElementById('token-result-container');
+    if (resBox) resBox.style.display = 'none';
     modal.classList.add('active');
+    modal.style.display = 'flex';
 }
 
 function closeNewTokenModal() {
-    document.getElementById('modal-endpoint-new-token')?.classList.remove('active');
+    const modal = document.getElementById('modal-endpoint-new-token');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 async function submitCreateToken() {
-    const name = document.getElementById('token-form-name')?.value.trim();
+    const name = (document.getElementById('token-form-name')?.value || '').trim();
     const maxUses = parseInt(document.getElementById('token-form-max-uses')?.value || '0', 10);
     const expiresInH = parseInt(document.getElementById('token-form-expires-h')?.value || '0', 10);
     const isOneTime = document.getElementById('token-form-one-time')?.checked || false;
@@ -8454,13 +8477,18 @@ async function inspectEndpointAgent(agentId) {
         }
 
         modal.classList.add('active');
+        modal.style.display = 'flex';
     } catch (err) {
         showToast(err.message, 'error');
     }
 }
 
 function closeAgentDetailModal() {
-    document.getElementById('modal-endpoint-agent-detail')?.classList.remove('active');
+    const modal = document.getElementById('modal-endpoint-agent-detail');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -8600,10 +8628,15 @@ function openTokenInstallModal(tokenId, tokenName, tokenPrefix) {
 
     updateModalTokenCommands();
     modal.classList.add('active');
+    modal.style.display = 'flex';
 }
 
 function closeTokenInstallModal() {
-    document.getElementById('modal-endpoint-token-install')?.classList.remove('active');
+    const modal = document.getElementById('modal-endpoint-token-install');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 function updateModalTokenCommands() {
@@ -8736,6 +8769,19 @@ function copyQuickStepCmd() {
         showToast('Kopyalama başarısız oldu.', 'error');
     });
 }
+
+// Global window aliases for Endpoint Security
+window.switchEndpointSubSection = switchEndpointSubSection;
+window.switchEndpointSubnav = switchEndpointSubSection;
+window.openNewTokenModal = openNewTokenModal;
+window.closeNewTokenModal = closeNewTokenModal;
+window.closeAgentDetailModal = closeAgentDetailModal;
+window.openTokenInstallModal = openTokenInstallModal;
+window.closeTokenInstallModal = closeTokenInstallModal;
+window.submitCreateToken = submitCreateToken;
+window.inspectEndpointAgent = inspectEndpointAgent;
+window.revokeEndpointToken = revokeEndpointToken;
+
 
 
 

@@ -265,6 +265,17 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.8.3** (Endpoint Security Modal Dialog Visibility, Sub-Navigation Sync & pgx ErrNoRows Fixes):
+  - **Endpoint Enrollment Token Modal & Dialog Fixes**:
+    - Restored full modal dialog visibility for New Enrollment Token (`#modal-endpoint-new-token`), Agent Inspection (`#modal-endpoint-agent-detail`), and Token Quick Commands (`#modal-endpoint-token-install`) by standardizing on `.modal-backdrop` and explicit display flex/none management.
+    - Added CSS fallback rules in `dashboard.css` for `.modal-overlay` and `.modal-backdrop.active` / `.modal-overlay.active`.
+    - Implemented backdrop click auto-dismissal for all endpoint security modals.
+  - **Sidebar Submenu & Sub-Section Navigation**:
+    - Fixed sub-section synchronization when opening the Endpoint Security tab (`switchTab('endpoint')`) so active panes and subitems consistently sync.
+    - Added missing global function alias `switchEndpointSubnav = switchEndpointSubSection`.
+  - **Database Error Handling Hardening**:
+    - Resolved pgx v5 `pgx.ErrNoRows` handling in `internal/database/postgres/endpoint.go` across token consumption, agent heartbeats, and agent detail lookups.
+
 - **v1.8.2** (Native Windows .exe & macOS .dmg Standalone Agent Installers):
   - **Standalone Windows Installer (`logger-agent-setup.exe`)**:
     - Embedded native Go installer (`agent/cmd/installer-windows`) packaging `logger-agent.exe` into a single standalone executable.

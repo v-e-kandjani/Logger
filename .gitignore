@@ -18,6 +18,7 @@ coverage/
 # Runtime data & archives
 /archive/
 /data/
+config/.version_info
 *.log
 *.zd
 *.sha256
