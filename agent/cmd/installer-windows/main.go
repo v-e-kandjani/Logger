@@ -164,13 +164,34 @@ func runInstall(serverURL, token, targetDir string, insecure, silent bool) {
 		fatalMsg(silent, "Failed to write config file to %s: %v", configPath, err)
 	}
 
+	// Write uninstall.bat helper
+	uninstallBatPath := filepath.Join(targetDir, "uninstall.bat")
+	uninstallBatContent := `@echo off
+echo ==================================================================
+echo       VALTRIVO LOGSEAL - WINDOWS AGENT UNINSTALLER
+echo ==================================================================
+echo.
+echo [*] Stopping and removing LoggerAgent Windows Service...
+net stop LoggerAgent >nul 2>&1
+sc.exe stop LoggerAgent >nul 2>&1
+sc.exe delete LoggerAgent >nul 2>&1
+reg.exe delete "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\LoggerAgent" /f >nul 2>&1
+echo [✓] Windows Service and Registry entries successfully removed.
+echo [*] Removing application files...
+start /b "" cmd /c "ping -n 3 127.0.0.1 >nul & rmdir /s /q \"%~dp0\""
+echo [✓] Valtrivo LogSeal Agent has been completely uninstalled.
+echo.
+pause
+`
+	_ = os.WriteFile(uninstallBatPath, []byte(uninstallBatContent), 0755)
+
 	// 4. Register Windows Service
 	logMsg(silent, "[*] Registering Windows Service '%s'...", serviceName)
 	// Delete old service if exists
 	exec.Command("sc.exe", "delete", serviceName).Run()
 	time.Sleep(500 * time.Millisecond)
 
-	binPathCmd := fmt.Sprintf(`"%s" -config "%s"`, binaryPath, configPath)
+	binPathCmd := fmt.Sprintf(`"%s"`, binaryPath)
 	createArgs := []string{
 		"create", serviceName,
 		fmt.Sprintf("binPath= %s", binPathCmd),
@@ -212,6 +233,7 @@ func runInstall(serverURL, token, targetDir string, insecure, silent bool) {
 		fmt.Printf(" Binary Location  : %s\n", binaryPath)
 		fmt.Printf(" Configuration    : %s\n", configPath)
 		fmt.Printf(" Data Directory   : %s\n", dataDir)
+		fmt.Printf(" Uninstaller      : %s\n", uninstallBatPath)
 		fmt.Println(" Verify Command   : Get-Service LoggerAgent")
 		fmt.Println("==================================================================")
 		fmt.Println()
@@ -237,9 +259,14 @@ func runUninstall(targetDir string, silent bool) {
 
 	logMsg(silent, "[✓] Service unregistered and removed from Windows.")
 
+	// Schedule directory cleanup via detached cmd process so running executable isn't blocked
+	if targetDir != "" {
+		cleanupCmd := fmt.Sprintf(`ping -n 3 127.0.0.1 >nul & rmdir /s /q "%s"`, targetDir)
+		_ = exec.Command("cmd.exe", "/c", cleanupCmd).Start()
+	}
+
 	if !silent {
-		fmt.Printf("[*] Configuration and data remain preserved at: %s\n", targetDir)
-		fmt.Println("[✓] Uninstallation completed successfully.")
+		fmt.Println("[✓] Uninstallation completed successfully. All files scheduled for removal.")
 		fmt.Println("Press Enter to exit...")
 		var wait string
 		fmt.Scanln(&wait)

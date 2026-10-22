@@ -265,7 +265,16 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
-- **v1.8.3** (Endpoint Security Modal Dialog Visibility, Sub-Navigation Sync & pgx ErrNoRows Fixes):
+- **v1.8.3** (Endpoint Security Modal Dialog Visibility, Sub-Navigation Sync & pgx ErrNoRows Fixes) / **Agent v0.1.1** (Windows SCM Dispatcher & Comprehensive Uninstaller):
+  - **LOGGER Agent v0.1.1 Hardening**:
+    - **Windows Service Dispatcher (`golang.org/x/sys/windows/svc`)**: Native integration with Windows Service Control Manager (SCM), preventing service start timeouts and error 1053.
+    - **Zero-Args Service Execution & Config Discovery**: The service starts cleanly without relying on fragile CLI arguments; automatically detects `config.json` next to the binary.
+    - **Resilient Enrollment Retry Loop**: If initial network connectivity fails or the token is pending, the agent retries enrollment every 15s instead of terminating the Windows service.
+    - **Multi-Mode Windows Uninstaller**:
+      - One-click `uninstall.bat` generated directly inside `C:\Program Files\LOGGER Agent`.
+      - Integrated silent/interactive uninstaller in `logger-agent-setup.exe -uninstall`.
+      - Standalone remote PowerShell uninstaller (`uninstall-agent.ps1`) for remote IT management.
+      - Full registration in Windows Add/Remove Programs (Registry).
   - **Endpoint Enrollment Token Modal & Dialog Fixes**:
     - Restored full modal dialog visibility for New Enrollment Token (`#modal-endpoint-new-token`), Agent Inspection (`#modal-endpoint-agent-detail`), and Token Quick Commands (`#modal-endpoint-token-install`) by standardizing on `.modal-backdrop` and explicit display flex/none management.
     - Added CSS fallback rules in `dashboard.css` for `.modal-overlay` and `.modal-backdrop.active` / `.modal-overlay.active`.

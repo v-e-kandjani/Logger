@@ -41,6 +41,18 @@ func DefaultConfig() *Config {
 // LoadConfig loads from json file or returns defaults
 func LoadConfig(path string) (*Config, error) {
 	cfg := DefaultConfig()
+
+	if path == "" {
+		if _, err := os.Stat("config.json"); err == nil {
+			path = "config.json"
+		} else if exe, err := os.Executable(); err == nil {
+			cand := filepath.Join(filepath.Dir(exe), "config.json")
+			if _, err := os.Stat(cand); err == nil {
+				path = cand
+			}
+		}
+	}
+
 	cfg.ConfigPath = path
 
 	if path != "" {

@@ -101,6 +101,41 @@ $config = @{
 }
 $config | ConvertTo-Json -Depth 4 | Set-Content -Path $ConfigFile -Encoding UTF8
 
+# Write Uninstaller batch script
+$uninstallBat = @"
+@echo off
+setlocal
+echo ==================================================================
+echo       VALTRIVO LOGSEAL - WINDOWS AGENT UNINSTALLER
+echo ==================================================================
+echo.
+echo [*] Stopping and removing $ServiceName Windows Service...
+net stop $ServiceName >nul 2>&1
+sc.exe stop $ServiceName >nul 2>&1
+sc.exe delete $ServiceName >nul 2>&1
+reg.exe delete "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\$ServiceName" /f >nul 2>&1
+echo [✓] Windows Service and Registry entries successfully removed.
+echo [*] Removing application files...
+start /b "" cmd /c "ping -n 3 127.0.0.1 >nul & rmdir /s /q `"%~dp0`""
+echo [✓] Valtrivo LogSeal Agent has been completely uninstalled.
+echo.
+pause
+"@
+[System.IO.File]::WriteAllText("$InstallDir\uninstall.bat", $uninstallBat, [System.Text.Encoding]::ASCII)
+
+# Register in Windows Add/Remove Programs (Registry)
+try {
+    $regPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$ServiceName"
+    New-Item -Path $regPath -Force | Out-Null
+    Set-ItemProperty -Path $regPath -Name "DisplayName" -Value "Valtrivo LogSeal Endpoint Agent" -Force
+    Set-ItemProperty -Path $regPath -Name "DisplayVersion" -Value "0.1.1" -Force
+    Set-ItemProperty -Path $regPath -Name "Publisher" -Value "Valtrivo" -Force
+    Set-ItemProperty -Path $regPath -Name "InstallLocation" -Value $InstallDir -Force
+    Set-ItemProperty -Path $regPath -Name "UninstallString" -Value "`"$InstallDir\uninstall.bat`"" -Force
+} catch {
+    Write-Warning "Could not write Add/Remove Programs registry entry: $_"
+}
+
 # Setup Windows Service
 Write-Host "[*] Configuring Windows Service '$ServiceName'..." -ForegroundColor Blue
 $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
@@ -111,24 +146,32 @@ if ($existingService) {
     Start-Sleep -Seconds 2
 }
 
-# Create new Windows Service
-$binPathArg = "`"$BinaryPath`" -config `"$ConfigFile`""
-$createResult = & sc.exe create $ServiceName binPath= $binPathArg start= auto DisplayName= "LogSeal Endpoint Security Agent"
+# Create new Windows Service (Auto-locates config.json next to binary)
+$binPathArg = "`"$BinaryPath`""
+$createResult = & sc.exe create $ServiceName binPath= $binPathArg start= auto DisplayName= "Valtrivo LogSeal Endpoint Agent"
 Write-Host "[*] sc.exe result: $createResult"
 
 & sc.exe description $ServiceName "Valtrivo LogSeal cross-platform endpoint telemetry, asset inventory, and vulnerability agent." | Out-Null
-& sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/60000 | Out-Null
+& sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
 
 # Start Service
 Write-Host "[*] Starting $ServiceName..." -ForegroundColor Blue
-Start-Service -Name $ServiceName
-Start-Sleep -Seconds 2
-
-$status = Get-Service -Name $ServiceName
-Write-Host "==================================================================" -ForegroundColor Green
-Write-Host "      LOGGER AGENT INSTALLED AND STARTED SUCCESSFULLY!            " -ForegroundColor Green
-Write-Host "==================================================================" -ForegroundColor Green
-Write-Host "Service Name   : $($status.Name) ($($status.DisplayName))"
-Write-Host "Service Status : $($status.Status)"
-Write-Host "Configuration  : $ConfigFile"
-Write-Host "Check Status   : Get-Service LoggerAgent"
+try {
+    Start-Service -Name $ServiceName -ErrorAction Stop
+    Start-Sleep -Seconds 2
+    $status = Get-Service -Name $ServiceName
+    Write-Host "==================================================================" -ForegroundColor Green
+    Write-Host "      LOGGER AGENT INSTALLED AND STARTED SUCCESSFULLY!            " -ForegroundColor Green
+    Write-Host "==================================================================" -ForegroundColor Green
+    Write-Host "Service Name   : $($status.Name) ($($status.DisplayName))"
+    Write-Host "Service Status : $($status.Status)"
+    Write-Host "Configuration  : $ConfigFile"
+    Write-Host "Log File       : $DataDir\agent.log"
+    Write-Host "Uninstaller    : $InstallDir\uninstall.bat"
+    Write-Host "Check Status   : Get-Service LoggerAgent"
+} catch {
+    Write-Warning "[!] Service failed to start immediately: $_"
+    Write-Host "Diagnostics:" -ForegroundColor Yellow
+    Write-Host "1. Review agent log: Get-Content `"$DataDir\agent.log`" -Tail 20"
+    Write-Host "2. Or run manually in console to test: & `"$BinaryPath`""
+}

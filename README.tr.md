@@ -254,7 +254,16 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
-- **v1.8.3** (Uç Nokta Güvenliği Modal Pencere Görünürlüğü, Menü Senkronizasyonu & pgx ErrNoRows İyileştirmesi):
+- **v1.8.3** (Uç Nokta Güvenliği Modal Pencere Görünürlüğü, Menü Senkronizasyonu & pgx ErrNoRows İyileştirmesi) / **Agent v0.1.1** (Windows SCM Servis Yöneticisi & Kapsamlı Kaldırıcı):
+  - **LOGGER Ajan v0.1.1 Sağlamlaştırması**:
+    - **Windows Service Dispatcher (`golang.org/x/sys/windows/svc`)**: Windows Service Control Manager (SCM) ile doğrudan yerel entegrasyon; servisin başlatılamama ve zaman aşımına uğrama (hata 1053) sorunu tamamen çözüldü.
+    - **Parametresiz Servis Başlatma & Otomatik Yapılandırma Bulma**: Servis kırılgan CLI parametrelerine ihtiyaç duymadan temiz başlatılır; binary'nin yanındaki `config.json` dosyasını otomatik bulur.
+    - **Dirençli Kayıt Yeniden Deneme Döngüsü**: Sunucuya anlık erişilemediğinde veya belirteç henüz yapılandırılmadığında servis çökmez, 15 saniyede bir otomatik kaydolmayı dener.
+    - **Çok Yönlü Windows Kaldırıcı (Uninstaller)**:
+      - `C:\Program Files\LOGGER Agent\uninstall.bat` tek tıkla kaldırma betiği.
+      - `logger-agent-setup.exe -uninstall` gömülü kaldırıcı desteği.
+      - Uzaktan yönetim için `uninstall-agent.ps1` tek satır PowerShell betiği.
+      - Windows Program Ekle/Kaldır (Denetim Masası) tam kayıt entegrasyonu.
   - **Uç Nokta Belirteç ve Ajan Pencereleri Düzeltmesi**:
     - Yeni Kurulum Belirteci (`#modal-endpoint-new-token`), Ajan İnceleme (`#modal-endpoint-agent-detail`) ve Hızlı Kurulum Komutları (`#modal-endpoint-token-install`) pencereleri `.modal-backdrop` standardına getirilerek açılmama ve görünmez kalma sorunu giderildi.
     - `dashboard.css` içerisine `.modal-overlay` ve `.modal-backdrop.active` / `.modal-overlay.active` için `display: flex !important` kuralları eklendi.
