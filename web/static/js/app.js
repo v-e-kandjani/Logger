@@ -4681,6 +4681,11 @@ function initSIEMManagement() {
         btnOpenRules.addEventListener('click', openSIEMRulesModal);
     }
 
+    const btnOpenSOAR = document.getElementById('btn-open-soar-playbooks');
+    if (btnOpenSOAR) {
+        btnOpenSOAR.addEventListener('click', openSOARModal);
+    }
+
     const btnOpenSimulate = document.getElementById('btn-open-siem-simulate');
     if (btnOpenSimulate) {
         btnOpenSimulate.addEventListener('click', () => {
@@ -4986,6 +4991,90 @@ async function openSIEMInvestigate(alertID) {
         } else {
             evidenceEl.textContent = 'No raw log evidence attached to this alert.';
         }
+
+        // Match connected endpoint agent for SOAR Active Mitigation
+        let matchedAgent = null;
+        try {
+            const agRes = await fetch(`/api/v1/endpoint/agents`);
+            if (agRes.ok) {
+                const agData = await agRes.json();
+                const agents = agData.agents || [];
+                matchedAgent = agents.find(a => 
+                    (alert.device_name && a.hostname && a.hostname.toLowerCase() === alert.device_name.toLowerCase()) ||
+                    (alert.source_ip && (a.ip_address === alert.source_ip || (a.ip_addresses && a.ip_addresses.includes(alert.source_ip)))) ||
+                    (alert.destination_ip && (a.ip_address === alert.destination_ip || (a.ip_addresses && a.ip_addresses.includes(alert.destination_ip))))
+                );
+            }
+        } catch (_) {}
+
+        const matchedBadge = document.getElementById('siem-inv-agent-matched-badge');
+        const agentNameEl = document.getElementById('siem-inv-agent-name');
+        const agentIsoEl = document.getElementById('siem-inv-agent-iso-badge');
+        const btnIso = document.getElementById('btn-siem-quick-isolate');
+        const btnIsoText = document.getElementById('btn-siem-quick-isolate-text');
+        const btnOsquery = document.getElementById('btn-siem-quick-osquery');
+        const btnRunPB = document.getElementById('btn-siem-run-playbook');
+
+        if (matchedAgent) {
+            if (matchedBadge) matchedBadge.innerHTML = `<span class="badge badge-success" style="font-size: 11px;">🟢 Ajan Çevrimiçi (${escapeHtml(matchedAgent.agent_version)})</span>`;
+            if (agentNameEl) agentNameEl.textContent = matchedAgent.hostname + ' (' + (matchedAgent.ip_address || '-') + ')';
+            if (agentIsoEl) {
+                if (matchedAgent.is_isolated) {
+                    agentIsoEl.className = 'badge badge-danger pulsing-alert';
+                    agentIsoEl.textContent = 'ISOLATED';
+                    if (btnIsoText) btnIsoText.textContent = 'İzolasyonu Kaldır';
+                    if (btnIso) btnIso.onclick = () => openActiveResponseModal(matchedAgent.id, 'unisolate');
+                } else {
+                    agentIsoEl.className = 'badge badge-outline';
+                    agentIsoEl.textContent = 'NORMAL';
+                    if (btnIsoText) btnIsoText.textContent = 'Uç Noktayı İzole Et';
+                    if (btnIso) btnIso.onclick = () => openActiveResponseModal(matchedAgent.id, 'isolate');
+                }
+            }
+            if (btnOsquery) {
+                btnOsquery.onclick = () => openActiveResponseModal(matchedAgent.id, 'osquery');
+            }
+            if (btnRunPB) {
+                btnRunPB.onclick = () => openSOARRunModal(null, matchedAgent.id, alert.id);
+            }
+        } else {
+            if (matchedBadge) matchedBadge.innerHTML = `<span class="badge badge-secondary" style="font-size: 11px;">⚪ Ajan Eşleşmedi</span>`;
+            if (agentNameEl) agentNameEl.textContent = alert.device_name || alert.source_ip || 'Ajan bulunamadı';
+            if (agentIsoEl) {
+                agentIsoEl.className = 'badge badge-outline';
+                agentIsoEl.textContent = 'N/A';
+            }
+            if (btnIso) {
+                btnIso.onclick = () => showToast('Bu olay için kayıtlı aktif LogSeal ajanı bulunamadı.', 'warning');
+            }
+            if (btnOsquery) {
+                btnOsquery.onclick = () => showToast('Adli sorgulama için bağlı bir ajan gereklidir.', 'warning');
+            }
+            if (btnRunPB) {
+                btnRunPB.onclick = () => openSOARRunModal(null, null, alert.id);
+            }
+        }
+
+        // Check if there are any pending SOAR approvals for this alert
+        const pendingCard = document.getElementById('siem-inv-pending-approval-card');
+        const pendingPBName = document.getElementById('siem-inv-pending-pb-name');
+        const btnApprove = document.getElementById('btn-siem-approve-soar');
+        const btnReject = document.getElementById('btn-siem-reject-soar');
+        if (pendingCard) pendingCard.style.display = 'none';
+
+        try {
+            const execRes = await fetch(`/api/v1/soar/executions?status=PENDING_APPROVAL`);
+            if (execRes.ok) {
+                const execData = await execRes.json();
+                const pendingExec = (execData.executions || []).find(e => e.alert_id === alert.id);
+                if (pendingExec && pendingCard) {
+                    pendingCard.style.display = 'block';
+                    if (pendingPBName) pendingPBName.textContent = pendingExec.playbook_name;
+                    if (btnApprove) btnApprove.onclick = () => approveSOARExecution(pendingExec.id);
+                    if (btnReject) btnReject.onclick = () => rejectSOARExecution(pendingExec.id);
+                }
+            }
+        } catch (_) {}
 
         // Render Case Notes
         renderSIEMNotes(notes);
@@ -10297,6 +10386,608 @@ window.submitFileQuarantine = submitFileQuarantine;
 window.loadQuarantinedFiles = loadQuarantinedFiles;
 window.setOSQuery = setOSQuery;
 window.submitOSQuery = submitOSQuery;
+
+/* ========================================================================
+   SOAR PLAYBOOKS & AUTOMATED INCIDENT RESPONSE ENGINE
+   ======================================================================== */
+let currentSOARPlaybooks = [];
+let currentSOARExecutions = [];
+let soarHistoryFilter = 'ALL';
+
+async function openSOARModal() {
+    const modal = document.getElementById('modal-soar-playbooks');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    switchSOARTab('catalog');
+    await loadSOARPlaybooks();
+    await loadSOARExecutions();
+}
+
+function closeSOARModal() {
+    const modal = document.getElementById('modal-soar-playbooks');
+    if (modal) modal.style.display = 'none';
+}
+
+function switchSOARTab(tab) {
+    const catPane = document.getElementById('soar-pane-catalog');
+    const histPane = document.getElementById('soar-pane-history');
+    const editPane = document.getElementById('soar-pane-editor');
+    if (catPane) catPane.style.display = (tab === 'catalog') ? 'block' : 'none';
+    if (histPane) histPane.style.display = (tab === 'history') ? 'block' : 'none';
+    if (editPane) editPane.style.display = (tab === 'editor') ? 'block' : 'none';
+
+    const btnCat = document.getElementById('btn-soar-tab-catalog');
+    const btnHist = document.getElementById('btn-soar-tab-history');
+    const btnEdit = document.getElementById('btn-soar-tab-editor');
+    if (btnCat) btnCat.classList.toggle('active', tab === 'catalog');
+    if (btnHist) btnHist.classList.toggle('active', tab === 'history');
+    if (btnEdit) btnEdit.classList.toggle('active', tab === 'editor');
+
+    if (tab === 'catalog') loadSOARPlaybooks();
+    if (tab === 'history') loadSOARExecutions();
+}
+
+async function loadSOARPlaybooks() {
+    try {
+        const [pbRes, statsRes] = await Promise.all([
+            fetch('/api/v1/soar/playbooks'),
+            fetch('/api/v1/soar/stats')
+        ]);
+        if (!pbRes.ok) throw new Error('Playbooklar alınamadı');
+        const pbData = await pbRes.json();
+        currentSOARPlaybooks = pbData.playbooks || [];
+
+        if (statsRes.ok) {
+            const stats = await statsRes.json();
+            const elTotal = document.getElementById('soar-stat-total');
+            const elActive = document.getElementById('soar-stat-active');
+            const elPending = document.getElementById('soar-stat-pending');
+            const elContained = document.getElementById('soar-stat-contained');
+            if (elTotal) elTotal.textContent = stats.total_playbooks || currentSOARPlaybooks.length;
+            if (elActive) elActive.textContent = stats.active_playbooks || 0;
+            if (elPending) elPending.textContent = stats.pending_approvals || 0;
+            if (elContained) elContained.textContent = stats.contained_hosts || 0;
+
+            const pendingBadge = document.getElementById('soar-pending-badge');
+            if (pendingBadge) {
+                if (stats.pending_approvals > 0) {
+                    pendingBadge.textContent = stats.pending_approvals;
+                    pendingBadge.style.display = 'inline-block';
+                } else {
+                    pendingBadge.style.display = 'none';
+                }
+            }
+        }
+
+        renderSOARPlaybooksTable();
+    } catch (e) {
+        showToast('SOAR yüklenemedi: ' + e.message, 'error');
+    }
+}
+
+function renderSOARPlaybooksTable() {
+    const tbody = document.getElementById('tbody-soar-playbooks');
+    if (!tbody) return;
+
+    if (currentSOARPlaybooks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding: 24px;">Tanımlı SOAR playbook senaryosu bulunamadı.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = currentSOARPlaybooks.map(pb => {
+        const modeBadge = pb.execution_mode === 'autonomous'
+            ? '<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);">⚡ Otonom (Auto)</span>'
+            : '<span class="badge" style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3);">👤 Analist Onaylı</span>';
+
+        const trigBadges = [];
+        if (pb.trigger_conditions) {
+            if (pb.trigger_conditions.severities && pb.trigger_conditions.severities.length > 0) {
+                trigBadges.push(pb.trigger_conditions.severities.map(s => getSeverityBadgeHTML(s)).join(' '));
+            }
+            if (pb.trigger_conditions.min_risk_score) {
+                trigBadges.push(`<span class="badge badge-outline" style="font-size: 10.5px;">Skor &ge; ${pb.trigger_conditions.min_risk_score}</span>`);
+            }
+            if (pb.trigger_conditions.mitre_tactics && pb.trigger_conditions.mitre_tactics.length > 0) {
+                trigBadges.push(`<span class="badge badge-mitre" style="font-size: 10.5px;">${pb.trigger_conditions.mitre_tactics.join(', ')}</span>`);
+            }
+        }
+        const trigHTML = trigBadges.length > 0 ? trigBadges.join(' ') : '<span class="text-muted">Tüm Uyarılar</span>';
+
+        const actionBadges = (pb.actions || []).map(a => {
+            switch (a.type) {
+                case 'isolate_host': return '<span class="badge badge-danger" style="font-size: 10.5px;">🛑 İzolasyon</span>';
+                case 'osquery_run': return '<span class="badge" style="font-size: 10.5px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">🔍 OSQuery</span>';
+                case 'kill_process': return '<span class="badge badge-warning" style="font-size: 10.5px;">⚡ Process Kill</span>';
+                case 'file_quarantine': return '<span class="badge badge-warning" style="font-size: 10.5px;">📦 Quarantine</span>';
+                case 'webhook_notify': return '<span class="badge" style="font-size: 10.5px; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">🌐 Webhook</span>';
+                default: return `<span class="badge badge-outline" style="font-size: 10.5px;">${escapeHtml(a.type)}</span>`;
+            }
+        }).join(' ');
+
+        const lastExecStr = pb.last_executed_at ? formatRelativeTime(pb.last_executed_at) : 'Hiç çalışmadı';
+
+        return `
+            <tr>
+                <td>
+                    <label class="switch" style="margin: 0;" title="Etkinleştir / Devre Dışı Bırak">
+                        <input type="checkbox" ${pb.is_enabled ? 'checked' : ''} onchange="toggleSOARPlaybook('${pb.id}')">
+                        <span class="slider round"></span>
+                    </label>
+                </td>
+                <td>
+                    <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">${escapeHtml(pb.name)}</div>
+                    <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4; margin-top: 2px;">${escapeHtml(pb.description || '')}</div>
+                </td>
+                <td>${modeBadge}</td>
+                <td><div style="display: flex; flex-wrap: wrap; gap: 4px;">${trigHTML}</div></td>
+                <td><div style="display: flex; flex-wrap: wrap; gap: 4px;">${actionBadges || '<span class="text-muted">-</span>'}</div></td>
+                <td>
+                    <div style="font-size: 12px; font-weight: 600;">${pb.total_executions || 0} kez</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${lastExecStr}</div>
+                </td>
+                <td style="text-align: right;">
+                    <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                        <button class="btn btn-outline btn-sm" onclick="openSOARRunModal('${pb.id}')" title="Manuel Çalıştır">⚡</button>
+                        <button class="btn btn-outline btn-sm" onclick="openSOAREditor('${pb.id}')" title="Düzenle">✏️</button>
+                        <button class="btn btn-outline btn-sm text-red" onclick="deleteSOARPlaybook('${pb.id}', '${escapeHtml(pb.name)}')" title="Sil">🗑️</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function toggleSOARPlaybook(id) {
+    try {
+        const res = await fetch('/api/v1/soar/playbooks/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        if (!res.ok) throw new Error('Durum güncellenemedi');
+        const data = await res.json();
+        showToast(`Playbook durumu: ${data.is_enabled ? 'Aktif' : 'Pasif'}`, 'info');
+        loadSOARPlaybooks();
+    } catch (e) {
+        showToast(e.message, 'error');
+        loadSOARPlaybooks();
+    }
+}
+
+function openSOAREditor(pbId = null) {
+    const catPane = document.getElementById('soar-pane-catalog');
+    const histPane = document.getElementById('soar-pane-history');
+    const editPane = document.getElementById('soar-pane-editor');
+    if (catPane) catPane.style.display = 'none';
+    if (histPane) histPane.style.display = 'none';
+    if (editPane) editPane.style.display = 'block';
+
+    const btnCat = document.getElementById('btn-soar-tab-catalog');
+    const btnHist = document.getElementById('btn-soar-tab-history');
+    const btnEdit = document.getElementById('btn-soar-tab-editor');
+    if (btnCat) btnCat.classList.remove('active');
+    if (btnHist) btnHist.classList.remove('active');
+    if (btnEdit) btnEdit.classList.add('active');
+
+    if (pbId) {
+        const pb = currentSOARPlaybooks.find(p => p.id === pbId);
+        if (pb) {
+            document.getElementById('soar-edit-id').value = pb.id;
+            document.getElementById('soar-edit-name').value = pb.name || '';
+            document.getElementById('soar-edit-desc').value = pb.description || '';
+            document.getElementById('soar-edit-mode').value = pb.execution_mode || 'autonomous';
+            document.getElementById('soar-edit-cooldown').value = pb.cooldown_minutes || 15;
+            document.getElementById('soar-edit-enabled').checked = pb.is_enabled !== false;
+
+            const tc = pb.trigger_conditions || {};
+            const sevs = tc.severities || [];
+            document.getElementById('soar-trig-sev-crit').checked = sevs.includes('CRITICAL');
+            document.getElementById('soar-trig-sev-high').checked = sevs.includes('HIGH');
+            document.getElementById('soar-trig-sev-med').checked = sevs.includes('MEDIUM');
+            document.getElementById('soar-trig-sev-low').checked = sevs.includes('LOW');
+            document.getElementById('soar-trig-risk').value = tc.min_risk_score || 0;
+            document.getElementById('soar-trig-tactics').value = (tc.mitre_tactics || []).join(', ');
+            document.getElementById('soar-trig-cats').value = (tc.categories || []).join(', ');
+
+            const acts = pb.actions || [];
+            const isoAct = acts.find(a => a.type === 'isolate_host');
+            const osqAct = acts.find(a => a.type === 'osquery_run');
+            const webAct = acts.find(a => a.type === 'webhook_notify');
+
+            document.getElementById('soar-act-isolate').checked = !!isoAct;
+            document.getElementById('soar-act-osquery').checked = !!osqAct;
+            if (osqAct && osqAct.parameters && osqAct.parameters.query) {
+                document.getElementById('soar-act-osquery-sql').value = osqAct.parameters.query;
+            }
+            document.getElementById('soar-act-webhook').checked = !!webAct;
+            if (webAct && webAct.parameters && webAct.parameters.url) {
+                document.getElementById('soar-act-webhook-url').value = webAct.parameters.url;
+            }
+            return;
+        }
+    }
+
+    // Reset Form for New Playbook
+    document.getElementById('soar-edit-id').value = '';
+    document.getElementById('soar-edit-name').value = '';
+    document.getElementById('soar-edit-desc').value = '';
+    document.getElementById('soar-edit-mode').value = 'autonomous';
+    document.getElementById('soar-edit-cooldown').value = '15';
+    document.getElementById('soar-edit-enabled').checked = true;
+    document.getElementById('soar-trig-sev-crit').checked = true;
+    document.getElementById('soar-trig-sev-high').checked = true;
+    document.getElementById('soar-trig-sev-med').checked = false;
+    document.getElementById('soar-trig-sev-low').checked = false;
+    document.getElementById('soar-trig-risk').value = '70';
+    document.getElementById('soar-trig-tactics').value = '';
+    document.getElementById('soar-trig-cats').value = '';
+    document.getElementById('soar-act-isolate').checked = true;
+    document.getElementById('soar-act-osquery').checked = true;
+    document.getElementById('soar-act-osquery-sql').value = 'SELECT pid, name, path, cmdline FROM processes ORDER BY pid LIMIT 50;';
+    document.getElementById('soar-act-webhook').checked = false;
+    document.getElementById('soar-act-webhook-url').value = '';
+}
+
+async function submitSaveSOARPlaybook() {
+    const id = document.getElementById('soar-edit-id').value;
+    const name = document.getElementById('soar-edit-name').value.trim();
+    if (!name) {
+        showToast('Lütfen playbook adını belirtin.', 'error');
+        return;
+    }
+
+    const desc = document.getElementById('soar-edit-desc').value.trim();
+    const mode = document.getElementById('soar-edit-mode').value;
+    const cooldown = parseInt(document.getElementById('soar-edit-cooldown').value, 10) || 15;
+    const isEnabled = document.getElementById('soar-edit-enabled').checked;
+
+    const severities = [];
+    if (document.getElementById('soar-trig-sev-crit').checked) severities.push('CRITICAL');
+    if (document.getElementById('soar-trig-sev-high').checked) severities.push('HIGH');
+    if (document.getElementById('soar-trig-sev-med').checked) severities.push('MEDIUM');
+    if (document.getElementById('soar-trig-sev-low').checked) severities.push('LOW');
+
+    const minRisk = parseInt(document.getElementById('soar-trig-risk').value, 10) || 0;
+    const tacticsStr = document.getElementById('soar-trig-tactics').value.trim();
+    const tactics = tacticsStr ? tacticsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const catsStr = document.getElementById('soar-trig-cats').value.trim();
+    const cats = catsStr ? catsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+    const actions = [];
+    if (document.getElementById('soar-act-isolate').checked) {
+        actions.push({
+            id: 'act-isolate',
+            type: 'isolate_host',
+            parameters: { reason: 'Automated SOAR Containment: ' + name }
+        });
+    }
+    if (document.getElementById('soar-act-osquery').checked) {
+        const sql = document.getElementById('soar-act-osquery-sql').value.trim() || 'SELECT * FROM listening_ports;';
+        actions.push({
+            id: 'act-osquery',
+            type: 'osquery_run',
+            parameters: { query: sql }
+        });
+    }
+    if (document.getElementById('soar-act-webhook').checked) {
+        const url = document.getElementById('soar-act-webhook-url').value.trim();
+        actions.push({
+            id: 'act-webhook',
+            type: 'webhook_notify',
+            parameters: { url }
+        });
+    }
+
+    const payload = {
+        name,
+        description: desc,
+        execution_mode: mode,
+        cooldown_minutes: cooldown,
+        is_enabled: isEnabled,
+        trigger_conditions: {
+            severities,
+            min_risk_score: minRisk,
+            mitre_tactics: tactics,
+            categories: cats
+        },
+        actions
+    };
+
+    try {
+        const url = id ? `/api/v1/soar/playbooks/${id}` : '/api/v1/soar/playbooks';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+        showToast(`Playbook başarıyla ${id ? 'güncellendi' : 'kaydedildi'}!`, 'success');
+        switchSOARTab('catalog');
+    } catch (e) {
+        showToast('Playbook kaydedilemedi: ' + e.message, 'error');
+    }
+}
+
+async function deleteSOARPlaybook(id, name) {
+    if (!confirm(`'${name}' başlıklı playbook silinsin mi?`)) return;
+    try {
+        const res = await fetch(`/api/v1/soar/playbooks/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Silinemedi');
+        showToast('Playbook silindi', 'info');
+        loadSOARPlaybooks();
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+async function loadSOARExecutions() {
+    try {
+        const params = new URLSearchParams();
+        if (soarHistoryFilter && soarHistoryFilter !== 'ALL') {
+            params.append('status', soarHistoryFilter);
+        }
+        const res = await fetch(`/api/v1/soar/executions?${params.toString()}`);
+        if (!res.ok) throw new Error('Çalıştırma geçmişi alınamadı');
+        const data = await res.json();
+        currentSOARExecutions = data.executions || [];
+        renderSOARHistoryTable();
+    } catch (e) {
+        showToast('Geçmiş yüklenemedi: ' + e.message, 'error');
+    }
+}
+
+function filterSOARHistory(status) {
+    soarHistoryFilter = status;
+    document.querySelectorAll('#soar-history-filters .btn-filter').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-status') === status);
+    });
+    loadSOARExecutions();
+}
+
+function renderSOARHistoryTable() {
+    const tbody = document.getElementById('tbody-soar-history');
+    if (!tbody) return;
+
+    if (currentSOARExecutions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding: 24px;">Kayıtlı çalıştırma geçmişi bulunamadı.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = currentSOARExecutions.map(ex => {
+        let statusBadge = '';
+        switch (ex.status) {
+            case 'COMPLETED':
+                statusBadge = '<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);">✅ TAMAMLANDI</span>';
+                break;
+            case 'PENDING_APPROVAL':
+                statusBadge = '<span class="badge pulsing-alert" style="background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4);">⚠️ ONAY BEKLİYOR</span>';
+                break;
+            case 'RUNNING':
+                statusBadge = '<span class="badge badge-info pulsing-alert">⚡ ÇALIŞIYOR</span>';
+                break;
+            case 'FAILED':
+                statusBadge = '<span class="badge badge-danger">❌ BAŞARISIZ</span>';
+                break;
+            case 'REJECTED':
+                statusBadge = '<span class="badge badge-secondary">🚫 REDDEDİLDİ</span>';
+                break;
+            default:
+                statusBadge = `<span class="badge badge-outline">${escapeHtml(ex.status)}</span>`;
+        }
+
+        const actionsBtn = (ex.status === 'PENDING_APPROVAL')
+            ? `
+                <div style="display: flex; gap: 4px; justify-content: flex-end;">
+                    <button class="btn btn-sm btn-primary" style="background: #22c55e; border-color: #22c55e; padding: 2px 8px; font-size: 11px;" onclick="approveSOARExecution('${ex.id}')">Onayla</button>
+                    <button class="btn btn-sm btn-outline text-red" style="padding: 2px 8px; font-size: 11px;" onclick="rejectSOARExecution('${ex.id}')">Reddet</button>
+                    <button class="btn btn-sm btn-outline" style="padding: 2px 8px; font-size: 11px;" onclick="openSOARExecDetail('${ex.id}')">Detay</button>
+                </div>
+              `
+            : `
+                <button class="btn btn-sm btn-outline" style="padding: 2px 8px; font-size: 11px;" onclick="openSOARExecDetail('${ex.id}')">🔍 İncele</button>
+              `;
+
+        return `
+            <tr>
+                <td style="font-size: 11.5px; color: var(--text-muted);">${formatRelativeTime(ex.created_at)}</td>
+                <td style="font-weight: 600; color: var(--text-main); font-size: 12.5px;">${escapeHtml(ex.playbook_name)}</td>
+                <td><span class="mono-code" style="font-size: 12px;">${escapeHtml(ex.target_host || '-')}</span></td>
+                <td style="font-size: 12px; color: var(--text-muted);">${escapeHtml(ex.triggered_by)}</td>
+                <td style="font-size: 12px;"><span class="badge badge-outline">${ex.actions_executed || 0} adım</span></td>
+                <td>${statusBadge}</td>
+                <td style="text-align: right;">${actionsBtn}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function approveSOARExecution(id) {
+    try {
+        const res = await fetch('/api/v1/soar/executions/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        if (!res.ok) throw new Error('Onaylanamadı');
+        showToast('Playbook müdahalesi onaylandı ve derhal yürütülmeye başlandı!', 'success');
+        loadSOARExecutions();
+        loadSOARPlaybooks();
+        const pendingCard = document.getElementById('siem-inv-pending-approval-card');
+        if (pendingCard) pendingCard.style.display = 'none';
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+async function rejectSOARExecution(id) {
+    try {
+        const res = await fetch('/api/v1/soar/executions/reject', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        if (!res.ok) throw new Error('Reddedilemedi');
+        showToast('Playbook çalıştırma talebi reddedildi.', 'info');
+        loadSOARExecutions();
+        loadSOARPlaybooks();
+        const pendingCard = document.getElementById('siem-inv-pending-approval-card');
+        if (pendingCard) pendingCard.style.display = 'none';
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+async function openSOARExecDetail(id) {
+    const modal = document.getElementById('modal-soar-exec-detail');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    try {
+        const res = await fetch(`/api/v1/soar/executions/${id}`);
+        if (!res.ok) throw new Error('Kayıt bulunamadı');
+        const ex = await res.json();
+
+        document.getElementById('soar-detail-title').textContent = ex.playbook_name || 'Playbook Detayı';
+        document.getElementById('soar-detail-sub').textContent = `${formatRelativeTime(ex.created_at)} • Hedef: ${ex.target_host || '-'}`;
+
+        const summaryEl = document.getElementById('soar-detail-summary');
+        summaryEl.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; font-size: 12px;">
+                <div><strong>Durum:</strong> <span class="badge badge-outline">${escapeHtml(ex.status)}</span></div>
+                <div><strong>Tetikleyen:</strong> <span>${escapeHtml(ex.triggered_by)}</span></div>
+                <div><strong>Hedef Host:</strong> <span class="mono-code">${escapeHtml(ex.target_host || '-')}</span></div>
+                <div><strong>Uygulanan Eylem:</strong> <span>${ex.actions_executed || 0}</span></div>
+            </div>
+            ${ex.error_msg ? `<div style="margin-top: 8px; color: #ef4444; font-size: 11.5px; background: rgba(239, 68, 68, 0.1); padding: 8px; border-radius: 4px;">Hata Detayı: ${escapeHtml(ex.error_msg)}</div>` : ''}
+        `;
+
+        const stepsEl = document.getElementById('soar-detail-steps');
+        const logs = ex.execution_log || [];
+        if (logs.length === 0) {
+            stepsEl.innerHTML = '<div class="text-muted" style="font-size: 12px;">Henüz kaydedilmiş adım telemetrisi yok.</div>';
+        } else {
+            stepsEl.innerHTML = logs.map((log, i) => `
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                        <span style="font-weight: 600; color: var(--primary);">Adım ${i+1}: ${escapeHtml(log.action_type)}</span>
+                        <span style="color: var(--text-muted);">${log.duration_ms || 0} ms • <span class="badge ${log.status === 'success' ? 'badge-success' : 'badge-danger'}">${escapeHtml(log.status)}</span></span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-main);">${escapeHtml(log.message || '')}</div>
+                </div>
+            `).join('');
+        }
+
+    } catch (e) {
+        showToast('Detay yüklenemedi: ' + e.message, 'error');
+    }
+}
+
+function closeSOARExecDetail() {
+    const modal = document.getElementById('modal-soar-exec-detail');
+    if (modal) modal.style.display = 'none';
+}
+
+async function openSOARRunModal(pbId = null, agentId = null, alertId = null) {
+    const modal = document.getElementById('modal-soar-run-manual');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    const pbSelect = document.getElementById('soar-run-pb-select');
+    const agSelect = document.getElementById('soar-run-agent-select');
+    const alertInfo = document.getElementById('soar-run-alert-info');
+
+    // Populate playbooks
+    pbSelect.innerHTML = '<option value="">Playbook Seçin...</option>' + currentSOARPlaybooks.map(p =>
+        `<option value="${p.id}" ${p.id === pbId ? 'selected' : ''}>${escapeHtml(p.name)} (${p.execution_mode})</option>`
+    ).join('');
+
+    // Populate agents
+    try {
+        const res = await fetch('/api/v1/endpoint/agents');
+        if (res.ok) {
+            const data = await res.json();
+            const agents = data.agents || [];
+            agSelect.innerHTML = '<option value="">Hedef Uç Nokta Seçin...</option>' + agents.map(a =>
+                `<option value="${a.id}" ${a.id === agentId ? 'selected' : ''}>${escapeHtml(a.hostname)} (${escapeHtml(a.ip_address || '-')}) [${a.is_isolated ? 'ISOLATED' : 'NORMAL'}]</option>`
+            ).join('');
+        }
+    } catch (_) {}
+
+    if (alertId) {
+        alertInfo.style.display = 'block';
+        alertInfo.textContent = `🚨 Olay ID: ${alertId} ile ilişkilendirilecek`;
+        alertInfo.setAttribute('data-alert-id', alertId);
+    } else {
+        alertInfo.style.display = 'none';
+        alertInfo.removeAttribute('data-alert-id');
+    }
+}
+
+function closeSOARRunModal() {
+    const modal = document.getElementById('modal-soar-run-manual');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitSOARManualRun() {
+    const pbId = document.getElementById('soar-run-pb-select').value;
+    const agId = document.getElementById('soar-run-agent-select').value;
+    const alertInfo = document.getElementById('soar-run-alert-info');
+    const alertId = alertInfo ? alertInfo.getAttribute('data-alert-id') : null;
+
+    if (!pbId) {
+        showToast('Lütfen çalıştırılacak playbook seçin.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btn-submit-soar-run');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/v1/soar/playbooks/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playbook_id: pbId,
+                agent_id: agId || undefined,
+                alert_id: alertId || undefined
+            })
+        });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+        showToast('Playbook başarıyla tetiklendi ve adımlar yürütüldü!', 'success');
+        closeSOARRunModal();
+        loadSOARExecutions();
+    } catch (e) {
+        showToast('Çalıştırma hatası: ' + e.message, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+window.openSOARModal = openSOARModal;
+window.closeSOARModal = closeSOARModal;
+window.switchSOARTab = switchSOARTab;
+window.loadSOARPlaybooks = loadSOARPlaybooks;
+window.toggleSOARPlaybook = toggleSOARPlaybook;
+window.openSOAREditor = openSOAREditor;
+window.submitSaveSOARPlaybook = submitSaveSOARPlaybook;
+window.deleteSOARPlaybook = deleteSOARPlaybook;
+window.loadSOARExecutions = loadSOARExecutions;
+window.filterSOARHistory = filterSOARHistory;
+window.openSOARExecDetail = openSOARExecDetail;
+window.closeSOARExecDetail = closeSOARExecDetail;
+window.approveSOARExecution = approveSOARExecution;
+window.rejectSOARExecution = rejectSOARExecution;
+window.openSOARRunModal = openSOARRunModal;
+window.closeSOARRunModal = closeSOARRunModal;
+window.submitSOARManualRun = submitSOARManualRun;
+
 
 
 

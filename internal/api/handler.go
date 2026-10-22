@@ -29,6 +29,7 @@ import (
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/quota"
 	"github.com/syslog-platform/logger/internal/siem/mitre"
+	"github.com/syslog-platform/logger/internal/soar"
 	"github.com/syslog-platform/logger/internal/syslog/detector"
 	"github.com/syslog-platform/logger/internal/syslog/listener"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
@@ -59,6 +60,7 @@ type Handler struct {
 	evidenceSealer   *archive.EvidenceSealer
 	quotaEnforcer    *quota.QuotaEnforcer
 	cveSyncer        *cve.Syncer
+	soarEngine       *soar.Engine
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
@@ -80,6 +82,10 @@ func (h *Handler) SetHTTPSManager(m *https.Manager) {
 
 func (h *Handler) SetResultCache(c *cache.ResultCache) {
 	h.resultCache = c
+}
+
+func (h *Handler) SetSOAREngine(s *soar.Engine) {
+	h.soarEngine = s
 }
 
 func NewHandler(
@@ -313,6 +319,17 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/policies/", h.requireAuth(h.handleEndpointPolicyDetail))
 	mux.HandleFunc("/api/v1/endpoint/policies/assign", h.requireAuth(h.handleEndpointPolicyAssign))
 
+	// SOAR & Automated Playbook Endpoints
+	mux.HandleFunc("/api/v1/soar/stats", h.requireAuth(h.handleSOARStats))
+	mux.HandleFunc("/api/v1/soar/playbooks", h.requireAuth(h.handleSOARPlaybooks))
+	mux.HandleFunc("/api/v1/soar/playbooks/", h.requireAuth(h.handleSOARPlaybookDetail))
+	mux.HandleFunc("/api/v1/soar/playbooks/toggle", h.requireAuth(h.handleSOARPlaybookToggle))
+	mux.HandleFunc("/api/v1/soar/playbooks/run", h.requireAuth(h.handleSOARPlaybookRun))
+	mux.HandleFunc("/api/v1/soar/executions", h.requireAuth(h.handleSOARExecutions))
+	mux.HandleFunc("/api/v1/soar/executions/", h.requireAuth(h.handleSOARExecutionDetail))
+	mux.HandleFunc("/api/v1/soar/executions/approve", h.requireAuth(h.handleSOARExecutionApprove))
+	mux.HandleFunc("/api/v1/soar/executions/reject", h.requireAuth(h.handleSOARExecutionReject))
+
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fs))
@@ -325,6 +342,17 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(data)
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+func (h *Handler) currentUsername(r *http.Request) string {
+	if s, ok := h.getSession(r); ok && s != nil && s.Username != "" {
+		return s.Username
+	}
+	return "admin"
 }
 
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {

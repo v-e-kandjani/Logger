@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.8</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.9</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -603,6 +603,9 @@
                         </button>
                         <button class="btn btn-outline" id="btn-open-siem-rules">
                             <span>⚙️</span> <span data-i18n="btn_siem_rules">Detection Rules</span>
+                        </button>
+                        <button class="btn btn-outline" id="btn-open-soar-playbooks" style="border-color: #a855f7; color: #a855f7;">
+                            <span>🤖</span> <span data-i18n="btn_soar_playbooks">SOAR Playbooks</span>
                         </button>
                         <button class="btn btn-primary" id="btn-open-siem-simulate" style="display: none;">
                             <span>⚡</span> <span data-i18n="btn_simulate_threat">Simulate Threat</span>
@@ -3165,12 +3168,12 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.8</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.9</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_commit">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">432ebeb</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">51a8f90</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-23</div>
                     </div>
                     <div class="stat-card">
@@ -4182,6 +4185,56 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                             <input type="text" id="siem-inv-assigned-input" class="form-input" style="padding: 4px 10px; font-size: 13px; width: 140px;" value="admin">
                         </div>
                         <button class="btn btn-primary btn-sm" id="btn-save-siem-status" data-i18n="btn_save_siem_status">Save Status & Assignment</button>
+                    </div>
+                </div>
+
+                <!-- Active SOAR Response & Playbook Mitigation -->
+                <div class="panel" style="margin-bottom: 16px; border: 1px solid rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.03);">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 15px;">🤖</span>
+                            <h4 style="margin: 0; font-size: 13px;" data-i18n="siem_soar_response_title">SOAR Automated & Active Mitigation</h4>
+                        </div>
+                        <div id="siem-inv-agent-matched-badge">
+                            <span class="badge badge-secondary" style="font-size: 11px;">Scanning connected endpoint...</span>
+                        </div>
+                    </div>
+                    <div class="panel-body" style="padding: 12px 14px;">
+                        <div id="siem-inv-pending-approval-card" style="display: none; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.3); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                <div>
+                                    <strong style="color: #facc15;" data-i18n="soar_approval_needed_title">⚠️ SOAR Playbook Awaiting Analyst Approval:</strong>
+                                    <span id="siem-inv-pending-pb-name" style="font-weight: 600; margin-left: 6px; color: var(--text-main);"></span>
+                                </div>
+                                <div style="display: flex; gap: 6px;">
+                                    <button class="btn btn-sm btn-primary" id="btn-siem-approve-soar" style="background: #22c55e; border-color: #22c55e;">
+                                        <span>✅</span> <span data-i18n="btn_approve_execute">Approve & Execute</span>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline" id="btn-siem-reject-soar" style="color: #ef4444; border-color: #ef4444;">
+                                        <span>❌</span> <span data-i18n="btn_reject">Reject</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 10px; font-size: 12px;">
+                                <span class="text-muted" data-i18n="lbl_target_endpoint">Matched Endpoint:</span>
+                                <span id="siem-inv-agent-name" style="font-weight: 600; font-family: monospace;">-</span>
+                                <span id="siem-inv-agent-iso-badge" class="badge badge-outline">-</span>
+                            </div>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button class="btn btn-sm btn-outline" id="btn-siem-quick-isolate" style="border-color: #ef4444; color: #ef4444;">
+                                    <span>🛑</span> <span id="btn-siem-quick-isolate-text" data-i18n="btn_isolate_endpoint">Isolate Host</span>
+                                </button>
+                                <button class="btn btn-sm btn-outline" id="btn-siem-quick-osquery" style="border-color: #38bdf8; color: #38bdf8;">
+                                    <span>🔍</span> <span data-i18n="btn_osquery_snapshot">OSQuery Sockets</span>
+                                </button>
+                                <button class="btn btn-sm btn-outline" id="btn-siem-run-playbook" style="border-color: #a855f7; color: #a855f7;">
+                                    <span>🤖</span> <span data-i18n="btn_run_playbook">Trigger Playbook...</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -6116,14 +6169,285 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 </div>
             </div>
 
-            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); flex-shrink: 0;">
-                <button class="btn btn-outline" onclick="closeActiveResponseModal()" data-i18n="btn_close">Kapat</button>
+    <!-- MODAL: SOAR Incident Response Playbooks & Automation -->
+    <div class="modal-backdrop" id="modal-soar-playbooks" style="display: none; z-index: 1060;">
+        <div class="modal modal-wide" style="max-width: 1100px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding: 14px 20px; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 22px;">🤖</span>
+                    <div>
+                        <h3 style="margin: 0; font-size: 16px;" data-i18n="soar_modal_title">SOAR Incident Response Playbooks & Automation</h3>
+                        <div style="font-size: 12px; color: var(--text-muted);" data-i18n="soar_modal_subtitle">Automated SIEM-to-EDR active mitigation, host containment & forensic investigation workflows</div>
+                    </div>
+                </div>
+                <button class="close-btn" id="btn-close-soar-modal" onclick="closeSOARModal()">&times;</button>
+            </div>
+
+            <!-- SOAR Navigation Tabs -->
+            <div style="display: flex; gap: 8px; padding: 10px 20px 0 20px; background: rgba(0,0,0,0.15); border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
+                <button class="btn btn-outline btn-sm active" id="btn-soar-tab-catalog" onclick="switchSOARTab('catalog')">
+                    <span>📚</span> <span data-i18n="soar_tab_catalog">Playbook Kataloğu</span>
+                </button>
+                <button class="btn btn-outline btn-sm" id="btn-soar-tab-history" onclick="switchSOARTab('history')">
+                    <span>⏱️</span> <span data-i18n="soar_tab_history">Çalıştırma Geçmişi (Logs)</span>
+                    <span class="badge badge-warning" id="soar-pending-badge" style="display: none; font-size: 10px; margin-left: 4px;">0</span>
+                </button>
+                <button class="btn btn-outline btn-sm" id="btn-soar-tab-editor" onclick="openSOAREditor()">
+                    <span>➕</span> <span data-i18n="soar_tab_create">Yeni Playbook Oluştur</span>
+                </button>
+            </div>
+
+            <div class="modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+                <!-- PANE 1: Playbooks Catalog -->
+                <div id="soar-pane-catalog">
+                    <!-- SOAR Stats Cards -->
+                    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px;">
+                        <div class="stat-card" style="padding: 12px;">
+                            <div class="stat-header" data-i18n="soar_stat_total">Toplam Playbook</div>
+                            <div class="stat-value text-blue" id="soar-stat-total">0</div>
+                            <div class="stat-sub" data-i18n="soar_stat_total_sub">Kayıtlı yanıt senaryoları</div>
+                        </div>
+                        <div class="stat-card" style="padding: 12px;">
+                            <div class="stat-header" data-i18n="soar_stat_active">Aktif Otonom Yanıt</div>
+                            <div class="stat-value text-green" id="soar-stat-active">0</div>
+                            <div class="stat-sub" data-i18n="soar_stat_active_sub">Otomatik tetiklenen kurallar</div>
+                        </div>
+                        <div class="stat-card" style="padding: 12px;">
+                            <div class="stat-header" data-i18n="soar_stat_pending">Onay Bekleyen</div>
+                            <div class="stat-value text-yellow" id="soar-stat-pending">0</div>
+                            <div class="stat-sub" data-i18n="soar_stat_pending_sub">Analist teyidi gerekenler</div>
+                        </div>
+                        <div class="stat-card" style="padding: 12px;">
+                            <div class="stat-header" data-i18n="soar_stat_contained">İzole Edilen Cihaz</div>
+                            <div class="stat-value text-red" id="soar-stat-contained">0</div>
+                            <div class="stat-sub" data-i18n="soar_stat_contained_sub">Ağdan yalıtılmış uç noktalar</div>
+                        </div>
+                    </div>
+
+                    <!-- Playbooks Table -->
+                    <div class="table-container">
+                        <table class="data-table" id="table-soar-playbooks">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">Durum</th>
+                                    <th>Playbook Adı &amp; Açıklaması</th>
+                                    <th style="width: 130px;">Çalışma Modu</th>
+                                    <th style="width: 170px;">Tetikleyici Kriterler</th>
+                                    <th style="width: 160px;">Müdahale Eylemleri</th>
+                                    <th style="width: 110px;">Çalışma / Son</th>
+                                    <th style="width: 140px; text-align: right;">İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-soar-playbooks">
+                                <tr><td colspan="7" class="text-center text-muted" style="padding: 24px;">Playbook'lar yükleniyor...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- PANE 2: Execution History -->
+                <div id="soar-pane-history" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                        <div class="btn-group" id="soar-history-filters" style="display: flex; background: var(--bg-card); border-radius: 6px; padding: 2px; border: 1px solid var(--border-color);">
+                            <button class="btn btn-sm btn-filter active" data-status="ALL" onclick="filterSOARHistory('ALL')">Tümü</button>
+                            <button class="btn btn-sm btn-filter" data-status="PENDING_APPROVAL" onclick="filterSOARHistory('PENDING_APPROVAL')">Onay Bekleyenler</button>
+                            <button class="btn btn-sm btn-filter" data-status="COMPLETED" onclick="filterSOARHistory('COMPLETED')">Tamamlananlar</button>
+                            <button class="btn btn-sm btn-filter" data-status="FAILED" onclick="filterSOARHistory('FAILED')">Başarısız</button>
+                        </div>
+                        <button class="btn btn-sm btn-outline" onclick="loadSOARExecutions()">
+                            <span>🔄</span> <span data-i18n="btn_refresh">Yenile</span>
+                        </button>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table" id="table-soar-history">
+                            <thead>
+                                <tr>
+                                    <th style="width: 130px;">Zaman</th>
+                                    <th>Playbook</th>
+                                    <th style="width: 140px;">Hedef Sunucu</th>
+                                    <th>Tetikleyici Olay</th>
+                                    <th style="width: 80px;">Adımlar</th>
+                                    <th style="width: 120px;">Durum</th>
+                                    <th style="width: 130px; text-align: right;">İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-soar-history">
+                                <tr><td colspan="7" class="text-center text-muted" style="padding: 24px;">Çalıştırma kayıtları yükleniyor...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- PANE 3: Playbook Editor Form -->
+                <div id="soar-pane-editor" style="display: none;">
+                    <input type="hidden" id="soar-edit-id" value="">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+                        <!-- General Config Card -->
+                        <div class="panel" style="background: rgba(255,255,255,0.02); padding: 14px; border: 1px solid var(--border-color); border-radius: 8px;">
+                            <h4 style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600; color: var(--primary);">⚙️ Genel Bilgiler &amp; Mod</h4>
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label style="font-size: 12px; font-weight: 600;">Playbook Adı <span class="text-red">*</span></label>
+                                <input type="text" id="soar-edit-name" class="form-input" placeholder="Örn: Fidye Yazılımı Otomatik İzolasyon" style="width: 100%; font-size: 12.5px;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label style="font-size: 12px; font-weight: 600;">Açıklama</label>
+                                <textarea id="soar-edit-desc" class="form-input" rows="2" placeholder="Senaryonun amacını ve kurallarını belirtin..." style="width: 100%; font-size: 12px; resize: none;"></textarea>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                                <div class="form-group">
+                                    <label style="font-size: 12px; font-weight: 600;">Çalıştırma Modu</label>
+                                    <select id="soar-edit-mode" class="form-input" style="width: 100%; font-size: 12.5px;">
+                                        <option value="autonomous">⚡ Otonom (Otomatik Uygula)</option>
+                                        <option value="manual_approval">👤 Analist Onayı Gerekir</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-size: 12px; font-weight: 600;">Soğuma Süresi (Dakika)</label>
+                                    <input type="number" id="soar-edit-cooldown" class="form-input" value="15" min="1" max="1440" style="width: 100%; font-size: 12.5px;">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
+                                    <input type="checkbox" id="soar-edit-enabled" checked style="accent-color: var(--primary);">
+                                    <span>Playbook Aktif ve Tetiklemeye Açık</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Trigger Conditions Card -->
+                        <div class="panel" style="background: rgba(255,255,255,0.02); padding: 14px; border: 1px solid var(--border-color); border-radius: 8px;">
+                            <h4 style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600; color: #38bdf8;">🎯 Tetikleyici SIEM Kriterleri</h4>
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label style="font-size: 12px; font-weight: 600;">Tehdit Seviyesi (Severity)</label>
+                                <div style="display: flex; gap: 12px; margin-top: 4px; font-size: 12px;">
+                                    <label><input type="checkbox" id="soar-trig-sev-crit" value="CRITICAL" checked> Critical</label>
+                                    <label><input type="checkbox" id="soar-trig-sev-high" value="HIGH" checked> High</label>
+                                    <label><input type="checkbox" id="soar-trig-sev-med" value="MEDIUM"> Medium</label>
+                                    <label><input type="checkbox" id="soar-trig-sev-low" value="LOW"> Low</label>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label style="font-size: 12px; font-weight: 600;">Minimum Tehdit Skoru (0-100)</label>
+                                <input type="number" id="soar-trig-risk" class="form-input" value="70" min="0" max="100" style="width: 100%; font-size: 12.5px;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 10px;">
+                                <label style="font-size: 12px; font-weight: 600;">MITRE ATT&CK Taktikleri (Virgülle ayırın)</label>
+                                <input type="text" id="soar-trig-tactics" class="form-input" placeholder="Örn: Impact, Execution, Lateral Movement" style="width: 100%; font-size: 12px;">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size: 12px; font-weight: 600;">Hedef SIEM Kategorileri (Virgülle ayırın)</label>
+                                <input type="text" id="soar-trig-cats" class="form-input" placeholder="Örn: threat, authentication, privilege" style="width: 100%; font-size: 12px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions Builder Card -->
+                    <div class="panel" style="margin-top: 16px; background: rgba(255,255,255,0.02); padding: 14px; border: 1px solid var(--border-color); border-radius: 8px;">
+                        <h4 style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600; color: #a855f7;">⚡ Otomatik Müdahale Adımları (EDR &amp; Forensics)</h4>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <!-- Action 1: Isolate Host -->
+                            <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 6px; padding: 10px 14px;">
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #f87171; cursor: pointer;">
+                                    <input type="checkbox" id="soar-act-isolate" checked style="accent-color: #ef4444;">
+                                    <span>🛑 Uç Noktayı Ağdan İzole Et (Network Containment)</span>
+                                </label>
+                                <p style="margin: 4px 0 0 24px; font-size: 11.5px; color: var(--text-muted);">
+                                    İhlal edilen ana makineyi SOC bağlantısı haricindeki tüm gelen/giden ağ trafiğinden derhal keser.
+                                </p>
+                            </div>
+
+                            <!-- Action 2: OSQuery Forensics -->
+                            <div style="background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 6px; padding: 10px 14px;">
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #38bdf8; cursor: pointer;">
+                                    <input type="checkbox" id="soar-act-osquery" checked style="accent-color: #0284c7;">
+                                    <span>🔍 Anlık Canlı Adli SQL Sorgusu (OSQuery Snapshot)</span>
+                                </label>
+                                <div style="margin: 8px 0 0 24px;">
+                                    <input type="text" id="soar-act-osquery-sql" class="form-input" value="SELECT pid, name, path, cmdline FROM processes ORDER BY pid LIMIT 50;" style="width: 100%; font-family: var(--font-mono); font-size: 11.5px;">
+                                </div>
+                            </div>
+
+                            <!-- Action 3: Webhook Notification -->
+                            <div style="background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 6px; padding: 10px 14px;">
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #c084fc; cursor: pointer;">
+                                    <input type="checkbox" id="soar-act-webhook" style="accent-color: #a855f7;">
+                                    <span>🌐 Dış Entegrasyon Webhook Bildirimi (Slack / Teams / FortiLens / NetVault)</span>
+                                </label>
+                                <div style="margin: 8px 0 0 24px;">
+                                    <input type="url" id="soar-act-webhook-url" class="form-input" placeholder="https://hooks.slack.com/services/... veya https://fortilens/api/v1/alert" style="width: 100%; font-size: 12px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+                        <button class="btn btn-outline" onclick="switchSOARTab('catalog')">İptal</button>
+                        <button class="btn btn-primary" onclick="submitSaveSOARPlaybook()">
+                            <span>💾</span> <span>Playbook'u Kaydet</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="padding: 10px 20px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); flex-shrink: 0;">
+                <button class="btn btn-outline" onclick="closeSOARModal()" data-i18n="btn_close">Kapat</button>
             </div>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.8.8"></script>
-    <script src="/static/js/translations.js?v=1.8.8"></script>
-    <script src="/static/js/app.js?v=1.8.8"></script>
+    <!-- MODAL: SOAR Execution Detail / Forensic Step Inspector -->
+    <div class="modal-backdrop" id="modal-soar-exec-detail" style="display: none; z-index: 1070;">
+        <div class="modal modal-wide" style="max-width: 800px; width: 90%; max-height: 85vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding: 14px 20px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px;">📋</span>
+                    <div>
+                        <h3 id="soar-detail-title" style="margin: 0; font-size: 15px;">Playbook Çalıştırma Telemetrisi</h3>
+                        <div id="soar-detail-sub" style="font-size: 11.5px; color: var(--text-muted);">-</div>
+                    </div>
+                </div>
+                <button class="close-btn" onclick="closeSOARExecDetail()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+                <div id="soar-detail-summary" style="margin-bottom: 14px;"></div>
+                <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">Uygulanan Müdahale Adımları (Execution Pipeline):</div>
+                <div id="soar-detail-steps" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            </div>
+            <div class="modal-footer" style="padding: 10px 20px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-outline" onclick="closeSOARExecDetail()" data-i18n="btn_close">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SOAR Manual Playbook Trigger -->
+    <div class="modal-backdrop" id="modal-soar-run-manual" style="display: none; z-index: 1070;">
+        <div class="modal" style="max-width: 500px; width: 90%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 15px;">⚡ Playbook Manuel Tetikle</h3>
+                <button class="close-btn" onclick="closeSOARRunModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px;">
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: 600;">Çalıştırılacak Playbook:</label>
+                    <select id="soar-run-pb-select" class="form-input" style="width: 100%; font-size: 12.5px;"></select>
+                </div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: 600;">Hedef Uç Nokta Ajanı:</label>
+                    <select id="soar-run-agent-select" class="form-input" style="width: 100%; font-size: 12.5px;"></select>
+                </div>
+                <div id="soar-run-alert-info" style="display: none; font-size: 11.5px; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 8px; border-radius: 4px;"></div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px;">
+                <button class="btn btn-outline" onclick="closeSOARRunModal()">İptal</button>
+                <button class="btn btn-primary" id="btn-submit-soar-run" onclick="submitSOARManualRun()">⚡ Şimdi Başlat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/marked.min.js?v=1.8.9"></script>
+    <script src="/static/js/translations.js?v=1.8.9"></script>
+    <script src="/static/js/app.js?v=1.8.9"></script>
 </body>
 </html>

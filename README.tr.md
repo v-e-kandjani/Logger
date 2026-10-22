@@ -254,6 +254,24 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.8.9** (Otomatik SOAR Olay Müdahale Playbookları & EDR Aktif Müdahale Paketi - Phase K):
+  - **Otomatik SIEM-EDR Playbook Motoru (Phase K.1 & K.2)**:
+    - SIEM korelasyon kuralları ile uç nokta EDR aktif müdahale yeteneklerini gerçek zamanlı birbirine bağlayan olay güdümlü SOAR motoru.
+    - Gelen alarmları playbook tetikleyici kriterlerine (Önem derecesi, Minimum risk skoru, MITRE ATT&CK taktikleri ve SIEM kategorileri) göre anlık değerlendiren kuyruk dinleyicisi.
+    - Syslog alarmlarını kayıtlı ajanların ana makine adları ve IP adresleri (`ip_address`) ile akıllıca eşleştiren hedef çözümleme mantığı.
+    - Flapping ve alarm fırtınalarını engelleyen ayarlanabilir soğuma (cooldown) koruması (örneğin ana makine ve playbook başına 15 dakikalık bastırma penceresi).
+  - **Çift Modlu Otonom & Analist Onaylı İş Akışları**:
+    - **Otonom Mod**: Kritik tehditlerde (fidye yazılımı şifreleme veya savunma atlatma) saniyeden kısa sürede sıfır dokunuşla otomatik ağ izolasyonu ve süreç dökümü alma.
+    - **Analist Onayı Modu**: Şüpheli yanal hareket ve yetki yükseltme vakalarında analist onayı için `PENDING_APPROVAL` kaydı oluşturma; olay inceleme ekranından tek tıkla "Onayla ve Çalıştır" veya "Reddet" imkanı.
+  - **Kullanıma Hazır Varsayılan Playbook Kataloğu**:
+    - *Fidye Yazılımı Hızlı Ağ İzolasyonu*: Kitlesel dosya şifreleme alarmlarında otonom ağ izolasyonu, süreç dökümü ve bildirim adımları.
+    - *Kritik Kaba Kuvvet & Açık Port Adli İncelemesi*: Kimlik doğrulama saldırılarında anlık OSQuery ile dinlenen portlar (`listening_ports`) ve aktif oturum açmış kullanıcıları (`logged_in_users`) toplama.
+    - *Şüpheli Yanal Hareket Ağ İzolasyonu*: Yanal hareket araçları tespit edildiğinde analist teyidiyle ana makineyi ağdan koparma ve komut satırı süreçlerini yakalama.
+  - **SOAR Konsolu & Adli Adım Denetleyicisi (Phase K.4)**:
+    - İnteraktif playbook kataloğu, durum anahtarları, görsel playbook oluşturucu ve manuel çalıştırma butonları içeren kapsamlı SOAR yönetim konsolu.
+    - Her bir eylemin çalışma süresini (ms), komut çıktılarını ve adım detaylarını gösteren görsel yürütme boru hattı (pipeline) denetleyicisi.
+    - Derin SIEM entegrasyonu: Alarm detay penceresinde eşleşen uç nokta durumu, anlık izolasyon göstergesi ve tek tıkla doğrudan müdahale.
+
 - **v1.8.8** (Aktif Müdahale, EDR Ağ İzolasyonu & Canlı Adli SQL / OSQuery) / **Agent v0.1.5**:
   - **EDR Ağ Kapsaması & Uç Nokta İzolasyonu (Phase J.3)**:
     - LogSeal yönetim telemetrisi ve yerel döngü (loopback) bağlantılarını kesintisiz korurken, tüm diğer gelen/giden ağ ve internet trafiğini anında kesen dinamik ağ izolasyonu.

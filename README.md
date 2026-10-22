@@ -265,6 +265,24 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.8.9** (Automated SOAR Incident Response Playbooks & EDR Active Mitigation Suite - Phase K):
+  - **Automated SIEM-to-EDR Playbook Engine (Phase K.1 & K.2)**:
+    - Real-time event-driven incident mitigation engine bridging SIEM detection rules directly with cross-platform endpoint active response tasks.
+    - Decoupled alert listener evaluating incoming correlation alerts against playbook trigger conditions (Severities, Minimum Risk Score, MITRE ATT&CK Tactics, and SIEM Categories).
+    - Intelligent target endpoint resolution mapping syslog alerts to registered hostnames and IP addresses (`ip_address`).
+    - Flapping and alert storm mitigation with configurable cooldown guards (e.g. 15-minute suppression window per host/playbook).
+  - **Dual Autonomous & Analyst Approval Workflows**:
+    - **Autonomous Mode**: Zero-touch, sub-second execution of containment actions upon critical threats (e.g. automated host isolation and process tree snapshots on ransomware behavior).
+    - **Manual Approval Mode**: Suspicious activity stages a `PENDING_APPROVAL` case, notifying analysts within the incident triage view with 1-click "Approve & Execute" or "Reject".
+  - **Out-of-the-Box Default Playbook Catalog**:
+    - *Ransomware Rapid Network Containment*: Autonomous network isolation and forensic process snapshot upon detection of mass file encryption or defense evasion.
+    - *Critical Brute-Force & Sockets Forensic Snapshot*: Automated live OSQuery probing of active listening sockets (`listening_ports`) and logged-in user sessions (`logged_in_users`).
+    - *Suspicious Lateral Movement Host Containment*: Analyst-approved isolation and process inspection upon detection of lateral movement tools (PsExec, WMI, WinRM).
+  - **SOAR Console & Forensic Step Inspector (Phase K.4)**:
+    - Dedicated SOAR Playbooks console modal featuring an interactive playbook catalog, status toggles, visual playbook editor, and manual run dispatcher.
+    - Step-by-step execution pipeline inspector displaying individual action durations (ms), command outputs, and step telemetry.
+    - Deep SIEM incident investigation synergy: Matched endpoint badge, current isolation status, and 1-click active response directly from the incident investigation dialog.
+
 - **v1.8.8** (Active Response, EDR Host Isolation & Live Forensic SQL / OSQuery) / **Agent v0.1.5**:
   - **EDR Network Containment & Host Isolation (Phase J.3)**:
     - Dynamic host containment cutting off all inbound and outbound network traffic while strictly preserving the secure LogSeal telemetry channel and loopback.

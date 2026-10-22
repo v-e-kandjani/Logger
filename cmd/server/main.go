@@ -25,6 +25,7 @@ import (
 	"github.com/syslog-platform/logger/internal/notification/smtp"
 	"github.com/syslog-platform/logger/internal/siem/correlation"
 	"github.com/syslog-platform/logger/internal/siem/normalizer"
+	"github.com/syslog-platform/logger/internal/soar"
 	"github.com/syslog-platform/logger/internal/syslog/generator"
 	"github.com/syslog-platform/logger/internal/syslog/listener"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
@@ -97,6 +98,13 @@ func main() {
 		log.Printf("[PostgreSQL] Warning ensuring Endpoint Security schema: %v", err)
 	} else {
 		log.Println("[PostgreSQL] Endpoint Security tables, policies, and feed catalog verified")
+	}
+
+	// Verify & auto-migrate SOAR Playbooks schema
+	if err := pgDB.EnsureSOARSchema(context.Background()); err != nil {
+		log.Printf("[PostgreSQL] Warning ensuring SOAR Playbooks schema: %v", err)
+	} else {
+		log.Println("[PostgreSQL] SOAR Playbooks tables and incident response catalog verified")
 	}
 
 	// 2. Initialize in-memory Device Cache
@@ -173,6 +181,13 @@ func main() {
 	defer siemEngine.Stop()
 	pipe.SetSIEMEngine(siemEngine)
 	log.Println("[SIEM] Detection & Correlation Engine active with real-time sliding windows")
+
+	// Initialize SOAR Playbook Engine & attach to live SIEM alerts
+	soarEngine := soar.NewEngine(pgDB)
+	soarAlertCh := siemEngine.SubscribeAlerts()
+	soarEngine.StartAlertListener(soarAlertCh)
+	defer siemEngine.UnsubscribeAlerts(soarAlertCh)
+	log.Println("[SOAR] Automated Incident Playbook Engine active with live correlation triggers")
 
 	// Start background critical alert SMTP broadcast listener
 	go func() {
@@ -251,6 +266,7 @@ func main() {
 	apiHandler.SetSyslogServer(syslogServer)
 	apiHandler.SetHTTPSManager(httpsMgr)
 	apiHandler.SetResultCache(resultCache)
+	apiHandler.SetSOAREngine(soarEngine)
 	apiHandler.StartMitreAutoSync(appCtx)
 	apiHandler.StartSupportBundleCleaner(appCtx)
 	apiHandler.StartEdgeHealthMonitor(appCtx)
