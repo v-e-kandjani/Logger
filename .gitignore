@@ -1,10 +1,14 @@
 # Binaries and build outputs
-bin/
+/bin/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+
+# Allow distribution agent binaries and installers in static directories
+!web/static/downloads/**
+!web/static/bin/**
 
 # Test artifacts and coverage
 *.out

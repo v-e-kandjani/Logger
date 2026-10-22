@@ -115,6 +115,24 @@ curl -k -sSL https://<LOGSEAL_SUNUCU>:8443/static/scripts/install-agent.sh | sud
 
 ### B. Windows (Windows 10, 11 & Windows Server 2016, 2019, 2022, 2025)
 
+#### Yöntem 0: Bağımsız Windows .exe Kurulum Sihirbazı (En Kolay & SCCM/GPO Uyumlu)
+LogSeal web panosundan `logger-agent-setup.exe` dosyasını doğrudan indirin (`/static/downloads/logger-agent-setup.exe`).
+
+- **İnteraktif Kurulum**: `logger-agent-setup.exe` dosyasına sağ tıklayıp Yönetici Olarak Çalıştırın. Ekrana gelen konsolda Sunucu Adresi ve Kurulum Belirteci sorulur, dosyalar otomatik olarak `C:\Program Files\LOGGER Agent` dizinine çıkarılır, `config.json` oluşturulur, `LoggerAgent` servisi kaydedilip başlatılır ve Windows Program Ekle/Kaldır listesine eklenir.
+- **Sessiz Otomatik Kurulum (Silent / SCCM / GPO / Intune)**:
+  ```cmd
+  logger-agent-setup.exe -server "http://<LOGSEAL_SUNUCU>:8080" -token "<KURULUM_BELIRTECI>" -silent
+  ```
+- **Özel Kurulum Dizini & Kendinden İmzalı Sertifika**:
+  ```cmd
+  logger-agent-setup.exe -server "https://<LOGSEAL_SUNUCU>:8443" -token "<KURULUM_BELIRTECI>" -insecure -dir "D:\Guvenlik\LOGGER Agent" -silent
+  ```
+- **Ajanı Kaldırma (Uninstall)**:
+  ```cmd
+  logger-agent-setup.exe -uninstall
+  ```
+  *(Veya doğrudan Windows Ayarlar > Yüklü Uygulamalar / Denetim Masası üzerinden kaldırılabilir).*
+
 #### Yöntem 1: PowerShell ile Otomatik Kurulum (Yönetici Olarak)
 **Yönetici (Run as Administrator)** yetkisiyle PowerShell açıp şu komutu çalıştırın:
 
@@ -156,7 +174,16 @@ iwr -useb "http://<LOGSEAL_SUNUCU>:8080/static/scripts/install-agent.ps1" -OutFi
 
 ### C. macOS (Apple Silicon M1/M2/M3/M4 & Intel x86_64)
 
-#### Otomatik Kurulum:
+#### Yöntem 0: macOS Disk İmajı (.dmg) & Apple Installer Paketi (.pkg) (En Kolay)
+LogSeal web panosundan `LOGGER-Agent-Installer.dmg` imajını doğrudan indirin (`/static/downloads/logger-agent-installer.dmg`).
+
+1. `LOGGER-Agent-Installer.dmg` dosyasına çift tıklayarak imajı bağlayın.
+2. DMG içinde hazır bulunan araçlar:
+   - **`Install LOGGER Agent.pkg`**: macOS Universal ARM64/Intel Apple Yükleyici paketi. Çift tıklayarak standart macOS sihirbazıyla sistemi kurun.
+   - **`Install LOGGER Agent.command`**: Çift tıklanabilir interaktif Terminal kurulum sihirbazı. Sunucu URL'si ve Belirteç sorar, ikili dosyayı `/opt/logger-agent` dizinine kurar ve launchd servisini başlatır.
+   - **`Uninstall LOGGER Agent.command`**: Ajanı ve launchd servisini tek tıkla sistemden temizler.
+
+#### Yöntem 1: Betik ile Otomatik Kurulum (Terminal / Sudo)
 Terminal açıp `sudo` ile çalıştırın:
 
 ```bash

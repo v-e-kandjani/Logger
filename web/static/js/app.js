@@ -8663,8 +8663,17 @@ function switchQuickPlatform(platform) {
     const s3Sub = document.getElementById('quick-step3-sub');
     const verifyBox = document.getElementById('quick-step3-verify');
     const s3Desc = document.getElementById('quick-step3-desc');
+    const installerBtn = document.getElementById('quick-step-installer-btn');
+    const installerText = document.getElementById('quick-step-installer-text');
 
     if (currentQuickPlatform === 'windows') {
+        if (installerBtn) {
+            installerBtn.style.display = 'inline-flex';
+            installerBtn.href = '/static/downloads/logger-agent-setup.exe';
+            installerBtn.setAttribute('download', 'logger-agent-setup.exe');
+            if (installerText) installerText.textContent = isEn ? '.exe Setup' : '.exe İndir';
+        }
+
         if (s1Title) s1Title.textContent = isEn ? 'Open PowerShell as Administrator' : 'Yönetici PowerShell Açın';
         if (s1Desc) s1Desc.innerHTML = isEn ? 'Right-click the Windows Start button &gt; select <strong>Windows PowerShell (Admin)</strong> or <strong>Terminal (Admin)</strong>.' : 'Windows Başlat menüsüne sağ tıklayın &gt; <strong>Windows PowerShell (Yönetici)</strong> veya <strong>Terminal (Yönetici)</strong> seçeneğini çalıştırın.';
         if (s1Hint) s1Hint.textContent = isEn ? 'Privilege: Administrator' : 'Yetki: Administrator';
@@ -8678,6 +8687,13 @@ function switchQuickPlatform(platform) {
         if (verifyBox) verifyBox.textContent = 'Get-Service LoggerAgent';
         if (s3Desc) s3Desc.textContent = isEn ? '✓ Appears healthy (Online) in the table below.' : '✓ Aşağıdaki tabloda yeşil (Online) görünür.';
     } else if (currentQuickPlatform === 'macos') {
+        if (installerBtn) {
+            installerBtn.style.display = 'inline-flex';
+            installerBtn.href = '/static/downloads/logger-agent-installer.dmg';
+            installerBtn.setAttribute('download', 'logger-agent-installer.dmg');
+            if (installerText) installerText.textContent = isEn ? '.dmg Installer' : '.dmg İndir';
+        }
+
         if (s1Title) s1Title.textContent = isEn ? 'Open Terminal App' : 'Terminal Uygulamasını Açın';
         if (s1Desc) s1Desc.innerHTML = isEn ? 'Press Spotlight (Cmd + Space) and launch <strong>Terminal</strong> or iTerm2.' : 'Spotlight (Cmd + Boşluk) ile <strong>Terminal</strong> uygulamasını başlatın veya iTerm2 açın.';
         if (s1Hint) s1Hint.textContent = isEn ? 'Privilege: Sudo / Root' : 'Yetki: Sudo / Root';
@@ -8691,6 +8707,10 @@ function switchQuickPlatform(platform) {
         if (verifyBox) verifyBox.textContent = 'sudo launchctl list | grep logger';
         if (s3Desc) s3Desc.textContent = isEn ? '✓ Appears healthy (Online) in the table below.' : '✓ Aşağıdaki tabloda yeşil (Online) görünür.';
     } else if (currentQuickPlatform === 'linux') {
+        if (installerBtn) {
+            installerBtn.style.display = 'none';
+        }
+
         if (s1Title) s1Title.textContent = isEn ? 'Open Root / Sudo Shell' : 'Kök / Sudo Terminali Açın';
         if (s1Desc) s1Desc.innerHTML = isEn ? 'Open a root shell or SSH into your Linux host with sudo privileges.' : 'Linux sunucu veya istemci konsoluna SSH yapın ya da terminal açın.';
         if (s1Hint) s1Hint.textContent = isEn ? 'Privilege: Root or sudo access' : 'Yetki: Root veya sudo ayrıcalığı';

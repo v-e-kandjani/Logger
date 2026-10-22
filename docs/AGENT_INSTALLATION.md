@@ -115,6 +115,24 @@ curl -k -sSL https://<LOGSEAL_SERVER>:8443/static/scripts/install-agent.sh | sud
 
 ### B. Windows (Windows 10, 11 & Windows Server 2016, 2019, 2022, 2025)
 
+#### Method 0: Standalone Windows .exe Setup Wizard (Easiest & SCCM/GPO Ready)
+Download `logger-agent-setup.exe` directly from the LogSeal dashboard (`/static/downloads/logger-agent-setup.exe`).
+
+- **Interactive Install**: Double-click `logger-agent-setup.exe` as Administrator. It will interactively prompt for Server URL and Enrollment Token, extract files to `C:\Program Files\LOGGER Agent`, configure `config.json`, register the `LoggerAgent` Windows Service, and register in Windows Add/Remove Programs.
+- **Silent Automated Install (SCCM / GPO / Intune)**:
+  ```cmd
+  logger-agent-setup.exe -server "http://<LOGSEAL_SERVER>:8080" -token "<ENROLLMENT_TOKEN>" -silent
+  ```
+- **Custom Install Directory & Insecure TLS**:
+  ```cmd
+  logger-agent-setup.exe -server "https://<LOGSEAL_SERVER>:8443" -token "<ENROLLMENT_TOKEN>" -insecure -dir "D:\Security\LOGGER Agent" -silent
+  ```
+- **Uninstall**:
+  ```cmd
+  logger-agent-setup.exe -uninstall
+  ```
+  *(Or uninstall directly from Windows Settings > Installed Apps / Control Panel Programs and Features).*
+
 #### Method 1: Automated PowerShell 1-Liner (Administrator)
 Open **PowerShell as Administrator** and execute:
 
@@ -156,7 +174,16 @@ iwr -useb "http://<LOGSEAL_SERVER>:8080/static/scripts/install-agent.ps1" -OutFi
 
 ### C. macOS (Apple Silicon M1/M2/M3/M4 & Intel x86_64)
 
-#### Automated Install:
+#### Method 0: macOS Disk Image (.dmg) & Apple Installer Package (.pkg) (Easiest)
+Download `LOGGER-Agent-Installer.dmg` from the LogSeal dashboard (`/static/downloads/logger-agent-installer.dmg`).
+
+1. Double-click `LOGGER-Agent-Installer.dmg` to mount the image.
+2. Inside the DMG you will find:
+   - **`Install LOGGER Agent.pkg`**: Native macOS Installer package with Universal ARM64/Intel binary. Double-click and follow the standard macOS installation wizard.
+   - **`Install LOGGER Agent.command`**: Interactive Terminal setup script. Double-click to run; prompts for Server URL and Token, copies binary to `/opt/logger-agent`, and loads the `launchd` daemon.
+   - **`Uninstall LOGGER Agent.command`**: Clean uninstaller script that unloads launchd daemon and deletes `/opt/logger-agent`.
+
+#### Method 1: Automated Script Install (Terminal / Sudo)
 Open Terminal and run with `sudo`:
 
 ```bash

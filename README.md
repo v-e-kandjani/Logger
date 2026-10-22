@@ -265,6 +265,18 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.8.2** (Native Windows .exe & macOS .dmg Standalone Agent Installers):
+  - **Standalone Windows Installer (`logger-agent-setup.exe`)**:
+    - Embedded native Go installer (`agent/cmd/installer-windows`) packaging `logger-agent.exe` into a single standalone executable.
+    - Supports interactive prompts for Server URL & Token or headless silent switches (`-server`, `-token`, `-dir`, `-insecure`, `-silent`, `-uninstall`).
+    - Creates `C:\Program Files\LOGGER Agent`, writes `config.json`, registers and starts the `LoggerAgent` Windows Service via Service Control Manager, configures automatic restart recovery, and registers into Windows Add/Remove Programs.
+  - **Native macOS Disk Image (`LOGGER-Agent-Installer.dmg`) & Package (`.pkg`)**:
+    - Universal binary compilation (`arm64` Apple Silicon M1-M4 + `x86_64` Intel) packaged into an official Apple disk image via `hdiutil`.
+    - Includes `Install LOGGER Agent.pkg` (Apple Installer package), `Install LOGGER Agent.command` (interactive Terminal wizard), `Uninstall LOGGER Agent.command`, and launchd daemon configuration.
+  - **Dashboard 1-Click Installer Downloads**:
+    - Integrated direct download buttons into the quick 3-step setup card, the full installation guide, and the token creation modal.
+    - Automated multi-platform build pipeline (`scripts/build-agent-installers.sh`) for reproducing installers and binaries.
+
 - **v1.8.1** (Interactive 3-Step Endpoint Installation Guide & Decoupled Native Agent Versioning):
   - **Quick Step-by-Step Installation UI**:
     - Added interactive 3-step setup banner (`#ep-quick-step-card`) directly above the Agents table with live platform toggles for Windows, macOS, and Linux.

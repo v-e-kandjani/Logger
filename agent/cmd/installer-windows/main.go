@@ -1,0 +1,264 @@
+//go:build windows_installer
+
+package main
+
+import (
+	_ "embed"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+//go:embed logger-agent.exe
+var embeddedAgentBinary []byte
+
+const (
+	defaultInstallDir = `C:\Program Files\LOGGER Agent`
+	serviceName       = "LoggerAgent"
+	serviceDisplayName = "Valtrivo LogSeal Endpoint Agent"
+	serviceDescription = "Valtrivo LogSeal native endpoint security and continuous telemetry collection daemon."
+	version           = "v0.1.0"
+)
+
+type Config struct {
+	ServerURL            string `json:"server_url"`
+	EnrollmentToken      string `json:"enrollment_token"`
+	InsecureTLS          bool   `json:"insecure_tls"`
+	LogLevel             string `json:"log_level"`
+	DataDir              string `json:"data_dir"`
+	HeartbeatIntervalSec int    `json:"heartbeat_interval_sec"`
+	IdentityFile         string `json:"identity_file"`
+}
+
+func main() {
+	serverURL := flag.String("server", "", "LogSeal Server URL (e.g. http://10.34.33.40:8080)")
+	enrollToken := flag.String("token", "", "Enrollment token (lp_ea_...)")
+	installDir := flag.String("dir", defaultInstallDir, "Target installation directory")
+	insecure := flag.Bool("insecure", false, "Allow insecure TLS certificates")
+	silent := flag.Bool("silent", false, "Unattended silent installation")
+	flag.BoolVar(silent, "q", false, "Unattended silent installation (shorthand)")
+	uninstall := flag.Bool("uninstall", false, "Uninstall Logger Agent service and remove files")
+	flag.BoolVar(uninstall, "u", false, "Uninstall Logger Agent service (shorthand)")
+	showVersion := flag.Bool("version", false, "Show installer version")
+	flag.BoolVar(showVersion, "v", false, "Show installer version (shorthand)")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("Valtrivo LogSeal Windows Agent Installer %s\n", version)
+		return
+	}
+
+	if *uninstall {
+		runUninstall(*installDir, *silent)
+		return
+	}
+
+	runInstall(*serverURL, *enrollToken, *installDir, *insecure, *silent)
+}
+
+func printBanner() {
+	fmt.Println("==================================================================")
+	fmt.Println("      VALTRIVO LOGSEAL - WINDOWS ENDPOINT AGENT INSTALLER         ")
+	fmt.Printf("                         Version %s\n", version)
+	fmt.Println("==================================================================")
+	fmt.Println()
+}
+
+func runInstall(serverURL, token, targetDir string, insecure, silent bool) {
+	if !silent {
+		printBanner()
+	}
+
+	// Interactive prompts if missing in non-silent mode
+	if !silent {
+		if serverURL == "" {
+			fmt.Print("Enter LogSeal Server URL [http://localhost:8080]: ")
+			var input string
+			fmt.Scanln(&input)
+			input = strings.TrimSpace(input)
+			if input == "" {
+				serverURL = "http://localhost:8080"
+			} else {
+				serverURL = input
+			}
+		}
+
+		if token == "" {
+			fmt.Print("Enter Enrollment Token (lp_ea_...): ")
+			fmt.Scanln(&token)
+			token = strings.TrimSpace(token)
+		}
+	}
+
+	if serverURL == "" {
+		serverURL = "http://localhost:8080"
+	}
+	serverURL = strings.TrimRight(serverURL, "/")
+
+	if token == "" {
+		if !silent {
+			fmt.Println("[WARNING] No enrollment token provided. Agent will wait for manual configuration.")
+		}
+		token = "<TOKEN>"
+	}
+
+	logMsg(silent, "[*] Installation Directory : %s", targetDir)
+	logMsg(silent, "[*] LogSeal Server URL      : %s", serverURL)
+
+	dataDir := filepath.Join(targetDir, "data")
+	binaryPath := filepath.Join(targetDir, "logger-agent.exe")
+	uninstallerPath := filepath.Join(targetDir, "uninstall.exe")
+	configPath := filepath.Join(targetDir, "config.json")
+	identityPath := filepath.Join(targetDir, "identity.json")
+
+	// 1. Create directories
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		fatalMsg(silent, "Failed to create installation directory: %v", err)
+	}
+
+	// 2. Write embedded logger-agent.exe binary
+	logMsg(silent, "[*] Extracting agent binary...")
+	if len(embeddedAgentBinary) == 0 {
+		fatalMsg(silent, "Embedded agent binary is empty. Please ensure logger-agent.exe was embedded during build.")
+	}
+
+	// Stop existing service if running before overwriting binary
+	exec.Command("sc.exe", "stop", serviceName).Run()
+	time.Sleep(1 * time.Second)
+
+	if err := os.WriteFile(binaryPath, embeddedAgentBinary, 0755); err != nil {
+		fatalMsg(silent, "Failed to write agent binary to %s: %v", binaryPath, err)
+	}
+
+	// Also copy installer itself as uninstaller
+	if selfPath, err := os.Executable(); err == nil {
+		if data, err := os.ReadFile(selfPath); err == nil {
+			_ = os.WriteFile(uninstallerPath, data, 0755)
+		}
+	}
+
+	// 3. Write config.json
+	logMsg(silent, "[*] Writing configuration...")
+	cfg := Config{
+		ServerURL:            serverURL,
+		EnrollmentToken:      token,
+		InsecureTLS:          insecure,
+		LogLevel:             "info",
+		DataDir:              dataDir,
+		HeartbeatIntervalSec: 30,
+		IdentityFile:         identityPath,
+	}
+
+	cfgBytes, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		fatalMsg(silent, "Failed to generate config JSON: %v", err)
+	}
+
+	if err := os.WriteFile(configPath, cfgBytes, 0644); err != nil {
+		fatalMsg(silent, "Failed to write config file to %s: %v", configPath, err)
+	}
+
+	// 4. Register Windows Service
+	logMsg(silent, "[*] Registering Windows Service '%s'...", serviceName)
+	// Delete old service if exists
+	exec.Command("sc.exe", "delete", serviceName).Run()
+	time.Sleep(500 * time.Millisecond)
+
+	binPathCmd := fmt.Sprintf(`"%s" -config "%s"`, binaryPath, configPath)
+	createArgs := []string{
+		"create", serviceName,
+		fmt.Sprintf("binPath= %s", binPathCmd),
+		"start=", "auto",
+		fmt.Sprintf("DisplayName= %s", serviceDisplayName),
+	}
+	cmd := exec.Command("sc.exe", createArgs...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		fatalMsg(silent, "Failed to create service: %v (%s)", err, string(out))
+	}
+
+	// Set description & failure actions
+	exec.Command("sc.exe", "description", serviceName, serviceDescription).Run()
+	exec.Command("sc.exe", "failure", serviceName, "reset=", "86400", "actions=", "restart/5000/restart/10000/restart/30000").Run()
+
+	// 5. Register in Windows Add/Remove Programs (Registry)
+	regBase := `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\` + serviceName
+	exec.Command("reg.exe", "add", regBase, "/v", "DisplayName", "/t", "REG_SZ", "/d", serviceDisplayName, "/f").Run()
+	exec.Command("reg.exe", "add", regBase, "/v", "DisplayVersion", "/t", "REG_SZ", "/d", version, "/f").Run()
+	exec.Command("reg.exe", "add", regBase, "/v", "Publisher", "/t", "REG_SZ", "/d", "Valtrivo", "/f").Run()
+	exec.Command("reg.exe", "add", regBase, "/v", "InstallLocation", "/t", "REG_SZ", "/d", targetDir, "/f").Run()
+	exec.Command("reg.exe", "add", regBase, "/v", "UninstallString", "/t", "REG_SZ", "/d", fmt.Sprintf(`"%s" -uninstall`, uninstallerPath), "/f").Run()
+
+	// 6. Start service
+	logMsg(silent, "[*] Starting %s service...", serviceName)
+	startCmd := exec.Command("sc.exe", "start", serviceName)
+	if out, err := startCmd.CombinedOutput(); err != nil {
+		logMsg(silent, "[!] Notice starting service: %v (%s). Checking status...", err, string(out))
+	}
+
+	time.Sleep(1 * time.Second)
+
+	if !silent {
+		fmt.Println()
+		fmt.Println("==================================================================")
+		fmt.Println(" [✓] VALTRIVO LOGSEAL AGENT SUCCESSFULLY INSTALLED!               ")
+		fmt.Println("==================================================================")
+		fmt.Printf(" Service Name     : %s\n", serviceName)
+		fmt.Printf(" Binary Location  : %s\n", binaryPath)
+		fmt.Printf(" Configuration    : %s\n", configPath)
+		fmt.Printf(" Data Directory   : %s\n", dataDir)
+		fmt.Println(" Verify Command   : Get-Service LoggerAgent")
+		fmt.Println("==================================================================")
+		fmt.Println()
+		fmt.Println("Press Enter to finish...")
+		var wait string
+		fmt.Scanln(&wait)
+	}
+}
+
+func runUninstall(targetDir string, silent bool) {
+	if !silent {
+		printBanner()
+		fmt.Println("[*] Stopping and removing LoggerAgent Windows Service...")
+	}
+
+	exec.Command("sc.exe", "stop", serviceName).Run()
+	time.Sleep(1 * time.Second)
+	exec.Command("sc.exe", "delete", serviceName).Run()
+
+	// Clean registry
+	regBase := `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\` + serviceName
+	exec.Command("reg.exe", "delete", regBase, "/f").Run()
+
+	logMsg(silent, "[✓] Service unregistered and removed from Windows.")
+
+	if !silent {
+		fmt.Printf("[*] Configuration and data remain preserved at: %s\n", targetDir)
+		fmt.Println("[✓] Uninstallation completed successfully.")
+		fmt.Println("Press Enter to exit...")
+		var wait string
+		fmt.Scanln(&wait)
+	}
+}
+
+func logMsg(silent bool, format string, a ...interface{}) {
+	if !silent {
+		fmt.Printf(format+"\n", a...)
+	}
+}
+
+func fatalMsg(silent bool, format string, a ...interface{}) {
+	msg := fmt.Sprintf(format, a...)
+	if !silent {
+		fmt.Printf("\n[ERROR] %s\n", msg)
+		fmt.Println("Press Enter to exit...")
+		var wait string
+		fmt.Scanln(&wait)
+	}
+	log.Fatal(msg)
+}

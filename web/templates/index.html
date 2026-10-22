@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.1</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.2</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -949,7 +949,10 @@
                                             <span class="ep-step-badge">2</span>
                                             <strong style="font-size: 12.5px;" id="quick-step2-title" data-i18n="lbl_quick_step2_title">Komutu Kopyalayıp Çalıştırın</strong>
                                         </div>
-                                        <button class="btn btn-sm btn-outline" onclick="copyQuickStepCmd()" style="padding: 2px 8px; font-size: 11px;">📋 Kopyala</button>
+                                        <div style="display: flex; gap: 4px; align-items: center;">
+                                            <a id="quick-step-installer-btn" href="/static/downloads/logger-agent-setup.exe" download="logger-agent-setup.exe" class="btn btn-sm btn-primary" style="padding: 2px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">⬇️ <span id="quick-step-installer-text">.exe İndir</span></a>
+                                            <button class="btn btn-sm btn-outline" onclick="copyQuickStepCmd()" style="padding: 2px 8px; font-size: 11px;">📋 Kopyala</button>
+                                        </div>
                                     </div>
                                     <div class="ep-code-box" style="margin: 4px 0; max-height: 60px; padding: 8px 10px;">
                                         <pre id="quick-step-cmd-box" style="font-size: 11px;">Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr -useb http://localhost:8080/static/scripts/install-agent.ps1 -OutFile "$env:TEMP\install-agent.ps1"; &amp; "$env:TEMP\install-agent.ps1" -Server "http://localhost:8080" -Token "&lt;TOKEN&gt;"</pre>
@@ -1121,6 +1124,12 @@
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                 <span data-i18n="btn_view_full_md">📄 Tam Dokümantasyon (MD)</span>
                             </button>
+                            <a href="/static/downloads/logger-agent-setup.exe" download="logger-agent-setup.exe" class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px; border-color: rgba(59, 130, 246, 0.4);">
+                                <span>🪟 Windows Setup (.exe)</span>
+                            </a>
+                            <a href="/static/downloads/logger-agent-installer.dmg" download="logger-agent-installer.dmg" class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px; border-color: rgba(16, 185, 129, 0.4);">
+                                <span>🍏 macOS Installer (.dmg)</span>
+                            </a>
                             <a href="/static/scripts/install-agent.sh" download="install-agent.sh" class="btn btn-outline btn-sm" style="display: flex; align-items: center; gap: 6px;">
                                 <span>⬇️ install-agent.sh</span>
                             </a>
@@ -1258,6 +1267,31 @@ sudo systemctl status logger-agent</pre>
 
                     <!-- PLATFORM CONTENT: WINDOWS -->
                     <div class="ep-platform-pane" id="ep-pane-windows" style="display: none;">
+                        <div class="ep-step-card" style="border: 1px solid rgba(59, 130, 246, 0.35); background: linear-gradient(135deg, rgba(59, 130, 246, 0.04) 0%, rgba(37, 99, 235, 0.02) 100%);">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num" style="background: var(--accent);">0</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;">Yöntem 0: Windows Kurulum Sihirbazı (.exe Installer) (En Kolay)</h5>
+                                <span class="badge badge-success" style="font-size: 10px; margin-left: auto;">Tek Tıkla Kurulum / SCCM Uyumlu</span>
+                            </div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+                                Bağımsız <code>logger-agent-setup.exe</code> yükleyicisi; hedef dizinleri (<code>C:\Program Files\LOGGER Agent</code>) oluşturur, gömülü ikili dosyayı ve <code>config.json</code>'ı yazar, <code>LoggerAgent</code> Windows servisini kaydeder, hata kurtarma ayarlarını yapar ve Denetim Masası / Program Ekle-Kaldır kaydını tamamlar:
+                            </p>
+                            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+                                <a href="/static/downloads/logger-agent-setup.exe" download="logger-agent-setup.exe" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; padding: 6px 14px;">
+                                    <span>⬇️ logger-agent-setup.exe İndir (9.5 MB)</span>
+                                </a>
+                                <span style="font-size: 11.5px; color: var(--text-muted);">Tüm 64-bit Windows sürümlerini (Win 10/11 &amp; Server 2016-2025) destekler.</span>
+                            </div>
+                            <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Sessiz Kurulum (Silent / Komut Satırı / SCCM / GPO):</div>
+                            <div class="ep-code-box">
+                                <button class="ep-copy-btn" onclick="copyCodeFromBox('code-win-exe-silent')">Kopyala</button>
+                                <pre id="code-win-exe-silent">logger-agent-setup.exe -server "http://localhost:8080" -token "&lt;TOKEN&gt;" -silent</pre>
+                            </div>
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 6px;">
+                                💡 <em>Çift tıklayarak çalıştırıldığında interaktif konsol açılır; sunucu adresi ve belirteç boş bırakılırsa varsayılan veya istem girilerek otomatik tamamlanır.</em>
+                            </div>
+                        </div>
+
                         <div class="ep-step-card">
                             <div class="ep-step-header">
                                 <span class="ep-step-num">1</span>
@@ -1309,6 +1343,31 @@ Get-Service LoggerAgent</pre>
 
                     <!-- PLATFORM CONTENT: MACOS -->
                     <div class="ep-platform-pane" id="ep-pane-macos" style="display: none;">
+                        <div class="ep-step-card" style="border: 1px solid rgba(16, 185, 129, 0.35); background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(5, 150, 105, 0.02) 100%);">
+                            <div class="ep-step-header">
+                                <span class="ep-step-num" style="background: var(--success);">0</span>
+                                <h5 style="margin: 0; font-size: 13.5px; font-weight: 600;">Yöntem 0: macOS .dmg Kurulum İmajı (.dmg &amp; .pkg) (En Kolay)</h5>
+                                <span class="badge badge-success" style="font-size: 10px; margin-left: auto;">Universal (ARM64 + Intel)</span>
+                            </div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+                                Apple Silicon (M1/M2/M3/M4) ve Intel Mac'ler için Universal Binary içeren resmi disk imajı (.dmg) veya doğrudan Apple Installer paketi (.pkg):
+                            </p>
+                            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+                                <a href="/static/downloads/logger-agent-installer.dmg" download="logger-agent-installer.dmg" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; padding: 6px 14px;">
+                                    <span>🍏 LOGGER-Agent-Installer.dmg İndir (11 MB)</span>
+                                </a>
+                                <a href="/static/downloads/logger-agent-macos.pkg" download="logger-agent-macos.pkg" class="btn btn-outline btn-sm" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;">
+                                    <span>📦 Doğrudan .pkg Paketi (5.3 MB)</span>
+                                </a>
+                            </div>
+                            <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.5;">
+                                <strong>DMG İçeriği:</strong><br>
+                                • <code>Install LOGGER Agent.pkg</code>: Çift tıklayarak sistem geneli servis kurulumu (Yönetici şifresi ister).<br>
+                                • <code>Install LOGGER Agent.command</code>: Çift tıklanabilir interaktif Terminal kurulum sihirbazı (Sunucu URL ve Token sorar).<br>
+                                • <code>Uninstall LOGGER Agent.command</code>: Ajanı ve launchd servisini tek tıkla sistemden temizler.
+                            </div>
+                        </div>
+
                         <div class="ep-step-card">
                             <div class="ep-step-header">
                                 <span class="ep-step-num">1</span>
@@ -2897,13 +2956,13 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.1</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.2</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">f1e8a01</div>
-                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-21</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">d61a08f</div>
+                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-22</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">GitHub Repository</div>
@@ -5290,7 +5349,10 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
 
                 <!-- Windows -->
                 <div style="margin-bottom: 16px;">
-                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">🪟 Windows (PowerShell Administrator):</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="font-size: 12px; font-weight: 600;">🪟 Windows (PowerShell Administrator &amp; .exe):</span>
+                        <a href="/static/downloads/logger-agent-setup.exe" download="logger-agent-setup.exe" class="btn btn-sm btn-outline" style="font-size: 11px; padding: 2px 8px;">⬇️ logger-agent-setup.exe</a>
+                    </div>
                     <div class="ep-code-box">
                         <button class="ep-copy-btn" onclick="copyCodeFromBox('modal-token-cmd-windows')">Kopyala</button>
                         <pre id="modal-token-cmd-windows">iwr -useb ...</pre>
@@ -5299,7 +5361,10 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
 
                 <!-- macOS -->
                 <div style="margin-bottom: 16px;">
-                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">🍏 macOS (Apple Silicon &amp; Intel):</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="font-size: 12px; font-weight: 600;">🍏 macOS (Terminal &amp; .dmg / .pkg):</span>
+                        <a href="/static/downloads/logger-agent-installer.dmg" download="logger-agent-installer.dmg" class="btn btn-sm btn-outline" style="font-size: 11px; padding: 2px 8px;">⬇️ LOGGER-Agent-Installer.dmg</a>
+                    </div>
                     <div class="ep-code-box">
                         <button class="ep-copy-btn" onclick="copyCodeFromBox('modal-token-cmd-macos')">Kopyala</button>
                         <pre id="modal-token-cmd-macos">curl -sSL ...</pre>
@@ -5322,8 +5387,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.8.1"></script>
-    <script src="/static/js/translations.js?v=1.8.1"></script>
-    <script src="/static/js/app.js?v=1.8.1"></script>
+    <script src="/static/js/marked.min.js?v=1.8.2"></script>
+    <script src="/static/js/translations.js?v=1.8.2"></script>
+    <script src="/static/js/app.js?v=1.8.2"></script>
 </body>
 </html>

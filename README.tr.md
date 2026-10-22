@@ -254,6 +254,18 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.8.2** (Windows .exe ve macOS .dmg Yerel Ajan Yükleyicileri):
+  - **Bağımsız Windows Kurulum Sihirbazı (`logger-agent-setup.exe`)**:
+    - `logger-agent.exe` ikili dosyasını kendi bünyesine gömen Go tabanlı yerel yükleyici (`agent/cmd/installer-windows`) geliştirildi.
+    - Çift tıkla çalışan etkileşimli konsol sihirbazı veya sessiz komut satırı parametreleri (`-server`, `-token`, `-dir`, `-insecure`, `-silent`, `-uninstall`) desteği sağlandı.
+    - `C:\Program Files\LOGGER Agent` dizinini oluşturur, `config.json` dosyasını yazar, Windows Service Control Manager üzerinden `LoggerAgent` servisini kurup başlatır, otomatik yeniden başlatma hata eylemlerini yapılandırır ve Windows Program Ekle/Kaldır kaydını tamamlar.
+  - **macOS Disk İmajı (`LOGGER-Agent-Installer.dmg`) ve Yükleyici Paketi (`.pkg`)**:
+    - Apple Silicon (ARM64) ve Intel (x86_64) mimarilerini tek dosyada birleştiren Universal Binary ikilisi oluşturuldu.
+    - `hdiutil` ile oluşturulan DMG imajı; `Install LOGGER Agent.pkg` (Apple Yükleyici paketi), `Install LOGGER Agent.command` (etkileşimli Terminal kurulum sihirbazı), `Uninstall LOGGER Agent.command` ve launchd arka plan servisi yapılandırmasını içerir.
+  - **Panodan Tek Tıkla İndirme**:
+    - Hızlı 3 adımlı kurulum kartı, detaylı kurulum kılavuzu ve belirteç oluşturma pencerelerine doğrudan `.exe` ve `.dmg` indirme bağlantıları entegre edildi.
+    - Tüm ikili dosyaları ve yükleyicileri otomatik derleyen derleme betiği (`scripts/build-agent-installers.sh`) eklendi.
+
 - **v1.8.1** (Etkileşimli 3 Adımda Uç Nokta Kurulum Rehberi & Bağımsız Yerel Ajan Sürümleme):
   - **Uygulama İçi 3 Adımda Hızlı Kurulum Arayüzü**:
     - Ajanlar tablosunun hemen üzerine Windows, macOS ve Linux işletim sistemleri için dinamik platform seçicili 3 adımlı hızlı kurulum paneli (`#ep-quick-step-card`) eklendi.
