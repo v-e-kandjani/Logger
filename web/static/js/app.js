@@ -205,6 +205,9 @@ function switchTab(tab, targetSectionId = null) {
     if (targetPane) targetPane.classList.add('active');
 
     updateViewHeader(tab);
+    if (window.i18n && typeof window.i18n.applyTranslations === 'function') {
+        window.i18n.applyTranslations();
+    }
 
     // Refresh tab-specific views with exception guard
     try {
@@ -3040,6 +3043,21 @@ window.onLanguageChanged = (lang) => {
         if (typeof loadUnregisteredSources === 'function') loadUnregisteredSources();
     } else if (activeTab === 'reports') {
         if (typeof loadReportsView === 'function') loadReportsView();
+    } else if (activeTab === 'endpoint') {
+        loadEndpointDashboard();
+        if (typeof currentEndpointSection !== 'undefined') {
+            if (currentEndpointSection === 'endpoint-sec-agents') loadEndpointAgents();
+            else if (currentEndpointSection === 'endpoint-sec-inventory') loadEndpointInventory();
+            else if (currentEndpointSection === 'endpoint-sec-vulnerabilities') { loadCVEStatus(); loadEndpointVulnerabilities(); }
+            else if (currentEndpointSection === 'endpoint-sec-patches') loadEndpointPatches();
+            else if (currentEndpointSection === 'endpoint-sec-tokens') loadEndpointTokens();
+        }
+    } else if (activeTab === 'health') {
+        if (typeof loadHealthTelemetry === 'function') loadHealthTelemetry();
+    } else if (activeTab === 'users') {
+        if (typeof loadUsers === 'function') loadUsers();
+    } else if (activeTab === 'updates') {
+        if (typeof loadUpdateStatus === 'function') loadUpdateStatus();
     }
 };
 
@@ -8222,28 +8240,29 @@ async function loadEndpointAgents() {
             `;
 
             // Version badge
+            const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
             const isLatest = (a.agent_version === 'v0.1.3' || a.agent_version === '0.1.3');
             const verBadge = isLatest
                 ? `<span class="badge badge-success" style="font-family: var(--font-mono); font-size: 10px;">${escapeHtml(a.agent_version || 'v0.1.3')}</span>`
-                : `<span class="badge badge-warning" style="font-family: var(--font-mono); font-size: 10px;" title="Otomatik Güncelleme Bekliyor">${escapeHtml(a.agent_version || 'v0.1.2')} ⚡ Güncellenecek</span>`;
+                : `<span class="badge badge-warning" style="font-family: var(--font-mono); font-size: 10px;" title="${t('status_will_update')}">${escapeHtml(a.agent_version || 'v0.1.2')} ⚡ ${t('status_will_update')}</span>`;
 
             const critVulnBadge = a.critical_vulns_count > 0 
                 ? `<span class="badge badge-danger" style="margin-right: 4px;">${a.critical_vulns_count} Crit</span>` 
                 : '';
             const totalVulnBadge = a.open_vulns_count > 0
-                ? `<span class="badge badge-secondary">${a.open_vulns_count} Toplam</span>`
-                : '<span style="color: var(--success); font-size: 11px;">Temiz</span>';
+                ? `<span class="badge badge-secondary">${a.open_vulns_count} ${t('status_total')}</span>`
+                : `<span style="color: var(--success); font-size: 11px;">${t('status_clean')}</span>`;
             const patchBadge = a.missing_patches_count > 0
-                ? `<span class="badge badge-warning">${a.missing_patches_count} Eksik</span>`
-                : '<span style="color: var(--success); font-size: 11px;">Güncel</span>';
+                ? `<span class="badge badge-warning">${a.missing_patches_count} ${t('status_missing')}</span>`
+                : `<span style="color: var(--success); font-size: 11px;">${t('status_updated')}</span>`;
             const rebootBadge = a.reboot_required
-                ? `<span class="badge badge-warning" style="margin-left: 4px;" title="Yeniden başlatma gerekiyor">🔄 Reboot</span>`
+                ? `<span class="badge badge-warning" style="margin-left: 4px;" title="${t('status_reboot_pending')}">🔄 Reboot</span>`
                 : '';
 
             return `
                 <tr>
                     <td>
-                        <div style="font-weight: 600;">${escapeHtml(a.hostname || 'Bilinmiyor')}</div>
+                        <div style="font-weight: 600;">${escapeHtml(a.hostname || t('status_unknown'))}</div>
                         <div style="font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(a.ip_address || '-')} • ${escapeHtml(a.agent_uuid)}</div>
                     </td>
                     <td>${osBadge}</td>
@@ -8255,7 +8274,7 @@ async function loadEndpointAgents() {
                     <td>${patchBadge}${rebootBadge}</td>
                     <td style="font-size: 11.5px; color: var(--text-muted);">${relativeTime}</td>
                     <td>
-                        <button class="btn btn-sm btn-outline" onclick="inspectEndpointAgent('${a.id}')">İncele</button>
+                        <button class="btn btn-sm btn-outline" onclick="inspectEndpointAgent('${a.id}')">${t('btn_inspect_agent')}</button>
                     </td>
                 </tr>
             `;
@@ -8969,17 +8988,18 @@ async function loadEndpointPatches() {
             return;
         }
 
+        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
         tbody.innerHTML = patches.map(p => {
             const isInstalled = (p.status === 'installed');
             const statusBadge = isInstalled
-                ? `<span class="badge badge-success">🟢 Yüklü</span>`
+                ? `<span class="badge badge-success">🟢 ${t('patch_opt_installed')}</span>`
                 : (p.status === 'pending_reboot' 
-                    ? `<span class="badge badge-danger">🔄 Reboot Bekliyor</span>` 
-                    : `<span class="badge badge-warning">🟠 Eksik</span>`);
+                    ? `<span class="badge badge-danger">🔄 ${t('patch_opt_reboot')}</span>` 
+                    : `<span class="badge badge-warning">🟠 ${t('patch_opt_missing')}</span>`);
 
             const rebootBadge = p.requires_reboot
-                ? `<span class="badge badge-danger" style="font-weight: 700;">Gerekiyor</span>`
-                : `<span style="color: var(--text-muted); font-size: 11px;">Hayır</span>`;
+                ? `<span class="badge badge-danger" style="font-weight: 700;">${t('lbl_required')}</span>`
+                : `<span style="color: var(--text-muted); font-size: 11px;">${t('lbl_no')}</span>`;
 
             const cves = (p.cve_ids && p.cve_ids.length > 0)
                 ? p.cve_ids.map(c => `<span style="font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); margin-right: 4px;">${escapeHtml(c)}</span>`).join('')

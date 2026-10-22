@@ -524,8 +524,8 @@
             <!-- TAB: Live Stream -->
             <section class="tab-pane" id="pane-live">
                 <div class="live-toolbar">
-                    <button class="btn btn-primary" id="btn-toggle-live">Pause Stream</button>
-                    <input type="text" class="input" id="live-filter" placeholder="Filter incoming live events (regex or text)...">
+                    <button class="btn btn-primary" id="btn-toggle-live" data-i18n="btn_pause_stream">Pause Stream</button>
+                    <input type="text" class="input" id="live-filter" placeholder="Filter incoming live events (regex or text)..." data-i18n-placeholder="live_filter_placeholder">
                     <span class="badge badge-secondary" id="live-buffer-count">0 in view (Max 15)</span>
                 </div>
                 <div class="console-box" id="live-log-container">
@@ -536,9 +536,9 @@
             <!-- TAB: Log Search -->
             <section class="tab-pane" id="pane-search">
                 <div class="search-toolbar">
-                    <input type="text" class="input" id="search-q" placeholder="Full-text token search (e.g. WatchGuard, Deny, HTTPS)...">
+                    <input type="text" class="input" id="search-q" placeholder="Full-text token search (e.g. WatchGuard, Deny, HTTPS)..." data-i18n-placeholder="search_placeholder">
                     <select class="input" id="search-vendor">
-                        <option value="">All Vendors</option>
+                        <option value="" data-i18n="opt_all_vendors">All Vendors</option>
                         <option value="WatchGuard">WatchGuard</option>
                         <option value="Fortinet">Fortinet</option>
                         <option value="Cisco">Cisco</option>
@@ -546,7 +546,7 @@
                         <option value="Generic">Generic</option>
                     </select>
                     <select class="input" id="search-severity">
-                        <option value="">All Severities</option>
+                        <option value="" data-i18n="opt_all_severities">All Severities</option>
                         <option value="EMERGENCY">EMERGENCY</option>
                         <option value="ALERT">ALERT</option>
                         <option value="CRITICAL">CRITICAL</option>
@@ -555,7 +555,7 @@
                         <option value="NOTICE">NOTICE</option>
                         <option value="INFORMATIONAL">INFORMATIONAL</option>
                     </select>
-                    <input type="text" class="input" id="search-source" placeholder="Source IP...">
+                    <input type="text" class="input" id="search-source" placeholder="Source IP..." data-i18n-placeholder="search_source_placeholder">
                     <select class="input" id="search-range">
                         <option value="24h" selected>Son 24 Saat (Last 24h)</option>
                         <option value="all">Tüm Zamanlar (All Time)</option>
@@ -571,13 +571,13 @@
                     <table class="data-table" id="search-results-table">
                         <thead>
                             <tr>
-                                <th>Timestamp (UTC)</th>
-                                <th>Source IP</th>
-                                <th>Vendor / Device</th>
-                                <th>Severity</th>
-                                <th>Facility</th>
-                                <th>App / Action</th>
-                                <th>Message</th>
+                                <th data-i18n="th_timestamp">Timestamp (UTC)</th>
+                                <th data-i18n="th_source_ip">Source IP</th>
+                                <th data-i18n="th_vendor_device">Vendor / Device</th>
+                                <th data-i18n="th_severity">Severity</th>
+                                <th data-i18n="th_facility">Facility</th>
+                                <th data-i18n="th_app_action">App / Action</th>
+                                <th data-i18n="th_message">Message</th>
                             </tr>
                         </thead>
                         <tbody id="search-results-body">
@@ -833,17 +833,17 @@
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px;">
                         <div class="panel" style="padding: 16px;">
                             <div class="panel-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-                                <h4 style="font-size: 13.5px; font-weight: 600;">⚠️ En Yüksek Riskli Uç Noktalar</h4>
-                                <button class="btn btn-sm btn-outline" onclick="switchEndpointSubSection('endpoint-sec-agents')">Tüm Ajanlar &rarr;</button>
+                                <h4 style="font-size: 13.5px; font-weight: 600;" data-i18n="ep_top_risk_agents">⚠️ En Yüksek Riskli Uç Noktalar</h4>
+                                <button class="btn btn-sm btn-outline" onclick="switchEndpointSubSection('endpoint-sec-agents')" data-i18n="ep_all_agents_btn">Tüm Ajanlar &rarr;</button>
                             </div>
                             <div class="table-container" style="max-height: 280px; overflow-y: auto;">
                                 <table class="data-table" id="ep-dash-top-agents-table">
                                     <thead>
                                         <tr>
-                                            <th>Uç Nokta</th>
-                                            <th>İşletim Sistemi</th>
-                                            <th>Kritik CVE</th>
-                                            <th>Toplam Zafiyet</th>
+                                            <th data-i18n="th_agent_hostname">Uç Nokta</th>
+                                            <th data-i18n="th_agent_os">İşletim Sistemi</th>
+                                            <th data-i18n="ep_stat_crit_vulns">Kritik CVE</th>
+                                            <th data-i18n="status_total">Toplam Zafiyet</th>
                                         </tr>
                                     </thead>
                                     <tbody id="ep-dash-top-agents-body">
@@ -855,17 +855,17 @@
 
                         <div class="panel" style="padding: 16px;">
                             <div class="panel-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-                                <h4 style="font-size: 13.5px; font-weight: 600;">🛡️ Kritik ve İstismara Açık Zafiyetler (CISA KEV / High EPSS)</h4>
-                                <button class="btn btn-sm btn-outline" onclick="switchEndpointSubSection('endpoint-sec-vulnerabilities')">Tüm Zafiyetler &rarr;</button>
+                                <h4 style="font-size: 13.5px; font-weight: 600;" data-i18n="ep_top_cves_title">🛡️ Kritik ve İstismara Açık Zafiyetler (CISA KEV / High EPSS)</h4>
+                                <button class="btn btn-sm btn-outline" onclick="switchEndpointSubSection('endpoint-sec-vulnerabilities')" data-i18n="ep_all_vulns_btn">Tüm Zafiyetler &rarr;</button>
                             </div>
                             <div class="table-container" style="max-height: 280px; overflow-y: auto;">
                                 <table class="data-table" id="ep-dash-top-cves-table">
                                     <thead>
                                         <tr>
-                                            <th>CVE ID</th>
-                                            <th>CVSS</th>
-                                            <th>KEV</th>
-                                            <th>Etkilenen Uç Nokta</th>
+                                            <th data-i18n="th_cve_desc">CVE ID</th>
+                                            <th data-i18n="th_cvss_score">CVSS</th>
+                                            <th data-i18n="th_kev">KEV</th>
+                                            <th data-i18n="th_affected_endpoint">Etkilenen Uç Nokta</th>
                                         </tr>
                                     </thead>
                                     <tbody id="ep-dash-top-cves-body">
@@ -881,7 +881,7 @@
                 <div class="endpoint-section" id="endpoint-sec-agents" style="display: none;">
                     <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                         <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 600px;">
-                            <input type="text" id="ep-agents-search" class="form-control" placeholder="Ajan ara (Hostname, IP, UUID)..." style="flex: 1;">
+                            <input type="text" id="ep-agents-search" class="form-control" placeholder="Ajan ara (Hostname, IP, UUID)..." data-i18n-placeholder="ep_search_placeholder" style="flex: 1;">
                             <select id="ep-agents-os-filter" class="form-control" style="width: 140px;">
                                 <option value="" data-i18n="lbl_filter_os">Tüm İşletim Sistemleri</option>
                                 <option value="linux">🐧 Linux</option>
@@ -890,16 +890,16 @@
                             </select>
                             <select id="ep-agents-status-filter" class="form-control" style="width: 130px;">
                                 <option value="" data-i18n="lbl_filter_status">Tüm Durumlar</option>
-                                <option value="healthy">Sağlıklı (Online)</option>
+                                <option value="healthy" data-i18n="status_healthy">Sağlıklı (Online)</option>
                                 <option value="warning">Uyarı</option>
-                                <option value="offline">Çevrimdışı</option>
+                                <option value="offline" data-i18n="ep_stat_offline">Çevrimdışı</option>
                             </select>
-                            <button class="btn btn-secondary" id="btn-ep-agents-filter-apply">Filtrele</button>
+                            <button class="btn btn-secondary" id="btn-ep-agents-filter-apply" data-i18n="btn_filter">Filtrele</button>
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button class="btn btn-outline" id="btn-ep-agents-refresh" onclick="loadEndpointAgents()">🔄 Yenile</button>
+                            <button class="btn btn-outline" id="btn-ep-agents-refresh" onclick="loadEndpointAgents()" data-i18n="btn_refresh">🔄 Yenile</button>
                             <button class="btn btn-outline" id="btn-ep-upgrade-all" onclick="triggerAgentUpgradeAll()" style="border-color: rgba(16, 185, 129, 0.4); color: var(--success);" title="Tüm ajanları bağlı oldukları sunucu üzerinden en son sürüme günceller">
-                                <span>🚀 Tüm Ajanları Otomatik Güncelle</span>
+                                <span data-i18n="btn_upgrade_all_agents">🚀 Tüm Ajanları Otomatik Güncelle</span>
                             </button>
                             <button class="btn btn-outline" id="btn-ep-quick-steps-toggle" onclick="toggleQuickStepCard()" style="border-color: rgba(59, 130, 246, 0.4); color: var(--accent);">
                                 <span data-i18n="btn_quick_step_guide">⚡ 3 Adımda Hızlı Kurulum</span>
@@ -2020,7 +2020,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
             <section class="tab-pane" id="pane-health">
                 <div class="panel">
                     <div class="panel-header">
-                        <h3>System Health & Ingestion Telemetry</h3>
+                        <h3 data-i18n="health_title">System Health & Ingestion Telemetry</h3>
                     </div>
                     <div class="panel-body" id="health-telemetry-body">
                         <!-- Loaded dynamically -->
@@ -3109,31 +3109,31 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <!-- Version & Git Status Cards -->
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
-                        <div class="stat-header">Installed Version</div>
+                        <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
                         <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.5</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-header">Installed Commit</div>
+                        <div class="stat-header" data-i18n="upd_stat_installed_commit">Installed Commit</div>
                         <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">d61a08f</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-22</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-header">GitHub Repository</div>
+                        <div class="stat-header" data-i18n="upd_stat_repo">GitHub Repository</div>
                         <div class="stat-value" style="font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                             <a href="https://github.com/v-e-kandjani/Logger" target="_blank" style="color: var(--primary); text-decoration: none;" id="upd-repo-link">v-e-kandjani/Logger</a>
                         </div>
                         <div class="stat-sub">Branch: <span class="badge badge-outline" id="upd-branch">main</span></div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-header">Synchronization Status</div>
+                        <div class="stat-header" data-i18n="upd_stat_sync_status">Synchronization Status</div>
                         <div class="stat-value" id="upd-status-badge-container">
                             <span class="badge badge-outline" id="upd-status-badge">Not Checked</span>
                         </div>
                         <div class="stat-sub" id="upd-last-checked-label">Click 'Check for Updates' to query GitHub</div>
                     </div>
                     <div class="stat-card" id="upd-kamusm-card">
-                        <div class="stat-header">TÜBİTAK KamuSM TSS Client</div>
+                        <div class="stat-header" data-i18n="upd_stat_kamusm_tss">TÜBİTAK KamuSM TSS Client</div>
                         <div class="stat-value" id="upd-kamusm-version" style="font-size: 1.3rem;">v3.1.33</div>
                         <div class="stat-sub" id="upd-kamusm-status">Timestamp Client Verified</div>
                     </div>
@@ -3142,7 +3142,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <!-- Update Details & Changed Files Box -->
                 <div class="panel" id="upd-details-panel" style="margin-bottom: 20px; display: none;">
                     <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-                        <h4 style="margin: 0;">📦 Available Remote Updates from GitHub</h4>
+                        <h4 style="margin: 0;" data-i18n="upd_remote_header">📦 Available Remote Updates from GitHub</h4>
                         <span class="badge badge-warning" id="upd-commits-behind-badge">0 commits behind</span>
                     </div>
                     <div class="panel-body">
@@ -3158,15 +3158,15 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                         </div>
 
                         <!-- Changed Files Table -->
-                        <h5 style="margin: 12px 0 8px 0;">Modified & Added Files in this Release:</h5>
+                        <h5 style="margin: 12px 0 8px 0;" data-i18n="upd_modified_files_title">Modified & Added Files in this Release:</h5>
                         <div class="table-container" style="max-height: 280px; overflow-y: auto;">
                             <table class="data-table" id="upd-files-table">
                                 <thead>
                                     <tr>
-                                        <th>File Path</th>
-                                        <th>Status</th>
-                                        <th>Changes</th>
-                                        <th>Upgrade Compatibility</th>
+                                        <th data-i18n="th_file_path">File Path</th>
+                                        <th data-i18n="th_file_status">Status</th>
+                                        <th data-i18n="th_file_changes">Changes</th>
+                                        <th data-i18n="th_file_compat">Upgrade Compatibility</th>
                                     </tr>
                                 </thead>
                                 <tbody id="upd-files-body">
