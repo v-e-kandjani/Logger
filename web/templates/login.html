@@ -582,7 +582,13 @@
             }
         };
 
-        let currentLoginLang = localStorage.getItem('logseal_lang') || 'tr';
+        let currentLoginLang = (function() {
+            const saved = localStorage.getItem('logseal_lang');
+            if (saved && (saved === 'en' || saved === 'tr')) return saved;
+            const navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+            if (navLang.startsWith('tr')) return 'tr';
+            return 'en';
+        })();
 
         function setLoginLang(lang) {
             currentLoginLang = lang;

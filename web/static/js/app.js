@@ -5987,7 +5987,8 @@ async function loadTenants() {
 
         // 1. Populate sidebar tenant context selector
         if (sel) {
-            let options = tenantSessionIsRoot ? `<option value="all">🌐 Tüm Kiracılar (Global Görünüm)</option>` : '';
+            const allLabel = (window.i18n ? window.i18n.t('opt_all_tenants') : null) || '🌐 Tüm Kiracılar (Global Görünüm)';
+            let options = tenantSessionIsRoot ? `<option value="all">${escapeHtml(allLabel)}</option>` : '';
             currentTenants.forEach(t => {
                 const icon = t.slug === 'default' ? '👑' : '🏢';
                 options += `<option value="${escapeHtml(t.slug)}">${icon} ${escapeHtml(t.name)}</option>`;

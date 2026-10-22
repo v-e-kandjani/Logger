@@ -1004,7 +1004,9 @@ const translations = {
         lbl_low_badge: "DÜŞÜK",
         lbl_kev_badge: "⚡ KEV (İstismarda)",
         ep_upgrade_all_hint: "Tüm ajanları bağlı oldukları sunucu üzerinden en son sürüme günceller",
-        lbl_copy_cmd: "Kopyala"
+        lbl_copy_cmd: "Kopyala",
+        opt_all_tenants: "🌐 Tüm Kiracılar (Global Görünüm)",
+        tenant_ctx_tooltip: "Aktif Kiracı / Müşteri Görünümü (Tenant Context)"
     },
 
     en: {
@@ -2011,13 +2013,22 @@ const translations = {
         lbl_low_badge: "LOW",
         lbl_kev_badge: "⚡ KEV (Exploited)",
         ep_upgrade_all_hint: "Upgrade all agents to the latest version hosted on their connected server",
-        lbl_copy_cmd: "Copy"
+        lbl_copy_cmd: "Copy",
+        opt_all_tenants: "🌐 All Tenants (Global View)",
+        tenant_ctx_tooltip: "Active Tenant / Organization Scope"
     }
 };
 
 // Global i18n Manager
 window.i18n = {
-    currentLang: localStorage.getItem('logseal_lang') || 'tr',
+    currentLang: (function() {
+        const saved = localStorage.getItem('logseal_lang');
+        if (saved && (saved === 'en' || saved === 'tr')) return saved;
+        // Auto-detect system default language from browser / OS
+        const navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+        if (navLang.startsWith('tr')) return 'tr';
+        return 'en'; // Default to English for international and English systems
+    })(),
 
     t: function(key) {
         const lang = this.currentLang;
