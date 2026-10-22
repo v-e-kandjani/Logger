@@ -44,6 +44,9 @@ type EndpointAgent struct {
 	CriticalVulnsCount     int             `json:"critical_vulns_count"`
 	MissingPatchesCount    int             `json:"missing_patches_count"`
 	RebootRequired         bool            `json:"reboot_required"`
+	IsIsolated             bool            `json:"is_isolated"`
+	IsolatedAt             *time.Time      `json:"isolated_at,omitempty"`
+	IsolationReason        string          `json:"isolation_reason,omitempty"`
 	CreatedAt              time.Time       `json:"created_at"`
 	UpdatedAt              time.Time       `json:"updated_at"`
 }
@@ -463,3 +466,39 @@ type BatchPatchDeployRequest struct {
 	AgentIDs       []string `json:"agent_ids,omitempty"`
 	RebootAfter    bool     `json:"reboot_after"`
 }
+
+// HostIsolationRequest defines a request to isolate or un-isolate an endpoint
+type HostIsolationRequest struct {
+	Reason     string   `json:"reason,omitempty"`
+	AllowedIPs []string `json:"allowed_ips,omitempty"`
+}
+
+// ProcessKillRequest defines an active response request to terminate a process
+type ProcessKillRequest struct {
+	PID         int    `json:"pid,omitempty"`
+	ProcessName string `json:"process_name,omitempty"`
+	Force       bool   `json:"force"`
+}
+
+// FileQuarantineRequest defines a request to quarantine a malicious or suspicious file
+type FileQuarantineRequest struct {
+	FilePath string `json:"file_path"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+// OSQueryRunRequest defines a remote live forensic SQL execution request
+type OSQueryRunRequest struct {
+	Query      string `json:"query"`
+	TimeoutSec int    `json:"timeout_sec,omitempty"`
+}
+
+// QuarantinedFileEntry records quarantined files on an endpoint
+type QuarantinedFileEntry struct {
+	OriginalPath   string    `json:"original_path"`
+	QuarantinePath string    `json:"quarantine_path"`
+	SHA256         string    `json:"sha256"`
+	SizeBytes      int64     `json:"size_bytes"`
+	QuarantinedAt  time.Time `json:"quarantined_at"`
+	Reason         string    `json:"reason,omitempty"`
+}
+

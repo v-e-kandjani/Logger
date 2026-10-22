@@ -113,7 +113,10 @@ func (db *DB) EnsureEndpointSchema(ctx context.Context) error {
 			"queue_depth": 0
 		}'::jsonb,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		is_isolated BOOLEAN NOT NULL DEFAULT FALSE,
+		isolated_at TIMESTAMPTZ,
+		isolation_reason TEXT DEFAULT ''
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_endpoint_agents_tenant ON endpoint_agents(tenant_slug);
@@ -325,6 +328,26 @@ func (db *DB) EnsureEndpointSchema(ctx context.Context) error {
 
 	ALTER TABLE endpoint_vulnerability_findings ADD COLUMN IF NOT EXISTS severity VARCHAR(32) DEFAULT 'UNKNOWN';
 	CREATE INDEX IF NOT EXISTS idx_endpoint_findings_severity ON endpoint_vulnerability_findings(severity);
+
+	-- Active Response & EDR Isolation migrations
+	ALTER TABLE endpoint_agents ADD COLUMN IF NOT EXISTS is_isolated BOOLEAN DEFAULT FALSE;
+	ALTER TABLE endpoint_agents ADD COLUMN IF NOT EXISTS isolated_at TIMESTAMPTZ;
+	ALTER TABLE endpoint_agents ADD COLUMN IF NOT EXISTS isolation_reason TEXT DEFAULT '';
+	CREATE INDEX IF NOT EXISTS idx_endpoint_agents_is_isolated ON endpoint_agents(is_isolated);
+
+	-- Quarantined files tracking
+	CREATE TABLE IF NOT EXISTS endpoint_quarantined_files (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default',
+		agent_id UUID NOT NULL REFERENCES endpoint_agents(id) ON DELETE CASCADE,
+		original_path TEXT NOT NULL,
+		quarantine_path TEXT NOT NULL,
+		sha256 VARCHAR(64) NOT NULL DEFAULT '',
+		size_bytes BIGINT DEFAULT 0,
+		reason TEXT DEFAULT '',
+		quarantined_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_quarantined_files_agent ON endpoint_quarantined_files(agent_id);
 	`
 
 	_, err := db.pool.Exec(ctx, schema)
@@ -758,6 +781,7 @@ func (db *DB) ListAgents(ctx context.Context, tenantSlug, status, osType, search
 		       COALESCE(p.name, '') as policy_name, a.policy_revision, a.group_id,
 		       COALESCE(g.name, '') as group_name, a.last_seen, a.last_inventory, a.last_patch_scan,
 		       a.last_vuln_scan, a.tags, a.labels, a.resource_usage, a.created_at, a.updated_at,
+		       COALESCE(a.is_isolated, FALSE) as is_isolated, a.isolated_at, COALESCE(a.isolation_reason, '') as isolation_reason,
 		       COALESCE((SELECT COUNT(*) FROM endpoint_vulnerability_findings vf WHERE vf.agent_id = a.id AND vf.status = 'open'), 0) as open_vulns,
 		       COALESCE((SELECT COUNT(*) FROM endpoint_vulnerability_findings vf WHERE vf.agent_id = a.id AND vf.status = 'open' AND (vf.severity = 'CRITICAL' OR vf.priority = 'CRITICAL')), 0) as crit_vulns,
 		       COALESCE((SELECT COUNT(*) FROM endpoint_patches_current pc WHERE pc.agent_id = a.id AND pc.status = 'missing'), 0) as missing_patches,
@@ -792,6 +816,7 @@ func (db *DB) ListAgents(ctx context.Context, tenantSlug, status, osType, search
 			&a.PolicyName, &a.PolicyRevision, &a.GroupID,
 			&a.GroupName, &a.LastSeen, &a.LastInventory, &a.LastPatchScan,
 			&a.LastVulnScan, &a.Tags, &labelBytes, &resourceBytes, &a.CreatedAt, &a.UpdatedAt,
+			&a.IsIsolated, &a.IsolatedAt, &a.IsolationReason,
 			&a.OpenVulnsCount, &a.CriticalVulnsCount, &a.MissingPatchesCount, &a.RebootRequired,
 		)
 		if err != nil {
@@ -818,6 +843,7 @@ func (db *DB) GetAgentByID(ctx context.Context, id uuid.UUID, tenantSlug string)
 		       COALESCE(p.name, '') as policy_name, a.policy_revision, a.group_id,
 		       COALESCE(g.name, '') as group_name, a.last_seen, a.last_inventory, a.last_patch_scan,
 		       a.last_vuln_scan, a.tags, a.labels, a.resource_usage, a.created_at, a.updated_at,
+		       COALESCE(a.is_isolated, FALSE) as is_isolated, a.isolated_at, COALESCE(a.isolation_reason, '') as isolation_reason,
 		       COALESCE((SELECT COUNT(*) FROM endpoint_vulnerability_findings vf WHERE vf.agent_id = a.id AND vf.status = 'open'), 0) as open_vulns,
 		       COALESCE((SELECT COUNT(*) FROM endpoint_vulnerability_findings vf WHERE vf.agent_id = a.id AND vf.status = 'open' AND (vf.severity = 'CRITICAL' OR vf.priority = 'CRITICAL')), 0) as crit_vulns,
 		       COALESCE((SELECT COUNT(*) FROM endpoint_patches_current pc WHERE pc.agent_id = a.id AND pc.status = 'missing'), 0) as missing_patches,
@@ -839,6 +865,7 @@ func (db *DB) GetAgentByID(ctx context.Context, id uuid.UUID, tenantSlug string)
 		&a.PolicyName, &a.PolicyRevision, &a.GroupID,
 		&a.GroupName, &a.LastSeen, &a.LastInventory, &a.LastPatchScan,
 		&a.LastVulnScan, &a.Tags, &labelBytes, &resourceBytes, &a.CreatedAt, &a.UpdatedAt,
+		&a.IsIsolated, &a.IsolatedAt, &a.IsolationReason,
 		&a.OpenVulnsCount, &a.CriticalVulnsCount, &a.MissingPatchesCount, &a.RebootRequired,
 	)
 	if err != nil {
@@ -1370,6 +1397,49 @@ func (db *DB) SaveTaskResult(ctx context.Context, agentUUID string, sub *models.
 		}
 	}
 
+	// 4. Active Response task hooks
+	if taskType == "isolate_host" && status == "completed" {
+		var payload struct {
+			Reason string `json:"reason"`
+		}
+		_ = json.Unmarshal(payloadBytes, &payload)
+		reason := payload.Reason
+		if reason == "" {
+			reason = "Manual containment initiated by security operator"
+		}
+		_, _ = db.pool.Exec(ctx, `
+			UPDATE endpoint_agents
+			SET is_isolated = TRUE, isolated_at = NOW(), isolation_reason = $2
+			WHERE id = $1
+		`, agentID, reason)
+	}
+
+	if taskType == "unisolate_host" && status == "completed" {
+		_, _ = db.pool.Exec(ctx, `
+			UPDATE endpoint_agents
+			SET is_isolated = FALSE, isolated_at = NULL, isolation_reason = ''
+			WHERE id = $1
+		`, agentID)
+	}
+
+	if taskType == "file_quarantine" && status == "completed" {
+		var qMeta struct {
+			OriginalPath   string `json:"original_path"`
+			QuarantinePath string `json:"quarantine_path"`
+			SHA256         string `json:"sha256"`
+			SizeBytes      int64  `json:"size_bytes"`
+			Reason         string `json:"reason"`
+		}
+		if err := json.Unmarshal([]byte(sub.Stdout), &qMeta); err == nil && qMeta.OriginalPath != "" {
+			var tSlug string
+			_ = db.pool.QueryRow(ctx, `SELECT tenant_slug FROM endpoint_agents WHERE id = $1`, agentID).Scan(&tSlug)
+			_, _ = db.pool.Exec(ctx, `
+				INSERT INTO endpoint_quarantined_files (tenant_slug, agent_id, original_path, quarantine_path, sha256, size_bytes, reason, quarantined_at)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+			`, tSlug, agentID, qMeta.OriginalPath, qMeta.QuarantinePath, qMeta.SHA256, qMeta.SizeBytes, qMeta.Reason)
+		}
+	}
+
 	return nil
 }
 
@@ -1511,5 +1581,78 @@ func (db *DB) RebootEndpointAgent(ctx context.Context, tenantSlug string, agentI
 	}
 
 	return db.CreateEndpointTask(ctx, task)
+}
+
+// DispatchActiveResponseTask dispatches an EDR active response task (isolate_host, unisolate_host, process_kill, file_quarantine, osquery_run)
+func (db *DB) DispatchActiveResponseTask(ctx context.Context, tenantSlug string, agentID uuid.UUID, taskType string, payload map[string]interface{}, user string) (*models.EndpointTask, error) {
+	var agentTenant string
+	err := db.pool.QueryRow(ctx, `SELECT tenant_slug FROM endpoint_agents WHERE id = $1`, agentID).Scan(&agentTenant)
+	if err != nil {
+		return nil, fmt.Errorf("agent not found: %w", err)
+	}
+	if tenantSlug != "" && tenantSlug != "all" && agentTenant != tenantSlug {
+		return nil, errors.New("unauthorized: agent belongs to another tenant")
+	}
+
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling task payload: %w", err)
+	}
+
+	task := &models.EndpointTask{
+		ID:          uuid.New(),
+		TenantSlug:  agentTenant,
+		AgentID:     agentID,
+		TaskType:    taskType,
+		PayloadJSON: payloadJSON,
+		Status:      "pending",
+		CreatedBy:   user,
+		ScheduledAt: time.Now().UTC(),
+	}
+
+	return db.CreateEndpointTask(ctx, task)
+}
+
+// ListQuarantinedFiles returns all quarantined files for an agent or tenant
+func (db *DB) ListQuarantinedFiles(ctx context.Context, tenantSlug string, agentID *uuid.UUID) ([]models.QuarantinedFileEntry, error) {
+	var query string
+	var rows pgx.Rows
+	var err error
+
+	if agentID != nil {
+		query = `
+			SELECT original_path, quarantine_path, sha256, size_bytes, quarantined_at, reason
+			FROM endpoint_quarantined_files
+			WHERE agent_id = $1 AND ($2 = '' OR $2 = 'all' OR tenant_slug = $2)
+			ORDER BY quarantined_at DESC
+		`
+		rows, err = db.pool.Query(ctx, query, *agentID, tenantSlug)
+	} else {
+		query = `
+			SELECT original_path, quarantine_path, sha256, size_bytes, quarantined_at, reason
+			FROM endpoint_quarantined_files
+			WHERE ($1 = '' OR $1 = 'all' OR tenant_slug = $1)
+			ORDER BY quarantined_at DESC
+			LIMIT 100
+		`
+		rows, err = db.pool.Query(ctx, query, tenantSlug)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []models.QuarantinedFileEntry
+	for rows.Next() {
+		var q models.QuarantinedFileEntry
+		if err := rows.Scan(&q.OriginalPath, &q.QuarantinePath, &q.SHA256, &q.SizeBytes, &q.QuarantinedAt, &q.Reason); err != nil {
+			return nil, err
+		}
+		entries = append(entries, q)
+	}
+	if entries == nil {
+		entries = []models.QuarantinedFileEntry{}
+	}
+	return entries, nil
 }
 

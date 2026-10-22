@@ -265,6 +265,23 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.8.8** (Active Response, EDR Host Isolation & Live Forensic SQL / OSQuery) / **Agent v0.1.5**:
+  - **EDR Network Containment & Host Isolation (Phase J.3)**:
+    - Dynamic host containment cutting off all inbound and outbound network traffic while strictly preserving the secure LogSeal telemetry channel and loopback.
+    - Native cross-platform firewall rule injection via `iptables` (Linux), `netsh advfirewall` (Windows), and `pfctl` (macOS).
+    - Real-time containment indicators with pulsing amber/red `ISOLATED` badges across the fleet table and endpoint details modal.
+    - Interactive "Isolate Host" and "Lift Isolation" actions with operator audit logging and reason tracking.
+  - **Remote Process Termination & File Quarantine (Phase J.3)**:
+    - Forceful remote process termination by PID or process name (`taskkill /F` on Windows, `kill -9` / `pkill -9` on Linux/macOS).
+    - Suspicious file quarantine safely relocating malicious artifacts to isolated directories, calculating cryptographic SHA-256 digests, and stripping all execution rights (`chmod 000`).
+    - Centralized Quarantined Files table tracking quarantined paths, hashes, file sizes, and containment timestamps.
+  - **Live Forensic SQL & OSQuery Console (Phase J.4)**:
+    - Real-time forensic SQL console allowing operators to query connected endpoints on-demand.
+    - Dual-mode execution engine: utilizes native `osqueryi` when available, with built-in cross-platform probers for key tables (`listening_ports`, `processes`, `logged_in_users`, `system_info`).
+    - Interactive query templates with configurable timeout guards (15s, 30s, 60s) and structured JSON/table result inspection.
+  - **SIEM Alert Quick-Response Synergy**:
+    - Direct containment integration from SIEM alert investigations, allowing analysts to instantly isolate compromised hosts during active incident triage.
+
 - **v1.8.7** (Remote Patch Remediation & Fleet Action Dispatcher) / **Agent v0.1.4**:
   - **Automated Remote Patch Remediation (Phase J.2)**:
     - Interactive "Deploy Patch" actions added directly to the Patch Management console table for missing security updates.

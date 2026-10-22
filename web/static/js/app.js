@@ -8270,10 +8270,17 @@ async function loadEndpointAgents() {
                 ? `<span class="badge badge-warning" style="margin-left: 4px;" title="${t('status_reboot_pending')}">🔄 Reboot</span>`
                 : '';
 
+            const isolatedBadge = a.is_isolated
+                ? `<span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); animation: pulse 2s infinite; font-weight: 700; font-size: 10px; margin-left: 6px;">🛡️ ${t('endpoint_isolated_badge')}</span>`
+                : '';
+
             return `
                 <tr>
                     <td>
-                        <div style="font-weight: 600;">${escapeHtml(a.hostname || t('status_unknown'))}</div>
+                        <div style="font-weight: 600; display: flex; align-items: center; flex-wrap: wrap;">
+                            <span>${escapeHtml(a.hostname || t('status_unknown'))}</span>
+                            ${isolatedBadge}
+                        </div>
                         <div style="font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(a.ip_address || '-')} • ${escapeHtml(a.agent_uuid)}</div>
                     </td>
                     <td>${osBadge}</td>
@@ -8286,6 +8293,7 @@ async function loadEndpointAgents() {
                     <td style="font-size: 11.5px; color: var(--text-muted);">${relativeTime}</td>
                     <td style="white-space: nowrap;">
                         <button class="btn btn-sm btn-outline" onclick="inspectEndpointAgent('${a.id}')">${t('btn_inspect_agent')}</button>
+                        <button class="btn btn-sm btn-outline" style="margin-left: 4px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4);" onclick="openActiveResponseModal('${a.id}', '${escapeHtml(a.hostname || a.ip_address)}', ${a.is_isolated ? 'true' : 'false'})" title="${t('endpoint_active_response_title')}">🛡️</button>
                         <button class="btn btn-sm btn-outline" style="margin-left: 4px;" onclick="openAssignPolicyModal('${a.agent_uuid}', '${escapeHtml(a.hostname || a.ip_address)}', '${a.policy_id || ''}')" title="${t('btn_assign_policy')}">📋</button>
                     </td>
                 </tr>
@@ -9945,6 +9953,329 @@ function closeTaskLogModal() {
     if (modal) modal.style.display = 'none';
 }
 
+// -----------------------------------------------------------------------------
+// Endpoint Active Response, EDR Host Isolation & OSQuery (Phase J.3 & J.4)
+// -----------------------------------------------------------------------------
+let currentARAgentID = null;
+let currentARHostname = '';
+let currentARIsIsolated = false;
+
+function openActiveResponseModal(agentId, hostname, isIsolated) {
+    currentARAgentID = agentId;
+    currentARHostname = hostname || 'Uç Nokta';
+    currentARIsIsolated = !!isIsolated;
+
+    const modal = document.getElementById('modal-endpoint-active-response');
+    if (!modal) return;
+
+    document.getElementById('ar-target-hostname').textContent = currentARHostname;
+    updateARIsolationUI();
+    switchARTab('isolation');
+    loadQuarantinedFiles(agentId);
+
+    modal.style.display = 'flex';
+}
+
+function closeActiveResponseModal() {
+    const modal = document.getElementById('modal-endpoint-active-response');
+    if (modal) modal.style.display = 'none';
+    currentARAgentID = null;
+}
+
+function updateARIsolationUI() {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const titleEl = document.getElementById('ar-iso-card-title');
+    const descEl = document.getElementById('ar-iso-card-desc');
+    const pillEl = document.getElementById('ar-iso-card-pill');
+    const statusBadgeEl = document.getElementById('ar-target-status-badge');
+    const btnIsolate = document.getElementById('btn-ar-trigger-isolate');
+    const btnUnisolate = document.getElementById('btn-ar-trigger-unisolate');
+    const statusCard = document.getElementById('ar-isolation-status-card');
+
+    if (currentARIsIsolated) {
+        if (titleEl) titleEl.textContent = 'Ağ Durumu: İZOLASYON AKTİF (Containment Active)';
+        if (descEl) descEl.textContent = 'Bu uç nokta ağdan izole edilmiştir. Sadece LogSeal yönetim telemetrisi açıktır.';
+        if (pillEl) pillEl.innerHTML = '<span class="badge badge-danger" style="animation: pulse 2s infinite; font-weight: 700;">🛡️ İZOLASYONDA</span>';
+        if (statusBadgeEl) statusBadgeEl.innerHTML = '<span class="badge badge-danger">🛡️ İZOLASYONDA</span>';
+        if (btnIsolate) btnIsolate.style.display = 'none';
+        if (btnUnisolate) btnUnisolate.style.display = 'inline-flex';
+        if (statusCard) {
+            statusCard.style.borderLeftColor = '#ef4444';
+            statusCard.style.background = 'rgba(239, 68, 68, 0.08)';
+        }
+    } else {
+        if (titleEl) titleEl.textContent = 'Ağ Durumu: Normal Bağlantı (Online)';
+        if (descEl) descEl.textContent = 'Uç nokta tüm iç ve dış ağlara erişebilir durumdadır.';
+        if (pillEl) pillEl.innerHTML = '<span class="badge badge-success">BAĞLI / ONLINE</span>';
+        if (statusBadgeEl) statusBadgeEl.innerHTML = '<span class="badge badge-success">BAĞLI / ONLINE</span>';
+        if (btnIsolate) btnIsolate.style.display = 'inline-flex';
+        if (btnUnisolate) btnUnisolate.style.display = 'none';
+        if (statusCard) {
+            statusCard.style.borderLeftColor = 'var(--accent)';
+            statusCard.style.background = 'rgba(255, 255, 255, 0.02)';
+        }
+    }
+}
+
+function switchARTab(tab) {
+    document.querySelectorAll('.ar-tab-btn').forEach(b => {
+        b.classList.toggle('active', b.id === `btn-tab-ar-${tab}`);
+        if (b.id === `btn-tab-ar-${tab}`) {
+            b.style.background = 'var(--panel-bg)';
+            b.style.color = 'var(--accent)';
+            b.style.borderBottom = '2px solid var(--accent)';
+        } else {
+            b.style.background = 'transparent';
+            b.style.color = 'var(--text-muted)';
+            b.style.borderBottom = 'none';
+        }
+    });
+
+    document.querySelectorAll('.ar-tab-pane').forEach(p => {
+        p.style.display = (p.id === `ar-pane-${tab}`) ? 'block' : 'none';
+    });
+}
+
+async function submitHostIsolation(isolate) {
+    if (!currentARAgentID) return;
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const confirmMsg = isolate ? t('confirm_isolate') : t('confirm_unisolate');
+
+    if (!confirm(`${currentARHostname}: ${confirmMsg}`)) return;
+
+    try {
+        const endpoint = isolate ? '/api/v1/endpoint/agents/isolate' : '/api/v1/endpoint/agents/unisolate';
+        const reason = document.getElementById('ar-isolation-reason')?.value || 'EDR Active Response Containment';
+        
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agent_id: currentARAgentID,
+                reason: reason
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'İzolasyon komutu gönderilemedi');
+        }
+
+        const successMsg = isolate ? t('msg_isolate_queued') : t('msg_unisolate_queued');
+        showToast('🛡️ ' + successMsg, 'success');
+        currentARIsIsolated = isolate;
+        updateARIsolationUI();
+        if (typeof loadEndpointAgents === 'function') loadEndpointAgents();
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+async function submitProcessKill() {
+    if (!currentARAgentID) return;
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const pidVal = parseInt(document.getElementById('ar-proc-pid')?.value, 10);
+    const nameVal = document.getElementById('ar-proc-name')?.value?.trim() || '';
+    const forceVal = document.getElementById('ar-proc-force')?.checked ?? true;
+
+    if (!pidVal && !nameVal) {
+        alert('Lütfen bir PID veya Süreç Adı belirtin.');
+        return;
+    }
+
+    if (!confirm(`${currentARHostname}: ${t('confirm_kill_proc')} (${pidVal ? 'PID: ' + pidVal : nameVal})`)) return;
+
+    try {
+        const res = await fetch('/api/v1/endpoint/agents/kill-process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agent_id: currentARAgentID,
+                pid: pidVal || 0,
+                process_name: nameVal,
+                force: forceVal
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Süreç sonlandırma komutu iletilemedi');
+        }
+
+        showToast('⚡ ' + t('msg_proc_kill_queued'), 'success');
+        document.getElementById('ar-proc-pid').value = '';
+        document.getElementById('ar-proc-name').value = '';
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+async function submitFileQuarantine() {
+    if (!currentARAgentID) return;
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const pathVal = document.getElementById('ar-quarantine-path')?.value?.trim() || '';
+    const reasonVal = document.getElementById('ar-quarantine-reason')?.value?.trim() || '';
+
+    if (!pathVal) {
+        alert('Lütfen karantinaya alınacak dosya yolunu girin.');
+        return;
+    }
+
+    if (!confirm(`${currentARHostname}: ${t('confirm_quarantine')} (${pathVal})`)) return;
+
+    try {
+        const res = await fetch('/api/v1/endpoint/agents/quarantine-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agent_id: currentARAgentID,
+                file_path: pathVal,
+                reason: reasonVal
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Dosya karantina komutu iletilemedi');
+        }
+
+        showToast('☣️ ' + t('msg_quarantine_queued'), 'success');
+        document.getElementById('ar-quarantine-path').value = '';
+        document.getElementById('ar-quarantine-reason').value = '';
+        setTimeout(() => loadQuarantinedFiles(currentARAgentID), 2000);
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+async function loadQuarantinedFiles(agentId) {
+    const tbody = document.getElementById('ar-quarantine-tbody');
+    if (!tbody) return;
+
+    try {
+        const res = await fetch(`/api/v1/endpoint/agents/quarantined-files?agent_id=${encodeURIComponent(agentId || '')}`);
+        if (!res.ok) throw new Error('Karantina listesi alınamadı');
+        const data = await res.json();
+        const files = data.files || [];
+
+        if (files.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="color: var(--text-muted); padding: 14px;">Bu uç noktada karantinaya alınmış dosya bulunmuyor.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = files.map(f => `
+            <tr>
+                <td style="font-family: var(--font-mono);">${escapeHtml(f.original_path)}</td>
+                <td style="font-family: var(--font-mono); color: var(--text-muted);">${escapeHtml(f.quarantine_path)}</td>
+                <td style="font-family: var(--font-mono); font-size: 10px;">${escapeHtml((f.sha256 || '').substring(0, 16))}...</td>
+                <td>${formatBytes(f.size_bytes || 0)}</td>
+                <td style="color: var(--text-muted);">${formatRelativeTime(f.quarantined_at)}</td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="color: var(--danger); padding: 10px;">${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function setOSQuery(sql) {
+    const textarea = document.getElementById('ar-osquery-sql');
+    if (textarea) textarea.value = sql;
+}
+
+async function submitOSQuery() {
+    if (!currentARAgentID) return;
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const sql = document.getElementById('ar-osquery-sql')?.value?.trim();
+    const timeout = parseInt(document.getElementById('ar-osquery-timeout')?.value, 10) || 15;
+    const resultBox = document.getElementById('ar-osquery-result');
+    const runBtn = document.getElementById('btn-ar-run-osquery');
+
+    if (!sql) {
+        alert('Lütfen çalıştırılacak adli SQL sorgusunu yazın.');
+        return;
+    }
+
+    if (resultBox) {
+        resultBox.textContent = '⏳ Sorgu uç noktaya iletildi, adli sonuçlar alınıyor (Timeout: ' + timeout + 's)...';
+        resultBox.style.color = '#58a6ff';
+    }
+    if (runBtn) runBtn.disabled = true;
+
+    try {
+        const res = await fetch('/api/v1/endpoint/agents/osquery', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agent_id: currentARAgentID,
+                query: sql,
+                timeout_sec: timeout
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Sorgu iletilemedi');
+        }
+
+        const data = await res.json();
+        const taskId = data.task_id;
+        showToast('🔍 ' + t('msg_osquery_queued'), 'success');
+
+        // Poll task result for up to timeout seconds
+        let attempts = 0;
+        const maxAttempts = timeout + 2;
+        const pollInterval = setInterval(async () => {
+            attempts++;
+            try {
+                const tRes = await fetch(`/api/v1/endpoint/tasks/${taskId}`);
+                if (tRes.ok) {
+                    const task = await tRes.json();
+                    if (task.status === 'completed') {
+                        clearInterval(pollInterval);
+                        if (runBtn) runBtn.disabled = false;
+                        
+                        let formattedOutput = task.stdout;
+                        try {
+                            const parsed = JSON.parse(task.stdout);
+                            formattedOutput = JSON.stringify(parsed, null, 2);
+                        } catch(e) {}
+
+                        if (resultBox) {
+                            resultBox.textContent = formattedOutput || '(Sorgu tamamlandı, sonuç döndürülmedi)';
+                            resultBox.style.color = '#3fb950';
+                        }
+                        return;
+                    } else if (task.status === 'failed') {
+                        clearInterval(pollInterval);
+                        if (runBtn) runBtn.disabled = false;
+                        if (resultBox) {
+                            resultBox.textContent = '✕ Sorgu başarısız:\n' + (task.stderr || task.error_message || 'Bilinmeyen hata');
+                            resultBox.style.color = '#f85149';
+                        }
+                        return;
+                    }
+                }
+            } catch(e) {}
+
+            if (attempts >= maxAttempts) {
+                clearInterval(pollInterval);
+                if (runBtn) runBtn.disabled = false;
+                if (resultBox) {
+                    resultBox.textContent = '⚠️ Zaman aşımı: Uç noktadan beklenen sürede yanıt alınamadı. Görev kayıtlarından çıktıyı kontrol edebilirsiniz.';
+                    resultBox.style.color = '#f59e0b';
+                }
+            }
+        }, 1000);
+
+    } catch (err) {
+        if (runBtn) runBtn.disabled = false;
+        if (resultBox) {
+            resultBox.textContent = 'Hata: ' + err.message;
+            resultBox.style.color = '#f85149';
+        }
+    }
+}
+
 window.openDeployPatchModal = openDeployPatchModal;
 window.closeDeployPatchModal = closeDeployPatchModal;
 window.submitDeployPatch = submitDeployPatch;
@@ -9957,6 +10288,16 @@ window.closeEndpointTasksModal = closeEndpointTasksModal;
 window.loadEndpointTasks = loadEndpointTasks;
 window.openTaskLogModal = openTaskLogModal;
 window.closeTaskLogModal = closeTaskLogModal;
+window.openActiveResponseModal = openActiveResponseModal;
+window.closeActiveResponseModal = closeActiveResponseModal;
+window.switchARTab = switchARTab;
+window.submitHostIsolation = submitHostIsolation;
+window.submitProcessKill = submitProcessKill;
+window.submitFileQuarantine = submitFileQuarantine;
+window.loadQuarantinedFiles = loadQuarantinedFiles;
+window.setOSQuery = setOSQuery;
+window.submitOSQuery = submitOSQuery;
+
 
 
 

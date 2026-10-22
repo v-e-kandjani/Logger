@@ -254,6 +254,23 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.8.8** (Aktif Müdahale, EDR Ağ İzolasyonu & Canlı Adli SQL / OSQuery) / **Agent v0.1.5**:
+  - **EDR Ağ Kapsaması & Uç Nokta İzolasyonu (Phase J.3)**:
+    - LogSeal yönetim telemetrisi ve yerel döngü (loopback) bağlantılarını kesintisiz korurken, tüm diğer gelen/giden ağ ve internet trafiğini anında kesen dinamik ağ izolasyonu.
+    - `iptables` (Linux), `netsh advfirewall` (Windows) ve `pfctl` (macOS) üzerinden yerel güvenlik duvarı kurallarının otomatik enjeksiyonu.
+    - Filo tablosu ve uç nokta detay ekranlarında parlayan kırmızı/amber `İZOLASYONDA` uyarı rozetleri.
+    - Operatör audit logları ve gerekçe kaydı ile desteklenen tek tıkla "Uç Noktayı İzole Et" ve "İzolasyonu Kaldır" eylemleri.
+  - **Uzaktan Süreç Sonlandırma & Güvenli Dosya Karantinası (Phase J.3)**:
+    - PID veya süreç adı ile zararlı yazılımların anında uzaktan zorla sonlandırılması (`taskkill /F`, `kill -9` / `pkill -9`).
+    - Şüpheli dosyaların güvenli karantina dizinine taşınması, SHA-256 kriptografik özetinin çıkarılması ve tüm yürütme izinlerinin sıfırlanması (`chmod 000`).
+    - Uç nokta bazında karantinaya alınan dosyaları takip eden merkezi Karantina Envanteri tablosu.
+  - **Canlı Adli SQL & OSQuery Konsolu (Phase J.4)**:
+    - Güvenlik operatörlerinin uç noktalarda anlık adli SQL sorguları çalıştırmasını sağlayan interaktif web konsolu.
+    - Çift modlu motor: Yerel `osqueryi` mevcut olduğunda doğrudan çalıştırır; bulunmadığında yerleşik çapraz platform sorgulayıcı ile açık portlar (`listening_ports`), süreçler (`processes`), oturum açan kullanıcılar (`logged_in_users`) ve sistem bilgilerini (`system_info`) dinamik olarak döner.
+    - Hazır adli şablon butonları, ayarlanabilir zaman aşımı koruması (15s, 30s, 60s) ve anlık JSON/tablo sonuç görüntüleyici.
+  - **SIEM Olay Müdahale Entegrasyonu**:
+    - SIEM alarm inceleme pencerelerinden şüpheli veya tehlike altındaki uç noktalara anında tek tıkla izolasyon uygulama entegrasyonu.
+
 - **v1.8.7** (Uzaktan Yama İyileştirme & Filo Eylem Dağıtıcısı) / **Agent v0.1.4**:
   - **Otomatik Uzaktan Yama İyileştirme (Phase J.2)**:
     - Yama Yönetimi tablosunda eksik güvenlik güncellemeleri için doğrudan "Yama Dağıt" eylem butonları.

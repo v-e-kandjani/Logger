@@ -1092,4 +1092,298 @@ func (h *Handler) handleEndpointPolicyAssign(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+// handleEndpointAgentIsolate isolates an endpoint from the network via remote firewall rules
+func (h *Handler) handleEndpointAgentIsolate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		AgentID    string   `json:"agent_id"`
+		Reason     string   `json:"reason"`
+		AllowedIPs []string `json:"allowed_ips"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	agentUUID, err := uuid.Parse(req.AgentID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid agent_id"})
+		return
+	}
+
+	username := "admin"
+	if s, ok := h.getSession(r); ok && s != nil {
+		username = s.Username
+	}
+
+	tenant := h.tenantScope(r)
+	payload := map[string]interface{}{
+		"reason":      req.Reason,
+		"allowed_ips": req.AllowedIPs,
+	}
+
+	task, err := h.pgDB.DispatchActiveResponseTask(r.Context(), tenant, agentUUID, "isolate_host", payload, username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "ENDPOINT_AGENT_ISOLATE_TRIGGERED", "endpoint/agents", "SUCCESS", map[string]interface{}{
+		"task_id":  task.ID.String(),
+		"agent_id": req.AgentID,
+		"reason":   req.Reason,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "queued",
+		"task_id": task.ID.String(),
+		"message": "Host containment task dispatched.",
+	})
+}
+
+// handleEndpointAgentUnisolate restores normal network connectivity to an isolated host
+func (h *Handler) handleEndpointAgentUnisolate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		AgentID string `json:"agent_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	agentUUID, err := uuid.Parse(req.AgentID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid agent_id"})
+		return
+	}
+
+	username := "admin"
+	if s, ok := h.getSession(r); ok && s != nil {
+		username = s.Username
+	}
+
+	tenant := h.tenantScope(r)
+	payload := map[string]interface{}{}
+
+	task, err := h.pgDB.DispatchActiveResponseTask(r.Context(), tenant, agentUUID, "unisolate_host", payload, username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "ENDPOINT_AGENT_UNISOLATE_TRIGGERED", "endpoint/agents", "SUCCESS", map[string]interface{}{
+		"task_id":  task.ID.String(),
+		"agent_id": req.AgentID,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "queued",
+		"task_id": task.ID.String(),
+		"message": "Host un-isolation task dispatched.",
+	})
+}
+
+// handleEndpointAgentKillProcess sends a process termination command to an endpoint
+func (h *Handler) handleEndpointAgentKillProcess(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		AgentID     string `json:"agent_id"`
+		PID         int    `json:"pid"`
+		ProcessName string `json:"process_name"`
+		Force       bool   `json:"force"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	agentUUID, err := uuid.Parse(req.AgentID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid agent_id"})
+		return
+	}
+
+	username := "admin"
+	if s, ok := h.getSession(r); ok && s != nil {
+		username = s.Username
+	}
+
+	tenant := h.tenantScope(r)
+	payload := map[string]interface{}{
+		"pid":          req.PID,
+		"process_name": req.ProcessName,
+		"force":        req.Force,
+	}
+
+	task, err := h.pgDB.DispatchActiveResponseTask(r.Context(), tenant, agentUUID, "process_kill", payload, username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "ENDPOINT_AGENT_KILL_PROCESS", "endpoint/agents", "SUCCESS", map[string]interface{}{
+		"task_id":      task.ID.String(),
+		"agent_id":     req.AgentID,
+		"pid":          req.PID,
+		"process_name": req.ProcessName,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "queued",
+		"task_id": task.ID.String(),
+		"message": "Process termination command dispatched.",
+	})
+}
+
+// handleEndpointAgentQuarantineFile instructs the agent to isolate and neutralize a suspicious file
+func (h *Handler) handleEndpointAgentQuarantineFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		AgentID  string `json:"agent_id"`
+		FilePath string `json:"file_path"`
+		Reason   string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	agentUUID, err := uuid.Parse(req.AgentID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid agent_id"})
+		return
+	}
+
+	username := "admin"
+	if s, ok := h.getSession(r); ok && s != nil {
+		username = s.Username
+	}
+
+	tenant := h.tenantScope(r)
+	payload := map[string]interface{}{
+		"file_path": req.FilePath,
+		"reason":    req.Reason,
+	}
+
+	task, err := h.pgDB.DispatchActiveResponseTask(r.Context(), tenant, agentUUID, "file_quarantine", payload, username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "ENDPOINT_AGENT_QUARANTINE_FILE", "endpoint/agents", "SUCCESS", map[string]interface{}{
+		"task_id":   task.ID.String(),
+		"agent_id":  req.AgentID,
+		"file_path": req.FilePath,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "queued",
+		"task_id": task.ID.String(),
+		"message": "File quarantine task dispatched.",
+	})
+}
+
+// handleEndpointAgentQuarantinedFiles lists quarantined files for an agent or tenant
+func (h *Handler) handleEndpointAgentQuarantinedFiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenant := h.tenantScope(r)
+	var agentIDPtr *uuid.UUID
+	if agentIDStr := r.URL.Query().Get("agent_id"); agentIDStr != "" {
+		if id, err := uuid.Parse(agentIDStr); err == nil {
+			agentIDPtr = &id
+		}
+	}
+
+	files, err := h.pgDB.ListQuarantinedFiles(r.Context(), tenant, agentIDPtr)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"files": files,
+		"total": len(files),
+	})
+}
+
+// handleEndpointAgentOSQuery executes a remote live forensic query against the endpoint
+func (h *Handler) handleEndpointAgentOSQuery(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		AgentID    string `json:"agent_id"`
+		Query      string `json:"query"`
+		TimeoutSec int    `json:"timeout_sec"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	agentUUID, err := uuid.Parse(req.AgentID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid agent_id"})
+		return
+	}
+
+	if strings.TrimSpace(req.Query) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "query cannot be empty"})
+		return
+	}
+
+	username := "admin"
+	if s, ok := h.getSession(r); ok && s != nil {
+		username = s.Username
+	}
+
+	tenant := h.tenantScope(r)
+	payload := map[string]interface{}{
+		"query":       req.Query,
+		"timeout_sec": req.TimeoutSec,
+	}
+
+	task, err := h.pgDB.DispatchActiveResponseTask(r.Context(), tenant, agentUUID, "osquery_run", payload, username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "ENDPOINT_AGENT_OSQUERY", "endpoint/agents", "SUCCESS", map[string]interface{}{
+		"task_id":  task.ID.String(),
+		"agent_id": req.AgentID,
+		"query":    req.Query,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "queued",
+		"task_id": task.ID.String(),
+		"message": "Forensic SQL query dispatched.",
+	})
+}
+
 

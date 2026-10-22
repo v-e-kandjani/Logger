@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.7</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.8</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -3165,13 +3165,13 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.7</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.8</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_commit">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">d61a08f</div>
-                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-22</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">432ebeb</div>
+                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-23</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_repo">GitHub Repository</div>
@@ -5953,8 +5953,177 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.8.7"></script>
-    <script src="/static/js/translations.js?v=1.8.7"></script>
-    <script src="/static/js/app.js?v=1.8.7"></script>
+    <!-- MODAL: Endpoint Active Response & Live Forensic SQL Console (Phase J.3 & J.4) -->
+    <div class="modal-backdrop" id="modal-endpoint-active-response" style="display: none; z-index: 1060;">
+        <div class="modal" style="max-width: 980px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+                        <span>🛡️</span>
+                        <span data-i18n="endpoint_active_response_title">Aktif Müdahale, EDR İzolasyon &amp; Canlı Adli SQL Konsolu</span>
+                    </h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" id="ar-modal-subtitle">
+                        Uç Nokta: <strong id="ar-target-hostname">-</strong> • <span id="ar-target-status-badge"></span>
+                    </div>
+                </div>
+                <button class="btn-close" onclick="closeActiveResponseModal()">&times;</button>
+            </div>
+            
+            <!-- Navigation Tabs -->
+            <div style="display: flex; gap: 4px; border-bottom: 1px solid var(--border-color); padding: 0 16px; background: rgba(0,0,0,0.15); flex-shrink: 0;">
+                <button class="btn btn-sm ar-tab-btn active" id="btn-tab-ar-isolation" onclick="switchARTab('isolation')" style="border-radius: 6px 6px 0 0; padding: 10px 14px; font-weight: 600; font-size: 12px;">🔒 Ağ İzolasyonu (Host Isolation)</button>
+                <button class="btn btn-sm ar-tab-btn" id="btn-tab-ar-process" onclick="switchARTab('process')" style="border-radius: 6px 6px 0 0; padding: 10px 14px; font-weight: 600; font-size: 12px;">⚡ Süreç Sonlandır (Kill Process)</button>
+                <button class="btn btn-sm ar-tab-btn" id="btn-tab-ar-quarantine" onclick="switchARTab('quarantine')" style="border-radius: 6px 6px 0 0; padding: 10px 14px; font-weight: 600; font-size: 12px;">☣️ Dosya Karantina (Quarantine)</button>
+                <button class="btn btn-sm ar-tab-btn" id="btn-tab-ar-osquery" onclick="switchARTab('osquery')" style="border-radius: 6px 6px 0 0; padding: 10px 14px; font-weight: 600; font-size: 12px;">🔍 Canlı Adli SQL &amp; OSQuery</button>
+            </div>
+
+            <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1;">
+                <!-- TAB 1: HOST ISOLATION -->
+                <div id="ar-pane-isolation" class="ar-tab-pane">
+                    <div id="ar-isolation-status-card" class="panel" style="padding: 16px; margin-bottom: 16px; border-left: 4px solid var(--accent); background: rgba(255,255,255,0.02);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;" id="ar-iso-card-title">Ağ Durumu: Normal Bağlantı</div>
+                                <div style="font-size: 12px; color: var(--text-muted);" id="ar-iso-card-desc">Uç nokta tüm iç ve dış ağlara erişebilir durumdadır.</div>
+                            </div>
+                            <div id="ar-iso-card-pill"><span class="badge badge-success">BAĞLI / ONLINE</span></div>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 14px; font-size: 12px; line-height: 1.6; margin-bottom: 16px;">
+                        ℹ️ <strong>EDR Ağ İzolasyonu Nasıl Çalışır?</strong>
+                        <br>İzolasyon uygulandığında uç noktanın yerel güvenlik duvarı kuralları (iptables, netsh veya pfctl) dinamik olarak güncellenir.
+                        LogSeal sunucusu ile olan güvenli telemetri, komut-kontrol kanalı ve yerel döngü (loopback) <strong>kesintisiz korunurken</strong>, diğer tüm gelen/giden ağ ve internet trafiği anında engellenir.
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">İzolasyon Nedeni / Açıklama:</label>
+                        <input type="text" id="ar-isolation-reason" class="form-control" style="width: 100%; font-size: 12px;" placeholder="Örn: SIEM Kuralı tetiklendi, fidye yazılımı yayılma şüphesi">
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-danger" id="btn-ar-trigger-isolate" onclick="submitHostIsolation(true)">
+                            <i class="fas fa-shield-virus"></i> 🛡️ Uç Noktayı Ağdan İzole Et
+                        </button>
+                        <button class="btn btn-success" id="btn-ar-trigger-unisolate" onclick="submitHostIsolation(false)" style="display: none;">
+                            <i class="fas fa-unlock"></i> 🔓 İzolasyonu Kaldır (Ağ Erişimini Aç)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB 2: PROCESS TERMINATION -->
+                <div id="ar-pane-process" class="ar-tab-pane" style="display: none;">
+                    <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px;">
+                        Uç noktada tespit edilen zararlı veya şüpheli süreçleri (process) uzaktan anında sonlandırın. PID veya süreç adı belirtebilirsiniz.
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-bottom: 14px;">
+                        <div>
+                            <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">Süreç ID (PID):</label>
+                            <input type="number" id="ar-proc-pid" class="form-control" style="width: 100%; font-family: var(--font-mono); font-size: 12px;" placeholder="Örn: 4821">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">Süreç Adı (Process Name):</label>
+                            <input type="text" id="ar-proc-name" class="form-control" style="width: 100%; font-family: var(--font-mono); font-size: 12px;" placeholder="Örn: cryptominer, nc, mimikatz.exe">
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                            <input type="checkbox" id="ar-proc-force" checked>
+                            <strong>Zorla Sonlandır (SIGKILL / Force Kill -9)</strong>
+                        </label>
+                    </div>
+
+                    <button class="btn btn-danger" onclick="submitProcessKill()">
+                        ⚡ Süreci Sonlandır (Kill Process)
+                    </button>
+                </div>
+
+                <!-- TAB 3: FILE QUARANTINE -->
+                <div id="ar-pane-quarantine" class="ar-tab-pane" style="display: none;">
+                    <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px;">
+                        Şüpheli veya zararlı dosyaları güvenli karantina dizinine taşıyın, SHA-256 özetini hesaplayın ve tüm yürütme/okuma izinlerini sıfırlayın.
+                    </div>
+
+                    <div style="margin-bottom: 14px;">
+                        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">Hedef Dosya Yolu (Absolute File Path):</label>
+                        <input type="text" id="ar-quarantine-path" class="form-control" style="width: 100%; font-family: var(--font-mono); font-size: 12px;" placeholder="Örn: /tmp/shell.elf veya C:\Windows\Temp\payload.exe">
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px;">Karantina Nedeni:</label>
+                        <input type="text" id="ar-quarantine-reason" class="form-control" style="width: 100%; font-size: 12px;" placeholder="Örn: Reverse shell şüphesi, izinsiz ikili dosya">
+                    </div>
+
+                    <button class="btn btn-warning" onclick="submitFileQuarantine()" style="margin-bottom: 20px;">
+                        ☣️ Dosyayı Karantinaya Al (Quarantine)
+                    </button>
+
+                    <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">📋 Bu Uç Noktadaki Karantinaya Alınmış Dosyalar:</h4>
+                    <div class="table-container panel" style="padding: 0; max-height: 220px; overflow-y: auto;">
+                        <table class="data-table" style="font-size: 11px;">
+                            <thead>
+                                <tr>
+                                    <th>Orijinal Yol</th>
+                                    <th>Karantina Yolu</th>
+                                    <th>SHA-256</th>
+                                    <th>Boyut</th>
+                                    <th>Tarih</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ar-quarantine-tbody">
+                                <tr><td colspan="5" class="text-center" style="color: var(--text-muted); padding: 14px;">Karantina kayıtları yükleniyor...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TAB 4: OSQUERY & LIVE FORENSIC SQL -->
+                <div id="ar-pane-osquery" class="ar-tab-pane" style="display: none;">
+                    <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px;">
+                        Uç nokta üzerinde gerçek zamanlı adli SQL sorguları çalıştırın. Dinamik olarak soketleri, açık portları, çalışan süreçleri ve oturum açmış kullanıcıları anlık sorgulayın.
+                    </div>
+
+                    <div style="display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap;">
+                        <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Örnek Adli Şablonlar:</span>
+                        <button class="btn btn-xs btn-outline" onclick="setOSQuery('SELECT * FROM listening_ports;')">🔌 Açık Portlar (Sockets)</button>
+                        <button class="btn btn-xs btn-outline" onclick="setOSQuery('SELECT * FROM processes;')">⚙️ Çalışan Süreçler (Processes)</button>
+                        <button class="btn btn-xs btn-outline" onclick="setOSQuery('SELECT * FROM logged_in_users;')">👤 Giriş Yapanlar (Users)</button>
+                        <button class="btn btn-xs btn-outline" onclick="setOSQuery('SELECT * FROM system_info;')">💻 Sistem Özeti (System Info)</button>
+                    </div>
+
+                    <div style="margin-bottom: 12px;">
+                        <textarea id="ar-osquery-sql" class="form-control" style="width: 100%; height: 90px; font-family: var(--font-mono); font-size: 12px; background: #0d1117; color: #58a6ff;" placeholder="SELECT * FROM listening_ports;"></textarea>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <label style="font-size: 11px; font-weight: 600;">Zaman Aşımı:</label>
+                            <select id="ar-osquery-timeout" class="form-control" style="font-size: 11px; width: 90px;">
+                                <option value="15">15 sn</option>
+                                <option value="30">30 sn</option>
+                                <option value="60">60 sn</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="btn-ar-run-osquery" onclick="submitOSQuery()">
+                            <i class="fas fa-play"></i> ⚡ Sorguyu Çalıştır (Execute SQL)
+                        </button>
+                    </div>
+
+                    <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Sorgu Çıktısı (Adli Sonuçlar):</div>
+                    <pre id="ar-osquery-result" style="background: #0d1117; color: #3fb950; font-family: var(--font-mono); font-size: 11.5px; padding: 12px; border-radius: 6px; max-height: 240px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); white-space: pre-wrap;">(Sorgu bekleniyor... Sonuçlar burada görüntülenecektir)</pre>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); flex-shrink: 0;">
+                <button class="btn btn-outline" onclick="closeActiveResponseModal()" data-i18n="btn_close">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/marked.min.js?v=1.8.8"></script>
+    <script src="/static/js/translations.js?v=1.8.8"></script>
+    <script src="/static/js/app.js?v=1.8.8"></script>
 </body>
 </html>

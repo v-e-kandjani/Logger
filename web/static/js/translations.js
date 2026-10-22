@@ -4,7 +4,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Aktif Kiracı",
-        app_version: "v1.8.7",
+        app_version: "v1.8.8",
         btn_dl_win_setup_exe: "🪟 Windows Setup (.exe) İndir",
         btn_dl_mac_dmg: "🍏 macOS Installer (.dmg) İndir",
         btn_dl_mac_pkg: "📦 macOS Paketi (.pkg) İndir",
@@ -1091,14 +1091,31 @@ const translations = {
         msg_batch_queued: "eksik yama için uzaktan yükleme emri kuyruğa alındı.",
         msg_reboot_queued: "Uç noktaya güvenli yeniden başlatma emri iletildi.",
         confirm_reboot: "Bu uç noktayı uzaktan yeniden başlatmak istediğinizden emin misiniz?",
-        ep_no_tasks: "Henüz kayıtlı bir uzaktan görev bulunmuyor."
+        ep_no_tasks: "Henüz kayıtlı bir uzaktan görev bulunmuyor.",
+        endpoint_isolate_btn: "Uç Noktayı İzole Et",
+        endpoint_unisolate_btn: "İzolasyonu Kaldır",
+        endpoint_isolated_badge: "İZOLASYONDA",
+        endpoint_active_response_title: "Aktif Müdahale, EDR İzolasyon & Canlı Adli SQL Konsolu",
+        endpoint_kill_process: "Süreç Sonlandır",
+        endpoint_quarantine_file: "Dosya Karantinaya Al",
+        endpoint_quarantined_files: "Karantinaya Alınan Dosyalar",
+        endpoint_osquery_title: "Canlı Adli SQL & OSQuery Konsolu",
+        msg_isolate_queued: "Uç noktayı ağdan izole etme emri gönderildi.",
+        msg_unisolate_queued: "Uç noktanın ağ izolasyonunu kaldırma emri gönderildi.",
+        msg_proc_kill_queued: "Süreç sonlandırma komutu uç noktaya iletildi.",
+        msg_quarantine_queued: "Dosya karantinaya alma emri uç noktaya iletildi.",
+        msg_osquery_queued: "Adli SQL sorgusu uç noktaya gönderildi. Sonuçlar bekleniyor...",
+        confirm_isolate: "Bu uç noktayı ağdan izole etmek istediğinizden emin misiniz? Sunucu telemetrisi korunacak, tüm diğer ağ trafiği engellenecektir.",
+        confirm_unisolate: "Bu uç noktanın ağ izolasyonunu kaldırıp normal trafiği açmak istiyor musunuz?",
+        confirm_kill_proc: "Bu süreci uç noktada zorla sonlandırmak istediğinizden emin misiniz?",
+        confirm_quarantine: "Bu dosyayı karantinaya almak istediğinizden emin misiniz?"
     },
 
     en: {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Active Tenant",
-        app_version: "v1.8.7",
+        app_version: "v1.8.8",
         btn_dl_win_setup_exe: "🪟 Download Windows Setup (.exe)",
         btn_dl_mac_dmg: "🍏 Download macOS Installer (.dmg)",
         btn_dl_mac_pkg: "📦 Download macOS Package (.pkg)",
@@ -2185,7 +2202,24 @@ const translations = {
         msg_batch_queued: "missing patches queued for remote remediation.",
         msg_reboot_queued: "Safe reboot command dispatched to endpoint.",
         confirm_reboot: "Are you sure you want to remotely reboot this endpoint?",
-        ep_no_tasks: "No remote tasks found."
+        ep_no_tasks: "No remote tasks found.",
+        endpoint_isolate_btn: "Isolate Host",
+        endpoint_unisolate_btn: "Lift Isolation",
+        endpoint_isolated_badge: "ISOLATED",
+        endpoint_active_response_title: "Active Response, Host Isolation & Live Forensic SQL Console",
+        endpoint_kill_process: "Kill Process",
+        endpoint_quarantine_file: "Quarantine File",
+        endpoint_quarantined_files: "Quarantined Files",
+        endpoint_osquery_title: "Live Forensic SQL & OSQuery Console",
+        msg_isolate_queued: "Host isolation command dispatched to endpoint.",
+        msg_unisolate_queued: "Host un-isolation command dispatched to endpoint.",
+        msg_proc_kill_queued: "Process termination command dispatched to endpoint.",
+        msg_quarantine_queued: "File quarantine task dispatched to endpoint.",
+        msg_osquery_queued: "Forensic SQL query dispatched. Awaiting results...",
+        confirm_isolate: "Are you sure you want to isolate this host from the network? Telemetry is preserved while blocking all other network traffic.",
+        confirm_unisolate: "Are you sure you want to lift host isolation and restore normal network connectivity?",
+        confirm_kill_proc: "Are you sure you want to forcefully terminate this process on the endpoint?",
+        confirm_quarantine: "Are you sure you want to quarantine this file on the endpoint?"
     }
 };
 
