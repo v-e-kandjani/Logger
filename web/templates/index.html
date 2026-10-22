@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.3</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.4</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -1008,23 +1008,110 @@
 
                 <!-- 3. INVENTORY VIEW -->
                 <div class="endpoint-section" id="endpoint-sec-inventory" style="display: none;">
-                    <div class="panel" style="padding: 24px; text-align: center;">
-                        <h4 style="margin-bottom: 8px;">📦 Varlık &amp; Yazılım Envanteri (Phase C)</h4>
-                        <p style="color: var(--text-muted); max-width: 650px; margin: 0 auto 16px auto;">
-                            Ajanlar üzerinden toplanan donanım bileşenleri, işletim sistemi çekirdek yapılandırmaları, dpkg/rpm/apk/msi paketleri, çalışan servisler ve dinleyen ağ portları bu ekranda normalize edilir.
-                        </p>
-                        <div style="font-size: 12px; color: var(--accent);">Detaylı sistem ve yazılım dökümü için Ajanlar listesinden "İncele" butonuna tıklayınız.</div>
+                    <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 600px;">
+                            <input type="text" id="ep-inv-search" class="form-control" placeholder="Yazılım, üretici veya uç nokta ara..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointInventory();">
+                            <button class="btn btn-secondary" onclick="loadEndpointInventory()">Filtrele</button>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <span style="font-size: 12px; color: var(--text-muted);" id="ep-inv-total-count">0 Yazılım</span>
+                            <button class="btn btn-outline" onclick="loadEndpointInventory()">🔄 Yenile</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container panel" style="padding: 0; overflow-x: auto;">
+                        <table class="data-table" id="ep-inventory-table">
+                            <thead>
+                                <tr>
+                                    <th>Uç Nokta</th>
+                                    <th>Yazılım Adı</th>
+                                    <th>Sürüm</th>
+                                    <th>Üretici / Yayıncı</th>
+                                    <th>Kurulum Konumu / ID</th>
+                                    <th>Son Güncelleme</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ep-inventory-tbody">
+                                <tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 24px;">Yazılım envanteri yükleniyor...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
                 <!-- 4. VULNERABILITIES VIEW -->
                 <div class="endpoint-section" id="endpoint-sec-vulnerabilities" style="display: none;">
-                    <div class="panel" style="padding: 24px; text-align: center;">
-                        <h4 style="margin-bottom: 8px;">🛡️ Merkezi Zafiyet Korelasyonu &amp; CVE İstihbaratı (Phase E/F)</h4>
-                        <p style="color: var(--text-muted); max-width: 650px; margin: 0 auto 16px auto;">
-                            NVD, CISA KEV, FIRST EPSS ve Linux dağıtıcı güvenlik bültenleri (Ubuntu OVAL, Debian, Red Hat) ile korelasyon motoru üzerinden aktif zafiyet tespiti yapılır.
-                        </p>
-                        <div style="font-size: 12px; color: var(--accent);">Aktif zafiyet tespitleri ve risk puanlaması arka planda merkezi olarak yürütülür.</div>
+                    <!-- CVE Catalog Status & Scheduler Control Panel -->
+                    <div class="panel" style="padding: 18px 22px; margin-bottom: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                                    <span style="font-size: 20px;">🛡️</span>
+                                    <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text-main);">Merkezi CVE Zafiyet İstihbaratı &amp; Veritabanı</h4>
+                                    <span class="badge badge-info" id="cve-sync-badge">CISA KEV + NIST</span>
+                                </div>
+                                <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+                                    <div>Katalog: <strong style="color: var(--text-main);" id="cve-stat-total">0</strong> CVE</div>
+                                    <div>Aktif İstismar (KEV): <strong style="color: #ef4444;" id="cve-stat-kev">0</strong></div>
+                                    <div>Son Güncelleme: <span id="cve-stat-last-sync" style="color: var(--text-main);">-</span></div>
+                                    <div>Sonraki Güncelleme: <span id="cve-stat-next-sync" style="color: var(--accent);">-</span></div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <label for="cve-schedule-select" style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin: 0;">Otomatik Güncelleme:</label>
+                                    <select id="cve-schedule-select" class="form-control" style="width: 170px; font-size: 12px; height: 34px;">
+                                        <option value="daily">📅 Her Gün (Daily)</option>
+                                        <option value="weekly">📆 Her Hafta (Weekly)</option>
+                                        <option value="monthly">🗓️ Her Ay (Monthly)</option>
+                                        <option value="manual">🛑 Manuel (Kapalı)</option>
+                                    </select>
+                                    <button class="btn btn-secondary btn-sm" onclick="saveCVESchedule()" style="height: 34px;">Kaydet</button>
+                                </div>
+                                <button class="btn btn-primary btn-sm" id="btn-cve-sync-now" onclick="triggerCVESync()" style="height: 34px; display: flex; align-items: center; gap: 6px;">
+                                    <span id="cve-sync-icon">🔄</span>
+                                    <span id="cve-sync-label">CVE Veritabanını Şimdi Güncelle</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vulnerabilities Filter & Search Bar -->
+                    <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 650px;">
+                            <input type="text" id="ep-vuln-search" class="form-control" placeholder="CVE ID, yazılım veya uç nokta ara..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointVulnerabilities();">
+                            <select id="ep-vuln-severity-filter" class="form-control" style="width: 140px;" onchange="loadEndpointVulnerabilities()">
+                                <option value="">Tüm Dereceler</option>
+                                <option value="CRITICAL">🔴 Kritik (CRITICAL)</option>
+                                <option value="HIGH">🟠 Yüksek (HIGH)</option>
+                                <option value="MEDIUM">🟡 Orta (MEDIUM)</option>
+                                <option value="LOW">🔵 Düşük (LOW)</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="loadEndpointVulnerabilities()">Filtrele</button>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <span style="font-size: 12px; color: var(--text-muted);" id="ep-vulns-total-count">0 Zafiyet</span>
+                            <button class="btn btn-outline" onclick="loadCVEStatus(); loadEndpointVulnerabilities();">🔄 Yenile</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container panel" style="padding: 0; overflow-x: auto;">
+                        <table class="data-table" id="ep-vulns-table">
+                            <thead>
+                                <tr>
+                                    <th>Uç Nokta</th>
+                                    <th>Etkilenen Yazılım</th>
+                                    <th>CVE Tanımı</th>
+                                    <th>CVSS Skoru</th>
+                                    <th>Önem</th>
+                                    <th>İstismar (KEV)</th>
+                                    <th>Açıklama / Çözüm</th>
+                                    <th>Tespit Tarihi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ep-vulns-tbody">
+                                <tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">Zafiyet tespitleri taranıyor...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -2959,7 +3046,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.3</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.4</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -5390,8 +5477,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.8.3"></script>
-    <script src="/static/js/translations.js?v=1.8.3"></script>
-    <script src="/static/js/app.js?v=1.8.3b"></script>
+    <script src="/static/js/marked.min.js?v=1.8.4"></script>
+    <script src="/static/js/translations.js?v=1.8.4"></script>
+    <script src="/static/js/app.js?v=1.8.4"></script>
 </body>
 </html>

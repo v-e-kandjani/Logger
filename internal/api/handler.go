@@ -20,6 +20,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/syslog-platform/logger/internal/archive"
 	"github.com/syslog-platform/logger/internal/cache"
+	"github.com/syslog-platform/logger/internal/cve"
 	"github.com/syslog-platform/logger/internal/database/clickhouse"
 	"github.com/syslog-platform/logger/internal/database/postgres"
 	"github.com/syslog-platform/logger/internal/governor"
@@ -57,6 +58,7 @@ type Handler struct {
 	resultCache      *cache.ResultCache
 	evidenceSealer   *archive.EvidenceSealer
 	quotaEnforcer    *quota.QuotaEnforcer
+	cveSyncer        *cve.Syncer
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
@@ -110,6 +112,11 @@ func NewHandler(
 	if ae != nil {
 		h.evidenceSealer = archive.NewEvidenceSealer(ch, pg, ts, ae.BaseDir())
 		h.evidenceSealer.StartHourlyScheduler(context.Background())
+	}
+
+	if pg != nil {
+		h.cveSyncer = cve.NewSyncer(pg)
+		go h.cveSyncer.StartScheduler(context.Background())
 	}
 
 	return h
@@ -274,6 +281,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/agent/v1/enroll", h.handleAgentEnroll)
 	mux.HandleFunc("/api/agent/v1/heartbeat", h.handleAgentHeartbeat)
 	mux.HandleFunc("/api/agent/v1/config", h.handleAgentConfig)
+	mux.HandleFunc("/api/agent/v1/inventory", h.handleAgentInventory)
 
 	// Protected Endpoint Security Administrative Endpoints
 	mux.HandleFunc("/api/v1/endpoint/dashboard", h.requireAuth(h.handleEndpointDashboard))
@@ -281,6 +289,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/agents/", h.requireAuth(h.handleEndpointAgentDetail))
 	mux.HandleFunc("/api/v1/endpoint/enrollment/tokens", h.requireAuth(h.handleEndpointEnrollmentTokens))
 	mux.HandleFunc("/api/v1/endpoint/enrollment/tokens/", h.requireAuth(h.handleEndpointEnrollmentTokenRevoke))
+	mux.HandleFunc("/api/v1/endpoint/vulnerabilities", h.requireAuth(h.handleEndpointVulnerabilities))
+	mux.HandleFunc("/api/v1/endpoint/inventory", h.requireAuth(h.handleEndpointInventory))
+	mux.HandleFunc("/api/v1/endpoint/cve/status", h.requireAuth(h.handleEndpointCVEStatus))
+	mux.HandleFunc("/api/v1/endpoint/cve/sync", h.requireAuth(h.handleEndpointCVESync))
+	mux.HandleFunc("/api/v1/endpoint/cve/schedule", h.requireAuth(h.handleEndpointCVESchedule))
 
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))

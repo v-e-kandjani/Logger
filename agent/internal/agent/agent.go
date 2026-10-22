@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/syslog-platform/logger/agent/internal/collector"
 	"github.com/syslog-platform/logger/agent/internal/config"
 	"github.com/syslog-platform/logger/agent/internal/identity"
 	"github.com/syslog-platform/logger/agent/internal/transport"
@@ -82,10 +83,11 @@ func (a *Agent) Run(ctx context.Context) error {
 		log.Printf("[LOGGER Agent] Authenticated with existing credentials (Tenant: %s)", a.identity.TenantSlug)
 	}
 
-	// 2. Initial heartbeat
+	// 2. Initial heartbeat & inventory
 	a.sendHeartbeat(ctx)
+	go a.sendInventory(ctx)
 
-	// 3. Heartbeat ticker with jitter
+	// 3. Heartbeat & Inventory tickers
 	interval := time.Duration(a.cfg.HeartbeatSec) * time.Second
 	if interval < 5*time.Second {
 		interval = 30 * time.Second
@@ -94,11 +96,17 @@ func (a *Agent) Run(ctx context.Context) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	// Periodic full inventory scan every 1 hour
+	invTicker := time.NewTicker(1 * time.Hour)
+	defer invTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Println("[LOGGER Agent] Shutting down gracefully...")
 			return nil
+		case <-invTicker.C:
+			go a.sendInventory(ctx)
 		case <-ticker.C:
 			// Apply random jitter (+/- 2 seconds) to avoid synchronization spikes
 			jitter := time.Duration(rand.Intn(4)-2) * time.Second
@@ -106,6 +114,29 @@ func (a *Agent) Run(ctx context.Context) error {
 			a.sendHeartbeat(ctx)
 		}
 	}
+}
+
+func (a *Agent) sendInventory(ctx context.Context) {
+	log.Println("[LOGGER Agent] Collecting host inventory, software packages, and patches...")
+	inv, err := collector.Collect()
+	if err != nil {
+		log.Printf("[LOGGER Agent] Error collecting inventory: %v", err)
+		return
+	}
+
+	inv.AgentUUID = a.identity.AgentUUID
+	inv.Hostname = a.identity.Hostname
+	inv.IPAddress = a.identity.IPAddress
+	inv.MACAddress = a.identity.MACAddress
+
+	var resp models.AgentInventoryResponse
+	if err := a.client.PostJSON(ctx, "/api/agent/v1/inventory", inv, &resp); err != nil {
+		log.Printf("[LOGGER Agent] Inventory upload error: %v", err)
+		return
+	}
+
+	log.Printf("[LOGGER Agent] Inventory reported successfully: %d software packages, %d patches (Server detected %d CVEs)",
+		resp.ProcessedSoftware, resp.ProcessedPatches, resp.DetectedVulns)
 }
 
 func (a *Agent) enroll(ctx context.Context) error {

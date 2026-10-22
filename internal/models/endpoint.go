@@ -301,3 +301,59 @@ type AgentHeartbeatResponse struct {
 	PolicyNeedsUpdate     bool       `json:"policy_needs_update"`
 	PendingTasksCount     int        `json:"pending_tasks_count"`
 }
+
+// AgentInventoryRequest represents an inventory, software, and patch snapshot sent by an agent
+type AgentInventoryRequest struct {
+	AgentUUID     string                 `json:"agent_uuid"`
+	Hostname      string                 `json:"hostname"`
+	OSType        string                 `json:"os_type"`
+	OSFamily      string                 `json:"os_family"`
+	OSName        string                 `json:"os_name"`
+	OSVersion     string                 `json:"os_version"`
+	OSBuild       string                 `json:"os_build"`
+	KernelVersion string                 `json:"kernel_version"`
+	Architecture  string                 `json:"architecture"`
+	IPAddress     string                 `json:"ip_address"`
+	MACAddress    string                 `json:"mac_address"`
+	SystemInfo    map[string]interface{} `json:"system_info,omitempty"`
+	HardwareInfo  map[string]interface{} `json:"hardware_info,omitempty"`
+	NetworkInfo   map[string]interface{} `json:"network_info,omitempty"`
+	Software      []AgentSoftwareItem    `json:"software"`
+	Patches       []AgentPatchItem       `json:"patches"`
+}
+
+type AgentSoftwareItem struct {
+	Name            string `json:"name"`
+	Vendor          string `json:"vendor"`
+	Version         string `json:"version"`
+	Arch            string `json:"arch"`
+	PackageType     string `json:"package_type"`
+	InstallLocation string `json:"install_location"`
+}
+
+type AgentPatchItem struct {
+	HotFixID    string `json:"hotfix_id"`
+	Description string `json:"description"`
+	InstalledOn string `json:"installed_on"`
+}
+
+type AgentInventoryResponse struct {
+	Ack               bool      `json:"ack"`
+	ProcessedSoftware int       `json:"processed_software"`
+	ProcessedPatches  int       `json:"processed_patches"`
+	DetectedVulns     int       `json:"detected_vulns"`
+	ServerTime        time.Time `json:"server_time"`
+}
+
+// CVESyncStatus represents the current state and schedule of the CVE intelligence database
+type CVESyncStatus struct {
+	TotalCVEs      int        `json:"total_cves"`
+	CISAKEVCount   int        `json:"cisa_kev_count"`
+	HighCritCount  int        `json:"high_crit_count"`
+	ScheduleMode   string     `json:"schedule_mode"` // manual, daily, weekly, monthly
+	LastSyncAt     *time.Time `json:"last_sync_at,omitempty"`
+	NextSyncAt     *time.Time `json:"next_sync_at,omitempty"`
+	LastSyncStatus string     `json:"last_sync_status"`
+	LastError      string     `json:"last_error,omitempty"`
+	IsSyncing      bool       `json:"is_syncing"`
+}

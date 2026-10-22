@@ -4,7 +4,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Aktif Kiracı",
-        app_version: "v1.8.3",
+        app_version: "v1.8.4",
         btn_dl_win_setup_exe: "🪟 Windows Setup (.exe) İndir",
         btn_dl_mac_dmg: "🍏 macOS Installer (.dmg) İndir",
         btn_dl_mac_pkg: "📦 macOS Paketi (.pkg) İndir",
@@ -876,7 +876,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Active Tenant",
-        app_version: "v1.8.3",
+        app_version: "v1.8.4",
         btn_dl_win_setup_exe: "🪟 Download Windows Setup (.exe)",
         btn_dl_mac_dmg: "🍏 Download macOS Installer (.dmg)",
         btn_dl_mac_pkg: "📦 Download macOS Package (.pkg)",

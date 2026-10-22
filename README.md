@@ -265,6 +265,23 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.8.4** (Endpoint Software Inventory, Automated CVE Sync Scheduler & Vulnerability Correlation) / **Agent v0.1.2** (Registry/Package Scanner & Auto Inventory Telemetry):
+  - **Endpoint Software & Hotfix Inventory Collection**:
+    - Native cross-platform collector scanning installed software: Windows 64-bit and 32-bit registry uninstall keys, Linux package managers (`dpkg-query`, `rpm`), and macOS application bundles (`/Applications`).
+    - Hotfix and patch enumeration (`wmic qfe` / `Get-HotFix`) capturing Windows KB patches, descriptions, and install timestamps.
+    - Automated background transmission to `/api/agent/v1/inventory` on agent startup and recurring hourly interval.
+  - **Automated CVE Database Intelligence & Scheduler**:
+    - Built-in CISA KEV (Known Exploited Vulnerabilities) syncer fetching actively exploited CVEs + NIST enterprise security vulnerability feeds.
+    - Configurable automated synchronization scheduler with 4 operational modes: **Every Day (`daily`)**, **Every Week (`weekly`)**, **Every Month (`monthly`)**, and **Manual (`manual`)**.
+    - On-demand manual sync trigger via Web UI ("Şimdi Güncelle") and REST API (`POST /api/v1/endpoint/cve/sync`).
+  - **Host Vulnerability Correlation Motor**:
+    - Automatic correlation engine analyzing installed endpoint software against the CVE database.
+    - Records detections into `endpoint_vulnerability_findings` with CVSS scoring, severity ranking (CRITICAL, HIGH, MEDIUM, LOW), and CISA KEV exploit tags.
+    - Automatically refreshes host risk scores and dashboard security telemetry.
+  - **Interactive Endpoint Security Web UI**:
+    - **Vulnerabilities Tab (`#endpoint-sec-vulnerabilities`)**: Displays CVE catalog intelligence status (total CVEs, KEV count, last sync, next scheduled run), automated update schedule dropdown selector, manual sync trigger, severity filters, and real-time vulnerability table linking directly to NIST NVD.
+    - **Software Inventory Tab (`#endpoint-sec-inventory`)**: Searchable host software inventory view with host filtering, publisher details, version tags, and package locations.
+
 - **v1.8.3** (Endpoint Security Modal Dialog Visibility, Sub-Navigation Sync & pgx ErrNoRows Fixes) / **Agent v0.1.1** (Windows SCM Dispatcher & Comprehensive Uninstaller):
   - **LOGGER Agent v0.1.1 Hardening**:
     - **Windows Service Dispatcher (`golang.org/x/sys/windows/svc`)**: Native integration with Windows Service Control Manager (SCM), preventing service start timeouts and error 1053.

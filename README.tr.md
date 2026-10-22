@@ -254,6 +254,23 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.8.4** (Uç Nokta Yazılım Envanteri, Otomatik CVE Veritabanı Zamanlayıcısı & Zafiyet Korelasyonu) / **Agent v0.1.2** (Kayıt Defteri/Paket Tarayıcısı & Otomatik Envanter Bildirimi):
+  - **Uç Nokta Yazılım ve Düzeltme Eki (Hotfix) Envanter Toplama**:
+    - Yerel çok platformlu toplayıcı: Windows 64-bit ve 32-bit Registry Uninstall anahtarları, Linux paket yöneticileri (`dpkg-query`, `rpm`) ve macOS uygulama paketleri (`/Applications`) taranarak kurulu yazılımlar otomatik listelenir.
+    - Windows KB düzeltme ekleri (`wmic qfe` / `Get-HotFix`) ve yükleme tarihleri merkezi olarak toplanır.
+    - Ajan açılışında ve saatlik döngülerde `/api/agent/v1/inventory` üzerinden sunucuya otomatik iletilir.
+  - **Otomatik CVE Veritabanı İstihbaratı ve Zamanlayıcısı**:
+    - Dahili CISA KEV (Known Exploited Vulnerabilities - Aktif İstismar Edilen Zafiyetler) ve kurumsal CVE veri çekicisi entegre edildi.
+    - 4 farklı periyotta çalışan otomatik senkronizasyon zamanlayıcısı: **Her Gün (`daily`)**, **Her Hafta (`weekly`)**, **Her Ay (`monthly`)** ve **Manuel (`manual`)**.
+    - Web arayüzü ("CVE Veritabanını Şimdi Güncelle") ve REST API (`POST /api/v1/endpoint/cve/sync`) üzerinden tek tıkla manuel güncelleme olanağı.
+  - **Merkezi Zafiyet Korelasyon Motoru**:
+    - Uç noktalardan gelen yazılım ve sürüm verilerini CVE kataloğu ile eşleştiren otomatik analiz motoru.
+    - Tespit edilen zafiyetleri `endpoint_vulnerability_findings` tablosuna CVSS skoru, önem derecesi (KRİTİK, YÜKSEK, ORTA, DÜŞÜK) ve CISA KEV istismar bayrağı ile kaydeder.
+    - Uç nokta risk göstergelerini ve panodaki kritik zafiyet sayaçlarını gerçek zamanlı günceller.
+  - **Etkileşimli Uç Nokta Güvenliği Web Panelleri**:
+    - **Zafiyetler Sekmesi (`#endpoint-sec-vulnerabilities`)**: CVE katalog istatistikleri (toplam CVE, KEV adedi, son senkronizasyon, bir sonraki güncelleme), otomatik plan seçici, manuel güncelleme butonu, önem filtreleri ve NIST NVD doğrudan bağlantılı bulgu tablosu.
+    - **Yazılım Envanteri Sekmesi (`#endpoint-sec-inventory`)**: Tüm uç noktalarda yüklü yazılımların arandığı, filtrelendiği ve sürümlerinin incelendiği merkezi envanter ekranı.
+
 - **v1.8.3** (Uç Nokta Güvenliği Modal Pencere Görünürlüğü, Menü Senkronizasyonu & pgx ErrNoRows İyileştirmesi) / **Agent v0.1.1** (Windows SCM Servis Yöneticisi & Kapsamlı Kaldırıcı):
   - **LOGGER Ajan v0.1.1 Sağlamlaştırması**:
     - **Windows Service Dispatcher (`golang.org/x/sys/windows/svc`)**: Windows Service Control Manager (SCM) ile doğrudan yerel entegrasyon; servisin başlatılamama ve zaman aşımına uğrama (hata 1053) sorunu tamamen çözüldü.

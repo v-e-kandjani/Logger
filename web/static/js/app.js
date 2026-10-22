@@ -8091,6 +8091,11 @@ function switchEndpointSubSection(targetId) {
         loadEndpointDashboard();
     } else if (targetId === 'endpoint-sec-guide') {
         initEndpointGuide();
+    } else if (targetId === 'endpoint-sec-inventory') {
+        loadEndpointInventory();
+    } else if (targetId === 'endpoint-sec-vulnerabilities') {
+        loadCVEStatus();
+        loadEndpointVulnerabilities();
     }
 }
 
@@ -8820,6 +8825,280 @@ window.closeTokenInstallModal = closeTokenInstallModal;
 window.submitCreateToken = submitCreateToken;
 window.inspectEndpointAgent = inspectEndpointAgent;
 window.revokeEndpointToken = revokeEndpointToken;
+window.loadEndpointInventory = loadEndpointInventory;
+window.loadCVEStatus = loadCVEStatus;
+window.saveCVESchedule = saveCVESchedule;
+window.triggerCVESync = triggerCVESync;
+window.loadEndpointVulnerabilities = loadEndpointVulnerabilities;
+
+// --- Endpoint Software Inventory ---
+async function loadEndpointInventory() {
+    const tbody = document.getElementById('ep-inventory-tbody');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const search = document.getElementById('ep-inv-search')?.value || '';
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 24px;">Yazılım envanteri yükleniyor...</td></tr>`;
+
+        const res = await fetch(`/api/v1/endpoint/inventory?tenant=${encodeURIComponent(tenant)}&search=${encodeURIComponent(search)}&limit=100`);
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--accent-red); padding: 24px;">Envanter verisi alınamadı (${res.status}).</td></tr>`;
+            return;
+        }
+
+        const data = await res.json();
+        const items = data.software || [];
+        const countEl = document.getElementById('ep-inv-total-count');
+        if (countEl) countEl.textContent = `${(data.total || items.length).toLocaleString()} Yazılım`;
+
+        if (items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 28px;">Henüz kayıtlı yazılım envanteri bulunmuyor. Ajanların envanter taraması bekleniyor.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = items.map(item => `
+            <tr>
+                <td>
+                    <div style="font-weight: 600;">${escapeHtml(item.hostname || '-')}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(item.ip_address || '')}</div>
+                </td>
+                <td>
+                    <strong>${escapeHtml(item.name)}</strong>
+                </td>
+                <td>
+                    <span style="font-family: var(--font-mono); font-size: 11.5px; background: rgba(59, 130, 246, 0.1); color: var(--accent); padding: 2px 6px; border-radius: 4px;">
+                        ${escapeHtml(item.version || '-')}
+                    </span>
+                </td>
+                <td>
+                    <span style="color: var(--text-muted); font-size: 12px;">${escapeHtml(item.vendor || '-')}</span>
+                </td>
+                <td>
+                    <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);" title="${escapeHtml(item.install_location || item.package_id || '')}">
+                        ${escapeHtml(item.install_location || item.package_id || '-')}
+                    </span>
+                </td>
+                <td>
+                    <span style="font-size: 11.5px; color: var(--text-muted);">
+                        ${item.last_seen ? formatDateTime(item.last_seen) : '-'}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error('Error loading endpoint inventory:', err);
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--accent-red); padding: 24px;">Bağlantı hatası: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+// --- CVE Intelligence Status & Scheduler ---
+let cveSyncPollingInterval = null;
+
+async function loadCVEStatus() {
+    try {
+        const res = await fetch('/api/v1/endpoint/cve/status');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const totalEl = document.getElementById('cve-stat-total');
+        if (totalEl) totalEl.textContent = (data.total_cves || 0).toLocaleString();
+
+        const kevEl = document.getElementById('cve-stat-kev');
+        if (kevEl) kevEl.textContent = (data.cisa_kev_count || 0).toLocaleString();
+
+        const lastSyncEl = document.getElementById('cve-stat-last-sync');
+        if (lastSyncEl) {
+            lastSyncEl.textContent = data.last_sync ? formatDateTime(data.last_sync) : 'Henüz güncellenmedi';
+        }
+
+        const nextSyncEl = document.getElementById('cve-stat-next-sync');
+        if (nextSyncEl) {
+            if (data.schedule_mode === 'manual') {
+                nextSyncEl.textContent = 'Otomatik Kapalı (Manuel)';
+            } else if (data.next_sync) {
+                nextSyncEl.textContent = formatDateTime(data.next_sync);
+            } else {
+                nextSyncEl.textContent = 'Planlanıyor';
+            }
+        }
+
+        const schedSelect = document.getElementById('cve-schedule-select');
+        if (schedSelect && data.schedule_mode) {
+            schedSelect.value = data.schedule_mode;
+        }
+
+        // Syncing button state
+        const syncBtn = document.getElementById('btn-cve-sync-now');
+        const syncLabel = document.getElementById('cve-sync-label');
+        const syncIcon = document.getElementById('cve-sync-icon');
+
+        if (data.is_syncing) {
+            if (syncBtn) syncBtn.disabled = true;
+            if (syncLabel) syncLabel.textContent = 'CVE İndiriliyor & Analiz Ediliyor...';
+            if (syncIcon) {
+                syncIcon.textContent = '⏳';
+                syncIcon.style.animation = 'spin 1.5s linear infinite';
+            }
+            if (!cveSyncPollingInterval) {
+                cveSyncPollingInterval = setInterval(loadCVEStatus, 4000);
+            }
+        } else {
+            if (syncBtn) syncBtn.disabled = false;
+            if (syncLabel) syncLabel.textContent = 'CVE Veritabanını Şimdi Güncelle';
+            if (syncIcon) {
+                syncIcon.textContent = '🔄';
+                syncIcon.style.animation = 'none';
+            }
+            if (cveSyncPollingInterval) {
+                clearInterval(cveSyncPollingInterval);
+                cveSyncPollingInterval = null;
+                // Refresh vulnerabilities findings when sync completes
+                loadEndpointVulnerabilities();
+            }
+        }
+    } catch (err) {
+        console.error('Error loading CVE status:', err);
+    }
+}
+
+async function saveCVESchedule() {
+    const sel = document.getElementById('cve-schedule-select');
+    if (!sel) return;
+    const mode = sel.value;
+
+    try {
+        const res = await fetch('/api/v1/endpoint/cve/schedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schedule_mode: mode })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            showToast('Hata: ' + (err.error || 'Plan kaydedilemedi'), 'error');
+            return;
+        }
+        showToast('✓ CVE otomatik güncelleme planı kaydedildi.', 'success');
+        loadCVEStatus();
+    } catch (err) {
+        console.error('Error saving CVE schedule:', err);
+        showToast('Bağlantı hatası: ' + err.message, 'error');
+    }
+}
+
+async function triggerCVESync() {
+    const syncBtn = document.getElementById('btn-cve-sync-now');
+    const syncLabel = document.getElementById('cve-sync-label');
+    const syncIcon = document.getElementById('cve-sync-icon');
+
+    if (syncBtn) syncBtn.disabled = true;
+    if (syncLabel) syncLabel.textContent = 'Senkronizasyon Başlatılıyor...';
+    if (syncIcon) syncIcon.textContent = '⏳';
+
+    try {
+        const res = await fetch('/api/v1/endpoint/cve/sync', { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json();
+            showToast('Hata: ' + (err.error || 'Güncelleme başlatılamadı'), 'error');
+            if (syncBtn) syncBtn.disabled = false;
+            return;
+        }
+
+        showToast('✓ CISA KEV ve CVE veritabanı senkronizasyonu başlatıldı.', 'success');
+        loadCVEStatus();
+    } catch (err) {
+        console.error('Error triggering CVE sync:', err);
+        showToast('Bağlantı hatası: ' + err.message, 'error');
+        if (syncBtn) syncBtn.disabled = false;
+    }
+}
+
+// --- Vulnerability Findings Table ---
+async function loadEndpointVulnerabilities() {
+    const tbody = document.getElementById('ep-vulns-tbody');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const search = document.getElementById('ep-vuln-search')?.value || '';
+        const severity = document.getElementById('ep-vuln-severity-filter')?.value || '';
+
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">Zafiyet tespitleri taranıyor...</td></tr>`;
+
+        let url = `/api/v1/endpoint/vulnerabilities?tenant=${encodeURIComponent(tenant)}&search=${encodeURIComponent(search)}&limit=100`;
+        if (severity) url += `&severity=${encodeURIComponent(severity)}`;
+
+        const res = await fetch(url);
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--accent-red); padding: 24px;">Zafiyet verileri alınamadı (${res.status}).</td></tr>`;
+            return;
+        }
+
+        const data = await res.json();
+        const findings = data.findings || [];
+        const countEl = document.getElementById('ep-vulns-total-count');
+        if (countEl) countEl.textContent = `${(data.total || findings.length).toLocaleString()} Zafiyet`;
+
+        if (findings.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 28px;">
+                🎉 Harika! Uç noktalarda aktif tespit edilmiş zafiyet bulunmuyor.
+            </td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = findings.map(f => {
+            let sevBadge = `<span class="badge" style="background: rgba(148, 163, 184, 0.2); color: #94a3b8;">${escapeHtml(f.severity)}</span>`;
+            if (f.severity === 'CRITICAL') {
+                sevBadge = `<span class="badge" style="background: #991b1b; color: #fff; font-weight: 700;">KRİTİK</span>`;
+            } else if (f.severity === 'HIGH') {
+                sevBadge = `<span class="badge" style="background: #ea580c; color: #fff; font-weight: 600;">YÜKSEK</span>`;
+            } else if (f.severity === 'MEDIUM') {
+                sevBadge = `<span class="badge" style="background: #ca8a04; color: #fff;">ORTA</span>`;
+            } else if (f.severity === 'LOW') {
+                sevBadge = `<span class="badge" style="background: #2563eb; color: #fff;">DÜŞÜK</span>`;
+            }
+
+            const cvssScore = (f.cvss_score != null) ? f.cvss_score.toFixed(1) : '-';
+            const kevBadge = f.is_exploited ?
+                `<span class="badge" style="background: #b91c1c; color: #fff; font-weight: 700;" title="CISA Known Exploited Vulnerability">⚡ KEV (İstismarda)</span>` :
+                `<span style="color: var(--text-muted); font-size: 11px;">-</span>`;
+
+            return `
+                <tr>
+                    <td>
+                        <div style="font-weight: 600;">${escapeHtml(f.hostname || '-')}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(f.ip_address || '')}</div>
+                    </td>
+                    <td>
+                        <strong>${escapeHtml(f.software_name || '-')}</strong>
+                        <div style="font-size: 11px; font-family: var(--font-mono); color: var(--accent);">${escapeHtml(f.installed_version || '-')}</div>
+                    </td>
+                    <td>
+                        <a href="https://nvd.nist.gov/vuln/detail/${encodeURIComponent(f.cve_id)}" target="_blank" rel="noopener" style="font-family: var(--font-mono); font-weight: 700; color: #ef4444; text-decoration: underline;">
+                            ${escapeHtml(f.cve_id)}
+                        </a>
+                    </td>
+                    <td>
+                        <span style="font-family: var(--font-mono); font-weight: 700; font-size: 12.5px;">${cvssScore}</span>
+                    </td>
+                    <td>${sevBadge}</td>
+                    <td>${kevBadge}</td>
+                    <td style="max-width: 300px; font-size: 11.5px; line-height: 1.4; color: var(--text-muted);">
+                        ${escapeHtml(f.title || f.cve_title || f.remediation || '-')}
+                    </td>
+                    <td>
+                        <span style="font-size: 11.5px; color: var(--text-muted);">
+                            ${f.first_detected ? formatDateTime(f.first_detected) : '-'}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('Error loading endpoint vulnerabilities:', err);
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--accent-red); padding: 24px;">Bağlantı hatası: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
 
 
 

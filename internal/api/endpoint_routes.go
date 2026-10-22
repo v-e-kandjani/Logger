@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -386,4 +387,176 @@ func (h *Handler) handleEndpointEnrollmentTokenRevoke(w http.ResponseWriter, r *
 	})
 
 	writeJSON(w, http.StatusOK, map[string]bool{"revoked": true})
+}
+
+// handleAgentInventory receives installed software, patches, and host telemetry from an agent
+func (h *Handler) handleAgentInventory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.AgentInventoryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	if req.AgentUUID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "agent_uuid is required"})
+		return
+	}
+
+	if req.IPAddress == "" {
+		req.IPAddress = getClientIP(r)
+	}
+
+	resp, err := h.pgDB.IngestAgentInventory(r.Context(), req.AgentUUID, req)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleEndpointVulnerabilities returns detected vulnerability findings
+func (h *Handler) handleEndpointVulnerabilities(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenant := h.tenantScope(r)
+	severity := r.URL.Query().Get("severity")
+	status := r.URL.Query().Get("status")
+	search := r.URL.Query().Get("search")
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+	findings, total, err := h.pgDB.ListVulnerabilityFindings(r.Context(), tenant, severity, status, search, limit, offset)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"findings": findings,
+		"total":    total,
+		"limit":    limit,
+		"offset":   offset,
+	})
+}
+
+// handleEndpointInventory lists discovered software packages across endpoints
+func (h *Handler) handleEndpointInventory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenant := h.tenantScope(r)
+	search := r.URL.Query().Get("search")
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+	software, total, err := h.pgDB.ListEndpointSoftware(r.Context(), tenant, search, limit, offset)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"software": software,
+		"total":    total,
+		"limit":    limit,
+		"offset":   offset,
+	})
+}
+
+// handleEndpointCVEStatus returns the current CVE catalog statistics and sync schedule
+func (h *Handler) handleEndpointCVEStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	status, err := h.pgDB.GetCVESyncStatus(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	if h.cveSyncer != nil {
+		status.IsSyncing = h.cveSyncer.IsSyncing()
+	}
+
+	writeJSON(w, http.StatusOK, status)
+}
+
+// handleEndpointCVESync triggers an immediate background CVE database update
+func (h *Handler) handleEndpointCVESync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if h.cveSyncer == nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "cve syncer not initialized"})
+		return
+	}
+
+	if h.cveSyncer.IsSyncing() {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "CVE senkronizasyonu şu anda devam ediyor."})
+		return
+	}
+
+	go func() {
+		_, _ = h.cveSyncer.SyncAll(context.Background())
+	}()
+
+	h.recordAudit(r, "CVE_SYNC_MANUAL_TRIGGERED", "endpoint/cve", "SUCCESS", map[string]interface{}{
+		"triggered_by": "admin",
+	})
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status":  "sync_started",
+		"message": "CVE veritabanı senkronizasyonu arka planda başlatıldı.",
+	})
+}
+
+// handleEndpointCVESchedule updates the automated update schedule (daily, weekly, monthly, manual)
+func (h *Handler) handleEndpointCVESchedule(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ScheduleMode string `json:"schedule_mode"` // daily, weekly, monthly, manual
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	mode := strings.ToLower(strings.TrimSpace(req.ScheduleMode))
+	if mode != "daily" && mode != "weekly" && mode != "monthly" && mode != "manual" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "schedule_mode must be 'daily', 'weekly', 'monthly', or 'manual'"})
+		return
+	}
+
+	if err := h.pgDB.UpdateCVESchedule(r.Context(), mode); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "CVE_SCHEDULE_UPDATED", "endpoint/cve", "SUCCESS", map[string]interface{}{
+		"schedule_mode": mode,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":        "ok",
+		"schedule_mode": mode,
+	})
 }
