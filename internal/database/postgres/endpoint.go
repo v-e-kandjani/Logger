@@ -440,6 +440,36 @@ func (db *DB) RevokeEnrollmentToken(ctx context.Context, id uuid.UUID, tenantSlu
 	return nil
 }
 
+// DeleteEnrollmentToken permanently deletes an enrollment token
+func (db *DB) DeleteEnrollmentToken(ctx context.Context, id uuid.UUID, tenantSlug string) error {
+	query := `
+		DELETE FROM endpoint_enrollment_tokens
+		WHERE id = $1 AND ($2 = '' OR $2 = 'all' OR tenant_slug = $2)
+	`
+	tag, err := db.pool.Exec(ctx, query, id, tenantSlug)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return errors.New("token not found or unauthorized")
+	}
+	return nil
+}
+
+// PurgeInactiveEnrollmentTokens deletes all revoked, expired, or fully consumed tokens
+func (db *DB) PurgeInactiveEnrollmentTokens(ctx context.Context, tenantSlug string) (int64, error) {
+	query := `
+		DELETE FROM endpoint_enrollment_tokens
+		WHERE (revoked_at IS NOT NULL OR (expires_at IS NOT NULL AND expires_at < NOW()) OR (max_uses > 0 AND current_uses >= max_uses))
+		  AND ($1 = '' OR $1 = 'all' OR tenant_slug = $1)
+	`
+	tag, err := db.pool.Exec(ctx, query, tenantSlug)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // ValidateAndConsumeEnrollmentToken checks validity, increments use count, and returns tenant & assigned group
 func (db *DB) ValidateAndConsumeEnrollmentToken(ctx context.Context, rawToken, osType string) (tenantSlug string, groupID *uuid.UUID, err error) {
 	tokenHash := HashToken(rawToken)

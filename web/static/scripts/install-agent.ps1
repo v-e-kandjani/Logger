@@ -77,11 +77,12 @@ try {
     Write-Host "[✓] Downloaded logger-agent.exe successfully." -ForegroundColor Green
 } catch {
     Write-Warning "Could not download remote binary from $downloadUrl ($($_.Exception.Message))."
-    if (Test-Path -Path ".\logger-agent.exe") {
-        Copy-Item -Path ".\logger-agent.exe" -Destination $BinaryPath -Force
-        Write-Host "[✓] Copied local logger-agent.exe." -ForegroundColor Green
+    $localExe = Join-Path (Get-Location) "logger-agent.exe"
+    if (Test-Path -Path $localExe) {
+        Copy-Item -Path $localExe -Destination $BinaryPath -Force
+        Write-Host "[OK] Copied local logger-agent.exe." -ForegroundColor Green
     } elseif (Test-Path -Path $BinaryPath) {
-        Write-Host "[✓] Using existing logger-agent.exe at destination." -ForegroundColor Green
+        Write-Host "[OK] Using existing logger-agent.exe at destination." -ForegroundColor Green
     } else {
         Write-Error "Cannot locate logger-agent.exe binary. Please host the binary or place it in the current directory."
         exit 1
@@ -101,27 +102,27 @@ $config = @{
 }
 $config | ConvertTo-Json -Depth 4 | Set-Content -Path $ConfigFile -Encoding UTF8
 
-# Write Uninstaller batch script
-$uninstallBat = @"
+# Write Uninstaller batch script using verbatim here-string
+$uninstallBatContent = @'
 @echo off
 setlocal
 echo ==================================================================
 echo       VALTRIVO LOGSEAL - WINDOWS AGENT UNINSTALLER
 echo ==================================================================
 echo.
-echo [*] Stopping and removing $ServiceName Windows Service...
-net stop $ServiceName >nul 2>&1
-sc.exe stop $ServiceName >nul 2>&1
-sc.exe delete $ServiceName >nul 2>&1
-reg.exe delete "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\$ServiceName" /f >nul 2>&1
-echo [✓] Windows Service and Registry entries successfully removed.
+echo [*] Stopping and removing LoggerAgent Windows Service...
+net stop LoggerAgent >nul 2>&1
+sc.exe stop LoggerAgent >nul 2>&1
+sc.exe delete LoggerAgent >nul 2>&1
+reg.exe delete "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\LoggerAgent" /f >nul 2>&1
+echo [OK] Windows Service and Registry entries successfully removed.
 echo [*] Removing application files...
-start /b "" cmd /c "ping -n 3 127.0.0.1 >nul & rmdir /s /q `"%~dp0`""
-echo [✓] Valtrivo LogSeal Agent has been completely uninstalled.
+start /b "" cmd /c "ping -n 3 127.0.0.1 >nul & rmdir /s /q \"%~dp0\""
+echo [OK] Valtrivo LogSeal Agent has been completely uninstalled.
 echo.
 pause
-"@
-[System.IO.File]::WriteAllText("$InstallDir\uninstall.bat", $uninstallBat, [System.Text.Encoding]::ASCII)
+'@
+[System.IO.File]::WriteAllText("$InstallDir\uninstall.bat", $uninstallBatContent, [System.Text.Encoding]::ASCII)
 
 # Register in Windows Add/Remove Programs (Registry)
 try {

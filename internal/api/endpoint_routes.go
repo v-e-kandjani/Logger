@@ -315,10 +315,24 @@ func (h *Handler) handleEndpointEnrollmentTokens(w http.ResponseWriter, r *http.
 		return
 	}
 
+	if r.Method == http.MethodDelete {
+		count, err := h.pgDB.PurgeInactiveEnrollmentTokens(r.Context(), tenant)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		h.recordAudit(r, "ENROLLMENT_TOKENS_PURGED", "endpoint/enrollment_token", "SUCCESS", map[string]interface{}{
+			"tenant_slug":  tenant,
+			"purged_count": count,
+		})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"purged": true, "count": count})
+		return
+	}
+
 	http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 }
 
-// handleEndpointEnrollmentTokenRevoke revokes an existing token
+// handleEndpointEnrollmentTokenRevoke revokes or deletes an existing token
 func (h *Handler) handleEndpointEnrollmentTokenRevoke(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -327,13 +341,41 @@ func (h *Handler) handleEndpointEnrollmentTokenRevoke(w http.ResponseWriter, r *
 
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1/endpoint/enrollment/tokens/")
 	idStr := strings.TrimSpace(path)
+	tenant := h.tenantScope(r)
+
+	if idStr == "purge-inactive" || idStr == "purge" {
+		count, err := h.pgDB.PurgeInactiveEnrollmentTokens(r.Context(), tenant)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		h.recordAudit(r, "ENROLLMENT_TOKENS_PURGED", "endpoint/enrollment_token", "SUCCESS", map[string]interface{}{
+			"tenant_slug":  tenant,
+			"purged_count": count,
+		})
+		writeJSON(w, http.StatusOK, map[string]interface{}{"purged": true, "count": count})
+		return
+	}
+
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid token id"})
 		return
 	}
 
-	tenant := h.tenantScope(r)
+	isDelete := r.URL.Query().Get("action") == "delete" || r.URL.Query().Get("permanent") == "true"
+	if isDelete {
+		if err := h.pgDB.DeleteEnrollmentToken(r.Context(), id, tenant); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		h.recordAudit(r, "ENROLLMENT_TOKEN_DELETED", "endpoint/enrollment_token", "SUCCESS", map[string]interface{}{
+			"token_id": id.String(),
+		})
+		writeJSON(w, http.StatusOK, map[string]bool{"deleted": true})
+		return
+	}
+
 	if err := h.pgDB.RevokeEnrollmentToken(r.Context(), id, tenant); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

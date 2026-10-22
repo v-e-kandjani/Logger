@@ -8281,9 +8281,13 @@ async function loadEndpointTokens() {
         tbody.innerHTML = tokens.map(t => {
             const isRevoked = !!t.revoked_at;
             const isExpired = t.expires_at && new Date(t.expires_at) < new Date();
+            const isFullyUsed = t.max_uses > 0 && t.current_uses >= t.max_uses;
+            const isInactive = isRevoked || isExpired || isFullyUsed;
+
             let statusBadge = '<span class="badge badge-success">Aktif</span>';
             if (isRevoked) statusBadge = '<span class="badge badge-danger">İptal Edildi</span>';
             else if (isExpired) statusBadge = '<span class="badge badge-secondary">Süresi Doldu</span>';
+            else if (isFullyUsed) statusBadge = '<span class="badge badge-warning">Tükendi</span>';
 
             const usesStr = `${t.current_uses} / ${t.max_uses > 0 ? t.max_uses : '∞'}`;
             const platforms = (t.allowed_os && t.allowed_os.length > 0) ? t.allowed_os.join(', ') : 'Tümü (*)';
@@ -8301,8 +8305,9 @@ async function loadEndpointTokens() {
                     <td>${statusBadge}</td>
                     <td>
                         <div style="display: flex; gap: 6px; align-items: center;">
-                            ${!isRevoked ? `<button class="btn btn-sm btn-outline" style="color: var(--accent); border-color: rgba(59, 130, 246, 0.4); font-size: 11px;" onclick="openTokenInstallModal('${t.id}', '${escapeHtml(t.name)}', '${escapeHtml(t.token_prefix)}')" title="Kurulum Komutlarını Görüntüle">📋 Komut Al</button>` : ''}
-                            ${!isRevoked ? `<button class="btn btn-sm btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4); font-size: 11px;" onclick="revokeEndpointToken('${t.id}')">İptal Et</button>` : '<span style="color: var(--text-muted);">-</span>'}
+                            ${!isInactive ? `<button class="btn btn-sm btn-outline" style="color: var(--accent); border-color: rgba(59, 130, 246, 0.4); font-size: 11px;" onclick="openTokenInstallModal('${t.id}', '${escapeHtml(t.name)}', '${escapeHtml(t.token_prefix)}')" title="Kurulum Komutlarını Görüntüle">📋 Komut Al</button>` : ''}
+                            ${!isRevoked ? `<button class="btn btn-sm btn-outline" style="color: var(--warning, #f59e0b); border-color: rgba(245, 158, 11, 0.4); font-size: 11px;" onclick="revokeEndpointToken('${t.id}')" title="Belirteci İptal Et">İptal Et</button>` : ''}
+                            <button class="btn btn-sm btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4); font-size: 11px;" onclick="deleteEndpointToken('${t.id}', '${escapeHtml(t.name)}')" title="Belirteci Kalıcı Olarak Sil">🗑️ Sil</button>
                         </div>
                     </td>
                 </tr>
@@ -8441,6 +8446,40 @@ async function revokeEndpointToken(id) {
         });
         if (!res.ok) throw new Error('İptal işlemi başarısız');
         showToast('✓ Belirteç iptal edildi.', 'success');
+        loadEndpointTokens();
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+async function deleteEndpointToken(id, name) {
+    if (!confirm(`"${name || 'Bu belirteç'}" kalıcı olarak silinecek. Onaylıyor musunuz?`)) return;
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/enrollment/tokens/${encodeURIComponent(id)}?action=delete&tenant=${encodeURIComponent(tenant)}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || 'Silme işlemi başarısız');
+        }
+        showToast('✓ Belirteç kalıcı olarak silindi.', 'success');
+        loadEndpointTokens();
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+async function purgeInactiveEndpointTokens() {
+    if (!confirm('Süresi dolmuş, iptal edilmiş veya limitine ulaşmış tüm pasif belirteçler kalıcı olarak silinecek. Onaylıyor musunuz?')) return;
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/enrollment/tokens/purge-inactive?tenant=${encodeURIComponent(tenant)}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Pasif belirteçler temizlenemedi');
+        showToast(`✓ ${data.count || 0} adet pasif belirteç başarıyla temizlendi.`, 'success');
         loadEndpointTokens();
     } catch (err) {
         showToast(err.message, 'error');
