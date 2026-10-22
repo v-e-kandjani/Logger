@@ -203,6 +203,9 @@ pause
 		fatalMsg(silent, "Failed to create service: %v (%s)", err, string(out))
 	}
 
+	// Explicitly configure binPath to guarantee exact registry ImagePath quoting in Windows SCM
+	exec.Command("sc.exe", "config", serviceName, fmt.Sprintf("binPath= %s", binPathCmd), "start=", "auto").Run()
+
 	// Set description & failure actions
 	exec.Command("sc.exe", "description", serviceName, serviceDescription).Run()
 	exec.Command("sc.exe", "failure", serviceName, "reset=", "86400", "actions=", "restart/5000/restart/10000/restart/30000").Run()

@@ -152,6 +152,9 @@ $binPathArg = "`"$BinaryPath`""
 $createResult = & sc.exe create $ServiceName binPath= $binPathArg start= auto DisplayName= "Valtrivo LogSeal Endpoint Agent"
 Write-Host "[*] sc.exe result: $createResult"
 
+# Explicitly configure binPath to guarantee exact quoting in Windows SCM ImagePath
+& sc.exe config $ServiceName binPath= "`"$BinaryPath`"" start= auto | Out-Null
+
 & sc.exe description $ServiceName "Valtrivo LogSeal cross-platform endpoint telemetry, asset inventory, and vulnerability agent." | Out-Null
 & sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
 
