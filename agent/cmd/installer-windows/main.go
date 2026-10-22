@@ -23,7 +23,7 @@ const (
 	serviceName       = "LoggerAgent"
 	serviceDisplayName = "Valtrivo LogSeal Endpoint Agent"
 	serviceDescription = "Valtrivo LogSeal native endpoint security and continuous telemetry collection daemon."
-	version           = "v0.1.0"
+	version           = "v0.1.1"
 )
 
 type Config struct {

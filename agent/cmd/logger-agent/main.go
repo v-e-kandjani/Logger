@@ -58,7 +58,7 @@ func main() {
 		cancel()
 	}()
 
-	if err := agt.Run(ctx); err != nil {
+	if err := runAgent(agt, cfg, ctx, cancel); err != nil {
 		log.Fatalf("Agent runtime error: %v", err)
 	}
 }
