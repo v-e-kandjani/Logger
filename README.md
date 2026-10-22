@@ -265,6 +265,21 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.8.7** (Remote Patch Remediation & Fleet Action Dispatcher) / **Agent v0.1.4**:
+  - **Automated Remote Patch Remediation (Phase J.2)**:
+    - Interactive "Deploy Patch" actions added directly to the Patch Management console table for missing security updates.
+    - Single patch deployment modal with target host telemetry, KB/Package ID preview, and optional automated reboot execution.
+    - Fleet-Wide Batch Patch Remediation modal to deploy missing updates across hosts based on severity filters (Critical, High, or All).
+  - **Asynchronous Task Queue & Execution Engine**:
+    - Centralized `endpoint_tasks` and `endpoint_task_results` tracking for remote commands (patch install, system reboot, instant inventory scan).
+    - Real-time task dispatching embedded directly in agent heartbeat responses (`resp.PendingTasks`), eliminating polling latency.
+    - Native cross-platform execution handlers supporting Windows Update / PowerShell, Debian/Ubuntu `apt-get`, RHEL/CentOS/Rocky `dnf`/`yum`, SUSE `zypper`, and macOS `softwareupdate`.
+  - **Remote Action History & Terminal Execution Log Viewer**:
+    - Interactive "Deployment Tasks" modal allowing operators to monitor pending, running, completed, and failed remediation tasks across the fleet.
+    - Built-in terminal log viewer inspecting real-time `stdout`, `stderr`, exit codes, and execution durations (ms).
+  - **Safe Remote Host Reboot**:
+    - Safe remote reboot actions with 30-second system warning notices for endpoints pending post-patch reboot.
+
 - **v1.8.6** (Centralized Endpoint Policies & Real-Time Dynamic Heartbeat Push) / **Agent v0.1.3**:
   - **Centralized Endpoint Policies Console (Phase J.1)**:
     - Interactive policy management console (`#endpoint-sec-policies`) allowing administrators to define, edit, assign, and delete endpoint policies.

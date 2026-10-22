@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -619,6 +620,226 @@ func (h *Handler) handleEndpointPatchesScan(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// handleAgentTaskResult receives task execution outcomes from agents
+func (h *Handler) handleAgentTaskResult(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.AgentTaskResultSubmission
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	agentUUID := req.AgentUUID
+	if agentUUID == "" {
+		agentUUID = r.Header.Get("X-Agent-UUID")
+	}
+	if agentUUID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "agent_uuid is required"})
+		return
+	}
+
+	if err := h.pgDB.SaveTaskResult(r.Context(), agentUUID, &req); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"ack":     true,
+		"task_id": req.TaskID,
+		"status":  req.Status,
+	})
+}
+
+// handleEndpointPatchDeploy dispatches a remediation task for a single patch on an endpoint
+func (h *Handler) handleEndpointPatchDeploy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenant := h.tenantScope(r)
+	var req models.PatchDeployRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	if req.AgentID == "" || req.PatchID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "agent_id and patch_id are required"})
+		return
+	}
+
+	username := "admin"
+	if s, ok := h.getSession(r); ok && s != nil {
+		username = s.Username
+	}
+
+	task, err := h.pgDB.DeployPatch(r.Context(), tenant, &req, username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "ENDPOINT_PATCH_DEPLOY_DISPATCHED", "endpoint/patches", "SUCCESS", map[string]interface{}{
+		"task_id":       task.ID.String(),
+		"agent_id":      req.AgentID,
+		"patch_id":      req.PatchID,
+		"reboot_after":  req.RebootAfter,
+		"dispatched_by": username,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "queued",
+		"task_id": task.ID.String(),
+		"message": "Yama yükleme görevi uç noktaya başarıyla iletildi.",
+	})
+}
+
+// handleEndpointBatchPatchDeploy dispatches remediation tasks for multiple missing patches
+func (h *Handler) handleEndpointBatchPatchDeploy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenant := h.tenantScope(r)
+	var req models.BatchPatchDeployRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	username := "admin"
+	if s, ok := h.getSession(r); ok && s != nil {
+		username = s.Username
+	}
+
+	count, err := h.pgDB.BatchDeployPatches(r.Context(), tenant, &req, username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "ENDPOINT_BATCH_PATCH_DEPLOY_DISPATCHED", "endpoint/patches", "SUCCESS", map[string]interface{}{
+		"severity_filter": req.SeverityFilter,
+		"reboot_after":    req.RebootAfter,
+		"queued_count":    count,
+		"dispatched_by":   username,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":       "queued",
+		"queued_count": count,
+		"message":      fmt.Sprintf("%d eksik yama için uzaktan yükleme emri kuyruğa alındı.", count),
+	})
+}
+
+// handleEndpointAgentReboot dispatches a safe reboot task to an endpoint
+func (h *Handler) handleEndpointAgentReboot(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenant := h.tenantScope(r)
+	var req struct {
+		AgentID string `json:"agent_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	agentUUID, err := uuid.Parse(req.AgentID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid agent_id"})
+		return
+	}
+
+	username := "admin"
+	if s, ok := h.getSession(r); ok && s != nil {
+		username = s.Username
+	}
+
+	task, err := h.pgDB.RebootEndpointAgent(r.Context(), tenant, agentUUID, username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "ENDPOINT_AGENT_REBOOT_TRIGGERED", "endpoint/agents", "SUCCESS", map[string]interface{}{
+		"task_id":      task.ID.String(),
+		"agent_id":     req.AgentID,
+		"triggered_by": username,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "queued",
+		"task_id": task.ID.String(),
+		"message": "Uç noktaya güvenli yeniden başlatma emri iletildi (30 saniye zaman aşımı ile).",
+	})
+}
+
+// handleEndpointTasks lists remote remediation and maintenance tasks
+func (h *Handler) handleEndpointTasks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenant := h.tenantScope(r)
+	status := r.URL.Query().Get("status")
+	taskType := r.URL.Query().Get("task_type")
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+	tasks, total, err := h.pgDB.ListEndpointTasks(r.Context(), tenant, status, taskType, limit, offset)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"tasks":  tasks,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+// handleEndpointTaskDetail returns task information including stdout/stderr result
+func (h *Handler) handleEndpointTaskDetail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(pathParts) < 5 {
+		http.Error(w, "Task ID Required", http.StatusBadRequest)
+		return
+	}
+
+	taskUUID, err := uuid.Parse(pathParts[4])
+	if err != nil {
+		http.Error(w, "Invalid Task ID", http.StatusBadRequest)
+		return
+	}
+
+	tenant := h.tenantScope(r)
+	task, err := h.pgDB.GetEndpointTask(r.Context(), tenant, taskUUID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Task not found"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, task)
+}
+
 // handleEndpointAgentUpgradeAll broadcasts an in-place upgrade trigger for all outdated agents
 func (h *Handler) handleEndpointAgentUpgradeAll(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -627,13 +848,13 @@ func (h *Handler) handleEndpointAgentUpgradeAll(w http.ResponseWriter, r *http.R
 	}
 
 	h.recordAudit(r, "ENDPOINT_AGENTS_UPGRADE_ALL", "endpoint/agents", "SUCCESS", map[string]interface{}{
-		"target_version": "v0.1.3",
+		"target_version": "v0.1.4",
 	})
 
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":         "upgrade_triggered",
-		"target_version": "v0.1.3",
-		"message":        "Tüm uç noktalar bağlı oldukları sunucu üzerinden v0.1.3 sürümüne otomatik güncelleniyor.",
+		"target_version": "v0.1.4",
+		"message":        "Tüm uç noktalar bağlı oldukları sunucu üzerinden v0.1.4 sürümüne otomatik güncelleniyor.",
 	})
 }
 

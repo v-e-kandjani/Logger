@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.6</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.7</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -1164,6 +1164,8 @@
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <span style="font-size: 12px; color: var(--text-muted);" id="ep-patches-total-count">0 Yama</span>
+                            <button class="btn btn-outline" onclick="openEndpointTasksModal()"><i class="fas fa-tasks"></i> <span data-i18n="btn_view_tasks">Görev Kayıtları</span></button>
+                            <button class="btn btn-warning" onclick="openBatchPatchDeployModal()" style="font-weight: 600;"><i class="fas fa-tools"></i> <span data-i18n="btn_batch_deploy">Toplu Yama Dağıt</span></button>
                             <button class="btn btn-outline" onclick="loadEndpointPatches()" data-i18n="btn_refresh">🔄 Yenile</button>
                             <button class="btn btn-primary" onclick="triggerPatchScan()" data-i18n="btn_scan_patches_now">⚡ Şimdi Yama Taraması Başlat</button>
                         </div>
@@ -1181,10 +1183,11 @@
                                     <th data-i18n="th_agent_status">Durum</th>
                                     <th data-i18n="th_reboot_required">Yeniden Başlatma</th>
                                     <th data-i18n="th_install_date">Tespit / Yükleme Tarihi</th>
+                                    <th style="text-align: right;" data-i18n="th_actions">İşlem</th>
                                 </tr>
                             </thead>
                             <tbody id="ep-patches-tbody">
-                                <tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">Yama kayıtları taranıyor...</td></tr>
+                                <tr><td colspan="9" class="text-center" style="color: var(--text-muted); padding: 24px;">Yama kayıtları taranıyor...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -3162,7 +3165,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.6</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.7</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -5774,8 +5777,184 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.8.6"></script>
-    <script src="/static/js/translations.js?v=1.8.6"></script>
-    <script src="/static/js/app.js?v=1.8.6"></script>
+    <!-- MODAL: Deploy Single Patch -->
+    <div class="modal-backdrop" id="modal-deploy-patch" style="display: none;">
+        <div class="modal" style="max-width: 520px; width: 95%; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_deploy_patch_title">🛠️ Güvenlik Yaması Dağıtımı</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" id="modal-deploy-patch-subtitle">Uç Nokta: -</div>
+                </div>
+                <button class="btn-close" onclick="closeDeployPatchModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <input type="hidden" id="deploy-patch-agent-id">
+                <input type="hidden" id="deploy-patch-id">
+                
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                    <div style="display: grid; grid-template-columns: 120px 1fr; gap: 8px; font-size: 12.5px;">
+                        <span style="color: var(--text-muted);" data-i18n="lbl_target_endpoint">Hedef Uç Nokta:</span>
+                        <strong id="deploy-patch-hostname" style="font-family: var(--font-mono);">-</strong>
+                        
+                        <span style="color: var(--text-muted);" data-i18n="lbl_patch_id">Yama / KB ID:</span>
+                        <strong id="deploy-patch-kbid" style="font-family: var(--font-mono); color: var(--accent);">-</strong>
+                        
+                        <span style="color: var(--text-muted);" data-i18n="lbl_patch_title">Başlık / Tanım:</span>
+                        <span id="deploy-patch-title-text">-</span>
+                        
+                        <span style="color: var(--text-muted);" data-i18n="lbl_os_type">İşletim Sistemi:</span>
+                        <span id="deploy-patch-os">-</span>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; cursor: pointer; padding: 10px; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px;">
+                        <input type="checkbox" id="deploy-patch-reboot" style="margin-top: 2px; transform: scale(1.15);">
+                        <div>
+                            <strong data-i18n="lbl_reboot_after_install">Gerektiğinde Uç Noktayı Yeniden Başlat (Reboot After Install)</strong>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" data-i18n="lbl_reboot_after_install_desc">Yama kurulumu sonrası işletim sistemi yeniden başlatma talep ederse, sistem 30 saniye gecikme ile güvenli biçimde yeniden başlatılacaktır.</div>
+                        </div>
+                    </label>
+                </div>
+
+                <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.5; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 6px; padding: 10px;" data-i18n="lbl_deploy_patch_notice">
+                    ⚡ <strong>Bilgilendirme:</strong> Görev sisteme kaydedildiğinde, bağlı ajan bir sonraki kalp atışında (ortalama 5-10 saniye) görevi alacak ve arka planda sessiz modda çalıştıracaktır.
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-outline" onclick="closeDeployPatchModal()" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" onclick="submitDeployPatch()" data-i18n="btn_confirm_deploy">🚀 Yamayı Dağıt &amp; Yükle</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Batch Patch Deployment -->
+    <div class="modal-backdrop" id="modal-batch-patch-deploy" style="display: none;">
+        <div class="modal" style="max-width: 540px; width: 95%; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_batch_deploy_title">🛠️ Toplu Güvenlik Yaması Dağıtımı</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" data-i18n="modal_batch_deploy_sub">Filo genelindeki eksik güvenlik açıklarını ve yamaları otomatik dağıtın</div>
+                </div>
+                <button class="btn-close" onclick="closeBatchPatchDeployModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px;" data-i18n="lbl_batch_severity">Dağıtılacak Yama Önem Seviyesi:</label>
+                    <select id="batch-deploy-severity" class="form-control" style="width: 100%; font-size: 13px;">
+                        <option value="CRITICAL" data-i18n="opt_severity_crit_only">🔴 Yalnızca Kritik (Critical) Yamalar</option>
+                        <option value="CRITICAL_HIGH" data-i18n="opt_severity_crit_high" selected>🟠 Kritik ve Yüksek (Critical &amp; High) Yamalar</option>
+                        <option value="ALL" data-i18n="opt_severity_all">🔵 Tüm Eksik Yamalar (All Missing)</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; cursor: pointer; padding: 10px; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px;">
+                        <input type="checkbox" id="batch-deploy-reboot" style="margin-top: 2px; transform: scale(1.15);">
+                        <div>
+                            <strong data-i18n="lbl_reboot_after_install">Yeniden Başlatma Gereken Uç Noktaları Reboot Et</strong>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" data-i18n="lbl_batch_reboot_desc">Yama kurulumu sonrası yeniden başlatma gereken sistemlere güvenli reboot sinyali gönderilir.</div>
+                        </div>
+                    </label>
+                </div>
+
+                <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; padding: 12px;" data-i18n="lbl_batch_notice">
+                    🛡️ <strong>Otomatik Dağıtım Mekanizması:</strong> Seçilen kritere uyan tüm eksik yamalar için bireysel uç nokta görevleri oluşturulur. Uç noktalardaki yerel paket yöneticileri (Windows Update, apt, dnf, zypper) devreye girer.
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-outline" onclick="closeBatchPatchDeployModal()" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-warning" onclick="submitBatchPatchDeploy()" data-i18n="btn_confirm_batch_deploy">⚡ Toplu Dağıtımı Başlat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Remote Endpoint Tasks History -->
+    <div class="modal-backdrop" id="modal-endpoint-tasks" style="display: none;">
+        <div class="modal" style="max-width: 960px; width: 95%; max-height: 88vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_endpoint_tasks_title">📜 Uzaktan Görev &amp; Yama Dağıtım Kayıtları</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" data-i18n="modal_endpoint_tasks_sub">Uç noktalara gönderilen yama kurulum, tarama ve bakım komutlarının canlı durumları</div>
+                </div>
+                <button class="btn-close" onclick="closeEndpointTasksModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px; overflow-y: auto; flex: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <select id="ep-tasks-status-filter" class="form-control" style="font-size: 12px; width: 140px;" onchange="loadEndpointTasks()">
+                            <option value="" data-i18n="lbl_all_statuses">Tüm Durumlar</option>
+                            <option value="pending">⏳ Bekliyor (Pending)</option>
+                            <option value="running">⚙️ Çalışıyor (Running)</option>
+                            <option value="completed">✓ Tamamlandı (Success)</option>
+                            <option value="failed">✕ Başarısız (Failed)</option>
+                        </select>
+                        <select id="ep-tasks-type-filter" class="form-control" style="font-size: 12px; width: 150px;" onchange="loadEndpointTasks()">
+                            <option value="" data-i18n="lbl_all_task_types">Tüm Görev Türleri</option>
+                            <option value="patch_install">Yama Kurulumu (Patch)</option>
+                            <option value="system_reboot">Sistem Yeniden Başlatma</option>
+                            <option value="patch_scan">Yama Taraması</option>
+                        </select>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline" onclick="loadEndpointTasks()"><i class="fas fa-sync-alt"></i> <span data-i18n="btn_refresh">Yenile</span></button>
+                    </div>
+                </div>
+
+                <div class="table-container panel" style="padding: 0; overflow-x: auto;">
+                    <table class="data-table" id="ep-tasks-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 140px;" data-i18n="th_task_id">Görev ID</th>
+                                <th data-i18n="th_affected_endpoint">Uç Nokta</th>
+                                <th data-i18n="th_task_type">Görev Türü</th>
+                                <th data-i18n="th_agent_status">Durum</th>
+                                <th data-i18n="th_duration">Süre</th>
+                                <th data-i18n="th_created_at">Tarih</th>
+                                <th style="text-align: right;" data-i18n="th_actions">Çıktı &amp; Log</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ep-tasks-tbody">
+                            <tr><td colspan="7" class="text-center" style="color: var(--text-muted); padding: 24px;">Görev kayıtları yükleniyor...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-outline" onclick="closeEndpointTasksModal()" data-i18n="btn_close">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Task Output & Log Viewer -->
+    <div class="modal-backdrop" id="modal-task-log-view" style="display: none; z-index: 1050;">
+        <div class="modal" style="max-width: 680px; width: 95%; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_task_log_title">💻 Görev Çalıştırma Çıktısı</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" id="task-log-header-info">Görev: -</div>
+                </div>
+                <button class="btn-close" onclick="closeTaskLogModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div id="task-log-meta-status">-</div>
+                    <div id="task-log-meta-duration" style="font-size: 11px; color: var(--text-muted);">-</div>
+                </div>
+                <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;" data-i18n="lbl_stdout">Standart Çıktı (stdout):</div>
+                <pre id="task-log-stdout" style="background: #0d1117; color: #58a6ff; font-family: var(--font-mono); font-size: 11.5px; padding: 12px; border-radius: 6px; max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); white-space: pre-wrap; margin-bottom: 12px;">(Çıktı yok)</pre>
+                
+                <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;" data-i18n="lbl_stderr">Hata Çıktısı (stderr / error):</div>
+                <pre id="task-log-stderr" style="background: #0d1117; color: #f85149; font-family: var(--font-mono); font-size: 11.5px; padding: 12px; border-radius: 6px; max-height: 140px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); white-space: pre-wrap;">(Hata yok)</pre>
+            </div>
+            <div class="modal-footer" style="padding: 10px 16px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-outline" onclick="closeTaskLogModal()" data-i18n="btn_close">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/marked.min.js?v=1.8.7"></script>
+    <script src="/static/js/translations.js?v=1.8.7"></script>
+    <script src="/static/js/app.js?v=1.8.7"></script>
 </body>
 </html>

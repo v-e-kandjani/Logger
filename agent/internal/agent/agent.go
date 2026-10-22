@@ -261,4 +261,11 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 			}
 		}()
 	}
+
+	// Remote task execution (Patch remediation, scans, safe reboots)
+	if len(resp.PendingTasks) > 0 {
+		for _, task := range resp.PendingTasks {
+			go a.executeTask(context.Background(), task)
+		}
+	}
 }

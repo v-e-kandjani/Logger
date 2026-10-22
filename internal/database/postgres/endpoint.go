@@ -649,26 +649,49 @@ func (db *DB) UpdateAgentHeartbeat(ctx context.Context, hb models.AgentHeartbeat
 			    health_score = $7,
 			    updated_at = NOW()
 			WHERE agent_uuid = $1
-			RETURNING policy_id, policy_revision, os_type, architecture
+			RETURNING id, policy_id, policy_revision, os_type, architecture
 		)
-		SELECT u.policy_revision, u.os_type, u.architecture,
+		SELECT u.id, u.policy_revision, u.os_type, u.architecture,
 		       COALESCE(p.revision, u.policy_revision, 1) as effective_revision,
 		       p.config_json
 		FROM updated u
 		LEFT JOIN endpoint_policies p ON u.policy_id = p.id
 	`
 
+	var agentDBID uuid.UUID
 	var agentRevision, effectiveRevision int
 	var osType, arch string
 	var policyConfigJSON []byte
 	err := db.pool.QueryRow(ctx, query,
 		hb.AgentUUID, hb.Status, hb.AgentVersion, hb.IPAddress, hb.MACAddress, metricsJSON, healthScore,
-	).Scan(&agentRevision, &osType, &arch, &effectiveRevision, &policyConfigJSON)
+	).Scan(&agentDBID, &agentRevision, &osType, &arch, &effectiveRevision, &policyConfigJSON)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("agent not found or unenrolled")
 		}
 		return nil, fmt.Errorf("updating heartbeat: %w", err)
+	}
+
+	var pendingTasks []models.EndpointTask
+	taskRows, err := db.pool.Query(ctx, `
+		UPDATE endpoint_tasks
+		SET status = 'running', started_at = NOW()
+		WHERE id IN (
+			SELECT id FROM endpoint_tasks
+			WHERE agent_id = $1 AND status = 'pending'
+			ORDER BY scheduled_at ASC
+			LIMIT 5
+		)
+		RETURNING id, tenant_slug, agent_id, task_type, payload_json, status, created_by, scheduled_at, started_at, created_at
+	`, agentDBID)
+	if err == nil {
+		defer taskRows.Close()
+		for taskRows.Next() {
+			var t models.EndpointTask
+			if err := taskRows.Scan(&t.ID, &t.TenantSlug, &t.AgentID, &t.TaskType, &t.PayloadJSON, &t.Status, &t.CreatedBy, &t.ScheduledAt, &t.StartedAt, &t.CreatedAt); err == nil {
+				pendingTasks = append(pendingTasks, t)
+			}
+		}
 	}
 
 	needsUpdate := effectiveRevision > hb.PolicyRevision
@@ -677,7 +700,8 @@ func (db *DB) UpdateAgentHeartbeat(ctx context.Context, hb models.AgentHeartbeat
 		ServerTime:            time.Now().UTC(),
 		CurrentPolicyRevision: effectiveRevision,
 		PolicyNeedsUpdate:     needsUpdate,
-		PendingTasksCount:     0,
+		PendingTasksCount:     len(pendingTasks),
+		PendingTasks:          pendingTasks,
 	}
 
 	if needsUpdate && len(policyConfigJSON) > 0 {
@@ -688,7 +712,7 @@ func (db *DB) UpdateAgentHeartbeat(ctx context.Context, hb models.AgentHeartbeat
 	}
 
 	// Auto-Update check: Offer latest agent binary if connected agent is running an older build
-	latestAgentVer := "v0.1.3"
+	latestAgentVer := "v0.1.4"
 	if hb.AgentVersion != "" && hb.AgentVersion != latestAgentVer {
 		downloadURL := "/static/bin/logger-agent-linux-amd64"
 		if strings.EqualFold(osType, "windows") {
@@ -1097,5 +1121,395 @@ func (db *DB) GetAgentPolicyConfig(ctx context.Context, agentUUID string) (*mode
 		_ = json.Unmarshal(cfgJSON, &cfg)
 	}
 	return &cfg, rev, nil
+}
+
+// CreateEndpointTask queues a new remote task for an agent
+func (db *DB) CreateEndpointTask(ctx context.Context, task *models.EndpointTask) (*models.EndpointTask, error) {
+	if task.ID == uuid.Nil {
+		task.ID = uuid.New()
+	}
+	if task.Status == "" {
+		task.Status = "pending"
+	}
+	if task.ScheduledAt.IsZero() {
+		task.ScheduledAt = time.Now().UTC()
+	}
+
+	query := `
+		INSERT INTO endpoint_tasks (id, tenant_slug, agent_id, group_id, task_type, payload_json, status, created_by, scheduled_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+		RETURNING created_at
+	`
+	err := db.pool.QueryRow(ctx, query,
+		task.ID, task.TenantSlug, task.AgentID, task.GroupID, task.TaskType, task.PayloadJSON, task.Status, task.CreatedBy, task.ScheduledAt,
+	).Scan(&task.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("creating endpoint task: %w", err)
+	}
+	return task, nil
+}
+
+// ListEndpointTasks lists recent tasks with agent details and execution results
+func (db *DB) ListEndpointTasks(ctx context.Context, tenantSlug, status, taskType string, limit, offset int) ([]models.EndpointTask, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	whereConditions := []string{"($1 = '' OR $1 = 'all' OR t.tenant_slug = $1)"}
+	args := []interface{}{tenantSlug}
+	argIdx := 2
+
+	if status != "" {
+		whereConditions = append(whereConditions, fmt.Sprintf("t.status = $%d", argIdx))
+		args = append(args, status)
+		argIdx++
+	}
+	if taskType != "" {
+		whereConditions = append(whereConditions, fmt.Sprintf("t.task_type = $%d", argIdx))
+		args = append(args, taskType)
+		argIdx++
+	}
+
+	whereClause := strings.Join(whereConditions, " AND ")
+
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM endpoint_tasks t WHERE %s`, whereClause)
+	var total int
+	if err := db.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			t.id, t.tenant_slug, t.agent_id, COALESCE(a.hostname, ''), COALESCE(a.ip_address, ''), COALESCE(a.os_type, ''),
+			t.group_id, t.task_type, t.payload_json, t.status, t.created_by,
+			t.scheduled_at, t.started_at, t.completed_at, COALESCE(t.error_message, ''),
+			t.created_at,
+			COALESCE(r.exit_code, 0), COALESCE(r.stdout, ''), COALESCE(r.stderr, ''),
+			COALESCE(r.execution_duration_ms, 0), r.completed_at
+		FROM endpoint_tasks t
+		LEFT JOIN endpoint_agents a ON a.id = t.agent_id
+		LEFT JOIN endpoint_task_results r ON r.task_id = t.id
+		WHERE %s
+		ORDER BY t.created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, whereClause, argIdx, argIdx+1)
+
+	args = append(args, limit, offset)
+	rows, err := db.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var tasks []models.EndpointTask
+	for rows.Next() {
+		var item models.EndpointTask
+		var host, ip, os string
+		var exitCode int
+		var stdout, stderr string
+		var durationMs int64
+		var resCompletedAt *time.Time
+
+		err := rows.Scan(
+			&item.ID, &item.TenantSlug, &item.AgentID, &host, &ip, &os,
+			&item.GroupID, &item.TaskType, &item.PayloadJSON, &item.Status, &item.CreatedBy,
+			&item.ScheduledAt, &item.StartedAt, &item.CompletedAt, &item.ErrorMessage,
+			&item.CreatedAt,
+			&exitCode, &stdout, &stderr, &durationMs, &resCompletedAt,
+		)
+		if err == nil {
+			item.AgentHostname = host
+			item.AgentIP = ip
+			item.AgentOS = os
+			item.ExecutionDurationMs = durationMs
+			if resCompletedAt != nil {
+				item.Result = &models.EndpointTaskResult{
+					TaskID:              item.ID,
+					AgentID:             item.AgentID,
+					Status:              item.Status,
+					ExitCode:            exitCode,
+					Stdout:              stdout,
+					Stderr:              stderr,
+					ExecutionDurationMs: durationMs,
+					CompletedAt:         *resCompletedAt,
+				}
+			}
+			tasks = append(tasks, item)
+		}
+	}
+	return tasks, total, nil
+}
+
+// GetEndpointTask returns single task details including stdout/stderr result
+func (db *DB) GetEndpointTask(ctx context.Context, tenantSlug string, taskID uuid.UUID) (*models.EndpointTask, error) {
+	query := `
+		SELECT 
+			t.id, t.tenant_slug, t.agent_id, COALESCE(a.hostname, ''), COALESCE(a.ip_address, ''), COALESCE(a.os_type, ''),
+			t.group_id, t.task_type, t.payload_json, t.status, t.created_by,
+			t.scheduled_at, t.started_at, t.completed_at, COALESCE(t.error_message, ''),
+			t.created_at,
+			COALESCE(r.exit_code, 0), COALESCE(r.stdout, ''), COALESCE(r.stderr, ''),
+			COALESCE(r.execution_duration_ms, 0), r.completed_at
+		FROM endpoint_tasks t
+		LEFT JOIN endpoint_agents a ON a.id = t.agent_id
+		LEFT JOIN endpoint_task_results r ON r.task_id = t.id
+		WHERE t.id = $1 AND ($2 = '' OR $2 = 'all' OR t.tenant_slug = $2)
+	`
+	var item models.EndpointTask
+	var host, ip, os string
+	var exitCode int
+	var stdout, stderr string
+	var durationMs int64
+	var resCompletedAt *time.Time
+
+	err := db.pool.QueryRow(ctx, query, taskID, tenantSlug).Scan(
+		&item.ID, &item.TenantSlug, &item.AgentID, &host, &ip, &os,
+		&item.GroupID, &item.TaskType, &item.PayloadJSON, &item.Status, &item.CreatedBy,
+		&item.ScheduledAt, &item.StartedAt, &item.CompletedAt, &item.ErrorMessage,
+		&item.CreatedAt,
+		&exitCode, &stdout, &stderr, &durationMs, &resCompletedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	item.AgentHostname = host
+	item.AgentIP = ip
+	item.AgentOS = os
+	item.ExecutionDurationMs = durationMs
+	if resCompletedAt != nil {
+		item.Result = &models.EndpointTaskResult{
+			TaskID:              item.ID,
+			AgentID:             item.AgentID,
+			Status:              item.Status,
+			ExitCode:            exitCode,
+			Stdout:              stdout,
+			Stderr:              stderr,
+			ExecutionDurationMs: durationMs,
+			CompletedAt:         *resCompletedAt,
+		}
+	}
+	return &item, nil
+}
+
+// SaveTaskResult records execution results from an agent
+func (db *DB) SaveTaskResult(ctx context.Context, agentUUID string, sub *models.AgentTaskResultSubmission) error {
+	taskUUID, err := uuid.Parse(sub.TaskID)
+	if err != nil {
+		return fmt.Errorf("invalid task id: %w", err)
+	}
+
+	var agentID uuid.UUID
+	var taskType string
+	var payloadBytes []byte
+	err = db.pool.QueryRow(ctx, `
+		SELECT t.agent_id, t.task_type, t.payload_json
+		FROM endpoint_tasks t
+		JOIN endpoint_agents a ON a.id = t.agent_id
+		WHERE t.id = $1 AND a.agent_uuid = $2
+	`, taskUUID, agentUUID).Scan(&agentID, &taskType, &payloadBytes)
+	if err != nil {
+		return fmt.Errorf("verifying task ownership: %w", err)
+	}
+
+	status := sub.Status
+	if status == "" {
+		if sub.ExitCode == 0 {
+			status = "completed"
+		} else {
+			status = "failed"
+		}
+	}
+
+	// 1. Update task status
+	_, err = db.pool.Exec(ctx, `
+		UPDATE endpoint_tasks
+		SET status = $2,
+		    completed_at = NOW(),
+		    error_message = $3
+		WHERE id = $1
+	`, taskUUID, status, sub.ErrorMessage)
+	if err != nil {
+		return fmt.Errorf("updating task: %w", err)
+	}
+
+	// 2. Insert or update task result
+	_, err = db.pool.Exec(ctx, `
+		INSERT INTO endpoint_task_results (task_id, agent_id, status, exit_code, stdout, stderr, execution_duration_ms, completed_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+		ON CONFLICT (task_id) DO UPDATE SET
+			status = EXCLUDED.status,
+			exit_code = EXCLUDED.exit_code,
+			stdout = EXCLUDED.stdout,
+			stderr = EXCLUDED.stderr,
+			execution_duration_ms = EXCLUDED.execution_duration_ms,
+			completed_at = NOW()
+	`, taskUUID, agentID, status, sub.ExitCode, sub.Stdout, sub.Stderr, sub.ExecutionDurationMs)
+	if err != nil {
+		return fmt.Errorf("saving task result: %w", err)
+	}
+
+	// 3. If task was patch_install and succeeded, update patch record in endpoint_patches_current
+	if taskType == "patch_install" && status == "completed" {
+		var payload struct {
+			PatchID     string `json:"patch_id"`
+			RebootAfter bool   `json:"reboot_after"`
+		}
+		if err := json.Unmarshal(payloadBytes, &payload); err == nil && payload.PatchID != "" {
+			if payload.RebootAfter {
+				_, _ = db.pool.Exec(ctx, `
+					UPDATE endpoint_patches_current
+					SET status = 'pending_reboot', requires_reboot = TRUE, installed_at = NOW()
+					WHERE agent_id = $1 AND patch_id = $2
+				`, agentID, payload.PatchID)
+			} else {
+				_, _ = db.pool.Exec(ctx, `
+					UPDATE endpoint_patches_current
+					SET status = 'installed', requires_reboot = FALSE, installed_at = NOW()
+					WHERE agent_id = $1 AND patch_id = $2
+				`, agentID, payload.PatchID)
+			}
+		}
+	}
+
+	return nil
+}
+
+// DeployPatch dispatches a remediation task to install a missing patch on an agent
+func (db *DB) DeployPatch(ctx context.Context, tenantSlug string, req *models.PatchDeployRequest, user string) (*models.EndpointTask, error) {
+	agentUUID, err := uuid.Parse(req.AgentID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid agent id: %w", err)
+	}
+
+	var agentTenant string
+	err = db.pool.QueryRow(ctx, `SELECT tenant_slug FROM endpoint_agents WHERE id = $1`, agentUUID).Scan(&agentTenant)
+	if err != nil {
+		return nil, fmt.Errorf("agent not found: %w", err)
+	}
+	if tenantSlug != "" && tenantSlug != "all" && agentTenant != tenantSlug {
+		return nil, errors.New("unauthorized: agent belongs to another tenant")
+	}
+
+	payloadJSON, _ := json.Marshal(map[string]interface{}{
+		"patch_id":     req.PatchID,
+		"title":        req.Title,
+		"reboot_after": req.RebootAfter,
+	})
+
+	task := &models.EndpointTask{
+		ID:          uuid.New(),
+		TenantSlug:  agentTenant,
+		AgentID:     agentUUID,
+		TaskType:    "patch_install",
+		PayloadJSON: payloadJSON,
+		Status:      "pending",
+		CreatedBy:   user,
+		ScheduledAt: time.Now().UTC(),
+	}
+
+	return db.CreateEndpointTask(ctx, task)
+}
+
+// BatchDeployPatches queues remediation tasks for all missing patches matching the criteria
+func (db *DB) BatchDeployPatches(ctx context.Context, tenantSlug string, req *models.BatchPatchDeployRequest, user string) (int, error) {
+	whereConditions := []string{"p.status = 'missing'"}
+	args := []interface{}{}
+	argIdx := 1
+
+	if tenantSlug != "" && tenantSlug != "all" {
+		whereConditions = append(whereConditions, fmt.Sprintf("p.tenant_slug = $%d", argIdx))
+		args = append(args, tenantSlug)
+		argIdx++
+	}
+
+	if req.SeverityFilter != "" && req.SeverityFilter != "ALL" {
+		if req.SeverityFilter == "CRITICAL" {
+			whereConditions = append(whereConditions, "p.severity = 'CRITICAL'")
+		} else if req.SeverityFilter == "HIGH" || req.SeverityFilter == "CRITICAL_HIGH" {
+			whereConditions = append(whereConditions, "p.severity IN ('CRITICAL', 'HIGH')")
+		}
+	}
+
+	whereClause := strings.Join(whereConditions, " AND ")
+	query := fmt.Sprintf(`
+		SELECT p.agent_id, p.patch_id, p.title, p.tenant_slug
+		FROM endpoint_patches_current p
+		JOIN endpoint_agents a ON a.id = p.agent_id
+		WHERE %s
+		LIMIT 200
+	`, whereClause)
+
+	rows, err := db.pool.Query(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	type item struct {
+		agentID    uuid.UUID
+		patchID    string
+		title      string
+		tenantSlug string
+	}
+	var items []item
+	for rows.Next() {
+		var it item
+		if err := rows.Scan(&it.agentID, &it.patchID, &it.title, &it.tenantSlug); err == nil {
+			items = append(items, it)
+		}
+	}
+
+	queued := 0
+	for _, it := range items {
+		payloadJSON, _ := json.Marshal(map[string]interface{}{
+			"patch_id":     it.patchID,
+			"title":        it.title,
+			"reboot_after": req.RebootAfter,
+		})
+		task := &models.EndpointTask{
+			ID:          uuid.New(),
+			TenantSlug:  it.tenantSlug,
+			AgentID:     it.agentID,
+			TaskType:    "patch_install",
+			PayloadJSON: payloadJSON,
+			Status:      "pending",
+			CreatedBy:   user,
+			ScheduledAt: time.Now().UTC(),
+		}
+		if _, err := db.CreateEndpointTask(ctx, task); err == nil {
+			queued++
+		}
+	}
+
+	return queued, nil
+}
+
+// RebootEndpointAgent dispatches a system reboot task to an agent
+func (db *DB) RebootEndpointAgent(ctx context.Context, tenantSlug string, agentID uuid.UUID, user string) (*models.EndpointTask, error) {
+	var agentTenant string
+	err := db.pool.QueryRow(ctx, `SELECT tenant_slug FROM endpoint_agents WHERE id = $1`, agentID).Scan(&agentTenant)
+	if err != nil {
+		return nil, fmt.Errorf("agent not found: %w", err)
+	}
+	if tenantSlug != "" && tenantSlug != "all" && agentTenant != tenantSlug {
+		return nil, errors.New("unauthorized: agent belongs to another tenant")
+	}
+
+	payloadJSON, _ := json.Marshal(map[string]interface{}{
+		"delay_seconds": 30,
+		"reason":        "LogSeal Security Patch Remediation Reboot requested by " + user,
+	})
+
+	task := &models.EndpointTask{
+		ID:          uuid.New(),
+		TenantSlug:  agentTenant,
+		AgentID:     agentID,
+		TaskType:    "system_reboot",
+		PayloadJSON: payloadJSON,
+		Status:      "pending",
+		CreatedBy:   user,
+		ScheduledAt: time.Now().UTC(),
+	}
+
+	return db.CreateEndpointTask(ctx, task)
 }
 

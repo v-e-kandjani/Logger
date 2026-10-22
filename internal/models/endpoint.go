@@ -310,6 +310,7 @@ type AgentHeartbeatResponse struct {
 	PolicyNeedsUpdate     bool                  `json:"policy_needs_update"`
 	Policy                *EndpointPolicyConfig `json:"policy,omitempty"`
 	PendingTasksCount     int                   `json:"pending_tasks_count"`
+	PendingTasks          []EndpointTask        `json:"pending_tasks,omitempty"`
 
 	// Auto-Update Telemetry
 	UpgradeAvailable      bool       `json:"upgrade_available,omitempty"`
@@ -400,4 +401,65 @@ type CVESyncStatus struct {
 	LastSyncStatus string     `json:"last_sync_status"`
 	LastError      string     `json:"last_error,omitempty"`
 	IsSyncing      bool       `json:"is_syncing"`
+}
+
+// EndpointTask represents a remote remediation or maintenance job dispatched to an agent
+type EndpointTask struct {
+	ID                  uuid.UUID           `json:"id"`
+	TenantSlug          string              `json:"tenant_slug"`
+	AgentID             uuid.UUID           `json:"agent_id"`
+	AgentHostname       string              `json:"agent_hostname,omitempty"`
+	AgentIP             string              `json:"agent_ip,omitempty"`
+	AgentOS             string              `json:"agent_os,omitempty"`
+	GroupID             *uuid.UUID          `json:"group_id,omitempty"`
+	TaskType            string              `json:"task_type"` // patch_install, patch_scan, system_reboot
+	PayloadJSON         json.RawMessage     `json:"payload_json"`
+	Status              string              `json:"status"` // pending, running, completed, failed, cancelled
+	CreatedBy           string              `json:"created_by"`
+	ScheduledAt         time.Time           `json:"scheduled_at"`
+	StartedAt           *time.Time          `json:"started_at,omitempty"`
+	CompletedAt         *time.Time          `json:"completed_at,omitempty"`
+	ErrorMessage        string              `json:"error_message,omitempty"`
+	CreatedAt           time.Time           `json:"created_at"`
+	ExecutionDurationMs int64               `json:"execution_duration_ms,omitempty"`
+	Result              *EndpointTaskResult `json:"result,omitempty"`
+}
+
+// EndpointTaskResult represents the raw execution stdout/stderr and exit code from an agent
+type EndpointTaskResult struct {
+	TaskID              uuid.UUID `json:"task_id"`
+	AgentID             uuid.UUID `json:"agent_id"`
+	Status              string    `json:"status"` // completed, failed
+	ExitCode            int       `json:"exit_code"`
+	Stdout              string    `json:"stdout"`
+	Stderr              string    `json:"stderr"`
+	ExecutionDurationMs int64     `json:"execution_duration_ms"`
+	CompletedAt         time.Time `json:"completed_at"`
+}
+
+// AgentTaskResultSubmission is the payload sent by the agent when completing a task
+type AgentTaskResultSubmission struct {
+	AgentUUID           string `json:"agent_uuid,omitempty"`
+	TaskID              string `json:"task_id"`
+	Status              string `json:"status"` // completed, failed
+	ExitCode            int    `json:"exit_code"`
+	Stdout              string `json:"stdout"`
+	Stderr              string `json:"stderr"`
+	ExecutionDurationMs int64  `json:"execution_duration_ms"`
+	ErrorMessage        string `json:"error_message,omitempty"`
+}
+
+// PatchDeployRequest defines an administrative request to remediate a missing patch on an endpoint
+type PatchDeployRequest struct {
+	AgentID     string `json:"agent_id"`
+	PatchID     string `json:"patch_id"`
+	Title       string `json:"title,omitempty"`
+	RebootAfter bool   `json:"reboot_after"`
+}
+
+// BatchPatchDeployRequest defines a fleet-wide or group-wide patch remediation dispatch
+type BatchPatchDeployRequest struct {
+	SeverityFilter string   `json:"severity_filter,omitempty"` // ALL, CRITICAL, HIGH
+	AgentIDs       []string `json:"agent_ids,omitempty"`
+	RebootAfter    bool     `json:"reboot_after"`
 }

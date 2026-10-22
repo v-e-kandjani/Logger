@@ -254,6 +254,21 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.8.7** (Uzaktan Yama İyileştirme & Filo Eylem Dağıtıcısı) / **Agent v0.1.4**:
+  - **Otomatik Uzaktan Yama İyileştirme (Phase J.2)**:
+    - Yama Yönetimi tablosunda eksik güvenlik güncellemeleri için doğrudan "Yama Dağıt" eylem butonları.
+    - Hedef sistem telemetrisi, KB/Paket ID önizlemesi ve isteğe bağlı otomatik yeniden başlatma seçenekli tekil yama dağıtım penceresi.
+    - Filo genelindeki eksik yamaları önem seviyesine (Kritik, Yüksek veya Tümü) göre tek seferde dağıtan Toplu Yama İyileştirme penceresi.
+  - **Asenkron Görev Kuyruğu & Çalıştırma Motoru**:
+    - Uzaktan komutlar için merkezi `endpoint_tasks` ve `endpoint_task_results` veritabanı altyapısı (yama kurulumu, sistem reboot, anlık tarama).
+    - Polling gecikmesini ortadan kaldıran ve heartbeat yanıtında doğrudan taşınan gerçek zamanlı görev iletimi (`resp.PendingTasks`).
+    - Windows Update / PowerShell, Debian/Ubuntu `apt-get`, RHEL/CentOS/Rocky `dnf`/`yum`, SUSE `zypper` ve macOS `softwareupdate` yerel paket yöneticisi entegrasyonları.
+  - **Uzaktan Görev Geçmişi & Canlı Terminal Çıktı Görüntüleyici**:
+    - Bekleyen, çalışan, tamamlanan ve başarısız olan tüm filo görevlerini izleyen "Görev Kayıtları" konsolu.
+    - Gerçek zamanlı `stdout`, `stderr`, çıkış kodları ve çalışma sürelerini (ms) gösteren yerleşik terminal log paneli.
+  - **Güvenli Uzaktan Reboot Eylemi**:
+    - Yama sonrası yeniden başlatma bekleyen uç noktalar için 30 saniye sistem uyarılı güvenli uzaktan reboot komutları.
+
 - **v1.8.6** (Merkezi Uç Nokta İlkeleri & Gerçek Zamanlı Dinamik Kalp Atışı Dağıtımı) / **Agent v0.1.3**:
   - **Merkezi Uç Nokta İlkeleri Konsolu (Phase J.1)**:
     - Yöneticilerin filo genelinde ilkeler tanımlamasını, düzenlemesini, atamasını ve silmesini sağlayan interaktif ilke yönetim konsolu (`#endpoint-sec-policies`).

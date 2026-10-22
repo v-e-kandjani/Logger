@@ -9012,7 +9012,7 @@ async function loadEndpointPatches() {
         if (countEl) countEl.textContent = `${(data.total || patches.length).toLocaleString()} ${t('lbl_patch_count')}`;
 
         if (patches.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 28px;">${t('ep_no_patches')}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="color: var(--text-muted); padding: 28px;">${t('ep_no_patches')}</td></tr>`;
             return;
         }
         tbody.innerHTML = patches.map(p => {
@@ -9030,6 +9030,15 @@ async function loadEndpointPatches() {
             const cves = (p.cve_ids && p.cve_ids.length > 0)
                 ? p.cve_ids.map(c => `<span style="font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); margin-right: 4px;">${escapeHtml(c)}</span>`).join('')
                 : `<span style="color: var(--text-muted);">-</span>`;
+
+            let actionBtn = '';
+            if (p.status === 'missing') {
+                actionBtn = `<button class="btn btn-sm btn-primary" onclick="openDeployPatchModal('${escapeHtml(p.agent_id)}', '${escapeHtml(p.agent_hostname)}', '${escapeHtml(p.patch_id)}', '${escapeHtml(p.title || '')}', '${escapeHtml(p.agent_os || '')}')" style="font-size: 11px; padding: 3px 8px; font-weight: 600;"><i class="fas fa-wrench"></i> ${t('btn_deploy_patch')}</button>`;
+            } else if (p.status === 'pending_reboot') {
+                actionBtn = `<button class="btn btn-sm btn-danger" onclick="rebootEndpoint('${escapeHtml(p.agent_id)}', '${escapeHtml(p.agent_hostname)}')" style="font-size: 11px; padding: 3px 8px; font-weight: 600;"><i class="fas fa-power-off"></i> ${t('btn_reboot_endpoint')}</button>`;
+            } else {
+                actionBtn = `<span class="badge badge-success" style="font-size: 11px; padding: 3px 6px;">✓ ${t('lbl_patched')}</span>`;
+            }
 
             return `
                 <tr>
@@ -9055,12 +9064,15 @@ async function loadEndpointPatches() {
                             ${p.installed_at ? formatDateTime(p.installed_at) : (p.detected_at ? formatDateTime(p.detected_at) : '-')}
                         </span>
                     </td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        ${actionBtn}
+                    </td>
                 </tr>
             `;
         }).join('');
     } catch (err) {
         console.error('Error loading endpoint patches:', err);
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--accent-red); padding: 24px;">Bağlantı hatası: ${escapeHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="color: var(--accent-red); padding: 24px;">Bağlantı hatası: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
 
@@ -9692,6 +9704,259 @@ window.deleteEndpointPolicy = deleteEndpointPolicy;
 window.openAssignPolicyModal = openAssignPolicyModal;
 window.closeAssignPolicyModal = closeAssignPolicyModal;
 window.submitAssignPolicy = submitAssignPolicy;
+
+// --- Patch Remediation & Dispatcher UI Functions ---
+
+function openDeployPatchModal(agentId, hostname, patchId, title, os) {
+    document.getElementById('deploy-patch-agent-id').value = agentId;
+    document.getElementById('deploy-patch-id').value = patchId;
+    document.getElementById('deploy-patch-hostname').textContent = hostname || '-';
+    document.getElementById('deploy-patch-kbid').textContent = patchId;
+    document.getElementById('deploy-patch-title-text').textContent = title || '-';
+    document.getElementById('deploy-patch-os').textContent = os || '-';
+    document.getElementById('deploy-patch-reboot').checked = false;
+    document.getElementById('modal-deploy-patch-subtitle').textContent = (hostname || 'Agent') + ' (' + (os || 'OS') + ')';
+    
+    const modal = document.getElementById('modal-deploy-patch');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeDeployPatchModal() {
+    const modal = document.getElementById('modal-deploy-patch');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitDeployPatch() {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const agentId = document.getElementById('deploy-patch-agent-id').value;
+    const patchId = document.getElementById('deploy-patch-id').value;
+    const title = document.getElementById('deploy-patch-title-text').textContent;
+    const rebootAfter = document.getElementById('deploy-patch-reboot').checked;
+
+    if (!agentId || !patchId) return;
+
+    try {
+        const res = await fetch('/api/v1/endpoint/patches/deploy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agent_id: agentId,
+                patch_id: patchId,
+                title: title,
+                reboot_after: rebootAfter
+            })
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'Yama dağıtılamadı');
+        }
+
+        closeDeployPatchModal();
+        if (typeof showToast === 'function') {
+            showToast('✓ ' + t('msg_patch_queued'), 'success');
+        } else if (typeof showNotification === 'function') {
+            showNotification(t('msg_patch_queued'), 'success');
+        }
+        loadEndpointPatches();
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+function openBatchPatchDeployModal() {
+    const modal = document.getElementById('modal-batch-patch-deploy');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeBatchPatchDeployModal() {
+    const modal = document.getElementById('modal-batch-patch-deploy');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitBatchPatchDeploy() {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const severity = document.getElementById('batch-deploy-severity').value;
+    const rebootAfter = document.getElementById('batch-deploy-reboot').checked;
+
+    try {
+        const res = await fetch('/api/v1/endpoint/patches/batch-deploy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                severity_filter: severity,
+                reboot_after: rebootAfter
+            })
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'Toplu yama dağıtımı başlatılamadı');
+        }
+
+        const data = await res.json();
+        closeBatchPatchDeployModal();
+        const msg = `${data.queued_count || 0} ${t('msg_batch_queued')}`;
+        if (typeof showToast === 'function') {
+            showToast('🚀 ' + msg, 'success');
+        } else if (typeof showNotification === 'function') {
+            showNotification(msg, 'success');
+        }
+        loadEndpointPatches();
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+async function rebootEndpoint(agentId, hostname) {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    if (!confirm(`${hostname || 'Uç nokta'}: ${t('confirm_reboot')}`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/v1/endpoint/agents/reboot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agent_id: agentId })
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'Reboot komutu gönderilemedi');
+        }
+
+        if (typeof showToast === 'function') {
+            showToast('⚡ ' + t('msg_reboot_queued'), 'success');
+        } else if (typeof showNotification === 'function') {
+            showNotification(t('msg_reboot_queued'), 'success');
+        }
+        loadEndpointPatches();
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+function openEndpointTasksModal() {
+    const modal = document.getElementById('modal-endpoint-tasks');
+    if (modal) modal.style.display = 'flex';
+    loadEndpointTasks();
+}
+
+function closeEndpointTasksModal() {
+    const modal = document.getElementById('modal-endpoint-tasks');
+    if (modal) modal.style.display = 'none';
+}
+
+async function loadEndpointTasks() {
+    const tbody = document.getElementById('ep-tasks-tbody');
+    if (!tbody) return;
+
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const status = document.getElementById('ep-tasks-status-filter')?.value || '';
+    const taskType = document.getElementById('ep-tasks-type-filter')?.value || '';
+    const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="color: var(--text-muted); padding: 24px;">Görev kayıtları yükleniyor...</td></tr>`;
+
+    try {
+        const res = await fetch(`/api/v1/endpoint/tasks?tenant=${encodeURIComponent(tenant)}&status=${encodeURIComponent(status)}&task_type=${encodeURIComponent(taskType)}&limit=100`);
+        if (!res.ok) throw new Error('Görevler yüklenemedi (' + res.status + ')');
+
+        const data = await res.json();
+        const tasks = data.tasks || [];
+
+        if (tasks.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="color: var(--text-muted); padding: 28px;">${t('ep_no_tasks')}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = tasks.map(task => {
+            let statusBadge = '';
+            if (task.status === 'completed') {
+                statusBadge = `<span class="badge badge-success">✓ Completed</span>`;
+            } else if (task.status === 'failed') {
+                statusBadge = `<span class="badge badge-danger">✕ Failed</span>`;
+            } else if (task.status === 'running') {
+                statusBadge = `<span class="badge badge-info" style="animation: pulse 1.5s infinite;">⚙️ Running...</span>`;
+            } else {
+                statusBadge = `<span class="badge badge-warning">⏳ Pending</span>`;
+            }
+
+            const shortId = (task.id || '').substring(0, 8);
+            const duration = task.execution_duration_ms ? `${task.execution_duration_ms} ms` : '-';
+            const dateStr = task.created_at ? formatDateTime(task.created_at) : '-';
+
+            return `
+                <tr>
+                    <td><strong style="font-family: var(--font-mono); font-size: 11.5px; color: var(--accent);">${escapeHtml(shortId)}</strong></td>
+                    <td>
+                        <div style="font-weight: 600;">${escapeHtml(task.agent_hostname || '-')}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(task.agent_ip || '')} (${escapeHtml(task.agent_os || '')})</div>
+                    </td>
+                    <td><span class="badge" style="background: rgba(148, 163, 184, 0.2); font-family: var(--font-mono); font-size: 11px;">${escapeHtml(task.task_type)}</span></td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size: 12px; color: var(--text-muted);">${duration}</td>
+                    <td style="font-size: 11.5px; color: var(--text-muted);">${dateStr}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-sm btn-outline" onclick="openTaskLogModal('${escapeHtml(task.id)}')" style="font-size: 11px; padding: 2px 8px;"><i class="fas fa-terminal"></i> Log</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="color: var(--accent-red); padding: 24px;">Hata: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+async function openTaskLogModal(taskId) {
+    const modal = document.getElementById('modal-task-log-view');
+    if (modal) modal.style.display = 'flex';
+
+    document.getElementById('task-log-header-info').textContent = 'Görev: ' + taskId;
+    document.getElementById('task-log-meta-status').innerHTML = '<span class="badge badge-secondary">Yükleniyor...</span>';
+    document.getElementById('task-log-meta-duration').textContent = '';
+    document.getElementById('task-log-stdout').textContent = 'Çıktı yükleniyor...';
+    document.getElementById('task-log-stderr').textContent = '';
+
+    try {
+        const res = await fetch(`/api/v1/endpoint/tasks/${encodeURIComponent(taskId)}`);
+        if (!res.ok) throw new Error('Görev ayrıntısı alınamadı');
+
+        const task = await res.json();
+        const resObj = task.result || {};
+        
+        let statusBadge = `<span class="badge badge-info">${escapeHtml(task.status)}</span>`;
+        if (task.status === 'completed') statusBadge = `<span class="badge badge-success">✓ Completed (Exit 0)</span>`;
+        if (task.status === 'failed') statusBadge = `<span class="badge badge-danger">✕ Failed (Exit ${resObj.exit_code || 1})</span>`;
+        
+        document.getElementById('task-log-meta-status').innerHTML = statusBadge;
+        document.getElementById('task-log-meta-duration').textContent = `Çalışma Süresi: ${task.execution_duration_ms || resObj.execution_duration_ms || 0} ms`;
+
+        document.getElementById('task-log-stdout').textContent = resObj.stdout || '(Standart çıktı üretilmedi)';
+        document.getElementById('task-log-stderr').textContent = resObj.stderr || task.error_message || '(Hata çıktısı yok)';
+    } catch (err) {
+        document.getElementById('task-log-stdout').textContent = 'Hata: ' + err.message;
+    }
+}
+
+function closeTaskLogModal() {
+    const modal = document.getElementById('modal-task-log-view');
+    if (modal) modal.style.display = 'none';
+}
+
+window.openDeployPatchModal = openDeployPatchModal;
+window.closeDeployPatchModal = closeDeployPatchModal;
+window.submitDeployPatch = submitDeployPatch;
+window.openBatchPatchDeployModal = openBatchPatchDeployModal;
+window.closeBatchPatchDeployModal = closeBatchPatchDeployModal;
+window.submitBatchPatchDeploy = submitBatchPatchDeploy;
+window.rebootEndpoint = rebootEndpoint;
+window.openEndpointTasksModal = openEndpointTasksModal;
+window.closeEndpointTasksModal = closeEndpointTasksModal;
+window.loadEndpointTasks = loadEndpointTasks;
+window.openTaskLogModal = openTaskLogModal;
+window.closeTaskLogModal = closeTaskLogModal;
 
 
 
