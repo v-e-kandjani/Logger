@@ -638,24 +638,32 @@ func (db *DB) UpdateAgentHeartbeat(ctx context.Context, hb models.AgentHeartbeat
 	}
 
 	query := `
-		UPDATE endpoint_agents
-		SET last_seen = NOW(),
-		    status = $2,
-		    agent_version = $3,
-		    ip_address = CASE WHEN $4 != '' THEN $4 ELSE ip_address END,
-		    mac_address = CASE WHEN $5 != '' THEN $5 ELSE mac_address END,
-		    resource_usage = $6,
-		    health_score = $7,
-		    updated_at = NOW()
-		WHERE agent_uuid = $1
-		RETURNING policy_revision, os_type, architecture
+		WITH updated AS (
+			UPDATE endpoint_agents
+			SET last_seen = NOW(),
+			    status = $2,
+			    agent_version = $3,
+			    ip_address = CASE WHEN $4 != '' THEN $4 ELSE ip_address END,
+			    mac_address = CASE WHEN $5 != '' THEN $5 ELSE mac_address END,
+			    resource_usage = $6,
+			    health_score = $7,
+			    updated_at = NOW()
+			WHERE agent_uuid = $1
+			RETURNING policy_id, policy_revision, os_type, architecture
+		)
+		SELECT u.policy_revision, u.os_type, u.architecture,
+		       COALESCE(p.revision, u.policy_revision, 1) as effective_revision,
+		       p.config_json
+		FROM updated u
+		LEFT JOIN endpoint_policies p ON u.policy_id = p.id
 	`
 
-	var currentRevision int
+	var agentRevision, effectiveRevision int
 	var osType, arch string
+	var policyConfigJSON []byte
 	err := db.pool.QueryRow(ctx, query,
 		hb.AgentUUID, hb.Status, hb.AgentVersion, hb.IPAddress, hb.MACAddress, metricsJSON, healthScore,
-	).Scan(&currentRevision, &osType, &arch)
+	).Scan(&agentRevision, &osType, &arch, &effectiveRevision, &policyConfigJSON)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("agent not found or unenrolled")
@@ -663,12 +671,20 @@ func (db *DB) UpdateAgentHeartbeat(ctx context.Context, hb models.AgentHeartbeat
 		return nil, fmt.Errorf("updating heartbeat: %w", err)
 	}
 
+	needsUpdate := effectiveRevision > hb.PolicyRevision
 	resp := &models.AgentHeartbeatResponse{
 		Ack:                   true,
 		ServerTime:            time.Now().UTC(),
-		CurrentPolicyRevision: currentRevision,
-		PolicyNeedsUpdate:     currentRevision > hb.PolicyRevision,
+		CurrentPolicyRevision: effectiveRevision,
+		PolicyNeedsUpdate:     needsUpdate,
 		PendingTasksCount:     0,
+	}
+
+	if needsUpdate && len(policyConfigJSON) > 0 {
+		var pCfg models.EndpointPolicyConfig
+		if err := json.Unmarshal(policyConfigJSON, &pCfg); err == nil {
+			resp.Policy = &pCfg
+		}
 	}
 
 	// Auto-Update check: Offer latest agent binary if connected agent is running an older build
@@ -879,3 +895,207 @@ func (db *DB) GetEndpointDashboardSummary(ctx context.Context, tenantSlug string
 
 	return summary, nil
 }
+
+// ListEndpointPolicies lists all policies configured for a tenant
+func (db *DB) ListEndpointPolicies(ctx context.Context, tenantSlug string) ([]models.EndpointPolicy, error) {
+	query := `
+		SELECT 
+			p.id, p.tenant_slug, p.name, p.description, p.revision, p.config_json, p.is_default,
+			p.created_at, p.updated_at,
+			COALESCE(COUNT(a.id), 0) AS agent_count
+		FROM endpoint_policies p
+		LEFT JOIN endpoint_agents a ON a.policy_id = p.id
+		WHERE ($1 = '' OR $1 = 'all' OR p.tenant_slug = $1)
+		GROUP BY p.id, p.tenant_slug, p.name, p.description, p.revision, p.config_json, p.is_default, p.created_at, p.updated_at
+		ORDER BY p.is_default DESC, p.name ASC
+	`
+	rows, err := db.pool.Query(ctx, query, tenantSlug)
+	if err != nil {
+		return nil, fmt.Errorf("querying endpoint policies: %w", err)
+	}
+	defer rows.Close()
+
+	var policies []models.EndpointPolicy
+	for rows.Next() {
+		var p models.EndpointPolicy
+		var cfgJSON []byte
+		if err := rows.Scan(
+			&p.ID, &p.TenantSlug, &p.Name, &p.Description, &p.Revision, &cfgJSON, &p.IsDefault,
+			&p.CreatedAt, &p.UpdatedAt, &p.AgentCount,
+		); err != nil {
+			return nil, fmt.Errorf("scanning policy row: %w", err)
+		}
+		p.Config = cfgJSON
+		if len(cfgJSON) > 0 {
+			var pCfg models.EndpointPolicyConfig
+			if err := json.Unmarshal(cfgJSON, &pCfg); err == nil {
+				p.PolicyConfig = &pCfg
+			}
+		}
+		policies = append(policies, p)
+	}
+	if policies == nil {
+		policies = []models.EndpointPolicy{}
+	}
+	return policies, nil
+}
+
+// GetEndpointPolicy retrieves a specific policy by ID
+func (db *DB) GetEndpointPolicy(ctx context.Context, policyID uuid.UUID) (*models.EndpointPolicy, error) {
+	query := `
+		SELECT 
+			p.id, p.tenant_slug, p.name, p.description, p.revision, p.config_json, p.is_default,
+			p.created_at, p.updated_at,
+			COALESCE(COUNT(a.id), 0) AS agent_count
+		FROM endpoint_policies p
+		LEFT JOIN endpoint_agents a ON a.policy_id = p.id
+		WHERE p.id = $1
+		GROUP BY p.id, p.tenant_slug, p.name, p.description, p.revision, p.config_json, p.is_default, p.created_at, p.updated_at
+	`
+	var p models.EndpointPolicy
+	var cfgJSON []byte
+	err := db.pool.QueryRow(ctx, query, policyID).Scan(
+		&p.ID, &p.TenantSlug, &p.Name, &p.Description, &p.Revision, &cfgJSON, &p.IsDefault,
+		&p.CreatedAt, &p.UpdatedAt, &p.AgentCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	p.Config = cfgJSON
+	if len(cfgJSON) > 0 {
+		var pCfg models.EndpointPolicyConfig
+		if err := json.Unmarshal(cfgJSON, &pCfg); err == nil {
+			p.PolicyConfig = &pCfg
+		}
+	}
+	return &p, nil
+}
+
+// CreateEndpointPolicy creates a new policy with revision 1
+func (db *DB) CreateEndpointPolicy(ctx context.Context, tenantSlug, name, description string, cfg models.EndpointPolicyConfig, isDefault bool) (*models.EndpointPolicy, error) {
+	cfgJSON, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling policy config: %w", err)
+	}
+
+	if isDefault {
+		_, _ = db.pool.Exec(ctx, `UPDATE endpoint_policies SET is_default = FALSE WHERE tenant_slug = $1`, tenantSlug)
+	}
+
+	var p models.EndpointPolicy
+	query := `
+		INSERT INTO endpoint_policies (tenant_slug, name, description, revision, config_json, is_default, created_at, updated_at)
+		VALUES ($1, $2, $3, 1, $4, $5, NOW(), NOW())
+		RETURNING id, tenant_slug, name, description, revision, config_json, is_default, created_at, updated_at
+	`
+	var retCfgJSON []byte
+	err = db.pool.QueryRow(ctx, query, tenantSlug, name, description, cfgJSON, isDefault).Scan(
+		&p.ID, &p.TenantSlug, &p.Name, &p.Description, &p.Revision, &retCfgJSON, &p.IsDefault, &p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("inserting policy: %w", err)
+	}
+	p.Config = retCfgJSON
+	p.PolicyConfig = &cfg
+	return &p, nil
+}
+
+// UpdateEndpointPolicy updates a policy's configuration and increments its revision
+func (db *DB) UpdateEndpointPolicy(ctx context.Context, policyID uuid.UUID, tenantSlug, name, description string, cfg models.EndpointPolicyConfig, isDefault bool) (*models.EndpointPolicy, error) {
+	cfgJSON, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling policy config: %w", err)
+	}
+
+	if isDefault {
+		_, _ = db.pool.Exec(ctx, `UPDATE endpoint_policies SET is_default = FALSE WHERE tenant_slug = $1 AND id != $2`, tenantSlug, policyID)
+	}
+
+	query := `
+		UPDATE endpoint_policies
+		SET name = $2,
+		    description = $3,
+		    revision = revision + 1,
+		    config_json = $4,
+		    is_default = $5,
+		    updated_at = NOW()
+		WHERE id = $1 AND ($6 = '' OR $6 = 'all' OR tenant_slug = $6)
+		RETURNING id, tenant_slug, name, description, revision, config_json, is_default, created_at, updated_at
+	`
+	var p models.EndpointPolicy
+	var retCfgJSON []byte
+	err = db.pool.QueryRow(ctx, query, policyID, name, description, cfgJSON, isDefault, tenantSlug).Scan(
+		&p.ID, &p.TenantSlug, &p.Name, &p.Description, &p.Revision, &retCfgJSON, &p.IsDefault, &p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("updating policy: %w", err)
+	}
+	p.Config = retCfgJSON
+	p.PolicyConfig = &cfg
+
+	_ = db.pool.QueryRow(ctx, `SELECT COUNT(*) FROM endpoint_agents WHERE policy_id = $1`, policyID).Scan(&p.AgentCount)
+	return &p, nil
+}
+
+// DeleteEndpointPolicy deletes a non-default policy and reassigns agents to default
+func (db *DB) DeleteEndpointPolicy(ctx context.Context, policyID uuid.UUID, tenantSlug string) error {
+	var isDefault bool
+	err := db.pool.QueryRow(ctx, `SELECT is_default FROM endpoint_policies WHERE id = $1`, policyID).Scan(&isDefault)
+	if err != nil {
+		return fmt.Errorf("policy not found: %w", err)
+	}
+	if isDefault {
+		return errors.New("cannot delete default policy")
+	}
+
+	var defaultPolicyID *uuid.UUID
+	_ = db.pool.QueryRow(ctx, `SELECT id FROM endpoint_policies WHERE tenant_slug = $1 AND is_default = TRUE LIMIT 1`, tenantSlug).Scan(&defaultPolicyID)
+	if defaultPolicyID == nil {
+		_ = db.pool.QueryRow(ctx, `SELECT id FROM endpoint_policies WHERE is_default = TRUE LIMIT 1`).Scan(&defaultPolicyID)
+	}
+
+	_, _ = db.pool.Exec(ctx, `UPDATE endpoint_agents SET policy_id = $1, policy_revision = 0 WHERE policy_id = $2`, defaultPolicyID, policyID)
+	_, err = db.pool.Exec(ctx, `DELETE FROM endpoint_policies WHERE id = $1`, policyID)
+	return err
+}
+
+// AssignAgentPolicy assigns a specific policy to an agent
+func (db *DB) AssignAgentPolicy(ctx context.Context, agentUUID string, policyID uuid.UUID) error {
+	res, err := db.pool.Exec(ctx, `
+		UPDATE endpoint_agents
+		SET policy_id = $2, policy_revision = 0, updated_at = NOW()
+		WHERE agent_uuid = $1
+	`, agentUUID, policyID)
+	if err != nil {
+		return fmt.Errorf("assigning policy: %w", err)
+	}
+	if res.RowsAffected() == 0 {
+		return errors.New("agent not found")
+	}
+	return nil
+}
+
+// GetAgentPolicyConfig retrieves the effective policy config for an agent
+func (db *DB) GetAgentPolicyConfig(ctx context.Context, agentUUID string) (*models.EndpointPolicyConfig, int, error) {
+	query := `
+		SELECT COALESCE(p.revision, 1), p.config_json
+		FROM endpoint_agents a
+		LEFT JOIN endpoint_policies p ON a.policy_id = p.id
+		WHERE a.agent_uuid = $1
+	`
+	var rev int
+	var cfgJSON []byte
+	err := db.pool.QueryRow(ctx, query, agentUUID).Scan(&rev, &cfgJSON)
+	if err != nil {
+		err = db.pool.QueryRow(ctx, `SELECT revision, config_json FROM endpoint_policies WHERE is_default = TRUE LIMIT 1`).Scan(&rev, &cfgJSON)
+		if err != nil {
+			return nil, 1, err
+		}
+	}
+	var cfg models.EndpointPolicyConfig
+	if len(cfgJSON) > 0 {
+		_ = json.Unmarshal(cfgJSON, &cfg)
+	}
+	return &cfg, rev, nil
+}
+

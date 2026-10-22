@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.5</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.6</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -1192,11 +1192,63 @@
 
                 <!-- 6. POLICIES VIEW -->
                 <div class="endpoint-section" id="endpoint-sec-policies" style="display: none;">
-                    <div class="panel" style="padding: 24px; text-align: center;">
-                        <h4 style="margin-bottom: 8px;">📋 Merkezi Ajan İlkeleri &amp; Yapılandırma (Phase B)</h4>
-                        <p style="color: var(--text-muted); max-width: 650px; margin: 0 auto 16px auto;">
-                            Ajanların kalp atışı aralıkları, CPU/RAM kaynak kısıtlamaları, disk tampon (spool) boyutları ve log toplama kanalları merkezi ilkelerle yönetilir.
-                        </p>
+                    <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div>
+                            <h4 style="font-size: 15px; font-weight: 600;" data-i18n="ep_policies_title">📋 Merkezi Uç Nokta İlkeleri</h4>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" data-i18n="ep_policies_desc">Kalp atışı, donanım kaynak kısıtlamaları, disk tamponu ve olay toplama kanallarını filo genelinde yönetin</p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-outline" onclick="loadEndpointPolicies()"><i class="fas fa-sync-alt"></i> <span data-i18n="btn_refresh">Yenile</span></button>
+                            <button class="btn btn-primary" onclick="openCreatePolicyModal()" data-i18n="btn_new_policy">+ Yeni İlke Oluştur</button>
+                        </div>
+                    </div>
+
+                    <!-- Policy Stats / Summary Cards -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px;">
+                        <div class="metric-card" style="padding: 14px 18px; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px;">
+                            <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;" data-i18n="lbl_total_policies">Toplam İlkeler</div>
+                            <div id="ep-stat-total-policies" style="font-size: 24px; font-weight: 700; color: var(--accent); margin-top: 4px;">-</div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" data-i18n="lbl_active_policies_sub">Tenant bazlı yapılandırmalar</div>
+                        </div>
+
+                        <div class="metric-card" style="padding: 14px 18px; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px;">
+                            <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;" data-i18n="lbl_default_policy">Varsayılan İlke</div>
+                            <div id="ep-stat-default-policy" style="font-size: 15px; font-weight: 700; color: var(--success); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" data-i18n="lbl_default_policy_sub">Yeni kayıt olan ajanlara atanır</div>
+                        </div>
+
+                        <div class="metric-card" style="padding: 14px 18px; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 8px;">
+                            <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;" data-i18n="lbl_governed_agents">Yönetilen Ajanlar</div>
+                            <div id="ep-stat-governed-agents" style="font-size: 24px; font-weight: 700; color: #a78bfa; margin-top: 4px;">-</div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" data-i18n="lbl_governed_agents_sub">İlke ile bağlı aktif uç noktalar</div>
+                        </div>
+
+                        <div class="metric-card" style="padding: 14px 18px; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px;">
+                            <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;" data-i18n="lbl_policy_sync_status">Senkronizasyon</div>
+                            <div style="font-size: 13.5px; font-weight: 700; color: var(--warning); margin-top: 6px;" data-i18n="lbl_live_heartbeat_sync">⚡ Canlı Kalp Atışı Pushed</div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" data-i18n="lbl_zero_downtime_sync">Sıfır kesintiyle anında geçerli</div>
+                        </div>
+                    </div>
+
+                    <!-- Policies Table -->
+                    <div class="table-container">
+                        <table class="data-table" id="ep-policies-table">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="th_policy_name">İlke Adı</th>
+                                    <th data-i18n="th_tenant">Kiracı</th>
+                                    <th data-i18n="th_policy_intervals">Zaman Aralıkları</th>
+                                    <th data-i18n="th_policy_limits">Kaynak Limitleri (Throttling)</th>
+                                    <th data-i18n="th_policy_channels">Olay Kanalları</th>
+                                    <th data-i18n="th_policy_fleet">Bağlı Uç Noktalar</th>
+                                    <th data-i18n="th_policy_revision">Revizyon</th>
+                                    <th data-i18n="th_actions">İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ep-policies-tbody">
+                                <tr><td colspan="8" style="text-align: center; padding: 24px; color: var(--text-muted);" data-i18n="loading">Yükleniyor...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -3110,7 +3162,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.5</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.6</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -5578,8 +5630,152 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.8.5"></script>
-    <script src="/static/js/translations.js?v=1.8.5"></script>
-    <script src="/static/js/app.js?v=1.8.5"></script>
+    <!-- MODAL: Endpoint Policy Configuration (Create / Edit) -->
+    <div class="modal-backdrop" id="modal-endpoint-policy" style="display: none;">
+        <div class="modal" style="max-width: 680px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem;" id="modal-policy-title" data-i18n="modal_policy_title">📋 İlke Yapılandırma</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" id="modal-policy-sub" data-i18n="modal_policy_sub">Uç noktalar için merkezi telemetri ve kaynak sınırlamaları</div>
+                </div>
+                <button class="btn-close" onclick="closePolicyModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1;">
+                <input type="hidden" id="policy-form-id">
+
+                <div style="margin-bottom: 14px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_policy_name">İlke Adı (Name) *</label>
+                    <input type="text" id="policy-form-name" class="form-control" style="width: 100%; font-size: 13px;" placeholder="ör. Balanced Workstation Policy">
+                </div>
+
+                <div style="margin-bottom: 14px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_policy_desc">Açıklama (Description)</label>
+                    <textarea id="policy-form-desc" class="form-control" rows="2" style="width: 100%; font-size: 12.5px;" placeholder="İlkenin kullanım amacı ve kapsamı..."></textarea>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer;">
+                        <input type="checkbox" id="policy-form-default" style="transform: scale(1.15);">
+                        <span data-i18n="lbl_policy_is_default">Varsayılan İlke (Default Policy) - Yeni kaydedilen ajanlara otomatik atanır</span>
+                    </label>
+                </div>
+
+                <!-- Telemetry & Intervals Group -->
+                <div style="background: rgba(59, 130, 246, 0.04); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                    <div style="font-size: 12.5px; font-weight: 700; color: var(--accent); margin-bottom: 10px;" data-i18n="grp_telemetry_intervals">⏱️ Telemetri &amp; Tarama Aralıkları</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_heartbeat_interval">Kalp Atışı (Heartbeat - sn)</label>
+                            <input type="number" id="policy-form-heartbeat" class="form-control" style="width: 100%;" min="5" max="3600" value="30">
+                            <span style="font-size: 10.5px; color: var(--text-muted);">Önerilen: 15 - 60 sn</span>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_inventory_interval">Yazılım Envanteri (sn)</label>
+                            <input type="number" id="policy-form-inventory" class="form-control" style="width: 100%;" min="300" max="86400" value="3600">
+                            <span style="font-size: 10.5px; color: var(--text-muted);">Önerilen: 3600 sn (1 saat)</span>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_patch_scan_interval">Yama Taraması (sn)</label>
+                            <input type="number" id="policy-form-patch-scan" class="form-control" style="width: 100%;" min="600" max="86400" value="14400">
+                            <span style="font-size: 10.5px; color: var(--text-muted);">Önerilen: 14400 sn (4 saat)</span>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_vuln_scan_interval">Zafiyet Taraması (sn)</label>
+                            <input type="number" id="policy-form-vuln-scan" class="form-control" style="width: 100%;" min="600" max="86400" value="14400">
+                            <span style="font-size: 10.5px; color: var(--text-muted);">Önerilen: 14400 sn (4 saat)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resource Throttling Group -->
+                <div style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                    <div style="font-size: 12.5px; font-weight: 700; color: var(--success); margin-bottom: 10px;" data-i18n="grp_resource_throttling">🛡️ Donanım Kaynak Kısıtlamaları (Throttling)</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_max_cpu">Maksimum CPU Limiti (%)</label>
+                            <input type="number" id="policy-form-cpu" class="form-control" style="width: 100%;" min="5" max="100" value="10">
+                            <span style="font-size: 10.5px; color: var(--text-muted);">Maksimum işlemci tavanı</span>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_max_ram">Maksimum RAM Limiti (MB)</label>
+                            <input type="number" id="policy-form-ram" class="form-control" style="width: 100%;" min="50" max="4096" value="150">
+                            <span style="font-size: 10.5px; color: var(--text-muted);">Ajan RSS bellek tavanı</span>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_spool_disk">Disk Tampon Boyutu (MB)</label>
+                            <input type="number" id="policy-form-spool-disk" class="form-control" style="width: 100%;" min="50" max="20000" value="500">
+                            <span style="font-size: 10.5px; color: var(--text-muted);">Çevrimdışı disk arabelleği</span>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_spool_age">Tampon Saklama Süresi (Saat)</label>
+                            <input type="number" id="policy-form-spool-age" class="form-control" style="width: 100%;" min="12" max="720" value="72">
+                            <span style="font-size: 10.5px; color: var(--text-muted);">Maksimum disk tampon ömrü</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Logging Channels & Updates -->
+                <div style="background: rgba(139, 92, 246, 0.04); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 8px; padding: 14px;">
+                    <div style="font-size: 12.5px; font-weight: 700; color: #a78bfa; margin-bottom: 10px;" data-i18n="grp_channels_updates">📡 Log Toplama &amp; Güncelleme Kanalı</div>
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; cursor: pointer; margin-bottom: 6px;">
+                            <input type="checkbox" id="policy-form-log-enabled" checked style="transform: scale(1.15);">
+                            <span data-i18n="lbl_log_collection_enabled">Olay Günlüğü Toplama Aktif (Event Log Collection Enabled)</span>
+                        </label>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_event_channels">Toplanacak Olay Kanalları / Tesisler (Virgülle ayırın)</label>
+                        <input type="text" id="policy-form-channels" class="form-control" style="width: 100%; font-family: var(--font-mono); font-size: 12px;" value="System, Application, Security">
+                        <span style="font-size: 10.5px; color: var(--text-muted);">Windows: System, Application, Security | Linux: syslog, auth, kern</span>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_update_channel">Güncelleme Kanalı (Update Channel)</label>
+                        <select id="policy-form-channel" class="form-control" style="width: 100%;">
+                            <option value="stable">Stable (Kararlı Üretim Sürümü)</option>
+                            <option value="beta">Beta (Önizleme Sürümü)</option>
+                            <option value="development">Development (Geliştirici Sürümü)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border-color); flex-shrink: 0;">
+                <button class="btn btn-outline" onclick="closePolicyModal()" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" onclick="savePolicyModal()" data-i18n="btn_save_policy">Kaydet &amp; Dağıt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Assign Policy to Agent -->
+    <div class="modal-backdrop" id="modal-endpoint-assign-policy" style="display: none;">
+        <div class="modal" style="max-width: 480px; width: 95%; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="modal_assign_title">📋 Uç Noktaya İlke Ata</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" id="modal-assign-agent-name">Uç Nokta: -</div>
+                </div>
+                <button class="btn-close" onclick="closeAssignPolicyModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <input type="hidden" id="assign-agent-uuid">
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px;" data-i18n="lbl_select_policy">Uygulanacak İlke:</label>
+                    <select id="assign-policy-select" class="form-control" style="width: 100%; font-size: 13px;">
+                        <option value="">Yükleniyor...</option>
+                    </select>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; padding: 10px;" data-i18n="lbl_assign_note">
+                    ℹ️ İlke atandığında, ajan bir sonraki kalp atışında (en geç birkaç saniye içinde) yeni yapılandırmayı otomatik olarak alacak ve uygulayacaktır.
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-outline" onclick="closeAssignPolicyModal()" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" onclick="submitAssignPolicy()" data-i18n="btn_apply_policy">İlkeyi Uygula</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/marked.min.js?v=1.8.6"></script>
+    <script src="/static/js/translations.js?v=1.8.6"></script>
+    <script src="/static/js/app.js?v=1.8.6"></script>
 </body>
 </html>

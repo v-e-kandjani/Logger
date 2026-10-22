@@ -150,7 +150,15 @@ func (h *Handler) handleAgentConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Standard default policy config
+	agentUUID := strings.TrimSpace(r.URL.Query().Get("agent_uuid"))
+	if agentUUID != "" {
+		if cfg, _, err := h.pgDB.GetAgentPolicyConfig(r.Context(), agentUUID); err == nil && cfg != nil {
+			writeJSON(w, http.StatusOK, cfg)
+			return
+		}
+	}
+
+	// Standard fallback default policy config
 	cfg := models.EndpointPolicyConfig{
 		HeartbeatIntervalSec: 30,
 		InventoryIntervalSec: 3600,
@@ -628,4 +636,239 @@ func (h *Handler) handleEndpointAgentUpgradeAll(w http.ResponseWriter, r *http.R
 		"message":        "Tüm uç noktalar bağlı oldukları sunucu üzerinden v0.1.3 sürümüne otomatik güncelleniyor.",
 	})
 }
+
+// handleEndpointPolicies lists or creates endpoint policies
+func (h *Handler) handleEndpointPolicies(w http.ResponseWriter, r *http.Request) {
+	tenant := h.tenantScope(r)
+
+	switch r.Method {
+	case http.MethodGet:
+		policies, err := h.pgDB.ListEndpointPolicies(r.Context(), tenant)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"policies": policies,
+			"total":    len(policies),
+		})
+
+	case http.MethodPost:
+		if tenant == "" || tenant == "all" {
+			tenant = "default"
+		}
+
+		var req struct {
+			Name        string                      `json:"name"`
+			Description string                      `json:"description"`
+			IsDefault   bool                        `json:"is_default"`
+			Config      models.EndpointPolicyConfig `json:"config"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+			return
+		}
+
+		req.Name = strings.TrimSpace(req.Name)
+		if req.Name == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "policy name is required"})
+			return
+		}
+
+		if req.Config.HeartbeatIntervalSec < 5 {
+			req.Config.HeartbeatIntervalSec = 30
+		}
+		if req.Config.InventoryIntervalSec < 60 {
+			req.Config.InventoryIntervalSec = 3600
+		}
+		if req.Config.PatchScanIntervalSec < 600 {
+			req.Config.PatchScanIntervalSec = 14400
+		}
+		if req.Config.VulnScanIntervalSec < 600 {
+			req.Config.VulnScanIntervalSec = 14400
+		}
+		if req.Config.MaxCPUPercent <= 0 {
+			req.Config.MaxCPUPercent = 10
+		}
+		if req.Config.MaxRAMMB <= 0 {
+			req.Config.MaxRAMMB = 150
+		}
+		if req.Config.SpoolMaxDiskMB <= 0 {
+			req.Config.SpoolMaxDiskMB = 500
+		}
+		if req.Config.SpoolMaxAgeHours <= 0 {
+			req.Config.SpoolMaxAgeHours = 72
+		}
+		if len(req.Config.EventChannels) == 0 {
+			req.Config.EventChannels = []string{"System", "Application", "Security"}
+		}
+		if req.Config.UpdateChannel == "" {
+			req.Config.UpdateChannel = "stable"
+		}
+
+		p, err := h.pgDB.CreateEndpointPolicy(r.Context(), tenant, req.Name, req.Description, req.Config, req.IsDefault)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		h.recordAudit(r, "ENDPOINT_POLICY_CREATED", "endpoint/policies", "SUCCESS", map[string]interface{}{
+			"policy_id":   p.ID.String(),
+			"name":        p.Name,
+			"tenant_slug": tenant,
+		})
+
+		writeJSON(w, http.StatusCreated, p)
+
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleEndpointPolicyDetail handles GET, PUT, DELETE for a specific policy
+func (h *Handler) handleEndpointPolicyDetail(w http.ResponseWriter, r *http.Request) {
+	tenant := h.tenantScope(r)
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/v1/endpoint/policies/")
+	idStr = strings.Trim(idStr, "/")
+
+	pID, err := uuid.Parse(idStr)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid policy UUID"})
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		p, err := h.pgDB.GetEndpointPolicy(r.Context(), pID)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "policy not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, p)
+
+	case http.MethodPut:
+		var req struct {
+			Name        string                      `json:"name"`
+			Description string                      `json:"description"`
+			IsDefault   bool                        `json:"is_default"`
+			Config      models.EndpointPolicyConfig `json:"config"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+			return
+		}
+
+		req.Name = strings.TrimSpace(req.Name)
+		if req.Name == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "policy name is required"})
+			return
+		}
+
+		if req.Config.HeartbeatIntervalSec < 5 {
+			req.Config.HeartbeatIntervalSec = 30
+		}
+		if req.Config.InventoryIntervalSec < 60 {
+			req.Config.InventoryIntervalSec = 3600
+		}
+		if req.Config.PatchScanIntervalSec < 600 {
+			req.Config.PatchScanIntervalSec = 14400
+		}
+		if req.Config.VulnScanIntervalSec < 600 {
+			req.Config.VulnScanIntervalSec = 14400
+		}
+		if req.Config.MaxCPUPercent <= 0 {
+			req.Config.MaxCPUPercent = 10
+		}
+		if req.Config.MaxRAMMB <= 0 {
+			req.Config.MaxRAMMB = 150
+		}
+		if req.Config.SpoolMaxDiskMB <= 0 {
+			req.Config.SpoolMaxDiskMB = 500
+		}
+		if req.Config.SpoolMaxAgeHours <= 0 {
+			req.Config.SpoolMaxAgeHours = 72
+		}
+		if len(req.Config.EventChannels) == 0 {
+			req.Config.EventChannels = []string{"System", "Application", "Security"}
+		}
+		if req.Config.UpdateChannel == "" {
+			req.Config.UpdateChannel = "stable"
+		}
+
+		p, err := h.pgDB.UpdateEndpointPolicy(r.Context(), pID, tenant, req.Name, req.Description, req.Config, req.IsDefault)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		h.recordAudit(r, "ENDPOINT_POLICY_UPDATED", "endpoint/policies", "SUCCESS", map[string]interface{}{
+			"policy_id": p.ID.String(),
+			"name":      p.Name,
+			"revision":  p.Revision,
+		})
+
+		writeJSON(w, http.StatusOK, p)
+
+	case http.MethodDelete:
+		if err := h.pgDB.DeleteEndpointPolicy(r.Context(), pID, tenant); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+
+		h.recordAudit(r, "ENDPOINT_POLICY_DELETED", "endpoint/policies", "SUCCESS", map[string]interface{}{
+			"policy_id": pID.String(),
+		})
+
+		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleEndpointPolicyAssign assigns one or more endpoints to a policy
+func (h *Handler) handleEndpointPolicyAssign(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		AgentUUID  string    `json:"agent_uuid"`
+		AgentUUIDs []string  `json:"agent_uuids"`
+		PolicyID   uuid.UUID `json:"policy_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+
+	uuids := req.AgentUUIDs
+	if req.AgentUUID != "" {
+		uuids = append(uuids, req.AgentUUID)
+	}
+
+	if len(uuids) == 0 || req.PolicyID == uuid.Nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "agent_uuid and policy_id are required"})
+		return
+	}
+
+	successCount := 0
+	for _, u := range uuids {
+		if err := h.pgDB.AssignAgentPolicy(r.Context(), strings.TrimSpace(u), req.PolicyID); err == nil {
+			successCount++
+		}
+	}
+
+	h.recordAudit(r, "ENDPOINT_POLICY_ASSIGNED", "endpoint/policies", "SUCCESS", map[string]interface{}{
+		"policy_id":    req.PolicyID.String(),
+		"agents_count": successCount,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status": "assigned",
+		"count":  successCount,
+	})
+}
+
 

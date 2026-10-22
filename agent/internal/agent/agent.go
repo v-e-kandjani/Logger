@@ -19,11 +19,14 @@ import (
 
 // Agent represents the running LOGGER Agent daemon instance
 type Agent struct {
-	cfg         *config.Config
-	identity    *identity.Info
-	client      *transport.Client
-	policyRev   int
-	isUpgrading bool
+	cfg           *config.Config
+	identity      *identity.Info
+	client        *transport.Client
+	policyRev     int
+	currentPolicy *models.EndpointPolicyConfig
+	hbTicker      *time.Ticker
+	invTicker     *time.Ticker
+	isUpgrading   bool
 }
 
 // NewAgent initializes the agent with configuration and identity
@@ -84,31 +87,36 @@ func (a *Agent) Run(ctx context.Context) error {
 		log.Printf("[LOGGER Agent] Authenticated with existing credentials (Tenant: %s)", a.identity.TenantSlug)
 	}
 
-	// 2. Initial heartbeat & inventory
-	a.sendHeartbeat(ctx)
-	go a.sendInventory(ctx)
-
-	// 3. Heartbeat & Inventory tickers
+	// 2. Heartbeat & Inventory tickers
 	interval := time.Duration(a.cfg.HeartbeatSec) * time.Second
-	if interval < 5*time.Second {
+	if a.currentPolicy != nil && a.currentPolicy.HeartbeatIntervalSec >= 5 {
+		interval = time.Duration(a.currentPolicy.HeartbeatIntervalSec) * time.Second
+	} else if interval < 5*time.Second {
 		interval = 30 * time.Second
 	}
 
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	a.hbTicker = time.NewTicker(interval)
+	defer a.hbTicker.Stop()
 
-	// Periodic full inventory scan every 1 hour
-	invTicker := time.NewTicker(1 * time.Hour)
-	defer invTicker.Stop()
+	invInterval := 1 * time.Hour
+	if a.currentPolicy != nil && a.currentPolicy.InventoryIntervalSec >= 60 {
+		invInterval = time.Duration(a.currentPolicy.InventoryIntervalSec) * time.Second
+	}
+	a.invTicker = time.NewTicker(invInterval)
+	defer a.invTicker.Stop()
+
+	// Initial heartbeat & inventory
+	a.sendHeartbeat(ctx)
+	go a.sendInventory(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
 			log.Println("[LOGGER Agent] Shutting down gracefully...")
 			return nil
-		case <-invTicker.C:
+		case <-a.invTicker.C:
 			go a.sendInventory(ctx)
-		case <-ticker.C:
+		case <-a.hbTicker.C:
 			// Apply random jitter (+/- 2 seconds) to avoid synchronization spikes
 			jitter := time.Duration(rand.Intn(4)-2) * time.Second
 			time.Sleep(jitter)
@@ -171,6 +179,16 @@ func (a *Agent) enroll(ctx context.Context) error {
 	a.policyRev = resp.PolicyRevision
 	a.client.SetAuthToken(resp.AuthToken)
 
+	if resp.Policy != nil {
+		a.currentPolicy = resp.Policy
+		if resp.Policy.HeartbeatIntervalSec >= 5 && a.hbTicker != nil {
+			a.hbTicker.Reset(time.Duration(resp.Policy.HeartbeatIntervalSec) * time.Second)
+		}
+		if resp.Policy.InventoryIntervalSec >= 60 && a.invTicker != nil {
+			a.invTicker.Reset(time.Duration(resp.Policy.InventoryIntervalSec) * time.Second)
+		}
+	}
+
 	// Persist updated identity with credentials
 	if err := identity.SaveIdentity(a.cfg.IdentityFile, a.identity); err != nil {
 		log.Printf("[LOGGER Agent] Warning saving identity: %v", err)
@@ -205,9 +223,30 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 	}
 
 	if resp.PolicyNeedsUpdate {
-		log.Printf("[LOGGER Agent] Server reports policy update available (Rev %d -> %d)",
-			a.policyRev, resp.CurrentPolicyRevision)
 		a.policyRev = resp.CurrentPolicyRevision
+		policy := resp.Policy
+		if policy == nil {
+			var fetched models.EndpointPolicyConfig
+			if err := a.client.GetJSON(ctx, "/api/agent/v1/config?agent_uuid="+a.identity.AgentUUID, &fetched); err == nil {
+				policy = &fetched
+			}
+		}
+
+		if policy != nil {
+			a.currentPolicy = policy
+			log.Printf("[LOGGER Agent] Applied Central Policy Rev %d: Heartbeat=%ds, Inv=%ds, CPU Limit=%d%%, Max RAM=%dMB, Spool=%dMB, Channels=%v",
+				a.policyRev, policy.HeartbeatIntervalSec, policy.InventoryIntervalSec,
+				policy.MaxCPUPercent, policy.MaxRAMMB, policy.SpoolMaxDiskMB, policy.EventChannels)
+
+			if policy.HeartbeatIntervalSec >= 5 && a.hbTicker != nil {
+				a.hbTicker.Reset(time.Duration(policy.HeartbeatIntervalSec) * time.Second)
+			}
+			if policy.InventoryIntervalSec >= 60 && a.invTicker != nil {
+				a.invTicker.Reset(time.Duration(policy.InventoryIntervalSec) * time.Second)
+			}
+		} else {
+			log.Printf("[LOGGER Agent] Server reports policy update available (Rev %d)", a.policyRev)
+		}
 	}
 
 	// Auto-Update check: server offers newer version

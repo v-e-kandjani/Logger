@@ -85,15 +85,17 @@ type EndpointEnrollmentToken struct {
 
 // EndpointPolicy defines intervals, throttling, and collection rules for agents
 type EndpointPolicy struct {
-	ID          uuid.UUID       `json:"id"`
-	TenantSlug  string          `json:"tenant_slug"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Revision    int             `json:"revision"`
-	Config      json.RawMessage `json:"config"`
-	IsDefault   bool            `json:"is_default"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	ID           uuid.UUID             `json:"id"`
+	TenantSlug   string                `json:"tenant_slug"`
+	Name         string                `json:"name"`
+	Description  string                `json:"description"`
+	Revision     int                   `json:"revision"`
+	Config       json.RawMessage       `json:"config"`
+	PolicyConfig *EndpointPolicyConfig `json:"policy_config,omitempty"`
+	IsDefault    bool                  `json:"is_default"`
+	AgentCount   int                   `json:"agent_count"`
+	CreatedAt    time.Time             `json:"created_at"`
+	UpdatedAt    time.Time             `json:"updated_at"`
 }
 
 // EndpointPolicyConfig defines the strongly-typed settings stored in Config JSON
@@ -302,11 +304,12 @@ type AgentResourceMetrics struct {
 }
 
 type AgentHeartbeatResponse struct {
-	Ack                   bool       `json:"ack"`
-	ServerTime            time.Time  `json:"server_time"`
-	CurrentPolicyRevision int        `json:"current_policy_revision"`
-	PolicyNeedsUpdate     bool       `json:"policy_needs_update"`
-	PendingTasksCount     int        `json:"pending_tasks_count"`
+	Ack                   bool                  `json:"ack"`
+	ServerTime            time.Time             `json:"server_time"`
+	CurrentPolicyRevision int                   `json:"current_policy_revision"`
+	PolicyNeedsUpdate     bool                  `json:"policy_needs_update"`
+	Policy                *EndpointPolicyConfig `json:"policy,omitempty"`
+	PendingTasksCount     int                   `json:"pending_tasks_count"`
 
 	// Auto-Update Telemetry
 	UpgradeAvailable      bool       `json:"upgrade_available,omitempty"`

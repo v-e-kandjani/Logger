@@ -297,6 +297,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/patches", h.requireAuth(h.handleEndpointPatches))
 	mux.HandleFunc("/api/v1/endpoint/patches/scan", h.requireAuth(h.handleEndpointPatchesScan))
 	mux.HandleFunc("/api/v1/endpoint/agents/upgrade-all", h.requireAuth(h.handleEndpointAgentUpgradeAll))
+	mux.HandleFunc("/api/v1/endpoint/policies", h.requireAuth(h.handleEndpointPolicies))
+	mux.HandleFunc("/api/v1/endpoint/policies/", h.requireAuth(h.handleEndpointPolicyDetail))
+	mux.HandleFunc("/api/v1/endpoint/policies/assign", h.requireAuth(h.handleEndpointPolicyAssign))
 
 	// Static Assets (Public so login page can load CSS/JS)
 	fs := http.FileServer(http.Dir("./web/static"))

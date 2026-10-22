@@ -8122,6 +8122,8 @@ function switchEndpointSubSection(targetId) {
         loadEndpointVulnerabilities();
     } else if (targetId === 'endpoint-sec-patches') {
         loadEndpointPatches();
+    } else if (targetId === 'endpoint-sec-policies') {
+        loadEndpointPolicies();
     }
 }
 
@@ -8282,8 +8284,9 @@ async function loadEndpointAgents() {
                     <td>${critVulnBadge}${totalVulnBadge}</td>
                     <td>${patchBadge}${rebootBadge}</td>
                     <td style="font-size: 11.5px; color: var(--text-muted);">${relativeTime}</td>
-                    <td>
+                    <td style="white-space: nowrap;">
                         <button class="btn btn-sm btn-outline" onclick="inspectEndpointAgent('${a.id}')">${t('btn_inspect_agent')}</button>
+                        <button class="btn btn-sm btn-outline" style="margin-left: 4px;" onclick="openAssignPolicyModal('${a.agent_uuid}', '${escapeHtml(a.hostname || a.ip_address)}', '${a.policy_id || ''}')" title="${t('btn_assign_policy')}">📋</button>
                     </td>
                 </tr>
             `;
@@ -9359,6 +9362,336 @@ async function loadEndpointVulnerabilities() {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--accent-red); padding: 24px;">Bağlantı hatası: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
+
+// --- Endpoint Policy Management Suite ---
+
+let currentEndpointPolicies = [];
+
+async function loadEndpointPolicies() {
+    const tbody = document.getElementById('ep-policies-tbody');
+    if (!tbody) return;
+
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/policies?tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) throw new Error('İlkeler yüklenemedi');
+        const data = await res.json();
+        const policies = data.policies || [];
+        currentEndpointPolicies = policies;
+
+        // Update Stat Cards
+        const totalEl = document.getElementById('ep-stat-total-policies');
+        const defaultEl = document.getElementById('ep-stat-default-policy');
+        const governedEl = document.getElementById('ep-stat-governed-agents');
+
+        if (totalEl) totalEl.textContent = policies.length;
+
+        let defaultPolicy = policies.find(p => p.is_default);
+        if (defaultEl) {
+            defaultEl.textContent = defaultPolicy ? defaultPolicy.name : '-';
+            defaultEl.title = defaultPolicy ? defaultPolicy.name : '';
+        }
+
+        let totalGoverned = policies.reduce((acc, p) => acc + (p.agent_count || 0), 0);
+        if (governedEl) governedEl.textContent = totalGoverned;
+
+        if (policies.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 32px; color: var(--text-muted);">${t('ep_no_policies')}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = policies.map(p => {
+            const cfg = p.policy_config || (typeof p.config === 'object' ? p.config : {});
+            const isDef = p.is_default;
+            const defBadge = isDef 
+                ? `<span class="badge badge-success" style="font-size: 10px; margin-left: 6px;">${t('badge_default_policy')}</span>` 
+                : '';
+
+            const hbSec = cfg.heartbeat_interval_sec || 30;
+            const invSec = cfg.inventory_interval_sec || 3600;
+            const patchSec = cfg.patch_scan_interval_sec || 14400;
+
+            const intervalsHtml = `
+                <div style="font-size: 11.5px; line-height: 1.4;">
+                    <div>HB: <strong style="color: var(--accent);">${hbSec}s</strong> | Inv: <strong>${Math.round(invSec / 60)}m</strong></div>
+                    <div style="color: var(--text-muted); font-size: 10.5px;">Patch/CVE: <strong>${Math.round(patchSec / 3600)}h</strong></div>
+                </div>
+            `;
+
+            const maxCpu = cfg.max_cpu_percent || 10;
+            const maxRam = cfg.max_ram_mb || 150;
+            const spoolDisk = cfg.spool_max_disk_mb || 500;
+
+            const limitsHtml = `
+                <div style="font-size: 11.5px; line-height: 1.4;">
+                    <div>CPU: <strong style="color: var(--accent);">${maxCpu}%</strong> | RAM: <strong style="color: #3b82f6;">${maxRam} MB</strong></div>
+                    <div style="color: var(--text-muted); font-size: 10.5px;">Spool: <strong>${spoolDisk} MB</strong> (${cfg.spool_max_age_hours || 72}h)</div>
+                </div>
+            `;
+
+            const channels = (cfg.event_channels && cfg.event_channels.length > 0)
+                ? cfg.event_channels.map(c => `<span class="badge badge-secondary" style="font-size: 10px; font-family: var(--font-mono); margin: 1px;">${escapeHtml(c)}</span>`).join(' ')
+                : `<span style="color: var(--text-muted); font-size: 11px;">Default</span>`;
+
+            const logCollectionStatus = cfg.log_collection_enabled !== false
+                ? `<div>${channels}</div>`
+                : `<div style="color: var(--danger); font-size: 11px;">❌ Disabled</div>`;
+
+            const fleetCount = p.agent_count || 0;
+            const fleetBadge = `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa; font-weight: 700; border: 1px solid rgba(139, 92, 246, 0.3); font-size: 11px;">${fleetCount} ${t('lbl_endpoint_single')}</span>`;
+
+            const revBadge = `<span class="badge badge-outline" style="font-family: var(--font-mono); font-size: 10.5px;">r${p.revision}</span>`;
+
+            const actionsHtml = `
+                <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-sm btn-outline" onclick="openEditPolicyModal('${p.id}')" title="Düzenle">✏️</button>
+                    ${!isDef ? `<button class="btn btn-sm btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.4);" onclick="deleteEndpointPolicy('${p.id}', '${escapeHtml(p.name)}')" title="Sil">🗑️</button>` : ''}
+                </div>
+            `;
+
+            return `
+                <tr>
+                    <td>
+                        <div style="font-weight: 600; display: flex; align-items: center;">
+                            <span>${escapeHtml(p.name)}</span>
+                            ${defBadge}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; max-width: 260px;">${escapeHtml(p.description || '-')}</div>
+                    </td>
+                    <td>
+                        <span class="badge badge-outline" style="font-size: 10.5px; font-family: var(--font-mono);">${escapeHtml(p.tenant_slug || 'default')}</span>
+                    </td>
+                    <td>${intervalsHtml}</td>
+                    <td>${limitsHtml}</td>
+                    <td>${logCollectionStatus}</td>
+                    <td>${fleetBadge}</td>
+                    <td>${revBadge}</td>
+                    <td>${actionsHtml}</td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error('Error loading policies:', err);
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--danger); padding: 24px;">Bağlantı hatası: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function openCreatePolicyModal() {
+    document.getElementById('policy-form-id').value = '';
+    document.getElementById('policy-form-name').value = '';
+    document.getElementById('policy-form-desc').value = '';
+    document.getElementById('policy-form-default').checked = false;
+    document.getElementById('policy-form-heartbeat').value = 30;
+    document.getElementById('policy-form-inventory').value = 3600;
+    document.getElementById('policy-form-patch-scan').value = 14400;
+    document.getElementById('policy-form-vuln-scan').value = 14400;
+    document.getElementById('policy-form-cpu').value = 10;
+    document.getElementById('policy-form-ram').value = 150;
+    document.getElementById('policy-form-spool-disk').value = 500;
+    document.getElementById('policy-form-spool-age').value = 72;
+    document.getElementById('policy-form-log-enabled').checked = true;
+    document.getElementById('policy-form-channels').value = 'System, Application, Security';
+    document.getElementById('policy-form-channel').value = 'stable';
+
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const titleEl = document.getElementById('modal-policy-title');
+    if (titleEl) titleEl.textContent = t('btn_new_policy');
+
+    const modal = document.getElementById('modal-endpoint-policy');
+    if (modal) modal.style.display = 'flex';
+}
+
+function openEditPolicyModal(policyId) {
+    const policy = currentEndpointPolicies.find(p => p.id === policyId);
+    if (!policy) return;
+
+    const cfg = policy.policy_config || (typeof policy.config === 'object' ? policy.config : {});
+
+    document.getElementById('policy-form-id').value = policy.id;
+    document.getElementById('policy-form-name').value = policy.name || '';
+    document.getElementById('policy-form-desc').value = policy.description || '';
+    document.getElementById('policy-form-default').checked = !!policy.is_default;
+    document.getElementById('policy-form-heartbeat').value = cfg.heartbeat_interval_sec || 30;
+    document.getElementById('policy-form-inventory').value = cfg.inventory_interval_sec || 3600;
+    document.getElementById('policy-form-patch-scan').value = cfg.patch_scan_interval_sec || 14400;
+    document.getElementById('policy-form-vuln-scan').value = cfg.vuln_scan_interval_sec || 14400;
+    document.getElementById('policy-form-cpu').value = cfg.max_cpu_percent || 10;
+    document.getElementById('policy-form-ram').value = cfg.max_ram_mb || 150;
+    document.getElementById('policy-form-spool-disk').value = cfg.spool_max_disk_mb || 500;
+    document.getElementById('policy-form-spool-age').value = cfg.spool_max_age_hours || 72;
+    document.getElementById('policy-form-log-enabled').checked = cfg.log_collection_enabled !== false;
+    document.getElementById('policy-form-channels').value = (cfg.event_channels && cfg.event_channels.length > 0) ? cfg.event_channels.join(', ') : 'System, Application, Security';
+    document.getElementById('policy-form-channel').value = cfg.update_channel || 'stable';
+
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const titleEl = document.getElementById('modal-policy-title');
+    if (titleEl) titleEl.textContent = `${t('modal_policy_title')} (r${policy.revision})`;
+
+    const modal = document.getElementById('modal-endpoint-policy');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closePolicyModal() {
+    const modal = document.getElementById('modal-endpoint-policy');
+    if (modal) modal.style.display = 'none';
+}
+
+async function savePolicyModal() {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const id = document.getElementById('policy-form-id').value;
+    const name = document.getElementById('policy-form-name').value.trim();
+    if (!name) {
+        alert(t('lbl_policy_name'));
+        return;
+    }
+
+    const desc = document.getElementById('policy-form-desc').value.trim();
+    const isDefault = document.getElementById('policy-form-default').checked;
+
+    const channelsRaw = document.getElementById('policy-form-channels').value;
+    const channels = channelsRaw.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+    const payload = {
+        name: name,
+        description: desc,
+        is_default: isDefault,
+        config: {
+            heartbeat_interval_sec: parseInt(document.getElementById('policy-form-heartbeat').value) || 30,
+            inventory_interval_sec: parseInt(document.getElementById('policy-form-inventory').value) || 3600,
+            patch_scan_interval_sec: parseInt(document.getElementById('policy-form-patch-scan').value) || 14400,
+            vuln_scan_interval_sec: parseInt(document.getElementById('policy-form-vuln-scan').value) || 14400,
+            max_cpu_percent: parseInt(document.getElementById('policy-form-cpu').value) || 10,
+            max_ram_mb: parseInt(document.getElementById('policy-form-ram').value) || 150,
+            spool_max_disk_mb: parseInt(document.getElementById('policy-form-spool-disk').value) || 500,
+            spool_max_age_hours: parseInt(document.getElementById('policy-form-spool-age').value) || 72,
+            log_collection_enabled: document.getElementById('policy-form-log-enabled').checked,
+            event_channels: channels,
+            update_channel: document.getElementById('policy-form-channel').value || 'stable'
+        }
+    };
+
+    try {
+        const url = id ? `/api/v1/endpoint/policies/${encodeURIComponent(id)}` : '/api/v1/endpoint/policies';
+        const method = id ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'İlke kaydedilemedi');
+        }
+
+        closePolicyModal();
+        await loadEndpointPolicies();
+        if (typeof showNotification === 'function') {
+            showNotification(t('msg_policy_saved'), 'success');
+        }
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+async function deleteEndpointPolicy(policyId, policyName) {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    if (!confirm(`${t('confirm_delete_policy')}\n\n"${policyName}"`)) return;
+
+    try {
+        const res = await fetch(`/api/v1/endpoint/policies/${encodeURIComponent(policyId)}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'İlke silinemedi');
+        }
+        await loadEndpointPolicies();
+        if (typeof showNotification === 'function') {
+            showNotification(t('msg_policy_deleted'), 'success');
+        }
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+async function openAssignPolicyModal(agentUUID, hostname, currentPolicyId) {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    document.getElementById('assign-agent-uuid').value = agentUUID;
+    const nameEl = document.getElementById('modal-assign-agent-name');
+    if (nameEl) nameEl.textContent = `${t('lbl_endpoint_single')}: ${hostname} (${agentUUID})`;
+
+    const select = document.getElementById('assign-policy-select');
+    if (!select) return;
+
+    // Fetch policies if not loaded
+    if (currentEndpointPolicies.length === 0) {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/policies?tenant=${encodeURIComponent(tenant)}`);
+        if (res.ok) {
+            const data = await res.json();
+            currentEndpointPolicies = data.policies || [];
+        }
+    }
+
+    select.innerHTML = currentEndpointPolicies.map(p => {
+        const isSelected = (p.id === currentPolicyId || (p.is_default && !currentPolicyId));
+        return `<option value="${p.id}" ${isSelected ? 'selected' : ''}>${escapeHtml(p.name)} ${p.is_default ? `(${t('badge_default_policy')})` : ''} - r${p.revision}</option>`;
+    }).join('');
+
+    const modal = document.getElementById('modal-endpoint-assign-policy');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeAssignPolicyModal() {
+    const modal = document.getElementById('modal-endpoint-assign-policy');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitAssignPolicy() {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const agentUUID = document.getElementById('assign-agent-uuid').value;
+    const policyID = document.getElementById('assign-policy-select').value;
+
+    if (!agentUUID || !policyID) return;
+
+    try {
+        const res = await fetch('/api/v1/endpoint/policies/assign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agent_uuid: agentUUID, policy_id: policyID })
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'İlke atanamadı');
+        }
+
+        closeAssignPolicyModal();
+        if (typeof showNotification === 'function') {
+            showNotification(t('msg_policy_assigned'), 'success');
+        }
+        if (typeof loadEndpointAgents === 'function') loadEndpointAgents();
+        if (typeof loadEndpointPolicies === 'function') loadEndpointPolicies();
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+// Window exports
+window.loadEndpointPolicies = loadEndpointPolicies;
+window.openCreatePolicyModal = openCreatePolicyModal;
+window.openEditPolicyModal = openEditPolicyModal;
+window.closePolicyModal = closePolicyModal;
+window.savePolicyModal = savePolicyModal;
+window.deleteEndpointPolicy = deleteEndpointPolicy;
+window.openAssignPolicyModal = openAssignPolicyModal;
+window.closeAssignPolicyModal = closeAssignPolicyModal;
+window.submitAssignPolicy = submitAssignPolicy;
 
 
 

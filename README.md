@@ -265,6 +265,22 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.8.6** (Centralized Endpoint Policies & Real-Time Dynamic Heartbeat Push) / **Agent v0.1.3**:
+  - **Centralized Endpoint Policies Console (Phase J.1)**:
+    - Interactive policy management console (`#endpoint-sec-policies`) allowing administrators to define, edit, assign, and delete endpoint policies.
+    - Summary telemetry cards tracking total policies, active default policies, governed fleet counts, and live zero-downtime push synchronization.
+    - Granular controls over heartbeat intervals (5s - 3600s), software inventory frequencies, patch/vulnerability scan schedules, and update channels (`stable`, `beta`, `development`).
+  - **Hardware Resource Throttling & Spool Queue Management**:
+    - Centralized controls over maximum agent CPU utilization % and RAM memory ceiling (MB).
+    - Configurable offline spool disk buffer limits (MB) and retention age (hours) to protect host storage during network disconnections.
+    - Dynamic event log channel filtering (e.g. `System`, `Application`, `Security` on Windows; `syslog`, `auth`, `kern` on Linux).
+  - **Real-Time Dynamic Heartbeat Push**:
+    - The server calculates policy revision differentials during agent heartbeats and injects updated configurations directly into the response payload (`AgentHeartbeatResponse.Policy`).
+    - The native agent daemon dynamically updates its operational parameters and resets internal tickers on-the-fly (`ticker.Reset`), achieving instant policy application without service restarts.
+  - **One-Click Fleet Policy Assignment**:
+    - Quick "📋 Assign Policy" action directly in the Agents table to quickly switch policies for individual endpoints or entire fleets.
+    - Multi-tenant MSSP data isolation preserving strict tenant security perimeters.
+
 - **v1.8.5** (Endpoint Hardware Telemetry, Dynamic Health Scoring, Patch Management & Seamless In-Place Auto-Updater) / **Agent v0.1.3** (Kernel Hardware Probers & Windows Service In-Place Upgrade Engine):
   - **Endpoint Hardware Utilization & Dynamic Health Scoring**:
     - Native kernel-level hardware telemetry probers across Windows (`GlobalMemoryStatusEx`, `GetDiskFreeSpaceExW`, `GetSystemTimes`), Linux (`/proc/meminfo`, `/proc/stat`, `Statfs`), and macOS (`sysctl`, `Statfs`).

@@ -254,6 +254,22 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.8.6** (Merkezi Uç Nokta İlkeleri & Gerçek Zamanlı Dinamik Kalp Atışı Dağıtımı) / **Agent v0.1.3**:
+  - **Merkezi Uç Nokta İlkeleri Konsolu (Phase J.1)**:
+    - Yöneticilerin filo genelinde ilkeler tanımlamasını, düzenlemesini, atamasını ve silmesini sağlayan interaktif ilke yönetim konsolu (`#endpoint-sec-policies`).
+    - Toplam ilke sayısı, aktif varsayılan ilke, yönetilen uç nokta adetleri ve sıfır kesintiyle anında dağıtım telemetri kartları.
+    - Kalp atışı aralığı (5sn - 3600sn), yazılım envanteri sıklığı, yama ve zafiyet tarama periyotları ve güncelleme kanalları (`stable`, `beta`, `development`) üzerinde hassas denetim.
+  - **Donanım Kaynak Kısıtlamaları (Throttling) & Disk Tampon Yönetimi**:
+    - Ajanın maksimum CPU kullanım yüzdesi (%5 - %100) ve RAM bellek tavanı (50 MB - 4096 MB) üzerinde merkezi kısıtlama kuralları.
+    - Ağ veya WAN kesintilerinde uç nokta diskini koruyan çevrimdışı disk tamponu boyutu (MB) ve saklama süresi (saat) limitleri.
+    - Dinamik olay günlüğü kanal filtrelemesi (Windows: `System`, `Application`, `Security`; Linux: `syslog`, `auth`, `kern`).
+  - **Canlı Kalp Atışı Üzerinden Sıfır Kesintili Dağıtım (Dynamic Push)**:
+    - Sunucu, her heartbeat sırasında ilke revizyon farklarını tespit ederek güncel yapılandırmayı yanıt gövdesinde doğrudan iletir (`AgentHeartbeatResponse.Policy`).
+    - Ajan süreçleri, yeni ilkeyi aldığı anda iç zamanlayıcılarını çalışma anında günceller (`ticker.Reset`) ve servis kesintisi olmaksızın anında yeni kurallara geçer.
+  - **Tek Tıkla Ajan İlke Ataması**:
+    - Ajanlar tablosundaki hızlı "📋 İlke Değiştir" eylemi ile uç noktaların ilkelerini tek tıkla güncelleme imkanı.
+    - MSSP kiracı izolasyonu ile çoklu müşteri ortamlarında tam veri güvenliği.
+
 - **v1.8.5** (Uç Nokta Donanım Telemetrisi, Dinamik Sağlık Skoru, Yama Yönetimi & Kesintisiz Yerinde Otomatik Güncelleme) / **Agent v0.1.3** (Çekirdek Düzeyi Donanım Algılayıcıları & Windows Servis Yerinde Yükseltme Motoru):
   - **Uç Nokta Donanım Kullanımı ve Dinamik Cihaz Sağlık Skoru**:
     - Windows (`GlobalMemoryStatusEx`, `GetDiskFreeSpaceExW`, `GetSystemTimes`), Linux (`/proc/meminfo`, `/proc/stat`, `Statfs`) ve macOS (`sysctl`, `Statfs`) üzerinde çalışan yerel donanım telemetri algılayıcıları.
