@@ -9,6 +9,7 @@ import (
 
 // Config represents local agent configuration
 type Config struct {
+	ConfigPath      string `json:"-"`
 	ServerURL       string `json:"server_url"`
 	EnrollmentToken string `json:"enrollment_token,omitempty"`
 	DataDir         string `json:"data_dir"`
@@ -40,6 +41,7 @@ func DefaultConfig() *Config {
 // LoadConfig loads from json file or returns defaults
 func LoadConfig(path string) (*Config, error) {
 	cfg := DefaultConfig()
+	cfg.ConfigPath = path
 
 	if path != "" {
 		if data, err := os.ReadFile(path); err == nil {

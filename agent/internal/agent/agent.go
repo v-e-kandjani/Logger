@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/syslog-platform/logger/agent/internal/config"
@@ -50,11 +51,32 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// 1. Enrollment check
 	if a.identity.AuthToken == "" {
-		if a.cfg.EnrollmentToken == "" {
-			return fmt.Errorf("agent is unenrolled and no enrollment token was provided")
-		}
-		if err := a.enroll(ctx); err != nil {
-			return fmt.Errorf("enrollment failed: %w", err)
+		for {
+			token := strings.TrimSpace(a.cfg.EnrollmentToken)
+			if token == "" || token == "<TOKEN>" {
+				log.Println("[LOGGER Agent] Waiting for valid enrollment token in config.json... (Retrying in 15s)")
+			} else {
+				if err := a.enroll(ctx); err == nil {
+					log.Printf("[LOGGER Agent] Successfully enrolled! (Tenant: %s)", a.identity.TenantSlug)
+					break
+				} else {
+					log.Printf("[LOGGER Agent] Enrollment attempt failed: %v. Retrying in 15s...", err)
+				}
+			}
+
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(15 * time.Second):
+				if a.cfg.ConfigPath != "" {
+					if refreshedCfg, err := config.LoadConfig(a.cfg.ConfigPath); err == nil {
+						if refreshedCfg.EnrollmentToken != "" && refreshedCfg.EnrollmentToken != "<TOKEN>" {
+							a.cfg.EnrollmentToken = refreshedCfg.EnrollmentToken
+							a.cfg.ServerURL = refreshedCfg.ServerURL
+						}
+					}
+				}
+			}
 		}
 	} else {
 		log.Printf("[LOGGER Agent] Authenticated with existing credentials (Tenant: %s)", a.identity.TenantSlug)
