@@ -8,9 +8,9 @@ import (
 const (
 	// DefaultAgentVersion represents the standalone semantic version of the native LOGGER Agent daemon.
 	// This versioning is intentionally decoupled from the LogSeal platform version.
-	DefaultAgentVersion = "v0.1.2"
+	DefaultAgentVersion = "v0.1.3"
 	DefaultBuildDate    = "2026-10-22"
-	DefaultCommitSHA    = "fe8463f"
+	DefaultCommitSHA    = "685e465"
 )
 
 var (

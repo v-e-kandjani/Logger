@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"runtime"
 	"strings"
 	"time"
 
@@ -13,16 +12,18 @@ import (
 	"github.com/syslog-platform/logger/agent/internal/config"
 	"github.com/syslog-platform/logger/agent/internal/identity"
 	"github.com/syslog-platform/logger/agent/internal/transport"
+	"github.com/syslog-platform/logger/agent/internal/updater"
 	"github.com/syslog-platform/logger/agent/internal/version"
 	"github.com/syslog-platform/logger/internal/models"
 )
 
 // Agent represents the running LOGGER Agent daemon instance
 type Agent struct {
-	cfg       *config.Config
-	identity  *identity.Info
-	client    *transport.Client
-	policyRev int
+	cfg         *config.Config
+	identity    *identity.Info
+	client      *transport.Client
+	policyRev   int
+	isUpgrading bool
 }
 
 // NewAgent initializes the agent with configuration and identity
@@ -182,8 +183,8 @@ func (a *Agent) enroll(ctx context.Context) error {
 }
 
 func (a *Agent) sendHeartbeat(ctx context.Context) {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
+	metrics := collector.GetHostHardwareStats()
+	rebootReq := collector.IsRebootRequired()
 
 	req := models.AgentHeartbeatRequest{
 		AgentUUID:      a.identity.AgentUUID,
@@ -193,14 +194,8 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 		PolicyRevision: a.policyRev,
 		IPAddress:      a.identity.IPAddress,
 		MACAddress:     a.identity.MACAddress,
-		RebootRequired: false,
-		Metrics: models.AgentResourceMetrics{
-			CPUPercent:     0.5,
-			RAMRSSBytes:    m.Sys,
-			SpoolDiskBytes: 0,
-			QueueDepth:     0,
-			EPSOut:         0.0,
-		},
+		RebootRequired: rebootReq,
+		Metrics:        metrics,
 	}
 
 	var resp models.AgentHeartbeatResponse
@@ -213,5 +208,18 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 		log.Printf("[LOGGER Agent] Server reports policy update available (Rev %d -> %d)",
 			a.policyRev, resp.CurrentPolicyRevision)
 		a.policyRev = resp.CurrentPolicyRevision
+	}
+
+	// Auto-Update check: server offers newer version
+	if resp.UpgradeAvailable && resp.TargetVersion != "" && resp.TargetVersion != version.Version && !a.isUpgrading {
+		a.isUpgrading = true
+		go func() {
+			log.Printf("[LOGGER Agent] Server offered auto-upgrade to %s (Current: %s). Starting download...",
+				resp.TargetVersion, version.Version)
+			if err := updater.ApplyUpgrade(context.Background(), a.cfg.ServerURL, resp.DownloadURL, resp.TargetVersion); err != nil {
+				log.Printf("[LOGGER Auto-Updater] Upgrade failed: %v", err)
+				a.isUpgrading = false
+			}
+		}()
 	}
 }

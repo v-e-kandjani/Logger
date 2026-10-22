@@ -595,3 +595,116 @@ func (db *DB) ListEndpointSoftware(ctx context.Context, tenantSlug, search strin
 
 	return list, total, nil
 }
+
+// ListEndpointPatches returns patches joining agent details
+func (db *DB) ListEndpointPatches(ctx context.Context, tenantSlug, status, search string, limit, offset int) ([]models.EndpointPatchItem, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	whereConditions := []string{"($1 = '' OR $1 = 'all' OR p.tenant_slug = $1)"}
+	args := []interface{}{tenantSlug}
+	argIdx := 2
+
+	if status != "" {
+		whereConditions = append(whereConditions, fmt.Sprintf("p.status = $%d", argIdx))
+		args = append(args, status)
+		argIdx++
+	}
+
+	if search != "" {
+		whereConditions = append(whereConditions, fmt.Sprintf("(p.patch_id ILIKE '%%' || $%d || '%%' OR p.title ILIKE '%%' || $%d || '%%' OR a.hostname ILIKE '%%' || $%d || '%%')", argIdx, argIdx, argIdx))
+		args = append(args, search)
+		argIdx++
+	}
+
+	whereClause := strings.Join(whereConditions, " AND ")
+
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM endpoint_patches_current p
+		JOIN endpoint_agents a ON a.id = p.agent_id
+		WHERE %s
+	`, whereClause)
+
+	var total int
+	if err := db.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			p.id, p.agent_id, a.hostname, a.ip_address, a.os_type,
+			p.patch_id, p.title, COALESCE(p.vendor, ''), COALESCE(p.kb_id, ''),
+			COALESCE(p.severity, 'UNKNOWN'), COALESCE(p.cve_ids, '{}'),
+			p.requires_reboot, p.status, p.installed_at, p.detected_at
+		FROM endpoint_patches_current p
+		JOIN endpoint_agents a ON a.id = p.agent_id
+		WHERE %s
+		ORDER BY p.detected_at DESC, p.title ASC
+		LIMIT $%d OFFSET $%d
+	`, whereClause, argIdx, argIdx+1)
+
+	args = append(args, limit, offset)
+
+	rows, err := db.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	list := []models.EndpointPatchItem{}
+	for rows.Next() {
+		var item models.EndpointPatchItem
+		var cveIDs []string
+		err := rows.Scan(
+			&item.ID, &item.AgentID, &item.AgentHostname, &item.AgentIP, &item.AgentOS,
+			&item.PatchID, &item.Title, &item.Vendor, &item.KBID,
+			&item.Severity, &cveIDs,
+			&item.RequiresReboot, &item.Status, &item.InstalledAt, &item.DetectedAt,
+		)
+		if err == nil {
+			item.CVEIDs = cveIDs
+			list = append(list, item)
+		}
+	}
+
+	return list, total, nil
+}
+
+// GetPatchComplianceSummary aggregates fleet patch compliance statistics
+func (db *DB) GetPatchComplianceSummary(ctx context.Context, tenantSlug string) (*models.PatchComplianceSummary, error) {
+	query := `
+		SELECT 
+			COUNT(*) as total_patches,
+			COALESCE(COUNT(*) FILTER (WHERE p.status = 'installed'), 0) as installed_count,
+			COALESCE(COUNT(*) FILTER (WHERE p.status = 'missing'), 0) as missing_count,
+			COALESCE(COUNT(*) FILTER (WHERE p.requires_reboot = true), 0) as reboot_count,
+			COALESCE(COUNT(DISTINCT p.agent_id) FILTER (WHERE p.requires_reboot = true), 0) as agents_need_reboot
+		FROM endpoint_patches_current p
+		WHERE ($1 = '' OR $1 = 'all' OR p.tenant_slug = $1)
+	`
+
+	var total, installed, missing, reboots, endpointsNeedReboot int
+	err := db.pool.QueryRow(ctx, query, tenantSlug).Scan(
+		&total, &installed, &missing, &reboots, &endpointsNeedReboot,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	compliancePct := 100.0
+	if total > 0 {
+		compliancePct = float64(installed) / float64(total) * 100.0
+	}
+
+	return &models.PatchComplianceSummary{
+		CompliancePct:       compliancePct,
+		TotalPatches:        total,
+		InstalledCount:      installed,
+		MissingCount:        missing,
+		PendingRebootsCount: reboots,
+		EndpointsNeedReboot: endpointsNeedReboot,
+	}, nil
+}
+

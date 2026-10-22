@@ -8096,6 +8096,8 @@ function switchEndpointSubSection(targetId) {
     } else if (targetId === 'endpoint-sec-vulnerabilities') {
         loadCVEStatus();
         loadEndpointVulnerabilities();
+    } else if (targetId === 'endpoint-sec-patches') {
+        loadEndpointPatches();
     }
 }
 
@@ -8182,7 +8184,7 @@ async function loadEndpointAgents() {
         const agents = data.agents || [];
 
         if (agents.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 32px; color: var(--text-muted);">Kayıtlı uç nokta ajanı bulunamadı. "Yeni Kurulum Belirteci" oluşturarak bir ajan kurabilirsiniz.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 32px; color: var(--text-muted);">Kayıtlı uç nokta ajanı bulunamadı. "Yeni Kurulum Belirteci" oluşturarak bir ajan kurabilirsiniz.</td></tr>`;
             return;
         }
 
@@ -8190,6 +8192,41 @@ async function loadEndpointAgents() {
             const osBadge = renderOSBadge(a.os_type, a.os_name);
             const statusBadge = renderAgentStatusBadge(a.status, a.last_seen);
             const relativeTime = formatRelativeTime(a.last_seen);
+
+            // Parse Hardware Telemetry
+            let resUsage = {};
+            try {
+                if (typeof a.resource_usage === 'string') resUsage = JSON.parse(a.resource_usage);
+                else if (a.resource_usage) resUsage = a.resource_usage;
+            } catch(e) {}
+
+            const cpuPct = (resUsage.cpu_percent != null) ? resUsage.cpu_percent.toFixed(1) : '0.0';
+            const ramPct = (resUsage.ram_percent != null) ? resUsage.ram_percent.toFixed(0) : '0';
+            const diskPct = (resUsage.disk_percent != null) ? resUsage.disk_percent.toFixed(0) : '0';
+
+            // Health Score badge
+            const health = (a.health_score != null) ? a.health_score : 100;
+            let healthBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);">${health} / 100 🟢</span>`;
+            if (health < 60) {
+                healthBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; font-weight: 700; border: 1px solid rgba(239, 68, 68, 0.3);">${health} / 100 🔴</span>`;
+            } else if (health < 80) {
+                healthBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-weight: 700; border: 1px solid rgba(245, 158, 11, 0.3);">${health} / 100 🟡</span>`;
+            }
+
+            // Hardware telemetry pills
+            const hwPills = `
+                <div style="font-size: 11px; display: flex; flex-direction: column; gap: 2px;">
+                    <div>CPU: <strong style="color: var(--accent);">${cpuPct}%</strong></div>
+                    <div style="color: var(--text-muted);">RAM: <strong style="color: #3b82f6;">${ramPct}%</strong> | Disk: <strong style="color: #10b981;">${diskPct}%</strong></div>
+                </div>
+            `;
+
+            // Version badge
+            const isLatest = (a.agent_version === 'v0.1.3' || a.agent_version === '0.1.3');
+            const verBadge = isLatest
+                ? `<span class="badge badge-success" style="font-family: var(--font-mono); font-size: 10px;">${escapeHtml(a.agent_version || 'v0.1.3')}</span>`
+                : `<span class="badge badge-warning" style="font-family: var(--font-mono); font-size: 10px;" title="Otomatik Güncelleme Bekliyor">${escapeHtml(a.agent_version || 'v0.1.2')} ⚡ Güncellenecek</span>`;
+
             const critVulnBadge = a.critical_vulns_count > 0 
                 ? `<span class="badge badge-danger" style="margin-right: 4px;">${a.critical_vulns_count} Crit</span>` 
                 : '';
@@ -8207,14 +8244,12 @@ async function loadEndpointAgents() {
                 <tr>
                     <td>
                         <div style="font-weight: 600;">${escapeHtml(a.hostname || 'Bilinmiyor')}</div>
-                        <div style="font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(a.agent_uuid)}</div>
-                    </td>
-                    <td>
-                        <div>${escapeHtml(a.ip_address || '-')}</div>
-                        <div style="font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(a.mac_address || '-')}</div>
+                        <div style="font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(a.ip_address || '-')} • ${escapeHtml(a.agent_uuid)}</div>
                     </td>
                     <td>${osBadge}</td>
-                    <td><span class="badge badge-secondary" style="font-family: var(--font-mono); font-size: 10.5px;">v${escapeHtml(a.agent_version || '1.0.0')}</span></td>
+                    <td>${verBadge}</td>
+                    <td>${healthBadge}</td>
+                    <td>${hwPills}</td>
                     <td>${statusBadge}</td>
                     <td>${critVulnBadge}${totalVulnBadge}</td>
                     <td>${patchBadge}${rebootBadge}</td>
@@ -8226,7 +8261,7 @@ async function loadEndpointAgents() {
             `;
         }).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 24px; color: var(--danger);">${escapeHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 24px; color: var(--danger);">${escapeHtml(err.message)}</td></tr>`;
     }
 }
 
@@ -8505,20 +8540,67 @@ async function inspectEndpointAgent(agentId) {
         document.getElementById('agent-detail-uuid').textContent = `UUID: ${agent.agent_uuid} • Tenant: ${agent.tenant_slug}`;
         document.getElementById('detail-card-os').innerHTML = renderOSBadge(agent.os_type, agent.os_name);
         document.getElementById('detail-card-net').textContent = `${agent.ip_address || '-'} / ${agent.mac_address || '-'}`;
-        document.getElementById('detail-card-ver').textContent = `v${agent.agent_version || '1.0.0'} (${agent.architecture})`;
-        document.getElementById('detail-card-health').textContent = `${agent.health_score || 100} / 100`;
+        document.getElementById('detail-card-ver').textContent = `v${agent.agent_version || '0.1.3'} (${agent.architecture})`;
+        
+        const health = agent.health_score != null ? agent.health_score : 100;
+        document.getElementById('detail-card-health').textContent = `${health} / 100`;
+        document.getElementById('detail-card-health').style.color = (health >= 80) ? '#10b981' : (health >= 60 ? '#f59e0b' : '#ef4444');
 
         document.getElementById('detail-card-policy').textContent = agent.policy_name || 'Default Balanced Policy';
         document.getElementById('detail-card-policy-rev').textContent = `Rev ${agent.policy_revision || 1}`;
-        document.getElementById('detail-card-reboot').textContent = agent.reboot_required ? '⚠️ Yeniden Başlatma Bekliyor' : 'Gerekmiyor';
+        document.getElementById('detail-card-reboot').innerHTML = agent.reboot_required 
+            ? '<span class="badge badge-danger">⚠️ Yeniden Başlatma Bekliyor</span>' 
+            : '<span style="color: var(--success);">Gerekmiyor</span>';
         document.getElementById('detail-card-last-seen').textContent = formatRelativeTime(agent.last_seen);
 
-        // Resource usage
+        // Hardware Resource usage
+        let resObj = {};
         if (agent.resource_usage) {
-            let resObj = (typeof agent.resource_usage === 'string') ? JSON.parse(agent.resource_usage) : agent.resource_usage;
-            document.getElementById('detail-card-cpu').textContent = `${(resObj.cpu_percent || 0.5).toFixed(1)}%`;
-            document.getElementById('detail-card-ram').textContent = formatBytes(resObj.ram_rss_bytes || 0);
+            resObj = (typeof agent.resource_usage === 'string') ? JSON.parse(agent.resource_usage) : agent.resource_usage;
         }
+
+        const cpuPct = (resObj.cpu_percent != null) ? resObj.cpu_percent.toFixed(1) : '0.0';
+        document.getElementById('detail-card-cpu-pct').textContent = `${cpuPct}%`;
+        const cpuBar = document.getElementById('detail-card-cpu-bar');
+        if (cpuBar) {
+            cpuBar.style.width = `${Math.min(parseFloat(cpuPct), 100)}%`;
+            cpuBar.style.background = (parseFloat(cpuPct) > 85) ? '#ef4444' : ((parseFloat(cpuPct) > 70) ? '#f59e0b' : 'var(--accent)');
+        }
+
+        const ramPct = (resObj.ram_percent != null) ? resObj.ram_percent.toFixed(0) : '0';
+        document.getElementById('detail-card-ram-pct').textContent = `${ramPct}%`;
+        const ramBar = document.getElementById('detail-card-ram-bar');
+        if (ramBar) {
+            ramBar.style.width = `${Math.min(parseFloat(ramPct), 100)}%`;
+            ramBar.style.background = (parseFloat(ramPct) > 85) ? '#ef4444' : '#3b82f6';
+        }
+        if (resObj.ram_total_bytes > 0) {
+            document.getElementById('detail-card-ram-details').textContent = `${formatBytes(resObj.ram_used_bytes)} / ${formatBytes(resObj.ram_total_bytes)}`;
+        } else {
+            document.getElementById('detail-card-ram-details').textContent = formatBytes(resObj.ram_rss_bytes || 0);
+        }
+
+        const diskPct = (resObj.disk_percent != null) ? resObj.disk_percent.toFixed(0) : '0';
+        document.getElementById('detail-card-disk-pct').textContent = `${diskPct}%`;
+        const diskBar = document.getElementById('detail-card-disk-bar');
+        if (diskBar) {
+            diskBar.style.width = `${Math.min(parseFloat(diskPct), 100)}%`;
+            diskBar.style.background = (parseFloat(diskPct) > 85) ? '#ef4444' : '#10b981';
+        }
+        if (resObj.disk_total_bytes > 0) {
+            document.getElementById('detail-card-disk-details').textContent = `${formatBytes(resObj.disk_used_bytes)} / ${formatBytes(resObj.disk_total_bytes)}`;
+        } else {
+            document.getElementById('detail-card-disk-details').textContent = '-';
+        }
+
+        if (resObj.uptime_seconds > 0) {
+            const days = Math.floor(resObj.uptime_seconds / 86400);
+            const hrs = Math.floor((resObj.uptime_seconds % 86400) / 3600);
+            document.getElementById('detail-card-uptime').textContent = `${days} gün, ${hrs} saat`;
+        } else {
+            document.getElementById('detail-card-uptime').textContent = '-';
+        }
+        document.getElementById('detail-card-ram').textContent = formatBytes(resObj.ram_rss_bytes || 0);
 
         modal.classList.add('active');
         modal.style.display = 'flex';
@@ -8830,6 +8912,139 @@ window.loadCVEStatus = loadCVEStatus;
 window.saveCVESchedule = saveCVESchedule;
 window.triggerCVESync = triggerCVESync;
 window.loadEndpointVulnerabilities = loadEndpointVulnerabilities;
+window.loadEndpointPatches = loadEndpointPatches;
+window.triggerPatchScan = triggerPatchScan;
+window.triggerAgentUpgradeAll = triggerAgentUpgradeAll;
+
+// --- Patch Management (Phase G) ---
+async function loadEndpointPatches() {
+    const tbody = document.getElementById('ep-patches-tbody');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const search = document.getElementById('ep-patches-search')?.value || '';
+        const status = document.getElementById('ep-patches-status-filter')?.value || '';
+
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">Yama kayıtları yükleniyor...</td></tr>`;
+
+        let url = `/api/v1/endpoint/patches?tenant=${encodeURIComponent(tenant)}&search=${encodeURIComponent(search)}&limit=100`;
+        if (status) url += `&status=${encodeURIComponent(status)}`;
+
+        const res = await fetch(url);
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--accent-red); padding: 24px;">Yama verileri alınamadı (${res.status}).</td></tr>`;
+            return;
+        }
+
+        const data = await res.json();
+        const patches = data.patches || [];
+        const summary = data.summary || {};
+
+        // Update KPI Cards
+        const compEl = document.getElementById('patch-stat-compliance');
+        if (compEl) {
+            const pct = (summary.compliance_pct != null) ? summary.compliance_pct.toFixed(1) : '100.0';
+            compEl.textContent = `%${pct}`;
+            compEl.style.color = (parseFloat(pct) >= 90) ? 'var(--success)' : (parseFloat(pct) >= 70 ? '#f59e0b' : '#ef4444');
+        }
+
+        const totalEl = document.getElementById('patch-stat-total');
+        if (totalEl) totalEl.textContent = (summary.total_patches || patches.length).toLocaleString();
+
+        const instEl = document.getElementById('patch-stat-installed');
+        if (instEl) instEl.textContent = (summary.installed_count || 0).toLocaleString();
+
+        const missEl = document.getElementById('patch-stat-missing');
+        if (missEl) missEl.textContent = (summary.missing_count || 0).toLocaleString();
+
+        const rebootEl = document.getElementById('patch-stat-reboot');
+        if (rebootEl) rebootEl.textContent = (summary.endpoints_need_reboot || 0).toLocaleString();
+
+        const countEl = document.getElementById('ep-patches-total-count');
+        if (countEl) countEl.textContent = `${(data.total || patches.length).toLocaleString()} Yama Kaydı`;
+
+        if (patches.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 28px;">Kayıtlı yama bulunmuyor. Uç noktalardan yama envanteri toplanması bekleniyor.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = patches.map(p => {
+            const isInstalled = (p.status === 'installed');
+            const statusBadge = isInstalled
+                ? `<span class="badge badge-success">🟢 Yüklü</span>`
+                : (p.status === 'pending_reboot' 
+                    ? `<span class="badge badge-danger">🔄 Reboot Bekliyor</span>` 
+                    : `<span class="badge badge-warning">🟠 Eksik</span>`);
+
+            const rebootBadge = p.requires_reboot
+                ? `<span class="badge badge-danger" style="font-weight: 700;">Gerekiyor</span>`
+                : `<span style="color: var(--text-muted); font-size: 11px;">Hayır</span>`;
+
+            const cves = (p.cve_ids && p.cve_ids.length > 0)
+                ? p.cve_ids.map(c => `<span style="font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); margin-right: 4px;">${escapeHtml(c)}</span>`).join('')
+                : `<span style="color: var(--text-muted);">-</span>`;
+
+            return `
+                <tr>
+                    <td>
+                        <div style="font-weight: 600;">${escapeHtml(p.agent_hostname || '-')}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(p.agent_ip || '')}</div>
+                    </td>
+                    <td>
+                        <strong style="font-family: var(--font-mono); color: var(--accent);">${escapeHtml(p.kb_id || p.patch_id)}</strong>
+                    </td>
+                    <td style="max-width: 320px; font-size: 12px; line-height: 1.4;">
+                        <div>${escapeHtml(p.title || '-')}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(p.vendor || '')}</div>
+                    </td>
+                    <td>
+                        <span class="badge" style="background: rgba(148, 163, 184, 0.2);">${escapeHtml(p.severity || 'UNKNOWN')}</span>
+                    </td>
+                    <td>${cves}</td>
+                    <td>${statusBadge}</td>
+                    <td>${rebootBadge}</td>
+                    <td>
+                        <span style="font-size: 11.5px; color: var(--text-muted);">
+                            ${p.installed_at ? formatDateTime(p.installed_at) : (p.detected_at ? formatDateTime(p.detected_at) : '-')}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('Error loading endpoint patches:', err);
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--accent-red); padding: 24px;">Bağlantı hatası: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+async function triggerPatchScan() {
+    try {
+        const res = await fetch('/api/v1/endpoint/patches/scan', { method: 'POST' });
+        if (!res.ok) throw new Error('Yama taraması başlatılamadı');
+        showToast('✓ Uç noktalara anlık yama tarama emri iletildi.', 'success');
+        loadEndpointPatches();
+    } catch (err) {
+        showToast('Hata: ' + err.message, 'error');
+    }
+}
+
+async function triggerAgentUpgradeAll() {
+    if (!confirm('Tüm bağlı uç nokta ajanları en son sürüme (v0.1.3) otomatik olarak güncellenecek. Devam etmek istiyor musunuz?')) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/v1/endpoint/agents/upgrade-all', { method: 'POST' });
+        if (!res.ok) throw new Error('Ajan güncellemesi tetiklenemedi');
+        const data = await res.json();
+        showToast('🚀 ' + (data.message || 'Tüm ajanlar için otomatik güncelleme emri iletildi.'), 'success');
+        loadEndpointAgents();
+    } catch (err) {
+        showToast('Hata: ' + err.message, 'error');
+    }
+}
+
 
 // --- Endpoint Software Inventory ---
 async function loadEndpointInventory() {

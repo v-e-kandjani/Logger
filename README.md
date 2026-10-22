@@ -265,6 +265,21 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.8.5** (Endpoint Hardware Telemetry, Dynamic Health Scoring, Patch Management & Seamless In-Place Auto-Updater) / **Agent v0.1.3** (Kernel Hardware Probers & Windows Service In-Place Upgrade Engine):
+  - **Endpoint Hardware Utilization & Dynamic Health Scoring**:
+    - Native kernel-level hardware telemetry probers across Windows (`GlobalMemoryStatusEx`, `GetDiskFreeSpaceExW`, `GetSystemTimes`), Linux (`/proc/meminfo`, `/proc/stat`, `Statfs`), and macOS (`sysctl`, `Statfs`).
+    - Gathers real-time CPU %, RAM usage (used/total/percent), Disk usage (used/total/percent), system uptime, and pending reboot status.
+    - Dynamic host health score calculation (0-100) factoring in CPU/RAM/Disk saturation, reboot requirements, and unpatched critical CVE findings.
+    - Visual utilization gauges and health badges (`🟢 Sağlıklı / 🟡 Dikkat / 🔴 Kritik`) in the Agents table and Agent Detail inspector modal.
+  - **Full Patch Management Suite (Phase G)**:
+    - Dedicated Patch Management UI (`#endpoint-sec-patches`) featuring patch compliance percentages, installed vs missing patch metrics, and pending reboot counters.
+    - Host-level patch table with OS advisory identifiers, KB numbers, installation dates, and severity tags.
+    - On-demand patch scan triggers via Web UI and REST API (`POST /api/v1/endpoint/patches/scan`).
+  - **Connected Server In-Place Auto-Update (Phase H)**:
+    - Native self-upgrade engine inside the agent daemon: heartbeat compares agent version with target version offered by the server.
+    - Windows running binary replacement mechanism (atomic `.old` renaming and service restart via SCM).
+    - Remote mass agent upgrade trigger via Web UI ("🚀 Tüm Ajanları Otomatik Güncelle") and REST API (`POST /api/v1/endpoint/agents/upgrade-all`).
+
 - **v1.8.4** (Endpoint Software Inventory, Automated CVE Sync Scheduler & Vulnerability Correlation) / **Agent v0.1.2** (Registry/Package Scanner & Auto Inventory Telemetry):
   - **Endpoint Software & Hotfix Inventory Collection**:
     - Native cross-platform collector scanning installed software: Windows 64-bit and 32-bit registry uninstall keys, Linux package managers (`dpkg-query`, `rpm`), and macOS application bundles (`/Applications`).

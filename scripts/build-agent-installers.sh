@@ -22,7 +22,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 mkdir -p "$BIN_DIR" "$DL_DIR"
 
-VERSION="v0.1.2"
+VERSION="v0.1.3"
 BUILD_DATE="$(date +%Y-%m-%d)"
 COMMIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
 LDFLAGS="-s -w -X github.com/syslog-platform/logger/agent/internal/version.Version=${VERSION} -X github.com/syslog-platform/logger/agent/internal/version.BuildDate=${BUILD_DATE} -X github.com/syslog-platform/logger/agent/internal/version.CommitSHA=${COMMIT_SHA}"

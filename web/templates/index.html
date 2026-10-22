@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.4</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.5</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -898,6 +898,9 @@
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                             <button class="btn btn-outline" id="btn-ep-agents-refresh" onclick="loadEndpointAgents()">🔄 Yenile</button>
+                            <button class="btn btn-outline" id="btn-ep-upgrade-all" onclick="triggerAgentUpgradeAll()" style="border-color: rgba(16, 185, 129, 0.4); color: var(--success);" title="Tüm ajanları bağlı oldukları sunucu üzerinden en son sürüme günceller">
+                                <span>🚀 Tüm Ajanları Otomatik Güncelle</span>
+                            </button>
                             <button class="btn btn-outline" id="btn-ep-quick-steps-toggle" onclick="toggleQuickStepCard()" style="border-color: rgba(59, 130, 246, 0.4); color: var(--accent);">
                                 <span data-i18n="btn_quick_step_guide">⚡ 3 Adımda Hızlı Kurulum</span>
                             </button>
@@ -989,9 +992,10 @@
                             <thead>
                                 <tr>
                                     <th data-i18n="th_agent_hostname">Uç Nokta / Hostname</th>
-                                    <th data-i18n="th_agent_ip">IP &amp; MAC Adresi</th>
                                     <th data-i18n="th_agent_os">İşletim Sistemi</th>
                                     <th data-i18n="th_agent_version">Ajan Sürümü</th>
+                                    <th>Cihaz Sağlığı</th>
+                                    <th>Donanım Kullanımı (CPU / RAM / Disk)</th>
                                     <th data-i18n="th_agent_status">Durum</th>
                                     <th data-i18n="th_agent_vulns">Zafiyetler</th>
                                     <th data-i18n="th_agent_patches">Yamalar</th>
@@ -1000,7 +1004,7 @@
                                 </tr>
                             </thead>
                             <tbody id="ep-agents-tbody">
-                                <tr><td colspan="9" class="text-center" style="padding: 24px; color: var(--text-muted);">Ajan verileri yükleniyor...</td></tr>
+                                <tr><td colspan="10" class="text-center" style="padding: 24px; color: var(--text-muted);">Ajan verileri yükleniyor...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1115,14 +1119,74 @@
                     </div>
                 </div>
 
-                <!-- 5. PATCHES VIEW -->
+                <!-- 5. PATCH MANAGEMENT VIEW (Phase G) -->
                 <div class="endpoint-section" id="endpoint-sec-patches" style="display: none;">
-                    <div class="panel" style="padding: 24px; text-align: center;">
-                        <h4 style="margin-bottom: 8px;">🔄 Yama Yönetimi &amp; Güvenlik Güncellemeleri (Phase G)</h4>
-                        <p style="color: var(--text-muted); max-width: 650px; margin: 0 auto 16px auto;">
-                            Windows Update Agent (WUA), Linux APT/DNF ve macOS SoftwareUpdate API entegrasyonu ile eksik yamalar ve yeniden başlatma gereksinimleri takip edilir.
-                        </p>
-                        <div style="font-size: 12px; color: var(--accent);">Yama denetimi ve uyumluluk raporları bu panel üzerinden izlenir.</div>
+                    <!-- Patch Compliance KPI Cards -->
+                    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
+                        <div class="stat-card" style="padding: 16px;">
+                            <div class="stat-header">Yama Uyumluluğu</div>
+                            <div class="stat-value" id="patch-stat-compliance" style="color: var(--success); font-size: 1.6rem;">%100.0</div>
+                            <div class="stat-sub">Filo Geneli Ortalama</div>
+                        </div>
+                        <div class="stat-card" style="padding: 16px;">
+                            <div class="stat-header">Toplam Tespit Edilen Yama</div>
+                            <div class="stat-value" id="patch-stat-total">0</div>
+                            <div class="stat-sub">Raporlanan Güncellemeler</div>
+                        </div>
+                        <div class="stat-card" style="padding: 16px;">
+                            <div class="stat-header">Yüklü Güncellemeler</div>
+                            <div class="stat-value" id="patch-stat-installed" style="color: #10b981;">0</div>
+                            <div class="stat-sub">Uygulanmış Güvenlik Paketleri</div>
+                        </div>
+                        <div class="stat-card" style="padding: 16px;">
+                            <div class="stat-header">Eksik Güvenlik Yamaları</div>
+                            <div class="stat-value" id="patch-stat-missing" style="color: #f59e0b;">0</div>
+                            <div class="stat-sub">Eksik Olan KB Paketleri</div>
+                        </div>
+                        <div class="stat-card" style="padding: 16px;">
+                            <div class="stat-header">Yeniden Başlatma Bekleyen</div>
+                            <div class="stat-value" id="patch-stat-reboot" style="color: #ef4444;">0</div>
+                            <div class="stat-sub">Reboot Gereken Uç Noktalar</div>
+                        </div>
+                    </div>
+
+                    <!-- Filter & Actions Bar -->
+                    <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 650px;">
+                            <input type="text" id="ep-patches-search" class="form-control" placeholder="KB ID, yama adı veya uç nokta ara..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointPatches();">
+                            <select id="ep-patches-status-filter" class="form-control" style="width: 150px;" onchange="loadEndpointPatches()">
+                                <option value="">Tüm Durumlar</option>
+                                <option value="installed">🟢 Yüklü (Installed)</option>
+                                <option value="missing">🟠 Eksik (Missing)</option>
+                                <option value="pending_reboot">🔴 Reboot Bekleyen</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="loadEndpointPatches()">Filtrele</button>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <span style="font-size: 12px; color: var(--text-muted);" id="ep-patches-total-count">0 Yama</span>
+                            <button class="btn btn-outline" onclick="loadEndpointPatches()">🔄 Yenile</button>
+                            <button class="btn btn-primary" onclick="triggerPatchScan()">⚡ Şimdi Yama Taraması Başlat</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container panel" style="padding: 0; overflow-x: auto;">
+                        <table class="data-table" id="ep-patches-table">
+                            <thead>
+                                <tr>
+                                    <th>Uç Nokta</th>
+                                    <th>Yama / KB ID</th>
+                                    <th>Açıklama &amp; Başlık</th>
+                                    <th>Önem Seviyesi</th>
+                                    <th>İlişkili CVE</th>
+                                    <th>Durum</th>
+                                    <th>Yeniden Başlatma</th>
+                                    <th>Tespit / Yükleme Tarihi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ep-patches-tbody">
+                                <tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">Yama kayıtları taranıyor...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -3046,7 +3110,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.4</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.5</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -5388,13 +5452,50 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 </div>
 
                 <div class="panel" style="padding: 16px; margin-bottom: 16px;">
-                    <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 10px;">📊 Kaynak Kullanımı &amp; İlke Durumu</h4>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 12px;">
+                    <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 12px;">📊 Donanım Kullanımı &amp; Kaynak Telemetrisi</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 14px;">
+                        <!-- CPU Usage -->
+                        <div style="background: rgba(15, 23, 42, 0.4); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+                                <span>İşlemci (CPU)</span>
+                                <strong id="detail-card-cpu-pct">0%</strong>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.08); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div id="detail-card-cpu-bar" style="background: var(--accent); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                            </div>
+                        </div>
+
+                        <!-- RAM Usage -->
+                        <div style="background: rgba(15, 23, 42, 0.4); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+                                <span>Bellek (RAM)</span>
+                                <strong id="detail-card-ram-pct">0%</strong>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.08); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div id="detail-card-ram-bar" style="background: #3b82f6; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;" id="detail-card-ram-details">- / -</div>
+                        </div>
+
+                        <!-- Disk Usage -->
+                        <div style="background: rgba(15, 23, 42, 0.4); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+                                <span>Disk Doluluk Oranı</span>
+                                <strong id="detail-card-disk-pct">0%</strong>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.08); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div id="detail-card-disk-bar" style="background: #10b981; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;" id="detail-card-disk-details">- / -</div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 12px; border-top: 1px solid var(--border-color); padding-top: 10px;">
                         <div><strong>Aktif İlke:</strong> <span id="detail-card-policy">Default Balanced Endpoint Policy</span></div>
                         <div><strong>İlke Revizyonu:</strong> <span id="detail-card-policy-rev">Rev 1</span></div>
-                        <div><strong>Ajan CPU Kullanımı:</strong> <span id="detail-card-cpu">0.5%</span></div>
-                        <div><strong>Ajan Bellek (RSS):</strong> <span id="detail-card-ram">-</span></div>
-                        <div><strong>Yeniden Başlatma:</strong> <span id="detail-card-reboot">Gerekmiyor</span></div>
+                        <div><strong>Ajan RAM (RSS):</strong> <span id="detail-card-ram">-</span></div>
+                        <div><strong>Sistem Çalışma Süresi (Uptime):</strong> <span id="detail-card-uptime">-</span></div>
+                        <div><strong>Yeniden Başlatma (Reboot):</strong> <span id="detail-card-reboot">Gerekmiyor</span></div>
                         <div><strong>Son Kalp Atışı:</strong> <span id="detail-card-last-seen">-</span></div>
                     </div>
                 </div>
@@ -5477,8 +5578,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.8.4"></script>
-    <script src="/static/js/translations.js?v=1.8.4"></script>
-    <script src="/static/js/app.js?v=1.8.4"></script>
+    <script src="/static/js/marked.min.js?v=1.8.5"></script>
+    <script src="/static/js/translations.js?v=1.8.5"></script>
+    <script src="/static/js/app.js?v=1.8.5"></script>
 </body>
 </html>

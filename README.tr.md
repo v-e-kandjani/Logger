@@ -254,6 +254,21 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.8.5** (Uç Nokta Donanım Telemetrisi, Dinamik Sağlık Skoru, Yama Yönetimi & Kesintisiz Yerinde Otomatik Güncelleme) / **Agent v0.1.3** (Çekirdek Düzeyi Donanım Algılayıcıları & Windows Servis Yerinde Yükseltme Motoru):
+  - **Uç Nokta Donanım Kullanımı ve Dinamik Cihaz Sağlık Skoru**:
+    - Windows (`GlobalMemoryStatusEx`, `GetDiskFreeSpaceExW`, `GetSystemTimes`), Linux (`/proc/meminfo`, `/proc/stat`, `Statfs`) ve macOS (`sysctl`, `Statfs`) üzerinde çalışan yerel donanım telemetri algılayıcıları.
+    - Gerçek zamanlı CPU %, RAM kullanımı (kullanılan/toplam/yüzde), Disk kullanımı (kullanılan/toplam/yüzde), sistem çalışma süresi (uptime) ve bekleyen yeniden başlatma (reboot) durumu tespiti.
+    - CPU/RAM/Disk doygunluğu, yeniden başlatma gereksinimi ve yamalanmamış kritik CVE zafiyetlerini dinamik olarak puanlayan Cihaz Sağlık Skoru (0-100).
+    - Ajanlar tablosunda ve Ajan Detay modalında görsel kullanım barları ve durum rozetleri (`🟢 Sağlıklı / 🟡 Dikkat / 🔴 Kritik`).
+  - **Kapsamlı Yama Yönetimi (Phase G - Patch Management)**:
+    - Yama uyumluluk yüzdesi, yüklü ve eksik yama sayıları ile yeniden başlatma bekleyen cihaz sayaçlarını içeren Yama Yönetimi arayüzü (`#endpoint-sec-patches`).
+    - İşletim sistemi danışma bildirimleri, KB numaraları, kurulum tarihleri ve önem derecelerini listeleyen aranabilir yama tablosu.
+    - Web arayüzü ve REST API (`POST /api/v1/endpoint/patches/scan`) üzerinden anlık yama tarama tetikleme.
+  - **Sunucu Tabanlı Yerinde Otomatik Ajan Güncelleme (Phase H - Auto-Update)**:
+    - Ajan içerisine entegre self-upgrade motoru: Her heartbeat'te sunucudan gelen hedef sürüm kontrol edilir, eski ajanlar arka planda yeni ikiliyi indirip kendilerini günceller.
+    - Windows üzerinde çalışan dosya kilitlenme koruması (atomik `.old` yeniden adlandırma ve SCM üzerinden servis yeniden başlatma).
+    - Web arayüzü ("🚀 Tüm Ajanları Otomatik Güncelle") ve REST API (`POST /api/v1/endpoint/agents/upgrade-all`) ile merkezi filo güncelleme tetikleyicisi.
+
 - **v1.8.4** (Uç Nokta Yazılım Envanteri, Otomatik CVE Veritabanı Zamanlayıcısı & Zafiyet Korelasyonu) / **Agent v0.1.2** (Kayıt Defteri/Paket Tarayıcısı & Otomatik Envanter Bildirimi):
   - **Uç Nokta Yazılım ve Düzeltme Eki (Hotfix) Envanter Toplama**:
     - Yerel çok platformlu toplayıcı: Windows 64-bit ve 32-bit Registry Uninstall anahtarları, Linux paket yöneticileri (`dpkg-query`, `rpm`) ve macOS uygulama paketleri (`/Applications`) taranarak kurulu yazılımlar otomatik listelenir.

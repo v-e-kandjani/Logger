@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -598,6 +599,44 @@ func (db *DB) UpsertEnrolledAgent(ctx context.Context, req models.AgentEnrollReq
 func (db *DB) UpdateAgentHeartbeat(ctx context.Context, hb models.AgentHeartbeatRequest) (*models.AgentHeartbeatResponse, error) {
 	metricsJSON, _ := json.Marshal(hb.Metrics)
 
+	// Compute dynamic host health score (0 - 100)
+	healthScore := 100
+	if hb.Metrics.CPUPercent > 90 {
+		healthScore -= 20
+	} else if hb.Metrics.CPUPercent > 75 {
+		healthScore -= 10
+	}
+
+	if hb.Metrics.RAMPercent > 90 {
+		healthScore -= 25
+	} else if hb.Metrics.RAMPercent > 80 {
+		healthScore -= 10
+	}
+
+	if hb.Metrics.DiskPercent > 90 {
+		healthScore -= 25
+	} else if hb.Metrics.DiskPercent > 80 {
+		healthScore -= 10
+	}
+
+	if hb.RebootRequired {
+		healthScore -= 10
+	}
+
+	// Check critical vulnerability findings
+	var critVulns int
+	_ = db.pool.QueryRow(ctx, `
+		SELECT COUNT(*) 
+		FROM endpoint_vulnerability_findings vf
+		JOIN endpoint_agents a ON a.id = vf.agent_id
+		WHERE a.agent_uuid = $1 AND vf.status = 'open' AND (vf.severity = 'CRITICAL' OR vf.priority = 'CRITICAL')
+	`, hb.AgentUUID).Scan(&critVulns)
+
+	healthScore -= (critVulns * 10)
+	if healthScore < 0 {
+		healthScore = 0
+	}
+
 	query := `
 		UPDATE endpoint_agents
 		SET last_seen = NOW(),
@@ -606,15 +645,17 @@ func (db *DB) UpdateAgentHeartbeat(ctx context.Context, hb models.AgentHeartbeat
 		    ip_address = CASE WHEN $4 != '' THEN $4 ELSE ip_address END,
 		    mac_address = CASE WHEN $5 != '' THEN $5 ELSE mac_address END,
 		    resource_usage = $6,
+		    health_score = $7,
 		    updated_at = NOW()
 		WHERE agent_uuid = $1
-		RETURNING policy_revision
+		RETURNING policy_revision, os_type, architecture
 	`
 
 	var currentRevision int
+	var osType, arch string
 	err := db.pool.QueryRow(ctx, query,
-		hb.AgentUUID, hb.Status, hb.AgentVersion, hb.IPAddress, hb.MACAddress, metricsJSON,
-	).Scan(&currentRevision)
+		hb.AgentUUID, hb.Status, hb.AgentVersion, hb.IPAddress, hb.MACAddress, metricsJSON, healthScore,
+	).Scan(&currentRevision, &osType, &arch)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("agent not found or unenrolled")
@@ -628,6 +669,23 @@ func (db *DB) UpdateAgentHeartbeat(ctx context.Context, hb models.AgentHeartbeat
 		CurrentPolicyRevision: currentRevision,
 		PolicyNeedsUpdate:     currentRevision > hb.PolicyRevision,
 		PendingTasksCount:     0,
+	}
+
+	// Auto-Update check: Offer latest agent binary if connected agent is running an older build
+	latestAgentVer := "v0.1.3"
+	if hb.AgentVersion != "" && hb.AgentVersion != latestAgentVer {
+		downloadURL := "/static/bin/logger-agent-linux-amd64"
+		if strings.EqualFold(osType, "windows") {
+			downloadURL = "/static/bin/logger-agent-windows-amd64.exe"
+		} else if strings.EqualFold(osType, "darwin") {
+			downloadURL = "/static/bin/logger-agent-darwin-universal"
+		} else if strings.EqualFold(arch, "arm64") {
+			downloadURL = "/static/bin/logger-agent-linux-arm64"
+		}
+
+		resp.UpgradeAvailable = true
+		resp.TargetVersion = latestAgentVer
+		resp.DownloadURL = downloadURL
 	}
 
 	return resp, nil

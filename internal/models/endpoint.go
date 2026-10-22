@@ -288,10 +288,17 @@ type AgentHeartbeatRequest struct {
 
 type AgentResourceMetrics struct {
 	CPUPercent     float64 `json:"cpu_percent"`
+	RAMUsedBytes   uint64  `json:"ram_used_bytes"`
+	RAMTotalBytes  uint64  `json:"ram_total_bytes"`
+	RAMPercent     float64 `json:"ram_percent"`
 	RAMRSSBytes    uint64  `json:"ram_rss_bytes"`
+	DiskUsedBytes  uint64  `json:"disk_used_bytes"`
+	DiskTotalBytes uint64  `json:"disk_total_bytes"`
+	DiskPercent    float64 `json:"disk_percent"`
 	SpoolDiskBytes uint64  `json:"spool_disk_bytes"`
 	QueueDepth     int     `json:"queue_depth"`
 	EPSOut         float64 `json:"eps_out"`
+	UptimeSeconds  uint64  `json:"uptime_seconds"`
 }
 
 type AgentHeartbeatResponse struct {
@@ -300,6 +307,40 @@ type AgentHeartbeatResponse struct {
 	CurrentPolicyRevision int        `json:"current_policy_revision"`
 	PolicyNeedsUpdate     bool       `json:"policy_needs_update"`
 	PendingTasksCount     int        `json:"pending_tasks_count"`
+
+	// Auto-Update Telemetry
+	UpgradeAvailable      bool       `json:"upgrade_available,omitempty"`
+	TargetVersion         string     `json:"target_version,omitempty"`
+	DownloadURL           string     `json:"download_url,omitempty"`
+	ChecksumSHA256        string     `json:"checksum_sha256,omitempty"`
+}
+
+// EndpointPatchItem represents an enriched patch view with host telemetry
+type EndpointPatchItem struct {
+	ID             uuid.UUID  `json:"id"`
+	AgentID        uuid.UUID  `json:"agent_id"`
+	AgentHostname  string     `json:"agent_hostname"`
+	AgentIP        string     `json:"agent_ip"`
+	AgentOS        string     `json:"agent_os"`
+	PatchID        string     `json:"patch_id"`
+	Title          string     `json:"title"`
+	Vendor         string     `json:"vendor"`
+	KBID           string     `json:"kb_id"`
+	Severity       string     `json:"severity"`
+	CVEIDs         []string   `json:"cve_ids"`
+	RequiresReboot bool       `json:"requires_reboot"`
+	Status         string     `json:"status"` // missing, installed, pending_reboot
+	InstalledAt    *time.Time `json:"installed_at,omitempty"`
+	DetectedAt     time.Time  `json:"detected_at"`
+}
+
+type PatchComplianceSummary struct {
+	CompliancePct       float64 `json:"compliance_pct"`
+	TotalPatches        int     `json:"total_patches"`
+	InstalledCount      int     `json:"installed_count"`
+	MissingCount        int     `json:"missing_count"`
+	PendingRebootsCount int     `json:"pending_reboots_count"`
+	EndpointsNeedReboot int     `json:"endpoints_need_reboot"`
 }
 
 // AgentInventoryRequest represents an inventory, software, and patch snapshot sent by an agent
