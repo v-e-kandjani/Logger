@@ -107,6 +107,13 @@ func main() {
 		log.Println("[PostgreSQL] SOAR Playbooks tables and incident response catalog verified")
 	}
 
+	// Verify & auto-migrate File & Registry Integrity Monitoring (FIM - Phase L) schema
+	if err := pgDB.EnsureFIMSchema(context.Background()); err != nil {
+		log.Printf("[PostgreSQL] Warning ensuring FIM schema: %v", err)
+	} else {
+		log.Println("[PostgreSQL] File & Registry Integrity Monitoring (FIM) schema verified")
+	}
+
 	// 2. Initialize in-memory Device Cache
 	deviceCache := postgres.NewDeviceCache(pgDB)
 	log.Println("[DeviceCache] Initialized active device lookup cache")
@@ -267,6 +274,7 @@ func main() {
 	apiHandler.SetHTTPSManager(httpsMgr)
 	apiHandler.SetResultCache(resultCache)
 	apiHandler.SetSOAREngine(soarEngine)
+	apiHandler.SetSIEMEngine(siemEngine)
 	apiHandler.StartMitreAutoSync(appCtx)
 	apiHandler.StartSupportBundleCleaner(appCtx)
 	apiHandler.StartEdgeHealthMonitor(appCtx)

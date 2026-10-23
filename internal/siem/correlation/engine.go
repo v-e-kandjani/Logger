@@ -390,6 +390,15 @@ func (e *Engine) triggerAlert(rule *models.SIEMRule, bucket *WindowBucket, event
 	e.broadcastAlert(alert)
 }
 
+// DispatchDirectAlert persists and broadcasts an alert generated from external sub-engines (e.g. FIM)
+func (e *Engine) DispatchDirectAlert(alert *models.SIEMAlert) {
+	if alert == nil {
+		return
+	}
+	go e.persistAlert(alert)
+	e.broadcastAlert(alert)
+}
+
 func (e *Engine) persistAlert(alert *models.SIEMAlert) {
 	if e.persister == nil {
 		return

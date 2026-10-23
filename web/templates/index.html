@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.8.9</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.0</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -88,6 +88,10 @@
                         <a class="nav-subitem" data-endpoint-target="endpoint-sec-patches">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
                             <span data-i18n="nav_ep_patches">Yama Durumu (Patches)</span>
+                        </a>
+                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-fim">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            <span data-i18n="nav_ep_fim">FIM Bütünlük İzleme</span>
                         </a>
                         <a class="nav-subitem" data-endpoint-target="endpoint-sec-policies">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
@@ -764,6 +768,9 @@
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-patches">
                         <span data-i18n="nav_ep_patches">Yama Durumu (Patches)</span>
                     </button>
+                    <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-fim">
+                        <span data-i18n="nav_ep_fim">📁 FIM (Bütünlük İzleme)</span>
+                    </button>
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-policies">
                         <span data-i18n="nav_ep_policies">İlkeler (Policies)</span>
                     </button>
@@ -1191,6 +1198,113 @@
                             </thead>
                             <tbody id="ep-patches-tbody">
                                 <tr><td colspan="9" class="text-center" style="color: var(--text-muted); padding: 24px;">Yama kayıtları taranıyor...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 5.5. FIM (FILE & REGISTRY INTEGRITY MONITORING) VIEW -->
+                <div class="endpoint-section" id="endpoint-sec-fim" style="display: none;">
+                    <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h4 style="font-size: 15px; font-weight: 600;" data-i18n="ep_fim_title">📁 Dosya ve Kayıt Defteri Bütünlük İzleme (FIM)</h4>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" data-i18n="ep_fim_desc">Kritik sistem ikilileri, konfigürasyon dosyaları ve Windows kayıt defteri kovanlarındaki izinsiz değişiklikleri ve MITRE ATT&CK tekniklerini tespit edin</p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-outline" onclick="openFIMBaselines()" data-i18n="btn_fim_view_baselines"><i class="fas fa-fingerprint"></i> Kriptografik Referanslar (Baselines)</button>
+                            <button class="btn btn-primary" onclick="loadEndpointFIM()" data-i18n="btn_refresh"><i class="fas fa-sync-alt"></i> Yenile</button>
+                        </div>
+                    </div>
+
+                    <!-- FIM Summary Cards -->
+                    <div class="stat-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px;">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="fim_stat_total">Toplam FIM Olayı</span>
+                                <span class="badge badge-info">FIM Events</span>
+                            </div>
+                            <div class="stat-value" id="ep-fim-stat-total" style="color: var(--accent);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="fim_stat_total_sub">
+                                Tespit edilen dosya ve kayıt sapmaları
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="fim_stat_critical">Kritik / Yüksek Sapma</span>
+                                <span class="badge badge-danger" id="ep-fim-crit-badge">0 CRIT</span>
+                            </div>
+                            <div class="stat-value" id="ep-fim-stat-critical" style="color: var(--danger);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--danger);" data-i18n="fim_stat_critical_sub">
+                                SIEM &amp; SOAR'a iletilen güvenlik ihlalleri
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="fim_stat_monitored">İzlenen Dosya / Anahtar</span>
+                                <span class="badge badge-secondary">Cryptographic Hashes</span>
+                            </div>
+                            <div class="stat-value" id="ep-fim-stat-monitored" style="color: var(--text-primary);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="fim_stat_monitored_sub">
+                                SHA-256 tabanlı referans veritabanı
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="fim_stat_endpoints">Etkilenen Uç Noktalar</span>
+                                <span class="badge badge-warning">Agents</span>
+                            </div>
+                            <div class="stat-value" id="ep-fim-stat-agents" style="color: var(--warning);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="fim_stat_endpoints_sub">
+                                Sapma raporlayan aktif ajanlar
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FIM Filter & Search Bar -->
+                    <div class="panel" style="padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 260px;">
+                            <input type="text" id="ep-fim-search" class="form-control" placeholder="Uç nokta adı, IP, dosya yolu veya hash ara..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointFIMEvents();">
+                            <button class="btn btn-secondary" onclick="loadEndpointFIMEvents()" data-i18n="btn_filter">Filtrele</button>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <select id="ep-fim-filter-change-type" class="form-control" style="width: 150px;" onchange="loadEndpointFIMEvents()">
+                                <option value="" data-i18n="fim_opt_all_changes">Tüm Olay Türleri</option>
+                                <option value="modified">Değiştirildi (Modified)</option>
+                                <option value="created">Yeni Oluşturuldu (Created)</option>
+                                <option value="deleted">Silindi (Deleted)</option>
+                                <option value="attribute_changed">İzin / Nitelik Değişti</option>
+                            </select>
+                            <select id="ep-fim-filter-severity" class="form-control" style="width: 140px;" onchange="loadEndpointFIMEvents()">
+                                <option value="" data-i18n="fim_opt_all_severities">Tüm Önem Düzeyleri</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                            <span style="font-size: 12px; color: var(--text-muted);" id="ep-fim-total-count">0 Olay</span>
+                        </div>
+                    </div>
+
+                    <!-- FIM Events Table -->
+                    <div class="table-container panel" style="padding: 0; overflow-x: auto;">
+                        <table class="data-table" id="ep-fim-table">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="th_affected_endpoint">Uç Nokta</th>
+                                    <th data-i18n="th_fim_change_type">Olay Türü</th>
+                                    <th data-i18n="th_fim_target_path">Hedef Dosya / Kayıt Yolu</th>
+                                    <th data-i18n="th_fim_hash_deviation">Hash Sapması (Eski &rarr; Yeni)</th>
+                                    <th data-i18n="th_severity">Önem</th>
+                                    <th data-i18n="th_mitre">MITRE ATT&CK</th>
+                                    <th data-i18n="th_time">Tespit Zamanı</th>
+                                    <th style="text-align: right;" data-i18n="th_actions">İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ep-fim-tbody">
+                                <tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;" data-i18n="fim_loading">Bütünlük izleme kayıtları taranıyor...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -3168,7 +3282,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.8.9</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.0</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -6446,8 +6560,136 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.8.9"></script>
-    <script src="/static/js/translations.js?v=1.8.9"></script>
-    <script src="/static/js/app.js?v=1.8.9"></script>
+    <!-- MODAL: FIM Event Detail -->
+    <div class="modal-backdrop" id="modal-fim-detail" style="display: none; z-index: 1070;">
+        <div class="modal modal-wide" style="max-width: 820px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">📁</span>
+                    <h3 style="margin: 0; font-size: 15px;" data-i18n="fim_modal_title">FIM Bütünlük Sapma Detayı</h3>
+                </div>
+                <button class="close-btn" onclick="closeFIMDetail()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 18px 22px; max-height: 75vh; overflow-y: auto;">
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
+                    <span id="fim-detail-severity-badge" class="badge badge-danger">CRITICAL</span>
+                    <span id="fim-detail-type-badge" class="badge badge-warning">MODIFIED</span>
+                    <span id="fim-detail-target-type-badge" class="badge badge-secondary">FILE</span>
+                    <span id="fim-detail-timestamp" style="font-size: 12px; color: var(--text-muted); margin-left: auto;">-</span>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;" data-i18n="th_target_path">Hedef Yol</div>
+                    <div id="fim-detail-target-path" class="mono-code" style="font-size: 13px; word-break: break-all; color: var(--accent);">-</div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                    <div class="panel" style="padding: 10px 14px;">
+                        <div style="font-size: 11px; color: var(--text-muted);" data-i18n="th_affected_endpoint">Uç Nokta / Ajan</div>
+                        <div id="fim-detail-hostname" style="font-weight: 600; font-size: 13px; margin-top: 2px;">-</div>
+                        <div id="fim-detail-ip" style="font-size: 11px; color: var(--text-muted);">-</div>
+                    </div>
+                    <div class="panel" style="padding: 10px 14px;">
+                        <div style="font-size: 11px; color: var(--text-muted);">İşletim Sistemi</div>
+                        <div id="fim-detail-os" style="font-weight: 600; font-size: 13px; margin-top: 2px;">-</div>
+                    </div>
+                    <div class="panel" style="padding: 10px 14px;">
+                        <div style="font-size: 11px; color: var(--text-muted);">Tetikleyen Süreç / Kullanıcı</div>
+                        <div id="fim-detail-process" style="font-weight: 600; font-size: 13px; margin-top: 2px;">-</div>
+                        <div id="fim-detail-user" style="font-size: 11px; color: var(--text-muted);">-</div>
+                    </div>
+                </div>
+
+                <!-- Hash Deviation Comparison Panel -->
+                <div class="panel" style="padding: 14px; margin-bottom: 16px; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.03);">
+                    <div style="font-weight: 600; font-size: 12px; color: var(--danger); margin-bottom: 8px;">🔐 Kriptografik SHA-256 Karşılaştırması</div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <div style="font-size: 11px; color: var(--text-muted);">Önceki Referans Hash (Baseline SHA-256):</div>
+                        <div id="fim-detail-prev-hash" class="mono-code" style="font-size: 11.5px; word-break: break-all; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px; margin-top: 2px;">-</div>
+                    </div>
+
+                    <div>
+                        <div style="font-size: 11px; color: var(--danger);">Tespit Edilen Yeni Hash (Observed SHA-256):</div>
+                        <div id="fim-detail-curr-hash" class="mono-code" style="font-size: 11.5px; word-break: break-all; color: var(--danger); background: rgba(239, 68, 68, 0.1); padding: 6px 8px; border-radius: 4px; margin-top: 2px;">-</div>
+                    </div>
+
+                    <div style="display: flex; gap: 16px; margin-top: 10px; font-size: 11.5px; color: var(--text-muted);">
+                        <div>Dosya Boyutu: <span id="fim-detail-size" style="font-weight: 600; color: var(--text-primary);">-</span></div>
+                        <div>İzinler: <span id="fim-detail-perms" class="mono-code" style="color: var(--text-primary);">-</span></div>
+                    </div>
+                </div>
+
+                <!-- Threat Intel / MITRE ATT&CK -->
+                <div class="panel" style="padding: 14px; margin-bottom: 16px;">
+                    <div style="font-weight: 600; font-size: 12px; margin-bottom: 8px;">🎯 MITRE ATT&CK ve Tehdit Sınıflandırması</div>
+                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <div>
+                            <span style="font-size: 11px; color: var(--text-muted);">Taktik:</span>
+                            <span id="fim-detail-mitre-tactic" class="badge badge-info" style="margin-left: 4px;">-</span>
+                        </div>
+                        <div>
+                            <span style="font-size: 11px; color: var(--text-muted);">Teknik ID:</span>
+                            <span id="fim-detail-mitre-technique" class="badge badge-secondary mono-code" style="margin-left: 4px;">-</span>
+                        </div>
+                    </div>
+                    <div id="fim-detail-extra-desc" style="font-size: 11.5px; color: var(--text-muted); margin-top: 8px;">-</div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px;">
+                <button class="btn btn-danger btn-sm" id="btn-fim-action-soar" onclick="triggerFIMSOARAction()" style="display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-shield-virus"></i> ⚡ Host İzolasyonu / Forensics Al
+                </button>
+                <button class="btn btn-outline" onclick="closeFIMDetail()">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: FIM Active Cryptographic Baselines -->
+    <div class="modal-backdrop" id="modal-fim-baselines" style="display: none; z-index: 1070;">
+        <div class="modal modal-wide" style="max-width: 950px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">🔐</span>
+                    <h3 style="margin: 0; font-size: 15px;" data-i18n="fim_baselines_modal_title">Kriptografik Bütünlük Referansları (Baselines)</h3>
+                </div>
+                <button class="close-btn" onclick="closeFIMBaselines()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px; max-height: 75vh; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <label style="font-size: 12px; font-weight: 600;" data-i18n="lbl_select_agent">Uç Nokta:</label>
+                        <select id="fim-baseline-agent-select" class="form-control" style="width: 260px;" onchange="loadFIMBaselinesForSelectedAgent()"></select>
+                    </div>
+                    <button class="btn btn-sm btn-outline" onclick="loadFIMBaselinesForSelectedAgent()" data-i18n="btn_refresh">🔄 Yenile</button>
+                </div>
+
+                <div class="table-container panel" style="padding: 0; overflow-x: auto;">
+                    <table class="data-table" id="ep-fim-baselines-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="th_target_path">Hedef Dosya / Kayıt</th>
+                                <th>Tür</th>
+                                <th>Kayıtlı SHA-256 Özeti</th>
+                                <th>Boyut</th>
+                                <th>İzin</th>
+                                <th>Son Doğrulama</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ep-fim-baselines-tbody">
+                            <tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 20px;">Lütfen bir uç nokta seçin.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; padding: 12px 20px;">
+                <button class="btn btn-outline" onclick="closeFIMBaselines()">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/marked.min.js?v=1.9.0"></script>
+    <script src="/static/js/translations.js?v=1.9.0"></script>
+    <script src="/static/js/app.js?v=1.9.0"></script>
 </body>
 </html>

@@ -28,6 +28,7 @@ import (
 	"github.com/syslog-platform/logger/internal/metrics"
 	"github.com/syslog-platform/logger/internal/models"
 	"github.com/syslog-platform/logger/internal/quota"
+	"github.com/syslog-platform/logger/internal/siem/correlation"
 	"github.com/syslog-platform/logger/internal/siem/mitre"
 	"github.com/syslog-platform/logger/internal/soar"
 	"github.com/syslog-platform/logger/internal/syslog/detector"
@@ -61,6 +62,7 @@ type Handler struct {
 	quotaEnforcer    *quota.QuotaEnforcer
 	cveSyncer        *cve.Syncer
 	soarEngine       *soar.Engine
+	siemEngine       *correlation.Engine
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
@@ -86,6 +88,10 @@ func (h *Handler) SetResultCache(c *cache.ResultCache) {
 
 func (h *Handler) SetSOAREngine(s *soar.Engine) {
 	h.soarEngine = s
+}
+
+func (h *Handler) SetSIEMEngine(e *correlation.Engine) {
+	h.siemEngine = e
 }
 
 func NewHandler(
@@ -288,6 +294,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/agent/v1/heartbeat", h.handleAgentHeartbeat)
 	mux.HandleFunc("/api/agent/v1/config", h.handleAgentConfig)
 	mux.HandleFunc("/api/agent/v1/inventory", h.handleAgentInventory)
+	mux.HandleFunc("/api/agent/v1/fim", h.handleAgentFIM)
 	mux.HandleFunc("/api/agent/v1/tasks/result", h.handleAgentTaskResult)
 
 	// Protected Endpoint Security Administrative Endpoints
@@ -312,6 +319,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/patches/scan", h.requireAuth(h.handleEndpointPatchesScan))
 	mux.HandleFunc("/api/v1/endpoint/patches/deploy", h.requireAuth(h.handleEndpointPatchDeploy))
 	mux.HandleFunc("/api/v1/endpoint/patches/batch-deploy", h.requireAuth(h.handleEndpointBatchPatchDeploy))
+	mux.HandleFunc("/api/v1/endpoint/fim/summary", h.requireAuth(h.handleEndpointFIMSummary))
+	mux.HandleFunc("/api/v1/endpoint/fim/events", h.requireAuth(h.handleEndpointFIMEvents))
+	mux.HandleFunc("/api/v1/endpoint/fim/events/", h.requireAuth(h.handleEndpointFIMEventDetail))
+	mux.HandleFunc("/api/v1/endpoint/fim/baselines", h.requireAuth(h.handleEndpointFIMBaselines))
 	mux.HandleFunc("/api/v1/endpoint/tasks", h.requireAuth(h.handleEndpointTasks))
 	mux.HandleFunc("/api/v1/endpoint/tasks/", h.requireAuth(h.handleEndpointTaskDetail))
 	mux.HandleFunc("/api/v1/endpoint/agents/upgrade-all", h.requireAuth(h.handleEndpointAgentUpgradeAll))

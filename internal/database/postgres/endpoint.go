@@ -764,7 +764,11 @@ func (db *DB) ListAgents(ctx context.Context, tenantSlug, status, osType, search
 		SELECT COUNT(*)
 		FROM endpoint_agents a
 		WHERE ($1 = '' OR $1 = 'all' OR a.tenant_slug = $1)
-		  AND ($2 = '' OR a.status = $2)
+		  AND ($2 = '' OR 
+		       ($2 = 'healthy' AND a.status = 'healthy' AND a.last_seen > NOW() - INTERVAL '5 minutes') OR
+		       ($2 = 'warning' AND (a.status = 'warning' OR (a.last_seen > NOW() - INTERVAL '15 minutes' AND a.last_seen <= NOW() - INTERVAL '5 minutes'))) OR
+		       ($2 = 'offline' AND (a.status = 'offline' OR a.last_seen <= NOW() - INTERVAL '15 minutes' OR a.last_seen IS NULL)) OR
+		       ($2 NOT IN ('healthy', 'warning', 'offline') AND a.status = $2))
 		  AND ($3 = '' OR a.os_type = $3)
 		  AND ($4 = '' OR a.hostname ILIKE '%' || $4 || '%' OR a.ip_address ILIKE '%' || $4 || '%' OR a.agent_uuid ILIKE '%' || $4 || '%')
 	`
@@ -790,7 +794,11 @@ func (db *DB) ListAgents(ctx context.Context, tenantSlug, status, osType, search
 		LEFT JOIN endpoint_policies p ON a.policy_id = p.id
 		LEFT JOIN endpoint_agent_groups g ON a.group_id = g.id
 		WHERE ($1 = '' OR $1 = 'all' OR a.tenant_slug = $1)
-		  AND ($2 = '' OR a.status = $2)
+		  AND ($2 = '' OR 
+		       ($2 = 'healthy' AND a.status = 'healthy' AND a.last_seen > NOW() - INTERVAL '5 minutes') OR
+		       ($2 = 'warning' AND (a.status = 'warning' OR (a.last_seen > NOW() - INTERVAL '15 minutes' AND a.last_seen <= NOW() - INTERVAL '5 minutes'))) OR
+		       ($2 = 'offline' AND (a.status = 'offline' OR a.last_seen <= NOW() - INTERVAL '15 minutes' OR a.last_seen IS NULL)) OR
+		       ($2 NOT IN ('healthy', 'warning', 'offline') AND a.status = $2))
 		  AND ($3 = '' OR a.os_type = $3)
 		  AND ($4 = '' OR a.hostname ILIKE '%' || $4 || '%' OR a.ip_address ILIKE '%' || $4 || '%' OR a.agent_uuid ILIKE '%' || $4 || '%')
 		ORDER BY a.last_seen DESC NULLS LAST
@@ -942,6 +950,59 @@ func (db *DB) GetEndpointDashboardSummary(ctx context.Context, tenantSlug string
 		summary.PatchCompliancePct = float64(summary.FullyPatchedAgents) / float64(summary.TotalAgents) * 100.0
 	} else {
 		summary.PatchCompliancePct = 100.0
+	}
+
+	// 4. Query Top Risk / Vulnerable Endpoints (or enrolled endpoints with health)
+	queryTopAgents := `
+		SELECT 
+			a.id, a.hostname, a.ip_address, a.os_type,
+			COALESCE(COUNT(*) FILTER (WHERE vf.severity = 'CRITICAL' AND vf.status = 'open'), 0) as crit_cnt,
+			COALESCE(COUNT(*) FILTER (WHERE vf.severity = 'HIGH' AND vf.status = 'open'), 0) as high_cnt,
+			COALESCE(COUNT(*) FILTER (WHERE vf.status = 'open'), 0) as total_cnt
+		FROM endpoint_agents a
+		LEFT JOIN endpoint_vulnerability_findings vf ON vf.agent_id = a.id
+		WHERE ($1 = '' OR $1 = 'all' OR a.tenant_slug = $1)
+		GROUP BY a.id, a.hostname, a.ip_address, a.os_type, a.last_seen
+		ORDER BY crit_cnt DESC, high_cnt DESC, total_cnt DESC, a.last_seen DESC NULLS LAST
+		LIMIT 5
+	`
+	agentRows, err := db.pool.Query(ctx, queryTopAgents, tenantSlug)
+	if err == nil {
+		defer agentRows.Close()
+		for agentRows.Next() {
+			var sa models.EndpointAgentSummary
+			if err := agentRows.Scan(&sa.AgentID, &sa.Hostname, &sa.IPAddress, &sa.OSType, &sa.CriticalCount, &sa.HighCount, &sa.TotalVulns); err == nil {
+				summary.TopVulnerableAgents = append(summary.TopVulnerableAgents, sa)
+			}
+		}
+	}
+
+	// 5. Query Top Exploited & Critical CVEs
+	queryTopCVEs := `
+		SELECT 
+			vf.cve_id,
+			COALESCE(c.title, vf.cve_id) as title,
+			COALESCE(MAX(vf.cvss_score), 0) as cvss,
+			COALESCE(MAX(vf.severity), 'HIGH') as sev,
+			BOOL_OR(COALESCE(vf.cisa_kev, false)) as is_kev,
+			COALESCE(MAX(vf.epss_probability), 0) as epss,
+			COUNT(DISTINCT vf.agent_id) as affected_count
+		FROM endpoint_vulnerability_findings vf
+		LEFT JOIN endpoint_cve_catalog c ON c.cve_id = vf.cve_id
+		WHERE ($1 = '' OR $1 = 'all' OR vf.tenant_slug = $1) AND vf.status = 'open'
+		GROUP BY vf.cve_id, c.title
+		ORDER BY is_kev DESC, cvss DESC, affected_count DESC
+		LIMIT 5
+	`
+	cveRows, err := db.pool.Query(ctx, queryTopCVEs, tenantSlug)
+	if err == nil {
+		defer cveRows.Close()
+		for cveRows.Next() {
+			var sc models.EndpointCVESummary
+			if err := cveRows.Scan(&sc.CVEID, &sc.Title, &sc.CVSSScore, &sc.Severity, &sc.CISAKEV, &sc.EPSSScore, &sc.AffectedCount); err == nil {
+				summary.TopCVEs = append(summary.TopCVEs, sc)
+			}
+		}
 	}
 
 	return summary, nil

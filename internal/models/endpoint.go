@@ -115,6 +115,14 @@ type EndpointPolicyConfig struct {
 	EventChannels        []string `json:"event_channels"`
 	OsqueryEnabled       bool     `json:"osquery_enabled"`
 	UpdateChannel        string   `json:"update_channel"` // stable, beta, development
+
+	// FIM (File & Registry Integrity Monitoring - Phase L)
+	FIMEnabled           bool     `json:"fim_enabled"`
+	FIMScanIntervalSec   int      `json:"fim_scan_interval_sec"`
+	FIMPaths             []string `json:"fim_paths"`
+	FIMExcludePaths      []string `json:"fim_exclude_paths"`
+	FIMRegistryKeys      []string `json:"fim_registry_keys"`
+	FIMSeverityThreshold string   `json:"fim_severity_threshold"` // LOW, MEDIUM, HIGH, CRITICAL
 }
 
 // EndpointSoftware represents a normalized software package installed on an endpoint
@@ -122,6 +130,9 @@ type EndpointSoftware struct {
 	ID              uuid.UUID `json:"id"`
 	AgentID         uuid.UUID `json:"agent_id"`
 	TenantSlug      string    `json:"tenant_slug"`
+	AgentHostname   string    `json:"agent_hostname,omitempty"`
+	AgentIP         string    `json:"agent_ip,omitempty"`
+	AgentOS         string    `json:"agent_os,omitempty"`
 	Name            string    `json:"name"`
 	Vendor          string    `json:"vendor"`
 	Version         string    `json:"version"`

@@ -254,6 +254,24 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.0** (Dosya ve Kayıt Defteri Bütünlük İzleme - FIM - Phase L ve Uç Nokta Veri Zenginleştirmesi) / **Agent v0.1.6**:
+  - **Yerel Çok Platformlu Kriptografik FIM Tarayıcısı (Phase L - Ajan v0.1.6)**:
+    - Kritik sistem ikilileri (`/bin`, `/usr/bin`, `C:\Windows\System32`), yapılandırma dosyaları (`/etc`, `/etc/pam.d`, `/etc/ssh`) ve Windows Kayıt Defteri kovanları (`Run`, `RunOnce`, `Services`, `IFEO`) üzerinde SHA-256 özetleri hesaplayan yerel tarayıcı.
+    - `created`, `modified` ve `deleted` dosya/anahtar değişikliklerini, dosya boyutu, izinler ve sahiplik farklarıyla otonom olarak tespit etme.
+    - Otomatik kriptografik referans tabanı (`endpoint_fim_baselines`) takibi ve `/api/agent/v1/fim` üzerinden güvenli gönderim.
+  - **SIEM ve SOAR Tehdit Entegrasyonu (Sıfır Gün & Kalıcılık Tespiti)**:
+    - Kritik ve yüksek seviyeli sapmaların MITRE ATT&CK teknikleriyle (`Persistence`, `Privilege Escalation`, `Defense Evasion`) otomatik etiketlenmesi.
+    - Doğrudan SIEM korelasyon motoruna aktarılarak anlık `endpoint_fim` güvenlik alarmları üretimi.
+    - Anında SOAR müdahale entegrasyonu: Yetkisiz ikili modifikasyonlarında tek tıkla veya otonom host izolasyonu ve adli bilişim (forensics) süreci.
+  - **Merkezi FIM Yönetim Paneli & Modalleri**:
+    - Toplam Olay, Kritik Sapma, İzlenen Referanslar ve Etkilenen Uç Noktalar KPI kartlarını içeren FIM alt paneli.
+    - Eski ve yeni SHA-256 hash karşılaştırması, MITRE rozetleri ve derinlemesine inceleme modalı.
+    - Ajan bazlı kriptografik referans (baseline) görüntüleme modalı.
+  - **Uç Nokta Tabloları & Veri Düzeltmeleri**:
+    - Yazılım Envanteri, Zafiyetler ve Yama Yönetimi tablolarında eksik görünen Hostname, IP ve İşletim Sistemi bilgilerinin tam zenginleştirilmesi.
+    - Uç Nokta Genel Bakış (Dashboard) ekranındaki En Yüksek Riskli Ajanlar ve En Çok Etkilenen CVE'ler tablolarının canlı verilerle doldurulması.
+    - Ajan sağlık durumunun son kalp atışı süresine göre dinamik olarak hesaplanması.
+
 - **v1.8.9** (Otomatik SOAR Olay Müdahale Playbookları & EDR Aktif Müdahale Paketi - Phase K):
   - **Otomatik SIEM-EDR Playbook Motoru (Phase K.1 & K.2)**:
     - SIEM korelasyon kuralları ile uç nokta EDR aktif müdahale yeteneklerini gerçek zamanlı birbirine bağlayan olay güdümlü SOAR motoru.

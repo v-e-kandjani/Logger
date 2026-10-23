@@ -265,6 +265,24 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.0** (File & Registry Integrity Monitoring - FIM - Phase L & Endpoint Data Enrichment) / **Agent v0.1.6**:
+  - **Native Cross-Platform Cryptographic FIM Scanner (Phase L - Agent v0.1.6)**:
+    - Integrated native Go cryptographic scanner calculating SHA-256 digests across critical operating system binaries (`/bin`, `/sbin`, `/usr/bin`, `C:\Windows\System32`), configurations (`/etc`, `/etc/pam.d`, `/etc/ssh`), and Windows Registry hives (`Run`, `RunOnce`, `Services`, `Image File Execution Options`).
+    - Autonomous detection of `created`, `modified`, and `deleted` system files and registry keys with permission, owner, and file size delta tracking.
+    - Automatic baseline tracking (`endpoint_fim_baselines`) and cryptographic deviation calculation submitted securely via `/api/agent/v1/fim`.
+  - **SIEM & SOAR Threat Synergy (Zero-Day & Persistence Mitigation)**:
+    - High & critical integrity deviations automatically enriched with MITRE ATT&CK techniques (`Persistence`, `Privilege Escalation`, `Defense Evasion`, `Impact`).
+    - Direct dispatch to SIEM correlation engine creating instantaneous `endpoint_fim` security alerts.
+    - Immediate SOAR automated playbook trigger capability: 1-click or autonomous host network isolation and forensics snapshot upon unauthorized binary modification or ransomware indicators.
+  - **Centralized FIM Operations Dashboard**:
+    - Dedicated FIM navigation view with KPI stat cards (Total Events, Critical Deviations, Monitored Baselines, Affected Endpoints).
+    - Real-time deviation event stream with SHA-256 hash comparison (Old vs New), MITRE badges, and deep inspection modal.
+    - Endpoint Cryptographic Baselines viewer displaying tracked file paths, verified hashes, sizes, and timestamps.
+  - **Endpoint Security Table & Data Enrichment**:
+    - Enriched Software Inventory, Vulnerabilities, and Patch Compliance tables to consistently display true Endpoint Hostname, IP address, and OS metadata.
+    - Updated Endpoint Security Dashboard with live Top Vulnerable Endpoints and Top CVEs ranked by critical risk.
+    - Real-time dynamic agent health status calculation derived from actual heartbeat staleness.
+
 - **v1.8.9** (Automated SOAR Incident Response Playbooks & EDR Active Mitigation Suite - Phase K):
   - **Automated SIEM-to-EDR Playbook Engine (Phase K.1 & K.2)**:
     - Real-time event-driven incident mitigation engine bridging SIEM detection rules directly with cross-platform endpoint active response tasks.

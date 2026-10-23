@@ -564,7 +564,8 @@ func (db *DB) ListEndpointSoftware(ctx context.Context, tenantSlug, search strin
 		SELECT 
 			s.id, s.agent_id, s.tenant_slug, s.name, s.vendor, s.version,
 			s.arch, s.package_type, s.package_name, s.install_location,
-			s.purl, s.cpe, s.first_seen, s.last_seen
+			s.purl, s.cpe, s.first_seen, s.last_seen,
+			COALESCE(a.hostname, ''), COALESCE(a.ip_address, ''), COALESCE(a.os_type, '')
 		FROM endpoint_software_current s
 		JOIN endpoint_agents a ON a.id = s.agent_id
 		WHERE %s
@@ -587,6 +588,7 @@ func (db *DB) ListEndpointSoftware(ctx context.Context, tenantSlug, search strin
 			&s.ID, &s.AgentID, &s.TenantSlug, &s.Name, &s.Vendor, &s.Version,
 			&s.Arch, &s.PackageType, &s.PackageName, &s.InstallLocation,
 			&s.PURL, &s.CPE, &s.FirstSeen, &s.LastSeen,
+			&s.AgentHostname, &s.AgentIP, &s.AgentOS,
 		)
 		if err == nil {
 			list = append(list, s)

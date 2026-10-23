@@ -10,6 +10,7 @@ import (
 
 	"github.com/syslog-platform/logger/agent/internal/collector"
 	"github.com/syslog-platform/logger/agent/internal/config"
+	"github.com/syslog-platform/logger/agent/internal/fim"
 	"github.com/syslog-platform/logger/agent/internal/identity"
 	"github.com/syslog-platform/logger/agent/internal/transport"
 	"github.com/syslog-platform/logger/agent/internal/updater"
@@ -26,6 +27,8 @@ type Agent struct {
 	currentPolicy *models.EndpointPolicyConfig
 	hbTicker      *time.Ticker
 	invTicker     *time.Ticker
+	fimTicker     *time.Ticker
+	fimScanner    *fim.Scanner
 	isUpgrading   bool
 }
 
@@ -42,10 +45,11 @@ func NewAgent(cfg *config.Config) (*Agent, error) {
 	}
 
 	return &Agent{
-		cfg:       cfg,
-		identity:  idInfo,
-		client:    client,
-		policyRev: 1,
+		cfg:        cfg,
+		identity:   idInfo,
+		client:     client,
+		policyRev:  1,
+		fimScanner: fim.NewScanner(),
 	}, nil
 }
 
@@ -105,9 +109,17 @@ func (a *Agent) Run(ctx context.Context) error {
 	a.invTicker = time.NewTicker(invInterval)
 	defer a.invTicker.Stop()
 
-	// Initial heartbeat & inventory
+	fimInterval := 5 * time.Minute
+	if a.currentPolicy != nil && a.currentPolicy.FIMScanIntervalSec >= 30 {
+		fimInterval = time.Duration(a.currentPolicy.FIMScanIntervalSec) * time.Second
+	}
+	a.fimTicker = time.NewTicker(fimInterval)
+	defer a.fimTicker.Stop()
+
+	// Initial heartbeat, inventory & FIM scan
 	a.sendHeartbeat(ctx)
 	go a.sendInventory(ctx)
+	go a.sendFIMScan(ctx)
 
 	for {
 		select {
@@ -116,6 +128,8 @@ func (a *Agent) Run(ctx context.Context) error {
 			return nil
 		case <-a.invTicker.C:
 			go a.sendInventory(ctx)
+		case <-a.fimTicker.C:
+			go a.sendFIMScan(ctx)
 		case <-a.hbTicker.C:
 			// Apply random jitter (+/- 2 seconds) to avoid synchronization spikes
 			jitter := time.Duration(rand.Intn(4)-2) * time.Second
@@ -244,6 +258,9 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 			if policy.InventoryIntervalSec >= 60 && a.invTicker != nil {
 				a.invTicker.Reset(time.Duration(policy.InventoryIntervalSec) * time.Second)
 			}
+			if policy.FIMScanIntervalSec >= 30 && a.fimTicker != nil {
+				a.fimTicker.Reset(time.Duration(policy.FIMScanIntervalSec) * time.Second)
+			}
 		} else {
 			log.Printf("[LOGGER Agent] Server reports policy update available (Rev %d)", a.policyRev)
 		}
@@ -267,5 +284,43 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 		for _, task := range resp.PendingTasks {
 			go a.executeTask(context.Background(), task)
 		}
+	}
+}
+
+func (a *Agent) sendFIMScan(ctx context.Context) {
+	if a.currentPolicy != nil && a.currentPolicy.FIMEnabled == false && a.currentPolicy.FIMScanIntervalSec > 0 {
+		return
+	}
+	if a.fimScanner == nil {
+		return
+	}
+
+	var customPaths, excludePaths []string
+	if a.currentPolicy != nil {
+		customPaths = a.currentPolicy.FIMPaths
+		excludePaths = a.currentPolicy.FIMExcludePaths
+	}
+
+	events, baselines := a.fimScanner.Scan(customPaths, excludePaths)
+	if len(events) == 0 && len(baselines) == 0 {
+		return
+	}
+
+	if len(events) > 0 {
+		log.Printf("[LOGGER FIM] Detected %d integrity deviation events on host!", len(events))
+	}
+
+	sub := models.AgentFIMSubmission{
+		AgentUUID:     a.identity.AgentUUID,
+		Hostname:      a.identity.Hostname,
+		Events:        events,
+		BaselineItems: baselines,
+	}
+
+	var resp struct {
+		Status string `json:"status"`
+	}
+	if err := a.client.PostJSON(ctx, "/api/agent/v1/fim", sub, &resp); err != nil {
+		log.Printf("[LOGGER FIM] Error submitting FIM telemetry: %v", err)
 	}
 }
