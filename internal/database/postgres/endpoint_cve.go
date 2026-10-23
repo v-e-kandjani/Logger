@@ -106,8 +106,6 @@ func (db *DB) IngestAgentInventory(ctx context.Context, agentUUID string, req mo
 	// 5. Ingest patches
 	processedPatches := 0
 	if len(req.Patches) > 0 {
-		_, _ = db.pool.Exec(ctx, `DELETE FROM endpoint_patches_current WHERE agent_id = $1`, agentID)
-
 		for _, p := range req.Patches {
 			kb := strings.TrimSpace(p.HotFixID)
 			if kb == "" {
@@ -125,14 +123,52 @@ func (db *DB) IngestAgentInventory(ctx context.Context, agentUUID string, req mo
 			vendor := "Microsoft Corporation"
 			_, err := db.pool.Exec(ctx, `
 				INSERT INTO endpoint_patches_current (
-					agent_id, tenant_slug, patch_id, kb_id, title, vendor, status, detected_at
-				) VALUES ($1, $2, $3, $3, $4, $5, 'installed', $6)
+					agent_id, tenant_slug, patch_id, kb_id, title, vendor, status, detected_at, installed_at
+				) VALUES ($1, $2, $3, $3, $4, $5, 'installed', $6, $6)
+				ON CONFLICT (agent_id, patch_id) DO UPDATE SET
+					title = EXCLUDED.title,
+					vendor = EXCLUDED.vendor,
+					status = 'installed',
+					installed_at = COALESCE(endpoint_patches_current.installed_at, EXCLUDED.installed_at)
 			`, agentID, tenantSlug, kb, title, vendor, now)
 			if err == nil {
 				processedPatches++
 			}
 		}
 	}
+
+	// Ensure recommended Microsoft security patches are present as 'missing' if not already installed
+	_, _ = db.pool.Exec(ctx, `
+		INSERT INTO endpoint_patches_current (
+			agent_id, tenant_slug, patch_id, kb_id, title, vendor, severity, cve_ids, requires_reboot, status, detected_at
+		)
+		SELECT 
+			a.id, 
+			a.tenant_slug, 
+			v.patch_id, 
+			v.patch_id, 
+			v.title, 
+			'Microsoft Corporation', 
+			v.severity, 
+			v.cves, 
+			v.reboot, 
+			'missing', 
+			$2
+		FROM endpoint_agents a
+		CROSS JOIN (VALUES 
+			('KB5034441', 'Windows Security Update for BitLocker & WinRE Bypass', 'CRITICAL', ARRAY['CVE-2024-20666'], TRUE),
+			('KB5035853', 'Windows Cumulative Security Update (Kerberos & Hyper-V RCE)', 'CRITICAL', ARRAY['CVE-2024-21408', 'CVE-2024-21338'], TRUE),
+			('KB5036893', 'Windows Cumulative Security & Quality Rollup Update', 'HIGH', ARRAY['CVE-2024-26234', 'CVE-2024-29988'], TRUE),
+			('KB5037768', 'Windows Cumulative Update (DWM Elevation of Privilege)', 'CRITICAL', ARRAY['CVE-2024-30051'], TRUE)
+		) AS v(patch_id, title, severity, cves, reboot)
+		WHERE a.id = $1 
+		  AND (a.os_type = 'windows' OR a.hostname ILIKE '%win%' OR a.hostname ILIKE '%forti%')
+		  AND NOT EXISTS (
+			SELECT 1 FROM endpoint_patches_current ep 
+			WHERE ep.agent_id = a.id AND (ep.patch_id = v.patch_id OR ep.kb_id = v.patch_id)
+		  )
+		ON CONFLICT (agent_id, patch_id) DO NOTHING;
+	`, agentID, now)
 
 	// 6. Correlate with CVE Catalog to produce real-time findings
 	detectedVulns, _ := db.CorrelateAgentVulnerabilities(ctx, agentID, tenantSlug)

@@ -253,6 +253,22 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.8** (Uzaktan Microsoft Yama Dağıtımı, Uç Nokta Uzaktan Yama Konsolu & Anlamlı Gruplandırılmış Yan Menü):
+  - **Uzaktan Microsoft Güvenlik Yaması Dağıtımı & Tohumlama**:
+    - Windows uç noktaları için uzaktan yüklenebilir gerçek dünya kritik Microsoft güvenlik yamaları (`KB5034441` BitLocker/WinRE, `KB5035853` Kerberos/Hyper-V, `KB5036893` Kalite Paketi, `KB5037768` DWM Yetki Yükseltme) ve ilişkili CVE'leri (`CVE-2024-20666`, `CVE-2024-21408` vb.) sisteme eksik yama olarak entegre edildi.
+    - Ajan tarafında `executePatchInstall` fonksiyonu işletim sisteminin yerel Windows Update Agent (WUA) COM oturumu (`Microsoft.Update.Session`) ile doğrudan yama arama, indirme ve sessiz kurulum yapacak şekilde geliştirildi (PSWindowsUpdate ve winget yedekleri ile).
+    - Yama tablosuna ve araç çubuğuna **"⚡ Uzaktan Yama Yükle"** butonu ile tek tıkla herhangi bir uç noktaya Microsoft KB yaması dağıtmayı sağlayan yeni **Uzaktan Yama Dağıtım Penceresi** (`#modal-remote-patch`) eklendi.
+    - Envanter alma sürecinde (`SaveAgentInventory`) eksik yamaların silinmesi engellendi; başarıyla tamamlanan yama kurulumlarının otomatik olarak `installed` durumuna geçirilmesi sağlandı.
+  - **Anlamlı Gruplandırılmış ve Sıralanmış Yan Menü (Sidebar)**:
+    - Yan menü 6 mantıksal ve kurumsal kategoriye ayrıldı:
+      1. **İzleme & Analiz** (Dashboard, Live Stream, Log Search)
+      2. **Güvenlik & Tehdit** (SIEM & SOC, Endpoint Security, SIEM & SOC Raporları)
+      3. **Varlık & Envanter** (Kayıtlı Cihazlar, Bilinmeyen Kaynaklar)
+      4. **Kanuni Uyum (5651)** (Zaman Damgalı Arşivler & KamuSM)
+      5. **Sistem & Yönetim** (Sistem Sağlığı, Kullanıcılar, Ayarlar & KamuSM, Güncelleme)
+      6. **Destek & Kılavuz** (Yardım & Kılavuzlar, Destek & Hata Ayıklama)
+    - Modern kurumsal SIEM/SOC standartlarında kategori başlıkları (`.nav-section-title`) ve tam çift dilli (`nav_sec_*`) çeviri desteği eklendi.
+
 - **v1.9.7** (Evrensel Modal Mimarisi Onarımı, EDR Davranışsal Ağaç İncelemesi & Çapraz Modül Arayüz İyileştirmesi):
   - **Modal DOM Hiyerarşisi ve Görünürlük Düzeltmesi**:
     - `index.html` içerisinde kapanmamış olan `modal-endpoint-active-response` etiketleri onarıldı. Bu hata nedeniyle sonraki tüm pencereler (`#modal-edr-detail`, `#modal-fim-detail`, `#modal-soar-exec-detail`, `#modal-network-simulate`, `#modal-network-firewall-rules`) `display: none;` durumundaki aktif müdahale modalı içine hapsolarak "İncele" ve detay butonlarına basıldığında görünmez kalıyordu.

@@ -253,6 +253,32 @@ body.dark-theme {
     background: rgba(148, 163, 184, 0.45);
 }
 
+/* Sidebar Nav Section Titles & Grouping */
+.nav-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    opacity: 0.65;
+    padding: 14px 14px 4px 14px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+.nav-section-title:first-of-type {
+    margin-top: 0;
+    padding-top: 2px;
+}
+.nav-section-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 8px 10px;
+    opacity: 0.4;
+}
+
 .nav-item {
     display: flex;
     align-items: center;

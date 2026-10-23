@@ -9183,11 +9183,15 @@ async function loadEndpointPatches() {
 
             let actionBtn = '';
             if (p.status === 'missing') {
-                actionBtn = `<button class="btn btn-sm btn-primary" onclick="openDeployPatchModal('${escapeHtml(p.agent_id)}', '${escapeHtml(p.agent_hostname)}', '${escapeHtml(p.patch_id)}', '${escapeHtml(patchTitle)}', '${escapeHtml(p.agent_os || '')}')" style="font-size: 11px; padding: 3px 8px; font-weight: 600;"><i class="fas fa-wrench"></i> ${t('btn_deploy_patch')}</button>`;
+                actionBtn = `<button class="btn btn-sm btn-primary" onclick="openDeployPatchModal('${escapeHtml(p.agent_id)}', '${escapeHtml(p.agent_hostname)}', '${escapeHtml(p.patch_id)}', '${escapeHtml(patchTitle)}', '${escapeHtml(p.agent_os || '')}')" style="font-size: 11px; padding: 4px 10px; font-weight: 600;"><i class="fas fa-satellite-dish"></i> ${t('btn_deploy_patch', 'Uzaktan Yama Yükle')}</button>`;
             } else if (p.status === 'pending_reboot') {
-                actionBtn = `<button class="btn btn-sm btn-danger" onclick="rebootEndpoint('${escapeHtml(p.agent_id)}', '${escapeHtml(p.agent_hostname)}')" style="font-size: 11px; padding: 3px 8px; font-weight: 600;"><i class="fas fa-power-off"></i> ${t('btn_reboot_endpoint')}</button>`;
+                actionBtn = `<button class="btn btn-sm btn-danger" onclick="rebootEndpoint('${escapeHtml(p.agent_id)}', '${escapeHtml(p.agent_hostname)}')" style="font-size: 11px; padding: 4px 10px; font-weight: 600;"><i class="fas fa-power-off"></i> ${t('btn_reboot_endpoint', 'Yeniden Başlat')}</button>`;
             } else {
-                actionBtn = `<span class="badge badge-success" style="font-size: 11px; padding: 3px 6px;">✓ ${t('lbl_patched')}</span>`;
+                actionBtn = `
+                    <div style="display: inline-flex; align-items: center; gap: 4px;">
+                        <span class="badge badge-success" style="font-size: 11px; padding: 3px 6px;">✓ ${t('lbl_patched', 'Yüklü')}</span>
+                        <button class="btn btn-sm btn-outline" onclick="openDeployPatchModal('${escapeHtml(p.agent_id)}', '${escapeHtml(p.agent_hostname)}', '${escapeHtml(p.patch_id)}', '${escapeHtml(patchTitle)}', '${escapeHtml(p.agent_os || '')}')" style="font-size: 10px; padding: 2px 6px;" title="${t('btn_redeploy_patch', 'Yeniden Uzaktan Yükle')}"><i class="fas fa-redo"></i></button>
+                    </div>`;
             }
 
             return `
@@ -9919,12 +9923,18 @@ function openDeployPatchModal(agentId, hostname, patchId, title, os) {
     document.getElementById('modal-deploy-patch-subtitle').textContent = (hostname || 'Agent') + ' (' + (os || 'OS') + ')';
     
     const modal = document.getElementById('modal-deploy-patch');
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
 }
 
 function closeDeployPatchModal() {
     const modal = document.getElementById('modal-deploy-patch');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 async function submitDeployPatch() {
@@ -9955,9 +9965,9 @@ async function submitDeployPatch() {
 
         closeDeployPatchModal();
         if (typeof showToast === 'function') {
-            showToast('✓ ' + t('msg_patch_queued'), 'success');
+            showToast('✓ ' + t('msg_patch_queued', 'Yama yükleme görevi uç noktaya başarıyla iletildi.'), 'success');
         } else if (typeof showNotification === 'function') {
-            showNotification(t('msg_patch_queued'), 'success');
+            showNotification(t('msg_patch_queued', 'Yama yükleme görevi uç noktaya başarıyla iletildi.'), 'success');
         }
         loadEndpointPatches();
     } catch (err) {
@@ -9967,13 +9977,145 @@ async function submitDeployPatch() {
 
 function openBatchPatchDeployModal() {
     const modal = document.getElementById('modal-batch-patch-deploy');
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
 }
 
 function closeBatchPatchDeployModal() {
     const modal = document.getElementById('modal-batch-patch-deploy');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
+
+// --- Remote Microsoft Patch Deployment Modal Controller ---
+async function openRemotePatchModal() {
+    const modal = document.getElementById('modal-remote-patch');
+    if (!modal) return;
+    
+    // Populate agent select
+    const select = document.getElementById('remote-patch-agent-select');
+    if (select) {
+        select.innerHTML = '<option value="">Uç noktalar yükleniyor...</option>';
+        try {
+            const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+            const res = await fetch(`/api/v1/endpoint/agents?tenant=${encodeURIComponent(tenant)}&limit=100`);
+            if (res.ok) {
+                const data = await res.json();
+                const agents = data.agents || [];
+                if (agents.length === 0) {
+                    select.innerHTML = '<option value="">Kayıtlı uç nokta bulunamadı</option>';
+                } else {
+                    select.innerHTML = agents.map(a => {
+                        const os = (a.os_type || 'OS').toUpperCase();
+                        const isWin = (a.os_type === 'windows' || (a.hostname && a.hostname.toLowerCase().includes('forti')));
+                        const icon = isWin ? '🪟' : (a.os_type === 'darwin' ? '🍎' : '🐧');
+                        return `<option value="${escapeHtml(a.id)}" data-os="${escapeHtml(a.os_type || '')}" ${isWin ? 'selected' : ''}>${icon} ${escapeHtml(a.hostname || a.ip_address)} (${escapeHtml(a.ip_address || '-')} - ${os})</option>`;
+                    }).join('');
+                }
+            }
+        } catch (e) {
+            console.error('Error fetching agents for remote patch modal:', e);
+            select.innerHTML = '<option value="">Uç nokta listesi alınamadı</option>';
+        }
+    }
+
+    // Reset inputs
+    const patchSel = document.getElementById('remote-patch-select');
+    if (patchSel) patchSel.selectedIndex = 0;
+    const customWrap = document.getElementById('remote-patch-custom-wrap');
+    if (customWrap) customWrap.style.display = 'none';
+    const customInp = document.getElementById('remote-patch-custom-kb');
+    if (customInp) customInp.value = '';
+    const rebootChk = document.getElementById('remote-patch-reboot');
+    if (rebootChk) rebootChk.checked = true;
+
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+}
+
+function closeRemotePatchModal() {
+    const modal = document.getElementById('modal-remote-patch');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+}
+
+function handleRemotePatchSelectChange(val) {
+    const customWrap = document.getElementById('remote-patch-custom-wrap');
+    if (customWrap) {
+        customWrap.style.display = (val === 'custom') ? 'block' : 'none';
+    }
+}
+
+async function submitRemotePatch() {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const agentSelect = document.getElementById('remote-patch-agent-select');
+    const agentId = agentSelect?.value;
+    if (!agentId) {
+        alert('Lütfen bir hedef uç nokta seçin.');
+        return;
+    }
+
+    const patchSel = document.getElementById('remote-patch-select');
+    let patchId = patchSel?.value;
+    let title = '';
+    if (patchId === 'custom') {
+        patchId = document.getElementById('remote-patch-custom-kb')?.value?.trim();
+        if (!patchId) {
+            alert('Lütfen geçerli bir KB veya paket numarası girin.');
+            return;
+        }
+        title = `Security & Quality Update (${patchId})`;
+    } else {
+        const selectedOpt = patchSel?.options[patchSel.selectedIndex];
+        title = selectedOpt?.getAttribute('data-title') || `Security Update (${patchId})`;
+    }
+
+    const rebootAfter = document.getElementById('remote-patch-reboot')?.checked || false;
+
+    try {
+        const res = await fetch('/api/v1/endpoint/patches/deploy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agent_id: agentId,
+                patch_id: patchId,
+                title: title,
+                reboot_after: rebootAfter
+            })
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'Uzaktan yama görevi iletilemedi');
+        }
+
+        closeRemotePatchModal();
+        const successMsg = `✓ ${patchId} yama yükleme görevi uç noktaya başarıyla iletildi.`;
+        if (typeof showToast === 'function') {
+            showToast(successMsg, 'success');
+        } else if (typeof showNotification === 'function') {
+            showNotification(successMsg, 'success');
+        }
+        loadEndpointPatches();
+    } catch (err) {
+        alert('Hata: ' + err.message);
+    }
+}
+
+window.openDeployPatchModal = openDeployPatchModal;
+window.closeDeployPatchModal = closeDeployPatchModal;
+window.openBatchPatchDeployModal = openBatchPatchDeployModal;
+window.closeBatchPatchDeployModal = closeBatchPatchDeployModal;
+window.openRemotePatchModal = openRemotePatchModal;
+window.closeRemotePatchModal = closeRemotePatchModal;
+window.handleRemotePatchSelectChange = handleRemotePatchSelectChange;
+window.submitRemotePatch = submitRemotePatch;
 
 async function submitBatchPatchDeploy() {
     const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;

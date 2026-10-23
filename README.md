@@ -264,6 +264,22 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.8** (Remote Microsoft Patching Orchestration, Fleet-Wide Remote Patch Console & Structured Sidebar Navigation):
+  - **Microsoft Remote Patch Deployment & Seeding**:
+    - Seeded real-world critical Microsoft security updates (`KB5034441` BitLocker/WinRE Bypass, `KB5035853` Kerberos/Hyper-V RCE, `KB5036893` Security Rollup, `KB5037768` DWM Privilege Escalation) for Windows endpoints with CVE correlation (`CVE-2024-20666`, `CVE-2024-21408`, etc.) as remediable missing patches.
+    - Enhanced agent `executePatchInstall` with native Windows Update Agent (WUA) COM session automation (`Microsoft.Update.Session`), downloading and installing updates via the OS update engine with fallback to `Install-WindowsUpdate` and `winget`.
+    - Added dedicated **Remote Patch Modal** (`#modal-remote-patch`) and **Remote Patch Button** (`⚡ Uzaktan Yama Yükle`) in the patch toolbar and table rows, enabling administrators to remotely deploy Microsoft security KBs to any connected endpoint with optional reboot scheduling.
+    - Updated patch inventory ingestion (`SaveAgentInventory`) with conflict resolution preserving missing updates while transitioning completed remediations to installed.
+  - **Structured & Ordered Sidebar Navigation**:
+    - Reorganized the navigation menu into 6 intuitive, role-based categories:
+      1. **Monitoring & Logs** (Dashboard, Live Stream, Log Search)
+      2. **Security & Threats** (SIEM & SOC, Endpoint Security, SIEM & SOC Reports)
+      3. **Asset Inventory** (Registered Devices, Unknown Sources)
+      4. **Compliance & Legal** (Archives & Legal Evidence - 5651)
+      5. **System & Administration** (System Health, Users & Access, Settings & KamuSM, System Upgrade)
+      6. **Support & Help** (Help & Guides, Support & Diagnostics)
+    - Added clean uppercase section titles (`.nav-section-title`) with full bilingual localization (`nav_sec_*`).
+
 - **v1.9.7** (Universal Modal Architecture Repair, EDR Behavioral Tree Inspection & Cross-Module UI Hardening):
   - **Modal DOM Hierarchy & Visibility Bugfix**:
     - Fixed unclosed modal div tags in `index.html` that previously trapped all subsequent modals (`#modal-edr-detail`, `#modal-fim-detail`, `#modal-soar-exec-detail`, `#modal-network-simulate`, `#modal-network-firewall-rules`) inside `#modal-endpoint-active-response` which had `display: none;`, preventing "Inspect" and detail buttons from opening modals.

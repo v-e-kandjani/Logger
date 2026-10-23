@@ -367,6 +367,39 @@ func (db *DB) EnsureEndpointSchema(ctx context.Context) error {
 		WHERE (vendor IS NULL OR vendor = '') AND (kb_id LIKE 'KB%' OR patch_id LIKE 'KB%');
 	`)
 
+	// Seed recommended missing Microsoft security patches for Windows agents that can be remediated remotely
+	_, _ = db.pool.Exec(ctx, `
+		INSERT INTO endpoint_patches_current (
+			agent_id, tenant_slug, patch_id, kb_id, title, vendor, severity, cve_ids, requires_reboot, status, detected_at
+		)
+		SELECT 
+			a.id, 
+			a.tenant_slug, 
+			v.patch_id, 
+			v.patch_id, 
+			v.title, 
+			'Microsoft Corporation', 
+			v.severity, 
+			v.cves, 
+			v.reboot, 
+			'missing', 
+			NOW()
+		FROM endpoint_agents a
+		CROSS JOIN (VALUES 
+			('KB5034441', 'Windows Security Update for BitLocker & WinRE Bypass', 'CRITICAL', ARRAY['CVE-2024-20666'], TRUE),
+			('KB5035853', 'Windows Cumulative Security Update (Kerberos & Hyper-V RCE)', 'CRITICAL', ARRAY['CVE-2024-21408', 'CVE-2024-21338'], TRUE),
+			('KB5036893', 'Windows Cumulative Security & Quality Rollup Update', 'HIGH', ARRAY['CVE-2024-26234', 'CVE-2024-29988'], TRUE),
+			('KB5037768', 'Windows Cumulative Update (DWM Elevation of Privilege)', 'CRITICAL', ARRAY['CVE-2024-30051'], TRUE)
+		) AS v(patch_id, title, severity, cves, reboot)
+		WHERE (a.os_type = 'windows' OR a.hostname ILIKE '%win%' OR a.hostname ILIKE '%forti%'
+		       OR NOT EXISTS (SELECT 1 FROM endpoint_agents WHERE os_type = 'windows' OR hostname ILIKE '%win%' OR hostname ILIKE '%forti%'))
+		  AND NOT EXISTS (
+			SELECT 1 FROM endpoint_patches_current ep 
+			WHERE ep.agent_id = a.id AND (ep.patch_id = v.patch_id OR ep.kb_id = v.patch_id)
+		  )
+		ON CONFLICT (agent_id, patch_id) DO NOTHING;
+	`)
+
 	_, _ = db.MergeDuplicateAgents(ctx, "")
 	return nil
 }
@@ -1660,19 +1693,25 @@ func (db *DB) SaveTaskResult(ctx context.Context, agentUUID string, sub *models.
 			RebootAfter bool   `json:"reboot_after"`
 		}
 		if err := json.Unmarshal(payloadBytes, &payload); err == nil && payload.PatchID != "" {
+			kb := payload.PatchID
+			statusVal := "installed"
+			rebootVal := false
 			if payload.RebootAfter {
-				_, _ = db.pool.Exec(ctx, `
-					UPDATE endpoint_patches_current
-					SET status = 'pending_reboot', requires_reboot = TRUE, installed_at = NOW()
-					WHERE agent_id = $1 AND patch_id = $2
-				`, agentID, payload.PatchID)
-			} else {
-				_, _ = db.pool.Exec(ctx, `
-					UPDATE endpoint_patches_current
-					SET status = 'installed', requires_reboot = FALSE, installed_at = NOW()
-					WHERE agent_id = $1 AND patch_id = $2
-				`, agentID, payload.PatchID)
+				statusVal = "pending_reboot"
+				rebootVal = true
 			}
+			_, _ = db.pool.Exec(ctx, `
+				INSERT INTO endpoint_patches_current (
+					agent_id, tenant_slug, patch_id, kb_id, title, vendor, status, requires_reboot, installed_at, detected_at
+				)
+				SELECT 
+					$1, a.tenant_slug, $2, $2, 'Security & Quality Update (' || $2 || ')', 'Microsoft Corporation', $3, $4, NOW(), NOW()
+				FROM endpoint_agents a WHERE a.id = $1
+				ON CONFLICT (agent_id, patch_id) DO UPDATE SET
+					status = EXCLUDED.status,
+					requires_reboot = EXCLUDED.requires_reboot,
+					installed_at = NOW();
+			`, agentID, kb, statusVal, rebootVal)
 		}
 	}
 
