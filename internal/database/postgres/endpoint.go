@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -774,18 +775,25 @@ func (db *DB) MergeDuplicateAgents(ctx context.Context, tenantSlug string) (int,
 			// 10. Quarantined Files
 			_, _ = tx.Exec(ctx, `UPDATE endpoint_quarantined_files SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
 
-			// 11. SOAR Executions
-			_, _ = tx.Exec(ctx, `UPDATE soar_playbook_executions SET target_agent_id = $1 WHERE target_agent_id = $2`, winner.ID, old.ID)
+			// 11. Vulnerability Exceptions
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_vulnerability_exceptions SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
 
-			// 12. Delete the old inactive agent
+			// 12. SOAR Executions
+			_, _ = tx.Exec(ctx, `UPDATE soar_executions SET target_agent_id = $1 WHERE target_agent_id = $2`, winner.ID, old.ID)
+
+			// 13. Delete the old inactive agent
 			_, err = tx.Exec(ctx, `DELETE FROM endpoint_agents WHERE id = $1`, old.ID)
 			if err != nil {
+				log.Printf("[MergeDuplicateAgents] Failed to delete old agent %s: %v", old.ID, err)
 				_ = tx.Rollback(ctx)
 				continue
 			}
 
 			if err := tx.Commit(ctx); err == nil {
 				totalRemoved++
+				log.Printf("[MergeDuplicateAgents] Successfully merged agent %s into %s", old.ID, winner.ID)
+			} else {
+				log.Printf("[MergeDuplicateAgents] Failed to commit merge tx for %s: %v", old.ID, err)
 			}
 		}
 	}
