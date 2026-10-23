@@ -3054,6 +3054,7 @@ window.onLanguageChanged = (lang) => {
             else if (currentEndpointSection === 'endpoint-sec-fim') loadEndpointFIM();
             else if (currentEndpointSection === 'endpoint-sec-usb') loadEndpointUSB();
             else if (currentEndpointSection === 'endpoint-sec-edr') loadEndpointEDR();
+            else if (currentEndpointSection === 'endpoint-sec-network') loadEndpointNetwork();
         }
     } else if (activeTab === 'health') {
         if (typeof loadHealthTelemetry === 'function') loadHealthTelemetry();
@@ -8220,6 +8221,8 @@ function switchEndpointSubSection(targetId) {
         loadEndpointUSB();
     } else if (targetId === 'endpoint-sec-edr') {
         loadEndpointEDR();
+    } else if (targetId === 'endpoint-sec-network') {
+        loadEndpointNetwork();
     } else if (targetId === 'endpoint-sec-policies') {
         loadEndpointPolicies();
     }
@@ -12093,6 +12096,388 @@ window.closeEDRDetail = closeEDRDetail;
 window.executeModalEDRKill = executeModalEDRKill;
 window.killEDRProcess = killEDRProcess;
 window.simulateEDREvent = simulateEDREvent;
+
+// ==========================================
+// PHASE O: ENDPOINT NETWORK TRAFFIC, DNS AUDITING & MICRO-SEGMENTATION
+// ==========================================
+
+let activeNetworkSubtab = 'conns';
+
+function switchNetworkSubtab(tab) {
+    activeNetworkSubtab = tab;
+    const connsBtn = document.getElementById('tab-net-conns-btn');
+    const dnsBtn = document.getElementById('tab-net-dns-btn');
+    const connsDiv = document.getElementById('subtab-net-conns');
+    const dnsDiv = document.getElementById('subtab-net-dns');
+
+    if (tab === 'conns') {
+        if (connsBtn) {
+            connsBtn.classList.add('active');
+            connsBtn.style.color = 'var(--accent)';
+            connsBtn.style.borderBottom = '2px solid var(--accent)';
+        }
+        if (dnsBtn) {
+            dnsBtn.classList.remove('active');
+            dnsBtn.style.color = 'var(--text-muted)';
+            dnsBtn.style.borderBottom = '2px solid transparent';
+        }
+        if (connsDiv) connsDiv.style.display = 'block';
+        if (dnsDiv) dnsDiv.style.display = 'none';
+        loadEndpointNetworkConnections();
+    } else {
+        if (dnsBtn) {
+            dnsBtn.classList.add('active');
+            dnsBtn.style.color = 'var(--accent)';
+            dnsBtn.style.borderBottom = '2px solid var(--accent)';
+        }
+        if (connsBtn) {
+            connsBtn.classList.remove('active');
+            connsBtn.style.color = 'var(--text-muted)';
+            connsBtn.style.borderBottom = '2px solid transparent';
+        }
+        if (connsDiv) connsDiv.style.display = 'none';
+        if (dnsDiv) dnsDiv.style.display = 'block';
+        loadEndpointNetworkDNS();
+    }
+}
+
+async function loadEndpointNetwork() {
+    loadEndpointNetworkStats();
+    if (activeNetworkSubtab === 'conns') {
+        loadEndpointNetworkConnections();
+    } else {
+        loadEndpointNetworkDNS();
+    }
+}
+
+async function loadEndpointNetworkStats() {
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/network/stats?tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const elConns = document.getElementById('ep-net-stat-conns');
+        const elSusp = document.getElementById('ep-net-stat-suspicious');
+        const elC2 = document.getElementById('ep-net-stat-c2');
+        const elDga = document.getElementById('ep-net-stat-dga');
+        const elFw = document.getElementById('ep-net-stat-fw');
+
+        if (elConns) elConns.textContent = (data.total_connections_observed || 0).toLocaleString();
+        if (elSusp) elSusp.textContent = (data.suspicious_outbound_conns || 0).toLocaleString();
+        if (elC2) elC2.textContent = (data.c2_beacons_detected || 0).toLocaleString();
+        if (elDga) elDga.textContent = (data.dga_domains_blocked || 0).toLocaleString();
+        if (elFw) elFw.textContent = (data.active_firewall_blocks || 0).toLocaleString();
+    } catch (e) {
+        console.error('loadEndpointNetworkStats error:', e);
+    }
+}
+
+async function loadEndpointNetworkConnections() {
+    const tbody = document.getElementById('ep-net-conns-tbody');
+    const countEl = document.getElementById('ep-net-conns-total-count');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const search = document.getElementById('ep-net-conn-search') ? document.getElementById('ep-net-conn-search').value.trim() : '';
+        const severity = document.getElementById('ep-net-filter-severity') ? document.getElementById('ep-net-filter-severity').value : 'all';
+
+        let url = `/api/v1/endpoint/network/connections?tenant=${encodeURIComponent(tenant)}&limit=100`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (severity && severity !== 'all') url += `&severity=${encodeURIComponent(severity)}`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const conns = data.connections || [];
+        if (countEl) countEl.textContent = `${data.total || conns.length} ${t('net_unit_conns') || 'Bağlantı'}`;
+
+        if (conns.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="color: var(--text-muted); padding: 28px;">${t('net_no_conns') || 'Henüz kaydedilmiş ağ soketi veya telemetri bulunmuyor.'}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = conns.map(c => {
+            const timeStr = formatDateTime(c.created_at || c.timestamp);
+            const sev = (c.threat_severity || 'info').toLowerCase();
+            let sevBadge = `<span class="badge badge-secondary">INFO</span>`;
+            if (sev === 'critical') sevBadge = `<span class="badge badge-danger">CRITICAL</span>`;
+            else if (sev === 'high') sevBadge = `<span class="badge badge-warning" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">HIGH</span>`;
+
+            let stateBadge = `<span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.1); color: var(--accent); font-family: monospace;">${escapeHtml(c.state || 'ESTABLISHED')}</span>`;
+            if (c.direction === 'listening') {
+                stateBadge = `<span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(148, 163, 184, 0.15); color: var(--text-muted); font-family: monospace;">LISTEN</span>`;
+            }
+
+            const localAddr = `${escapeHtml(c.local_ip || '0.0.0.0')}:${c.local_port || 0}`;
+            const remoteAddr = c.remote_ip ? `${escapeHtml(c.remote_ip)}:${c.remote_port}` : '<span style="color: var(--text-muted);">-</span>';
+            const reasonHtml = c.threat_reason ? `<div style="font-size: 11px; color: var(--danger); margin-top: 3px;">⚠️ ${escapeHtml(c.threat_reason)}</div>` : '';
+
+            let actionBtn = '';
+            if (c.remote_ip && c.direction === 'outbound' && !isPrivateIPString(c.remote_ip)) {
+                if (c.action_taken === 'blocked') {
+                    actionBtn = `<span class="badge badge-danger" style="font-size: 11px;">Engellendi</span>`;
+                } else {
+                    actionBtn = `<button class="btn btn-outline btn-sm" style="font-size: 11px; padding: 3px 8px; color: var(--danger); border-color: rgba(239, 68, 68, 0.4);" onclick="blockEndpointNetworkIP('${escapeHtml(c.remote_ip)}', '${escapeHtml(c.agent_hostname)}', '${escapeHtml(c.threat_reason || 'Şüpheli soket aktivitesi')}')" title="Hedef IP'yi host seviyesinde engelle"><i class="fas fa-ban"></i> Blokla</button>`;
+                }
+            } else {
+                actionBtn = `<span style="color: var(--text-muted); font-size: 11px;">-</span>`;
+            }
+
+            return `<tr>
+                <td style="font-size: 12px; white-space: nowrap; color: var(--text-muted);">${timeStr}</td>
+                <td>
+                    <div style="font-weight: 600; font-size: 13px;">${escapeHtml(c.agent_hostname || 'Bilinmeyen')}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(c.agent_ip || '')}</div>
+                </td>
+                <td>
+                    <div style="font-weight: 600; font-size: 12.5px; font-family: monospace;">${escapeHtml(c.process_name || 'system')}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">PID: ${c.pid || 0}</div>
+                </td>
+                <td><span style="font-weight: 600; text-transform: uppercase; font-size: 11px;">${escapeHtml(c.protocol || 'tcp')}</span></td>
+                <td style="font-family: monospace; font-size: 11.5px; color: var(--text-muted);">${localAddr}</td>
+                <td style="font-family: monospace; font-size: 12px; font-weight: 600;">${remoteAddr}</td>
+                <td>${stateBadge}</td>
+                <td>
+                    ${sevBadge}
+                    ${reasonHtml}
+                </td>
+                <td style="text-align: right;">${actionBtn}</td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        console.error('loadEndpointNetworkConnections error:', e);
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="color: var(--danger); padding: 24px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+function isPrivateIPString(ip) {
+    if (!ip) return true;
+    if (ip === '127.0.0.1' || ip === '::1' || ip === '0.0.0.0') return true;
+    if (ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('172.16.') || ip.startsWith('172.17.') || ip.startsWith('172.18.') || ip.startsWith('172.19.') || ip.startsWith('172.2') || ip.startsWith('172.30.') || ip.startsWith('172.31.')) return true;
+    return false;
+}
+
+async function loadEndpointNetworkDNS() {
+    const tbody = document.getElementById('ep-net-dns-tbody');
+    const countEl = document.getElementById('ep-net-dns-total-count');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const search = document.getElementById('ep-net-dns-search') ? document.getElementById('ep-net-dns-search').value.trim() : '';
+        const dgaOnly = document.getElementById('ep-net-dns-dga-only') && document.getElementById('ep-net-dns-dga-only').checked;
+
+        let url = `/api/v1/endpoint/network/dns?tenant=${encodeURIComponent(tenant)}&limit=100`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (dgaOnly) url += `&dga_only=true`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const queries = data.queries || [];
+        if (countEl) countEl.textContent = `${data.total || queries.length} ${t('net_unit_queries') || 'Sorgu'}`;
+
+        if (queries.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 28px;">${t('net_no_dns') || 'Henüz kaydedilmiş DNS sorgusu bulunmuyor.'}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = queries.map(q => {
+            const timeStr = formatDateTime(q.created_at || q.timestamp);
+            let dgaBadge = `<span class="badge badge-secondary" style="font-size: 10.5px;">Normal</span>`;
+            if (q.is_dga || q.is_malicious) {
+                dgaBadge = `<span class="badge badge-danger" style="font-size: 11px;">⚠️ DGA / Riskli</span>`;
+            }
+
+            let entropyColor = 'var(--text-muted)';
+            if (q.entropy_score >= 3.75) entropyColor = '#ec4899';
+            else if (q.entropy_score >= 3.3) entropyColor = 'var(--warning)';
+
+            let actionBadge = `<span class="badge badge-info" style="font-size: 10.5px;">${escapeHtml(q.action_taken || 'resolved')}</span>`;
+            if (q.action_taken === 'blocked') {
+                actionBadge = `<span class="badge badge-danger" style="font-size: 10.5px;">BLOCKED</span>`;
+            }
+
+            const threatDesc = q.threat_reason ? `<div style="font-size: 11px; color: var(--danger); margin-top: 2px;">${escapeHtml(q.threat_reason)}</div>` : '';
+
+            return `<tr>
+                <td style="font-size: 12px; white-space: nowrap; color: var(--text-muted);">${timeStr}</td>
+                <td>
+                    <div style="font-weight: 600; font-size: 13px;">${escapeHtml(q.agent_hostname || 'Bilinmeyen')}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(q.agent_ip || '')}</div>
+                </td>
+                <td style="font-family: monospace; font-size: 12px;">${escapeHtml(q.process_name || 'resolver')}</td>
+                <td>
+                    <div style="font-family: monospace; font-size: 12.5px; font-weight: 600; color: var(--text-primary);">${escapeHtml(q.query_domain)}</div>
+                    ${threatDesc}
+                </td>
+                <td style="font-size: 11.5px;">
+                    <span style="font-weight: 600;">${escapeHtml(q.query_type || 'A')}</span> &bull; 
+                    <span style="color: var(--text-muted);">${escapeHtml(q.response_code || 'NOERROR')}</span>
+                </td>
+                <td>
+                    <span style="font-family: monospace; font-weight: 700; color: ${entropyColor};">${Number(q.entropy_score || 0).toFixed(2)}</span>
+                    <span style="font-size: 10px; color: var(--text-muted);"> bits</span>
+                </td>
+                <td>${dgaBadge}</td>
+                <td style="text-align: right;">${actionBadge}</td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        console.error('loadEndpointNetworkDNS error:', e);
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--danger); padding: 24px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+async function blockEndpointNetworkIP(ip, hostname, reason) {
+    const isTr = !window.i18n || window.i18n.currentLang === 'tr';
+    const confirmMsg = isTr
+        ? `'${ip}' IP adresini host seviyesinde engellemek ve mikro-izolasyon kuralı oluşturmak istediğinizden emin misiniz?`
+        : `Are you sure you want to block IP '${ip}' at host level and create a micro-isolation rule?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch('/api/v1/endpoint/network/firewall/block', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                remote_ip: ip,
+                reason: reason || 'Host containment via Network EDR'
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        showToast(isTr ? `✓ ${ip} IP adresi için güvenlik duvarı engelleme kuralı eklendi` : `✓ Firewall isolation rule added for IP ${ip}`, 'success');
+        loadEndpointNetwork();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    }
+}
+
+function openNetworkSimulateModal() {
+    const modal = document.getElementById('modal-network-simulate');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeNetworkSimulateModal() {
+    const modal = document.getElementById('modal-network-simulate');
+    if (modal) modal.style.display = 'none';
+}
+
+async function executeNetworkSimulation() {
+    const scenarioType = document.getElementById('net-sim-scenario') ? document.getElementById('net-sim-scenario').value : 'c2_beacon';
+    const hostname = document.getElementById('net-sim-hostname') ? document.getElementById('net-sim-hostname').value.trim() : '';
+
+    closeNetworkSimulateModal();
+    const isTr = !window.i18n || window.i18n.currentLang === 'tr';
+    showToast(isTr ? '🌐 Ağ ve DNS saldırı senaryosu simüle ediliyor...' : '🌐 Simulating network & DNS attack scenario...', 'info');
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch('/api/v1/endpoint/network/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: scenarioType,
+                hostname: hostname
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        showToast(isTr ? '✓ Tehdit simülasyonu başarıyla oluşturuldu ve SIEM alarmı tetiklendi!' : '✓ Threat simulation generated and SIEM alert dispatched!', 'success');
+        loadEndpointNetwork();
+    } catch (e) {
+        showToast(`Simülasyon hatası: ${e.message}`, 'error');
+    }
+}
+
+async function openNetworkFirewallRulesModal() {
+    const modal = document.getElementById('modal-network-firewall-rules');
+    if (modal) modal.style.display = 'flex';
+    loadNetworkFirewallRules();
+}
+
+function closeNetworkFirewallRulesModal() {
+    const modal = document.getElementById('modal-network-firewall-rules');
+    if (modal) modal.style.display = 'none';
+}
+
+async function loadNetworkFirewallRules() {
+    const tbody = document.getElementById('ep-net-fw-tbody');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/network/firewall/rules?tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const rules = data.rules || [];
+
+        if (rules.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 24px; color: var(--text-muted);">${t('net_no_fw_rules') || 'Henüz tanımlanmış güvenlik duvarı engelleme kuralı bulunmuyor.'}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = rules.map(r => `
+            <tr>
+                <td style="font-weight: 600;">${escapeHtml(r.rule_name)}</td>
+                <td><span class="badge badge-secondary" style="font-size: 11px;">${escapeHtml(r.direction)}</span></td>
+                <td><span class="badge badge-danger" style="font-size: 11px;">${escapeHtml(r.action)}</span></td>
+                <td style="font-family: monospace; font-weight: 600;">${escapeHtml(r.remote_ip)}</td>
+                <td style="font-size: 12px; color: var(--text-muted);">${escapeHtml(r.reason || '-')}</td>
+                <td style="font-size: 12px;">${escapeHtml(r.created_by || 'system')}</td>
+                <td style="text-align: right;">
+                    <button class="btn btn-danger btn-sm" style="padding: 2px 7px; font-size: 11px;" onclick="deleteNetworkFirewallRule('${r.id}')"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="color: var(--danger); padding: 20px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+async function deleteNetworkFirewallRule(ruleId) {
+    const isTr = !window.i18n || window.i18n.currentLang === 'tr';
+    if (!confirm(isTr ? 'Bu güvenlik duvarı kuralını silmek istediğinizden emin misiniz?' : 'Are you sure you want to delete this firewall rule?')) return;
+
+    try {
+        const res = await fetch(`/api/v1/endpoint/network/firewall/rules/${ruleId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showToast(isTr ? '✓ Güvenlik duvarı kuralı silindi' : '✓ Firewall rule deleted', 'success');
+        loadNetworkFirewallRules();
+        loadEndpointNetworkStats();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    }
+}
+
+window.loadEndpointNetwork = loadEndpointNetwork;
+window.loadEndpointNetworkStats = loadEndpointNetworkStats;
+window.loadEndpointNetworkConnections = loadEndpointNetworkConnections;
+window.loadEndpointNetworkDNS = loadEndpointNetworkDNS;
+window.switchNetworkSubtab = switchNetworkSubtab;
+window.blockEndpointNetworkIP = blockEndpointNetworkIP;
+window.openNetworkSimulateModal = openNetworkSimulateModal;
+window.closeNetworkSimulateModal = closeNetworkSimulateModal;
+window.executeNetworkSimulation = executeNetworkSimulation;
+window.openNetworkFirewallRulesModal = openNetworkFirewallRulesModal;
+window.closeNetworkFirewallRulesModal = closeNetworkFirewallRulesModal;
+window.deleteNetworkFirewallRule = deleteNetworkFirewallRule;
+
 
 
 

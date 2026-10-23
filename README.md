@@ -262,8 +262,20 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🧪 [**Acceptance Test Results & Certification**](docs/validation/acceptance-results.md) — 10 validation scenarios, SLO benchmark results, and production sign-off.
 - 🛡️ [**MITRE ATT&CK® Integration & Synchronization Guide**](docs/MITRE_ATTACK_GUIDE.md) — Adversary tactic taxonomy, multi-vendor log normalization, and online/air-gapped STIX 2.1 synchronization.
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
-- 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
+
+- **v1.9.5** (Endpoint Network Traffic, DNS Exfiltration Protection & Micro-Segmentation - Phase O) / **Agent v0.1.9**:
+  - **Native Cross-Platform Network Telemetry & DNS Auditing (Agent v0.1.9)**:
+    - High-performance socket enumeration and process PID correlation across Linux (`ss -tuanp`), macOS (`lsof -i -P -n`), and Windows (`netstat -ano`).
+    - Algorithmic C2 Beaconing Detection: Outbound connection timing and interval jitter analysis (standard deviation thresholding) detecting regular heartbeats to external destinations.
+    - Suspicious Ports & LOLBin Outbound Blocking: Detects scripts/binaries (`powershell.exe`, `cmd.exe`, `bash`, `python`) connecting to non-standard or prohibited ports (`4444`, `1337`, `6667`, `8888`, `31337`).
+    - DNS Query Auditing & Shannon Entropy DGA Engine: Evaluates domain information entropy ($H(X) \ge 3.75$ / consonant density $\ge 0.80$) to detect algorithmic DGA domains and DNS exfiltration tunnels.
+    - Autonomous Host Firewall Enforcement: Local micro-isolation and packet dropping via native OS firewall commands (Windows `netsh advfirewall`, Linux `iptables`, macOS `pfctl`).
+  - **PostgreSQL Relational Schema & SIEM Correlation**:
+    - Relational tables `endpoint_network_connections`, `endpoint_dns_queries`, and `endpoint_firewall_rules` with multi-tenant isolation.
+    - SIEM alert dispatch for `EDR-NET-THREAT` (MITRE `T1071.001`) and `EDR-DGA-DNS` (MITRE `T1568.002`).
+  - **Web Operations Dashboard & Host Micro-Isolation**:
+    - Dedicated view (`#endpoint-sec-network`) with 5 KPI summary cards, socket connection stream, DNS queries log, 1-click IP isolation action, active firewall rules modal, and interactive attack simulator.
 
 - **v1.9.4** (Behavioral Anomaly Detection & Malicious Script EDR - Phase N) / **Agent v0.1.8**:
   - **Native Cross-Platform EDR Subsystem (Agent v0.1.8)**:

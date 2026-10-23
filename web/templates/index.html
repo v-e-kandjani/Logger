@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.4</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.5</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -100,6 +100,10 @@
                         <a class="nav-subitem" data-endpoint-target="endpoint-sec-edr">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                             <span data-i18n="nav_ep_edr">EDR &amp; Davranışsal Analiz</span>
+                        </a>
+                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-network">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                            <span data-i18n="nav_ep_network">Ağ &amp; DNS Güvenliği</span>
                         </a>
                         <a class="nav-subitem" data-endpoint-target="endpoint-sec-policies">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
@@ -784,6 +788,9 @@
                     </button>
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-edr">
                         <span data-i18n="nav_ep_edr">⚡ EDR (Davranış &amp; Betik)</span>
+                    </button>
+                    <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-network">
+                        <span data-i18n="nav_ep_network">🌐 Ağ &amp; DNS EDR</span>
                     </button>
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-policies">
                         <span data-i18n="nav_ep_policies">İlkeler (Policies)</span>
@@ -1572,6 +1579,156 @@
                                 <tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;" data-i18n="edr_loading">EDR davranışsal anomali kayıtları taranıyor...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- 5.8. ENDPOINT NETWORK TRAFFIC, DNS AUDITING & MICRO-SEGMENTATION VIEW (PHASE O) -->
+                <div class="endpoint-section" id="endpoint-sec-network" style="display: none;">
+                    <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h4 style="font-size: 15px; font-weight: 600;" data-i18n="ep_net_title">🌐 Uç Nokta Ağ Telemetrisi, C2 Beacon &amp; DNS Sızıntı Koruması</h4>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" data-i18n="ep_net_desc">Uç nokta soketlerini, şüpheli C2 işaretleşmelerini (beaconing), DGA tabanlı zararlı domain sorgularını izleyin ve yerel güvenlik duvarı ile mikro-izolasyon uygulayın</p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-outline" onclick="openNetworkFirewallRulesModal()" data-i18n="btn_net_fw_rules"><i class="fas fa-shield-alt"></i> Güvenlik Duvarı Kuralları</button>
+                            <button class="btn btn-secondary" onclick="openNetworkSimulateModal()" data-i18n="btn_net_simulate"><i class="fas fa-flask"></i> 🌐 Tehdit Simüle Et</button>
+                            <button class="btn btn-primary" onclick="loadEndpointNetwork()" data-i18n="btn_refresh"><i class="fas fa-sync-alt"></i> Yenile</button>
+                        </div>
+                    </div>
+
+                    <!-- Network & DNS Summary Stat Cards -->
+                    <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 20px;">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="net_stat_total_conns">Gözlemlenen Akış</span>
+                                <span class="badge badge-info">Sockets</span>
+                            </div>
+                            <div class="stat-value" id="ep-net-stat-conns" style="color: var(--accent);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="net_stat_total_conns_sub">
+                                Aktif ve kaydedilen soketler
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="net_stat_suspicious">Şüpheli / Riskli Akış</span>
+                                <span class="badge badge-warning">High Risk</span>
+                            </div>
+                            <div class="stat-value" id="ep-net-stat-suspicious" style="color: var(--warning);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="net_stat_suspicious_sub">
+                                Yasaklı port ve script akışları
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="net_stat_c2">C2 Beacon Tespiti</span>
+                                <span class="badge badge-danger">Beaconing</span>
+                            </div>
+                            <div class="stat-value" id="ep-net-stat-c2" style="color: var(--danger);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--danger);" data-i18n="net_stat_c2_sub">
+                                Periyodik C2 kalp atış kalıpları
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="net_stat_dga">Engellenen DGA / Domain</span>
+                                <span class="badge badge-danger">DGA / Blocked</span>
+                            </div>
+                            <div class="stat-value" id="ep-net-stat-dga" style="color: #ec4899;">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="net_stat_dga_sub">
+                                Yüksek entropili rastgele domainler
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="net_stat_fw_blocks">Aktif Güvenlik Duvarı Engeli</span>
+                                <span class="badge badge-success">Firewall</span>
+                            </div>
+                            <div class="stat-value" id="ep-net-stat-fw" style="color: var(--success);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="net_stat_fw_blocks_sub">
+                                Ajanlara basılan blok kuralları
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- View Tabs: Sockets vs DNS -->
+                    <div class="tab-bar" style="margin-bottom: 14px; border-bottom: 1px solid var(--border-color); display: flex; gap: 8px;">
+                        <button class="tab-btn active" id="tab-net-conns-btn" onclick="switchNetworkSubtab('conns')" style="padding: 8px 16px; border: none; background: none; font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 2px solid var(--accent); color: var(--accent);">
+                            🔌 <span data-i18n="tab_net_conns">Canlı Soket &amp; Bağlantı Telemetrisi</span>
+                        </button>
+                        <button class="tab-btn" id="tab-net-dns-btn" onclick="switchNetworkSubtab('dns')" style="padding: 8px 16px; border: none; background: none; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent;">
+                            🌐 <span data-i18n="tab_net_dns">DNS Sorguları &amp; DGA Tespiti</span>
+                        </button>
+                    </div>
+
+                    <!-- Subtab 1: Network Sockets Table -->
+                    <div id="subtab-net-conns">
+                        <div class="filter-bar" style="margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
+                            <input type="text" id="ep-net-conn-search" class="form-control" placeholder="Uç nokta, süreç, hedef IP veya port ara..." data-i18n-placeholder="net_conn_search_ph" style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointNetworkConnections();">
+                            <select id="ep-net-filter-severity" class="form-control" style="width: 170px;" onchange="loadEndpointNetworkConnections()">
+                                <option value="all" data-i18n="net_opt_all_sev">Tüm Seviyeler</option>
+                                <option value="critical" data-i18n="net_opt_crit">Kritik (Critical)</option>
+                                <option value="high" data-i18n="net_opt_high">Yüksek (High)</option>
+                                <option value="info" data-i18n="net_opt_info">Normal / Bilgi (Info)</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="loadEndpointNetworkConnections()" data-i18n="btn_filter">Filtrele</button>
+                            <span style="font-size: 12px; color: var(--text-muted); margin-left: auto; align-self: center;" id="ep-net-conns-total-count">0 Bağlantı</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table" id="ep-net-conns-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="th_net_time">Zaman</th>
+                                        <th data-i18n="th_net_host">Uç Nokta</th>
+                                        <th data-i18n="th_net_process">Süreç &amp; PID</th>
+                                        <th data-i18n="th_net_proto">Proto</th>
+                                        <th data-i18n="th_net_local">Yerel Soket</th>
+                                        <th data-i18n="th_net_remote">Hedef Soket</th>
+                                        <th data-i18n="th_net_state">Durum</th>
+                                        <th data-i18n="th_net_threat">Tehdit &amp; Seviye</th>
+                                        <th data-i18n="th_actions" style="text-align: right;">İşlem</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ep-net-conns-tbody">
+                                    <tr><td colspan="9" class="text-center" style="color: var(--text-muted); padding: 24px;" data-i18n="net_loading_conns">Ağ bağlantıları yükleniyor...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Subtab 2: DNS Queries Table -->
+                    <div id="subtab-net-dns" style="display: none;">
+                        <div class="filter-bar" style="margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
+                            <input type="text" id="ep-net-dns-search" class="form-control" placeholder="Domain, süreç adı veya tehdit nedeni ara..." data-i18n-placeholder="net_dns_search_ph" style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointNetworkDNS();">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer; margin: 0 6px;">
+                                <input type="checkbox" id="ep-net-dns-dga-only" onchange="loadEndpointNetworkDNS()">
+                                <span data-i18n="net_chk_dga_only">Sadece DGA / Zararlı Domainler</span>
+                            </label>
+                            <button class="btn btn-secondary" onclick="loadEndpointNetworkDNS()" data-i18n="btn_filter">Filtrele</button>
+                            <span style="font-size: 12px; color: var(--text-muted); margin-left: auto; align-self: center;" id="ep-net-dns-total-count">0 Sorgu</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table" id="ep-net-dns-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="th_net_time">Zaman</th>
+                                        <th data-i18n="th_net_host">Uç Nokta</th>
+                                        <th data-i18n="th_net_process">Süreç</th>
+                                        <th data-i18n="th_net_domain">Sorgulanan Domain</th>
+                                        <th data-i18n="th_net_dns_type">Tip &amp; Yanıt</th>
+                                        <th data-i18n="th_net_entropy">Shannon Entropisi</th>
+                                        <th data-i18n="th_net_verdict">DGA Değerlendirmesi</th>
+                                        <th data-i18n="th_actions" style="text-align: right;">İşlem</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ep-net-dns-tbody">
+                                    <tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;" data-i18n="net_loading_dns">DNS sorgu kayıtları yükleniyor...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -3548,7 +3705,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.4</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.5</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -7192,8 +7349,73 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.4"></script>
-    <script src="/static/js/translations.js?v=1.9.4"></script>
-    <script src="/static/js/app.js?v=1.9.4"></script>
+    <!-- MODAL: Network & DNS Attack Simulator -->
+    <div class="modal-backdrop" id="modal-network-simulate" style="display: none; z-index: 1070;">
+        <div class="modal" style="max-width: 520px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 15px;"><i class="fas fa-flask"></i> <span data-i18n="net_modal_sim_title">Ağ &amp; DNS Tehdit Simülatörü</span></h3>
+                <button class="close-btn" onclick="closeNetworkSimulateModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px;">
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;" data-i18n="net_sim_intro">
+                    Gerçek bir ajan ortamını etkilemeden, SIEM kuralları ve EDR ağ tespiti için canlı atak senaryoları tetikleyin.
+                </p>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: 600;" data-i18n="lbl_net_sim_type">Senaryo Tipi:</label>
+                    <select id="net-sim-scenario" class="form-control" style="margin-top: 4px; width: 100%;">
+                        <option value="c2_beacon">⚡ Cobalt Strike / Sliver C2 Beaconing (Periyodik Sinyal)</option>
+                        <option value="dga_dns">🌐 Algoritmik DGA Domain Sorgusu &amp; DNS Exfiltration</option>
+                        <option value="suspicious_port">⚠️ Yasaklı Port (4444) Metasploit Reverse Shell Akışı</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: 600;" data-i18n="lbl_net_sim_target_host">Hedef Uç Nokta (Opsiyonel):</label>
+                    <input type="text" id="net-sim-hostname" class="form-control" placeholder="Varsayılan: İlk aktif ajan" style="margin-top: 4px; width: 100%;">
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px;">
+                <button class="btn btn-outline" onclick="closeNetworkSimulateModal()" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" onclick="executeNetworkSimulation()" data-i18n="btn_launch_sim"><i class="fas fa-play"></i> Simülasyonu Başlat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Host Firewall Rules -->
+    <div class="modal-backdrop" id="modal-network-firewall-rules" style="display: none; z-index: 1070;">
+        <div class="modal modal-wide" style="max-width: 860px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 15px;"><i class="fas fa-shield-alt"></i> <span data-i18n="net_modal_fw_title">Uç Nokta Güvenlik Duvarı &amp; Mikro-İzolasyon Kuralları</span></h3>
+                <button class="close-btn" onclick="closeNetworkFirewallRulesModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px; max-height: 70vh; overflow-y: auto;">
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;" data-i18n="net_fw_desc">Bu kurallar kalp atışı sırasında ajanlara anında iletilerek yerel işletim sistemi güvenlik duvarında (Windows Firewall / iptables) paket düşürme kuralı olarak zorlanır.</div>
+                <div class="table-responsive">
+                    <table class="data-table" id="ep-net-fw-table">
+                        <thead>
+                            <tr>
+                                <th>Kural Adı</th>
+                                <th>Yön</th>
+                                <th>Eylem</th>
+                                <th>Hedef IP / CIDR</th>
+                                <th>Gerekçe</th>
+                                <th>Oluşturan</th>
+                                <th style="text-align: right;">Sil</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ep-net-fw-tbody">
+                            <tr><td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">Kurallar yükleniyor...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end;">
+                <button class="btn btn-outline" onclick="closeNetworkFirewallRulesModal()">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/marked.min.js?v=1.9.5"></script>
+    <script src="/static/js/translations.js?v=1.9.5"></script>
+    <script src="/static/js/app.js?v=1.9.5"></script>
 </body>
 </html>

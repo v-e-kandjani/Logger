@@ -297,6 +297,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/agent/v1/fim", h.handleAgentFIM)
 	mux.HandleFunc("/api/agent/v1/usb", h.handleEndpointAgentUSB)
 	mux.HandleFunc("/api/agent/v1/behavior", h.handleEndpointAgentBehavior)
+	mux.HandleFunc("/api/agent/v1/network", h.handleEndpointAgentNetwork)
 	mux.HandleFunc("/api/agent/v1/tasks/result", h.handleAgentTaskResult)
 
 	// Protected Endpoint Security Administrative Endpoints
@@ -340,6 +341,15 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/edr/stats", h.requireAuth(h.handleEndpointEDRStats))
 	mux.HandleFunc("/api/v1/endpoint/edr/kill", h.requireAuth(h.handleEndpointEDRKill))
 	mux.HandleFunc("/api/v1/endpoint/edr/simulate", h.requireAuth(h.handleEndpointEDRSimulate))
+
+	// Network & DNS Protection / Micro-Segmentation EDR (Phase O)
+	mux.HandleFunc("/api/v1/endpoint/network/connections", h.requireAuth(h.handleEndpointNetworkConnections))
+	mux.HandleFunc("/api/v1/endpoint/network/dns", h.requireAuth(h.handleEndpointNetworkDNS))
+	mux.HandleFunc("/api/v1/endpoint/network/stats", h.requireAuth(h.handleEndpointNetworkStats))
+	mux.HandleFunc("/api/v1/endpoint/network/firewall/rules", h.requireAuth(h.handleEndpointNetworkFirewallRules))
+	mux.HandleFunc("/api/v1/endpoint/network/firewall/rules/", h.requireAuth(h.handleEndpointNetworkFirewallRuleDelete))
+	mux.HandleFunc("/api/v1/endpoint/network/firewall/block", h.requireAuth(h.handleEndpointNetworkFirewallBlock))
+	mux.HandleFunc("/api/v1/endpoint/network/simulate", h.requireAuth(h.handleEndpointNetworkSimulate))
 	mux.HandleFunc("/api/v1/endpoint/tasks", h.requireAuth(h.handleEndpointTasks))
 	mux.HandleFunc("/api/v1/endpoint/tasks/", h.requireAuth(h.handleEndpointTaskDetail))
 	mux.HandleFunc("/api/v1/endpoint/agents/upgrade-all", h.requireAuth(h.handleEndpointAgentUpgradeAll))

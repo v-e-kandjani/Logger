@@ -251,8 +251,20 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🧪 [**Kabul Testi Sonuçları ve Sertifikasyon Raporu**](docs/validation/acceptance-results.md) — 10 kabul senaryosu sonucu, SLO kıyaslama metrikleri ve üretim onay kaydı.
 - 🛡️ [**MITRE ATT&CK® Entegrasyon ve Senkronizasyon Kılavuzu**](docs/MITRE_ATTACK_GUIDE.md) — Saldırgan taktikleri, çoklu üretici log normalizasyonu ve çevrim içi/hava boşluklu STIX 2.1 senkronizasyonu.
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
-- 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
+
+- **v1.9.5** (Uç Nokta Ağ Telemetrisi, DNS Sızıntı Koruması & Mikro-İzolasyon - Phase O) / **Ajan v0.1.9**:
+  - **Yerel Çok Platformlu Ağ Telemetrisi ve DNS Denetimi (Ajan v0.1.9)**:
+    - Linux (`ss -tuanp`), macOS (`lsof -i -P -n`) ve Windows (`netstat -ano`) üzerinde çalışan yüksek hızlı soket keşfi ve süreç (PID) eşleme motoru.
+    - Algoritmik C2 Beacon Tespiti: Dış hedeflere yapılan düzenli bağlantı aralıklarının ve seğirme (jitter) varyansının analiziyle C2 işaretleşmelerinin otonom yakalanması.
+    - Şüpheli Port & LOLBin Dış Bağlantı Koruması: Betik motorlarının (`powershell.exe`, `cmd.exe`, `bash`, `python`) yasaklı veya şüpheli portlara (`4444`, `1337`, `6667`, `8888`, `31337`) bağlantı açmasının engellenmesi.
+    - DNS Sorgu Denetimi & Shannon Entropisi DGA Motoru: Alan adı bilgi entropisi ($H(X) \ge 3.75$ veya ünsüz/sayı yoğunluğu $\ge 0.80$) ile rastgele türetilmiş DGA alan adlarının ve DNS tünelleme sızıntılarının tespiti.
+    - Yerel Güvenlik Duvarı ile Mikro-İzolasyon: İşletim sistemi yerel güvenlik duvarı komutları (Windows `netsh advfirewall`, Linux `iptables`, macOS `pfctl`) üzerinden zararlı IP'lere anında paket düşürme kuralı uygulama.
+  - **PostgreSQL İlişkisel Veritabanı & SIEM Korelasyonu**:
+    - Çok kiracılı `endpoint_network_connections`, `endpoint_dns_queries` ve `endpoint_firewall_rules` tabloları.
+    - `EDR-NET-THREAT` (MITRE `T1071.001`) ve `EDR-DGA-DNS` (MITRE `T1568.002`) doğrudan SIEM alarm üretim mekanizması.
+  - **Merkezi Web Operasyon Paneli & Ana Bilgisayar Mikro-İzolasyonu**:
+    - `#endpoint-sec-network` yönetim ekranı, 5 KPI gösterge kartı, canlı soket akışı tablosu, DNS sorgu denetim tablosu, tek tıkla IP izolasyon eylemi, güvenlik duvarı kural yönetim modalı ve canlı atak simülatörü.
 
 - **v1.9.4** (Davranışsal Anomali Tespiti ve Zararlı Betik Önleme EDR - Phase N) / **Ajan v0.1.8**:
   - **Yerel Çok Platformlu EDR Alt Sistemi (Ajan v0.1.8)**:

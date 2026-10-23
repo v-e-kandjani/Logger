@@ -140,6 +140,17 @@ type EndpointPolicyConfig struct {
 	EDRBlockLOLBins         bool   `json:"edr_block_lolbins"`          // Living-off-the-Land binary weaponization
 	EDRScanIntervalSec      int    `json:"edr_scan_interval_sec"`
 	EDRSeverityThreshold    string `json:"edr_severity_threshold"`     // "LOW", "MEDIUM", "HIGH", "CRITICAL"
+
+	// Network & DNS Protection / Micro-Segmentation EDR (Phase O)
+	EDRNetMonEnabled     bool     `json:"edr_netmon_enabled"`
+	EDRDNSAuditEnabled   bool     `json:"edr_dns_audit_enabled"`
+	EDRBlockMaliciousIPs bool     `json:"edr_block_malicious_ips"`
+	EDRDetectC2Beaconing bool     `json:"edr_detect_c2_beaconing"`
+	EDRDetectDGA         bool     `json:"edr_detect_dga"`
+	EDRBeaconIntervalSec int      `json:"edr_beacon_interval_sec"`
+	EDRBlockedPorts      []int    `json:"edr_blocked_ports"`
+	EDRBlockedIPs        []string `json:"edr_blocked_ips"`
+	EDRBlockedDomains    []string `json:"edr_blocked_domains"`
 }
 
 // EndpointSoftware represents a normalized software package installed on an endpoint
@@ -635,5 +646,88 @@ type EDRStats struct {
 	ProcessesTerminated  int64 `json:"processes_terminated"`
 	MonitoredAgentsCount int64 `json:"monitored_agents_count"`
 }
+
+// EndpointNetworkConnection represents an active or observed network socket/connection on an endpoint (Phase O)
+type EndpointNetworkConnection struct {
+	ID             uuid.UUID `json:"id"`
+	TenantSlug     string    `json:"tenant_slug"`
+	AgentID        uuid.UUID `json:"agent_id"`
+	AgentHostname  string    `json:"agent_hostname,omitempty"`
+	AgentIP        string    `json:"agent_ip,omitempty"`
+	PID            int       `json:"pid"`
+	ProcessName    string    `json:"process_name"`
+	Protocol       string    `json:"protocol"` // "tcp", "udp"
+	LocalIP        string    `json:"local_ip"`
+	LocalPort      int       `json:"local_port"`
+	RemoteIP       string    `json:"remote_ip"`
+	RemotePort     int       `json:"remote_port"`
+	RemoteDomain   string    `json:"remote_domain,omitempty"`
+	State          string    `json:"state"`     // "ESTABLISHED", "LISTEN", "TIME_WAIT", "CLOSE_WAIT", "SYN_SENT"
+	Direction      string    `json:"direction"` // "outbound", "inbound", "listening"
+	ThreatSeverity string    `json:"threat_severity"` // "info", "low", "medium", "high", "critical"
+	ThreatReason   string    `json:"threat_reason,omitempty"` // e.g. "C2 Beaconing Pattern", "Suspicious Port 4444"
+	ActionTaken    string    `json:"action_taken"`            // "allowed", "blocked", "isolated", "audited"
+	Timestamp      time.Time `json:"timestamp"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+// EndpointDNSQuery represents an audited DNS request performed by a process on an endpoint (Phase O)
+type EndpointDNSQuery struct {
+	ID            uuid.UUID `json:"id"`
+	TenantSlug    string    `json:"tenant_slug"`
+	AgentID       uuid.UUID `json:"agent_id"`
+	AgentHostname string    `json:"agent_hostname,omitempty"`
+	AgentIP       string    `json:"agent_ip,omitempty"`
+	PID           int       `json:"pid"`
+	ProcessName   string    `json:"process_name"`
+	QueryDomain   string    `json:"query_domain"`
+	QueryType     string    `json:"query_type"`   // "A", "AAAA", "TXT", "MX", "CNAME"
+	ResponseCode  string    `json:"response_code"` // "NOERROR", "NXDOMAIN", "SERVFAIL", "BLOCKED"
+	ResolvedIPs   []string  `json:"resolved_ips"`
+	EntropyScore  float64   `json:"entropy_score"` // Shannon entropy for DGA detection (> 3.8 = high entropy)
+	IsDGA         bool      `json:"is_dga"`
+	IsMalicious   bool      `json:"is_malicious"`
+	ThreatReason  string    `json:"threat_reason,omitempty"` // "DGA-Domain", "High Entropy", "Known Malicious Domain"
+	ActionTaken   string    `json:"action_taken"`            // "resolved", "blocked", "sinkholed"
+	Timestamp     time.Time `json:"timestamp"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// EndpointFirewallRule represents a dynamic host isolation or micro-segmentation rule enforced by the agent (Phase O)
+type EndpointFirewallRule struct {
+	ID         uuid.UUID  `json:"id"`
+	TenantSlug string     `json:"tenant_slug"`
+	AgentID    *uuid.UUID `json:"agent_id,omitempty"` // nil if tenant-wide global rule
+	RuleName   string     `json:"rule_name"`
+	Direction  string     `json:"direction"`  // "inbound", "outbound", "both"
+	Action     string     `json:"action"`     // "block", "allow"
+	Protocol   string     `json:"protocol"`   // "any", "tcp", "udp"
+	RemoteIP   string     `json:"remote_ip"`  // CIDR or IP (e.g. "198.51.100.23/32")
+	RemotePort string     `json:"remote_port"`// "any", "4444", "80,443"
+	IsEnabled  bool       `json:"is_enabled"`
+	Reason     string     `json:"reason"`
+	CreatedBy  string     `json:"created_by"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+}
+
+// AgentNetworkSubmission represents the payload sent by the agent to report active network sockets, DNS queries, and C2 beacons (Phase O)
+type AgentNetworkSubmission struct {
+	AgentUUID   string                      `json:"agent_uuid"`
+	Connections []EndpointNetworkConnection `json:"connections"`
+	DNSQueries  []EndpointDNSQuery          `json:"dns_queries"`
+}
+
+// EDRNetworkStats represents aggregate metrics for Phase O Network & DNS EDR
+type EDRNetworkStats struct {
+	TotalConnectionsObserved int64 `json:"total_connections_observed"`
+	SuspiciousOutboundConns  int64 `json:"suspicious_outbound_conns"`
+	C2BeaconsDetected        int64 `json:"c2_beacons_detected"`
+	DNSQueriesAudited        int64 `json:"dns_queries_audited"`
+	DGADomainsBlocked        int64 `json:"dga_domains_blocked"`
+	ActiveFirewallBlocks     int64 `json:"active_firewall_blocks"`
+	IsolatedEndpoints        int64 `json:"isolated_endpoints"`
+}
+
 
 

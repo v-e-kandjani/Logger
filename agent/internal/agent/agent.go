@@ -14,6 +14,7 @@ import (
 	"github.com/syslog-platform/logger/agent/internal/edr"
 	"github.com/syslog-platform/logger/agent/internal/fim"
 	"github.com/syslog-platform/logger/agent/internal/identity"
+	"github.com/syslog-platform/logger/agent/internal/netmon"
 	"github.com/syslog-platform/logger/agent/internal/transport"
 	"github.com/syslog-platform/logger/agent/internal/updater"
 	"github.com/syslog-platform/logger/agent/internal/version"
@@ -35,6 +36,8 @@ type Agent struct {
 	dlpScanner    *dlp.Scanner
 	edrTicker     *time.Ticker
 	edrScanner    *edr.Scanner
+	netmonTicker  *time.Ticker
+	netmonScanner *netmon.Scanner
 	isUpgrading   bool
 }
 
@@ -51,13 +54,14 @@ func NewAgent(cfg *config.Config) (*Agent, error) {
 	}
 
 	return &Agent{
-		cfg:        cfg,
-		identity:   idInfo,
-		client:     client,
-		policyRev:  1,
-		fimScanner: fim.NewScanner(),
-		dlpScanner: dlp.NewScanner(),
-		edrScanner: edr.NewScanner(),
+		cfg:           cfg,
+		identity:      idInfo,
+		client:        client,
+		policyRev:     1,
+		fimScanner:    fim.NewScanner(),
+		dlpScanner:    dlp.NewScanner(),
+		edrScanner:    edr.NewScanner(),
+		netmonScanner: netmon.NewScanner(),
 	}, nil
 }
 
@@ -138,12 +142,17 @@ func (a *Agent) Run(ctx context.Context) error {
 	a.edrTicker = time.NewTicker(edrInterval)
 	defer a.edrTicker.Stop()
 
-	// Initial heartbeat, inventory, FIM, DLP & EDR scans
+	netmonInterval := 20 * time.Second
+	a.netmonTicker = time.NewTicker(netmonInterval)
+	defer a.netmonTicker.Stop()
+
+	// Initial heartbeat, inventory, FIM, DLP, EDR & NetMon scans
 	a.sendHeartbeat(ctx)
 	go a.sendInventory(ctx)
 	go a.sendFIMScan(ctx)
 	go a.sendDLPScan(ctx)
 	go a.sendEDRScan(ctx)
+	go a.sendNetworkScan(ctx)
 
 	for {
 		select {
@@ -158,6 +167,8 @@ func (a *Agent) Run(ctx context.Context) error {
 			go a.sendDLPScan(ctx)
 		case <-a.edrTicker.C:
 			go a.sendEDRScan(ctx)
+		case <-a.netmonTicker.C:
+			go a.sendNetworkScan(ctx)
 		case <-a.hbTicker.C:
 			// Apply random jitter (+/- 2 seconds) to avoid synchronization spikes
 			jitter := time.Duration(rand.Intn(4)-2) * time.Second
@@ -417,3 +428,35 @@ func (a *Agent) sendEDRScan(ctx context.Context) {
 		log.Printf("[LOGGER EDR] Error submitting behavior telemetry: %v", err)
 	}
 }
+
+func (a *Agent) sendNetworkScan(ctx context.Context) {
+	if a.currentPolicy != nil && a.currentPolicy.EDRNetMonEnabled == false && a.currentPolicy.EDRDNSAuditEnabled == false && a.currentPolicy.EDRBeaconIntervalSec > 0 {
+		return
+	}
+	if a.netmonScanner == nil {
+		return
+	}
+
+	conns, dnsQueries := a.netmonScanner.Scan(a.currentPolicy)
+	if len(conns) == 0 && len(dnsQueries) == 0 {
+		return
+	}
+
+	if len(conns) > 0 || len(dnsQueries) > 0 {
+		log.Printf("[LOGGER NetMon] Observed %d socket connection(s), %d DNS query(ies)", len(conns), len(dnsQueries))
+	}
+
+	sub := models.AgentNetworkSubmission{
+		AgentUUID:   a.identity.AgentUUID,
+		Connections: conns,
+		DNSQueries:  dnsQueries,
+	}
+
+	var resp struct {
+		Status string `json:"status"`
+	}
+	if err := a.client.PostJSON(ctx, "/api/agent/v1/network", sub, &resp); err != nil {
+		log.Printf("[LOGGER NetMon] Error submitting network telemetry: %v", err)
+	}
+}
+
