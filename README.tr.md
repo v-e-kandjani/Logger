@@ -253,6 +253,16 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.7** (Evrensel Modal Mimarisi Onarımı, EDR Davranışsal Ağaç İncelemesi & Çapraz Modül Arayüz İyileştirmesi):
+  - **Modal DOM Hiyerarşisi ve Görünürlük Düzeltmesi**:
+    - `index.html` içerisinde kapanmamış olan `modal-endpoint-active-response` etiketleri onarıldı. Bu hata nedeniyle sonraki tüm pencereler (`#modal-edr-detail`, `#modal-fim-detail`, `#modal-soar-exec-detail`, `#modal-network-simulate`, `#modal-network-firewall-rules`) `display: none;` durumundaki aktif müdahale modalı içine hapsolarak "İncele" ve detay butonlarına basıldığında görünmez kalıyordu.
+    - `app.js` içerisindeki tüm modal açma/kapatma fonksiyonları `.classList.add('active')` / `.classList.remove('active')` ve `style.display = 'flex'` / `style.display = 'none'` senkronizasyonu ile `.modal-backdrop.active { display: flex !important; }` kuralına tam uyumlu hale getirildi.
+    - Tüm `.modal-backdrop` elemanları için dışına tıklandığında otomatik kapanma (backdrop click dismissal) mekanizması entegre edildi.
+  - **EDR & Güvenlik İnceleme Mekanizması Güçlendirmesi**:
+    - Tekil EDR anomalisini getiren `GET /api/v1/endpoint/edr/anomalies/{id}` API uç noktası ve Postgres veritabanı `GetProcessAnomaly` metodu eklendi.
+    - `openEDRDetail` fonksiyonu büyük/küçük harf duyarsız ID araması, API yedek sorgusu, güvenli metin dönüşümü (`(a.severity || 'medium').toUpperCase()`) ve `try...catch` hata yönetimi ile güçlendirildi.
+    - EDR, FIM, SOAR ve Uç Nokta tablolarındaki tüm "İncele" buton etiketleri (`btn_inspect`, `btn_inspect_detail`) yerelleştirildi.
+
 - **v1.9.6** (Uç Nokta Yama Yönetimi Başlık/Açıklama Zenginleştirmesi & UI Çeviri Kapsam İyileştirmesi) / **Ajan v0.1.10**:
   - **Yama Başlık & Üretici Bilgilerinin Zenginleştirilmesi**:
     - Windows yama toplayıcısı (`collect_windows.go`), WMIC ve PowerShell `Get-HotFix` üzerinden `Description`, `HotFixID` ve `InstalledOn` bilgilerini toplayacak şekilde geliştirildi.

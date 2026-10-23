@@ -338,6 +338,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	// Behavioral Anomaly & Script-Based Attack Prevention EDR (Phase N)
 	mux.HandleFunc("/api/v1/endpoint/edr/anomalies", h.requireAuth(h.handleEndpointEDRAnomalies))
+	mux.HandleFunc("/api/v1/endpoint/edr/anomalies/", h.requireAuth(h.handleEndpointEDRAnomalyDetail))
 	mux.HandleFunc("/api/v1/endpoint/edr/stats", h.requireAuth(h.handleEndpointEDRStats))
 	mux.HandleFunc("/api/v1/endpoint/edr/kill", h.requireAuth(h.handleEndpointEDRKill))
 	mux.HandleFunc("/api/v1/endpoint/edr/simulate", h.requireAuth(h.handleEndpointEDRSimulate))

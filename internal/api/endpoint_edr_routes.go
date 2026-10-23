@@ -157,6 +157,33 @@ func (h *Handler) handleEndpointEDRAnomalies(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+// handleEndpointEDRAnomalyDetail returns details of a single behavioral anomaly
+func (h *Handler) handleEndpointEDRAnomalyDetail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/v1/endpoint/edr/anomalies/")
+	anomalyUUID, err := uuid.Parse(idStr)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid anomaly id"})
+		return
+	}
+
+	tenant := h.tenantScope(r)
+	anomaly, err := h.pgDB.GetProcessAnomaly(r.Context(), tenant, anomalyUUID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "anomaly not found"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"anomaly": anomaly,
+	})
+}
+
+
 // handleEndpointEDRStats computes and returns dashboard KPI metrics for Phase N EDR
 func (h *Handler) handleEndpointEDRStats(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

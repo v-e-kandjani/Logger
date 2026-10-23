@@ -353,17 +353,14 @@ function initNavigation() {
         });
     });
 
-    // 4. Endpoint Modals Backdrop Click Dismissal
-    ['modal-endpoint-new-token', 'modal-endpoint-agent-detail', 'modal-endpoint-token-install'].forEach(id => {
-        const modal = document.getElementById(id);
-        if (modal) {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('active');
-                    modal.style.display = 'none';
-                }
-            });
-        }
+    // 4. Universal Modal Backdrop Click Dismissal
+    document.querySelectorAll('.modal-backdrop').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+                modal.style.display = 'none';
+            }
+        });
     });
 
     updateViewHeader('dashboard');
@@ -4713,28 +4710,32 @@ function initSIEMManagement() {
     const btnCloseInv = document.getElementById('btn-close-siem-inv');
     if (btnCloseInv) {
         btnCloseInv.addEventListener('click', () => {
-            document.getElementById('siem-investigate-modal').style.display = 'none';
+            const m = document.getElementById('siem-investigate-modal');
+            if (m) { m.classList.remove('active'); m.style.display = 'none'; }
         });
     }
 
     const btnCloseRules = document.getElementById('btn-close-siem-rules');
     if (btnCloseRules) {
         btnCloseRules.addEventListener('click', () => {
-            document.getElementById('siem-rules-modal').style.display = 'none';
+            const m = document.getElementById('siem-rules-modal');
+            if (m) { m.classList.remove('active'); m.style.display = 'none'; }
         });
     }
 
     const btnCloseSim = document.getElementById('btn-close-siem-simulate');
     if (btnCloseSim) {
         btnCloseSim.addEventListener('click', () => {
-            document.getElementById('siem-simulate-modal').style.display = 'none';
+            const m = document.getElementById('siem-simulate-modal');
+            if (m) { m.classList.remove('active'); m.style.display = 'none'; }
         });
     }
 
     const btnCloseMitre = document.getElementById('btn-close-siem-mitre');
     if (btnCloseMitre) {
         btnCloseMitre.addEventListener('click', () => {
-            document.getElementById('siem-mitre-modal').style.display = 'none';
+            const m = document.getElementById('siem-mitre-modal');
+            if (m) { m.classList.remove('active'); m.style.display = 'none'; }
         });
     }
 
@@ -4959,6 +4960,7 @@ async function openSIEMInvestigate(alertID) {
     const modal = document.getElementById('siem-investigate-modal');
     if (!modal) return;
 
+    modal.classList.add('active');
     modal.style.display = 'flex';
 
     try {
@@ -10110,7 +10112,10 @@ async function loadEndpointTasks() {
 
 async function openTaskLogModal(taskId) {
     const modal = document.getElementById('modal-task-log-view');
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
 
     document.getElementById('task-log-header-info').textContent = 'Görev: ' + taskId;
     document.getElementById('task-log-meta-status').innerHTML = '<span class="badge badge-secondary">Yükleniyor...</span>';
@@ -10141,7 +10146,10 @@ async function openTaskLogModal(taskId) {
 
 function closeTaskLogModal() {
     const modal = document.getElementById('modal-task-log-view');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -10499,6 +10507,7 @@ let soarHistoryFilter = 'ALL';
 async function openSOARModal() {
     const modal = document.getElementById('modal-soar-playbooks');
     if (!modal) return;
+    modal.classList.add('active');
     modal.style.display = 'flex';
     switchSOARTab('catalog');
     await loadSOARPlaybooks();
@@ -10507,7 +10516,10 @@ async function openSOARModal() {
 
 function closeSOARModal() {
     const modal = document.getElementById('modal-soar-playbooks');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 function switchSOARTab(tab) {
@@ -10946,6 +10958,7 @@ async function rejectSOARExecution(id) {
 async function openSOARExecDetail(id) {
     const modal = document.getElementById('modal-soar-exec-detail');
     if (!modal) return;
+    modal.classList.add('active');
     modal.style.display = 'flex';
 
     try {
@@ -10990,12 +11003,16 @@ async function openSOARExecDetail(id) {
 
 function closeSOARExecDetail() {
     const modal = document.getElementById('modal-soar-exec-detail');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 async function openSOARRunModal(pbId = null, agentId = null, alertId = null) {
     const modal = document.getElementById('modal-soar-run-manual');
     if (!modal) return;
+    modal.classList.add('active');
     modal.style.display = 'flex';
 
     const pbSelect = document.getElementById('soar-run-pb-select');
@@ -11031,7 +11048,10 @@ async function openSOARRunModal(pbId = null, agentId = null, alertId = null) {
 
 function closeSOARRunModal() {
     const modal = document.getElementById('modal-soar-run-manual');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 async function submitSOARManualRun() {
@@ -11237,8 +11257,8 @@ async function loadEndpointFIMEvents() {
                     <td>${mitreHtml}</td>
                     <td style="font-size: 11.5px; color: var(--text-muted);">${dt}</td>
                     <td style="text-align: right;">
-                        <button class="btn btn-sm btn-outline" onclick="openFIMDetail('${escapeHtml(ev.id)}')" title="Detaylı İnceleme">
-                            <i class="fas fa-search-plus"></i> İncele
+                        <button class="btn btn-sm btn-outline" onclick="openFIMDetail('${escapeHtml(ev.id)}')" title="${t('btn_inspect_detail', isTr ? 'Detaylı İnceleme' : 'Detailed Inspection')}">
+                            <i class="fas fa-search-plus"></i> ${t('btn_edr_inspect', isTr ? 'İncele' : 'Inspect')}
                         </button>
                     </td>
                 </tr>
@@ -11316,7 +11336,10 @@ async function openFIMDetail(eventId) {
         if (extraDescEl) extraDescEl.textContent = ev.details || 'Kriptografik bütünlük sapması tespit edildi. Dosya içeriği veya metaverileri referans durumundan farklılık gösteriyor.';
 
         const modal = document.getElementById('modal-fim-detail');
-        if (modal) modal.style.display = 'flex';
+        if (modal) {
+            modal.classList.add('active');
+            modal.style.display = 'flex';
+        }
     } catch (e) {
         showToast('FIM detay yükleme hatası: ' + e.message, 'error');
     }
@@ -11324,7 +11347,10 @@ async function openFIMDetail(eventId) {
 
 function closeFIMDetail() {
     const modal = document.getElementById('modal-fim-detail');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 function triggerFIMSOARAction() {
@@ -11961,77 +11987,100 @@ async function loadEndpointEDRAnomalies() {
     }
 }
 
-function openEDRDetail(anomalyId) {
-    const a = currentEDRAnomalies.find(x => x.id === anomalyId);
-    if (!a) return;
-    activeEDRDetail = a;
-
+async function openEDRDetail(anomalyId) {
+    if (!anomalyId) return;
     const isTr = !window.i18n || window.i18n.currentLang === 'tr';
     const modal = document.getElementById('modal-edr-detail');
     if (!modal) return;
 
-    // Badges
-    const sevBadge = document.getElementById('edr-detail-severity-badge');
-    if (sevBadge) {
-        const sev = (a.severity || 'medium').toLowerCase();
-        sevBadge.className = `badge badge-${sev === 'critical' ? 'danger' : (sev === 'high' ? 'warning' : 'info')}`;
-        sevBadge.textContent = a.severity.toUpperCase();
+    try {
+        let a = (currentEDRAnomalies || []).find(x => String(x.id).toLowerCase() === String(anomalyId).toLowerCase());
+        if (!a) {
+            const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+            const res = await fetch(`/api/v1/endpoint/edr/anomalies/${encodeURIComponent(anomalyId)}?tenant=${encodeURIComponent(tenant)}`);
+            if (res.ok) {
+                const data = await res.json();
+                a = data.anomaly || data;
+            }
+        }
+
+        if (!a) {
+            showToast(isTr ? 'EDR anomali detayı bulunamadı.' : 'EDR anomaly detail not found.', 'error');
+            return;
+        }
+
+        activeEDRDetail = a;
+
+        // Badges
+        const sevBadge = document.getElementById('edr-detail-severity-badge');
+        if (sevBadge) {
+            const sev = (a.severity || 'medium').toLowerCase();
+            sevBadge.className = `badge badge-${sev === 'critical' ? 'danger' : (sev === 'high' ? 'warning' : 'info')}`;
+            sevBadge.textContent = (a.severity || 'MEDIUM').toUpperCase();
+        }
+
+        const actionBadge = document.getElementById('edr-detail-action-badge');
+        if (actionBadge) {
+            const act = (a.action_taken || 'audited').toLowerCase();
+            actionBadge.className = `badge badge-${act === 'terminated' ? 'success' : 'warning'}`;
+            actionBadge.textContent = (a.action_taken || 'AUDITED').toUpperCase();
+        }
+
+        const ruleBadge = document.getElementById('edr-detail-rule-badge');
+        if (ruleBadge) ruleBadge.textContent = a.rule_id || 'EDR';
+
+        const timeEl = document.getElementById('edr-detail-timestamp');
+        if (timeEl) timeEl.textContent = a.timestamp ? new Date(a.timestamp).toLocaleString(isTr ? 'tr-TR' : 'en-US') : '-';
+
+        // Overview
+        const hostEl = document.getElementById('edr-detail-hostname');
+        if (hostEl) hostEl.textContent = a.agent_hostname || 'Unknown';
+        const ipEl = document.getElementById('edr-detail-ip');
+        if (ipEl) ipEl.textContent = a.agent_ip || '';
+        const userEl = document.getElementById('edr-detail-username');
+        if (userEl) userEl.textContent = a.username || 'SYSTEM / ROOT';
+        const ruleNameEl = document.getElementById('edr-detail-rulename');
+        if (ruleNameEl) ruleNameEl.textContent = a.rule_name || a.rule_id || '-';
+        const ruleIdEl = document.getElementById('edr-detail-ruleid');
+        if (ruleIdEl) ruleIdEl.textContent = a.rule_id || '';
+
+        // Process Tree
+        const pNameEl = document.getElementById('edr-detail-process-name');
+        if (pNameEl) pNameEl.textContent = a.process_name || 'unknown';
+        const pidEl = document.getElementById('edr-detail-pid');
+        if (pidEl) pidEl.textContent = `PID: ${a.pid || 0}`;
+        const cmdEl = document.getElementById('edr-detail-commandline');
+        if (cmdEl) cmdEl.textContent = a.command_line || a.process_name || '-';
+
+        const parentNameEl = document.getElementById('edr-detail-parent-name');
+        if (parentNameEl) parentNameEl.textContent = a.parent_name || 'System / init (0)';
+        const parentPidEl = document.getElementById('edr-detail-parent-pid');
+        if (parentPidEl) parentPidEl.textContent = `PPID: ${a.parent_pid || 0}`;
+        const parentCmdEl = document.getElementById('edr-detail-parent-cmd');
+        if (parentCmdEl) parentCmdEl.textContent = a.parent_command_line || a.parent_name || 'No command line recorded';
+
+        // MITRE
+        const mitreTacticEl = document.getElementById('edr-detail-mitre-tactic');
+        if (mitreTacticEl) mitreTacticEl.textContent = a.mitre_tactic || 'Execution';
+        const mitreTechEl = document.getElementById('edr-detail-mitre-technique');
+        if (mitreTechEl) mitreTechEl.textContent = a.mitre_technique || 'T1059';
+        const descEl = document.getElementById('edr-detail-full-desc');
+        if (descEl) descEl.textContent = a.details || 'Behavioral anomaly detected on endpoint.';
+
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    } catch (err) {
+        console.error('openEDRDetail error:', err);
+        showToast((isTr ? 'EDR Detayı açılırken hata: ' : 'Error opening EDR detail: ') + err.message, 'error');
     }
-
-    const actionBadge = document.getElementById('edr-detail-action-badge');
-    if (actionBadge) {
-        const act = (a.action_taken || 'audited').toLowerCase();
-        actionBadge.className = `badge badge-${act === 'terminated' ? 'success' : 'warning'}`;
-        actionBadge.textContent = a.action_taken.toUpperCase();
-    }
-
-    const ruleBadge = document.getElementById('edr-detail-rule-badge');
-    if (ruleBadge) ruleBadge.textContent = a.rule_id || 'EDR';
-
-    const timeEl = document.getElementById('edr-detail-timestamp');
-    if (timeEl) timeEl.textContent = a.timestamp ? new Date(a.timestamp).toLocaleString(isTr ? 'tr-TR' : 'en-US') : '-';
-
-    // Overview
-    const hostEl = document.getElementById('edr-detail-hostname');
-    if (hostEl) hostEl.textContent = a.agent_hostname || 'Unknown';
-    const ipEl = document.getElementById('edr-detail-ip');
-    if (ipEl) ipEl.textContent = a.agent_ip || '';
-    const userEl = document.getElementById('edr-detail-username');
-    if (userEl) userEl.textContent = a.username || 'SYSTEM / ROOT';
-    const ruleNameEl = document.getElementById('edr-detail-rulename');
-    if (ruleNameEl) ruleNameEl.textContent = a.rule_name || a.rule_id;
-    const ruleIdEl = document.getElementById('edr-detail-ruleid');
-    if (ruleIdEl) ruleIdEl.textContent = a.rule_id || '';
-
-    // Process Tree
-    const pNameEl = document.getElementById('edr-detail-process-name');
-    if (pNameEl) pNameEl.textContent = a.process_name || 'unknown';
-    const pidEl = document.getElementById('edr-detail-pid');
-    if (pidEl) pidEl.textContent = `PID: ${a.pid}`;
-    const cmdEl = document.getElementById('edr-detail-commandline');
-    if (cmdEl) cmdEl.textContent = a.command_line || a.process_name;
-
-    const parentNameEl = document.getElementById('edr-detail-parent-name');
-    if (parentNameEl) parentNameEl.textContent = a.parent_name || 'System / init (0)';
-    const parentPidEl = document.getElementById('edr-detail-parent-pid');
-    if (parentPidEl) parentPidEl.textContent = `PPID: ${a.parent_pid}`;
-    const parentCmdEl = document.getElementById('edr-detail-parent-cmd');
-    if (parentCmdEl) parentCmdEl.textContent = a.parent_command_line || a.parent_name || 'No command line recorded';
-
-    // MITRE
-    const mitreTacticEl = document.getElementById('edr-detail-mitre-tactic');
-    if (mitreTacticEl) mitreTacticEl.textContent = a.mitre_tactic || 'Execution';
-    const mitreTechEl = document.getElementById('edr-detail-mitre-technique');
-    if (mitreTechEl) mitreTechEl.textContent = a.mitre_technique || 'T1059';
-    const descEl = document.getElementById('edr-detail-full-desc');
-    if (descEl) descEl.textContent = a.details || 'Behavioral anomaly detected on endpoint.';
-
-    modal.style.display = 'flex';
 }
 
 function closeEDRDetail() {
     const modal = document.getElementById('modal-edr-detail');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
     activeEDRDetail = null;
 }
 
@@ -12381,12 +12430,18 @@ async function blockEndpointNetworkIP(ip, hostname, reason) {
 
 function openNetworkSimulateModal() {
     const modal = document.getElementById('modal-network-simulate');
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
 }
 
 function closeNetworkSimulateModal() {
     const modal = document.getElementById('modal-network-simulate');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 async function executeNetworkSimulation() {
@@ -12422,13 +12477,19 @@ async function executeNetworkSimulation() {
 
 async function openNetworkFirewallRulesModal() {
     const modal = document.getElementById('modal-network-firewall-rules');
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
     loadNetworkFirewallRules();
 }
 
 function closeNetworkFirewallRulesModal() {
     const modal = document.getElementById('modal-network-firewall-rules');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
 }
 
 async function loadNetworkFirewallRules() {

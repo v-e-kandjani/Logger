@@ -256,3 +256,48 @@ func (db *DB) GetEDRStats(ctx context.Context, tenant string) (*models.EDRStats,
 
 	return stats, nil
 }
+
+// GetProcessAnomaly retrieves a single anomaly by ID with agent metadata
+func (db *DB) GetProcessAnomaly(ctx context.Context, tenant string, anomalyID uuid.UUID) (*models.EndpointProcessAnomaly, error) {
+	var where []string
+	var args []interface{}
+	where = append(where, "e.id = $1")
+	args = append(args, anomalyID)
+
+	if tenant != "" && tenant != "all" {
+		where = append(where, "e.tenant_slug = $2")
+		args = append(args, tenant)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			e.id, e.tenant_slug, e.agent_id,
+			COALESCE(a.hostname, 'Unknown') AS agent_hostname,
+			COALESCE(a.ip_address, '') AS agent_ip,
+			e.pid, e.process_name, e.command_line,
+			e.parent_pid, e.parent_name, e.parent_command_line,
+			e.username, e.severity, e.rule_id, e.rule_name,
+			e.mitre_tactic, e.mitre_technique, e.action_taken,
+			e.details, e.timestamp, e.created_at
+		FROM endpoint_process_anomalies e
+		LEFT JOIN endpoint_agents a ON e.agent_id = a.id
+		WHERE %s
+		LIMIT 1
+	`, strings.Join(where, " AND "))
+
+	var a models.EndpointProcessAnomaly
+	err := db.pool.QueryRow(ctx, query, args...).Scan(
+		&a.ID, &a.TenantSlug, &a.AgentID,
+		&a.AgentHostname, &a.AgentIP,
+		&a.PID, &a.ProcessName, &a.CommandLine,
+		&a.ParentPID, &a.ParentName, &a.ParentCommandLine,
+		&a.Username, &a.Severity, &a.RuleID, &a.RuleName,
+		&a.MitreTactic, &a.MitreTechnique, &a.ActionTaken,
+		&a.Details, &a.Timestamp, &a.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("anomaly not found: %w", err)
+	}
+	return &a, nil
+}
+

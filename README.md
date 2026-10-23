@@ -264,6 +264,16 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.7** (Universal Modal Architecture Repair, EDR Behavioral Tree Inspection & Cross-Module UI Hardening):
+  - **Modal DOM Hierarchy & Visibility Bugfix**:
+    - Fixed unclosed modal div tags in `index.html` that previously trapped all subsequent modals (`#modal-edr-detail`, `#modal-fim-detail`, `#modal-soar-exec-detail`, `#modal-network-simulate`, `#modal-network-firewall-rules`) inside `#modal-endpoint-active-response` which had `display: none;`, preventing "Inspect" and detail buttons from opening modals.
+    - Synchronized all modal open/close functions in `app.js` to toggle both `.classList.add('active')` / `.classList.remove('active')` and `style.display = 'flex'` / `style.display = 'none'`, honoring `.modal-backdrop.active { display: flex !important; }`.
+    - Implemented universal backdrop click dismissal across all `.modal-backdrop` containers.
+  - **EDR & Security Inspection Hardening**:
+    - Added dedicated single-anomaly REST endpoint `GET /api/v1/endpoint/edr/anomalies/{id}` and Postgres database method `GetProcessAnomaly`.
+    - Hardened `openEDRDetail` with case-insensitive ID lookup, API fallback query, safe string method callers (`(a.severity || 'medium').toUpperCase()`), and comprehensive `try...catch` error handling with user toasts.
+    - Localized all Inspect button labels across EDR, FIM, SOAR, and Endpoint views (`btn_inspect`, `btn_inspect_detail`).
+
 - **v1.9.6** (Endpoint Patch Management Metadata Enrichment & UI Translation Scope Hardening) / **Agent v0.1.10**:
   - **Patch Metadata & Title/Vendor Population**:
     - Enhanced Windows patch collector (`collect_windows.go`) to query `Description`, `HotFixID`, and `InstalledOn` via WMIC and PowerShell `Get-HotFix`.
