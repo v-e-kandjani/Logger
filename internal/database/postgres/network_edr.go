@@ -80,6 +80,36 @@ func (db *DB) EnsureNetworkEDRSchema(ctx context.Context) error {
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_fw_rules_tenant ON endpoint_firewall_rules(tenant_slug);`,
 		`CREATE INDEX IF NOT EXISTS idx_fw_rules_agent ON endpoint_firewall_rules(agent_id);`,
+
+		`INSERT INTO siem_rules (id, name, description, severity, risk_score, category, is_enabled, created_at, updated_at)
+		 VALUES 
+		   ('EDR-NET-THREAT', 'Suspicious Endpoint Network Connection', 'Detects anomalous or malicious outbound socket connections originating from monitored endpoints', 'HIGH', 85, 'network', TRUE, NOW(), NOW()),
+		   ('EDR-DGA-DNS', 'High Entropy DGA / Malicious DNS Resolution', 'Detects high Shannon entropy algorithmically generated domains (DGA) or queries to blacklisted domains', 'HIGH', 85, 'network', TRUE, NOW(), NOW()),
+		   ('EDR-C2-BEACON-SIM', 'Simulated C2 Periodic Beaconing', 'Detects periodic command & control socket callback beacons with low jitter variance', 'CRITICAL', 95, 'network', TRUE, NOW(), NOW()),
+		   ('EDR-DGA-DNS-SIM', 'Simulated DGA Domain Exfiltration', 'Simulated suspicious DNS exfiltration query with pseudo-random high entropy hostname', 'HIGH', 85, 'network', TRUE, NOW(), NOW()),
+		   ('EDR-SUSPICIOUS-PORT-SIM', 'Simulated Suspicious Port Connection', 'Detects outbound connections to commonly exploited remote reconnaissance or back-connect ports', 'HIGH', 80, 'network', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-WEBSHELL', 'Web Shell / Malicious Persistence Execution', 'Detects web server child process spawning interactive shells or cmd interpreters', 'CRITICAL', 95, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-OFFICE-SPAWN', 'Office Document Spawning Shell or Script Host', 'Detects productivity suite applications spawning PowerShell, cmd, or wscript', 'HIGH', 85, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-LOLBIN-CERTUTIL', 'Living Off the Land: Certutil Ingress Tool Transfer', 'Detects certutil.exe used with urlcache or split flags for remote binary retrieval', 'HIGH', 80, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-LOLBIN-MSHTA', 'Living Off the Land: Mshta Execution', 'Detects execution of Microsoft HTML Application host (mshta.exe)', 'HIGH', 80, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-LOLBIN-REGSVR32', 'Living Off the Land: Regsvr32 Squiblydoo', 'Detects regsvr32.exe executing remote scriptlets', 'HIGH', 85, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-LOLBIN-RUNDLL32', 'Living Off the Land: Rundll32 Suspicious Invocation', 'Detects rundll32.exe executing scripts or undocumented exports', 'MEDIUM', 65, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-LOLBIN-BITSADMIN', 'Living Off the Land: Bitsadmin Ingress Download', 'Detects bitsadmin.exe utilized to create background transfer jobs for remote payloads', 'MEDIUM', 65, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-RANSOMWARE-INHIBIT', 'Ransomware: Shadow Copy Deletion / Recovery Invalidation', 'Detects vssadmin or wmic commands attempting to delete volume shadow copies', 'CRITICAL', 95, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-SCRIPT-OBFUSCATION', 'Suspicious Script Obfuscation & Encoded Payload', 'Detects PowerShell with Base64 encoded commands or bypassed execution policies', 'HIGH', 80, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-SCRIPT-STEALTH', 'Stealth Execution Arguments Detected', 'Detects script execution with flags designed to evade interactive command line auditing', 'MEDIUM', 65, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-DOWNLOAD-CRADLE', 'In-Memory Download Cradle Execution', 'Detects Net.WebClient or Invoke-WebRequest piping directly into IEX', 'CRITICAL', 95, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDR-RULE-PIPE-TO-SHELL', 'Curl / Wget Pipe to Shell Execution', 'Detects curl or wget command directly piped to shell', 'HIGH', 85, 'endpoint', TRUE, NOW(), NOW()),
+		   ('FIM-INTEGRITY-BREACH', 'Critical File Integrity Modification Detected', 'Alerts on unauthorized modification, creation, or deletion of monitored critical system files', 'HIGH', 85, 'endpoint', TRUE, NOW(), NOW()),
+		   ('DLP-USB-VIOLATION', 'Unauthorized USB Mass Storage Device Connection', 'Detects connection of unapproved USB storage devices', 'MEDIUM', 60, 'endpoint', TRUE, NOW(), NOW()),
+		   ('EDG-DEAD-MAN-001', 'Edge Node Heartbeat Dead Man Switch', 'Triggers when an enrolled Edge collector fails to send periodic telemetry', 'HIGH', 75, 'health', TRUE, NOW(), NOW())
+		 ON CONFLICT (id) DO UPDATE SET
+		   name = EXCLUDED.name,
+		   description = EXCLUDED.description,
+		   severity = EXCLUDED.severity,
+		   risk_score = EXCLUDED.risk_score,
+		   category = EXCLUDED.category,
+		   updated_at = NOW();`,
 	}
 
 	for _, q := range queries {

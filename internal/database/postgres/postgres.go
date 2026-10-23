@@ -1493,6 +1493,23 @@ func (db *DB) CreateOrUpdateSIEMAlert(ctx context.Context, alert *models.SIEMAle
 		tenant = "default"
 	}
 
+	// Ensure referenced rule exists so foreign key constraint siem_alerts_rule_id_fkey is always satisfied
+	if alert.RuleID != "" {
+		var exists bool
+		_ = db.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM siem_rules WHERE id = $1)`, alert.RuleID).Scan(&exists)
+		if !exists {
+			ruleName := alert.RuleName
+			if ruleName == "" {
+				ruleName = alert.RuleID
+			}
+			_, _ = db.pool.Exec(ctx, `
+				INSERT INTO siem_rules (id, name, description, severity, risk_score, category, is_enabled, created_at, updated_at)
+				VALUES ($1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW())
+				ON CONFLICT (id) DO NOTHING`,
+				alert.RuleID, ruleName, "Auto-registered detection rule for endpoint/system telemetry", alert.Severity, alert.RiskScore, alert.Category)
+		}
+	}
+
 	query := `
 		INSERT INTO siem_alerts (
 			id, rule_id, rule_name, severity, risk_score, category, status,
