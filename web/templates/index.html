@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.0</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.1</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -1656,13 +1656,14 @@ sudo systemctl status logger-agent</pre>
 }</pre>
                             </div>
 
-                            <div style="font-size: 12px; font-weight: 600; margin-top: 10px; margin-bottom: 4px;">Adım B: sc.exe ile Servis Oluşturma ve Başlatma (CMD / PowerShell)</div>
+                            <div style="font-size: 12px; font-weight: 600; margin-top: 10px; margin-bottom: 4px;">Adım B: PowerShell ile Servis Oluşturma ve Başlatma (Yönetici / Önerilen)</div>
                             <div class="ep-code-box">
                                 <button class="ep-copy-btn" onclick="copyCodeFromBox('code-win-sc')">Kopyala</button>
-                                <pre id="code-win-sc">sc.exe create LoggerAgent binPath= "\"C:\Program Files\LOGGER Agent\logger-agent.exe\" -config \"C:\Program Files\LOGGER Agent\config.json\"" start= auto DisplayName= "LogSeal Endpoint Security Agent"
-sc.exe description LoggerAgent "Valtrivo LogSeal Endpoint Security and Telemetry Daemon"
-sc.exe failure LoggerAgent reset= 86400 actions= restart/5000/restart/10000/restart/60000
-net start LoggerAgent
+                                <pre id="code-win-sc"># Eski/hatalı kayıt varsa temizle, New-Service ile kaydet ve başlat:
+Stop-Service LoggerAgent -ErrorAction SilentlyContinue
+&amp; sc.exe delete LoggerAgent 2&gt;&amp;1 | Out-Null
+New-Service -Name "LoggerAgent" -BinaryPathName '"C:\Program Files\LOGGER Agent\logger-agent.exe"' -DisplayName "Valtrivo LogSeal Endpoint Agent" -StartupType Automatic -Description "Valtrivo LogSeal Endpoint Security Agent"
+Start-Service LoggerAgent
 Get-Service LoggerAgent</pre>
                             </div>
                         </div>
@@ -3283,7 +3284,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.0</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.1</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -6689,8 +6690,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.0"></script>
-    <script src="/static/js/translations.js?v=1.9.0"></script>
-    <script src="/static/js/app.js?v=1.9.0"></script>
+    <script src="/static/js/marked.min.js?v=1.9.1"></script>
+    <script src="/static/js/translations.js?v=1.9.1"></script>
+    <script src="/static/js/app.js?v=1.9.1"></script>
 </body>
 </html>

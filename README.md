@@ -265,6 +265,14 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.1** (Windows Agent Service Resilience & FIM Event Simulation):
+  - **Windows Service Registration Resilience (Fix for "The parameter is incorrect" / Error 87)**:
+    - Updated Windows agent installation script (`install-agent.ps1`) and standalone setup wizard (`logger-agent-setup.exe`) to register services via native PowerShell `New-Service` and properly escaped `sc.exe` fallbacks, eliminating SCM command-line argument parsing and quote breakage.
+    - Updated documentation and UI code snippets for manual service installation with foolproof commands for PowerShell and Command Prompt.
+    - Added backwards-compatible JSON support for both `heartbeat_sec` and `heartbeat_interval_sec` in `config.json`.
+  - **FIM Operational Simulation & Live Validation**:
+    - Added `/api/v1/endpoint/fim/simulate` and UI action button allowing security operators to generate verifiable file tampering events and trace them across FIM, SIEM alerts, and SOAR mitigation playbooks.
+
 - **v1.9.0** (File & Registry Integrity Monitoring - FIM - Phase L & Endpoint Data Enrichment) / **Agent v0.1.6**:
   - **Native Cross-Platform Cryptographic FIM Scanner (Phase L - Agent v0.1.6)**:
     - Integrated native Go cryptographic scanner calculating SHA-256 digests across critical operating system binaries (`/bin`, `/sbin`, `/usr/bin`, `C:\Windows\System32`), configurations (`/etc`, `/etc/pam.d`, `/etc/ssh`), and Windows Registry hives (`Run`, `RunOnce`, `Services`, `Image File Execution Options`).

@@ -129,7 +129,7 @@ try {
     $regPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$ServiceName"
     New-Item -Path $regPath -Force | Out-Null
     Set-ItemProperty -Path $regPath -Name "DisplayName" -Value "Valtrivo LogSeal Endpoint Agent" -Force
-    Set-ItemProperty -Path $regPath -Name "DisplayVersion" -Value "0.1.1" -Force
+    Set-ItemProperty -Path $regPath -Name "DisplayVersion" -Value "0.1.6" -Force
     Set-ItemProperty -Path $regPath -Name "Publisher" -Value "Valtrivo" -Force
     Set-ItemProperty -Path $regPath -Name "InstallLocation" -Value $InstallDir -Force
     Set-ItemProperty -Path $regPath -Name "UninstallString" -Value "`"$InstallDir\uninstall.bat`"" -Force
@@ -141,22 +141,30 @@ try {
 Write-Host "[*] Configuring Windows Service '$ServiceName'..." -ForegroundColor Blue
 $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if ($existingService) {
-    Write-Host "[*] Stopping existing service..." -ForegroundColor Yellow
+    Write-Host "[*] Stopping and removing previous service instance..." -ForegroundColor Yellow
     Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-    & sc.exe delete $ServiceName | Out-Null
-    Start-Sleep -Seconds 2
+    Start-Sleep -Milliseconds 500
+    & sc.exe delete $ServiceName 2>&1 | Out-Null
+    Start-Sleep -Seconds 1
 }
 
-# Create new Windows Service (Auto-locates config.json next to binary)
-$binPathArg = "`"$BinaryPath`""
-$createResult = & sc.exe create $ServiceName binPath= $binPathArg start= auto DisplayName= "Valtrivo LogSeal Endpoint Agent"
-Write-Host "[*] sc.exe result: $createResult"
+# Create new Windows Service via native New-Service (immune to sc.exe argument quoting/parameter 87 errors)
+Write-Host "[*] Registering Windows Service '$ServiceName'..." -ForegroundColor Blue
+try {
+    $svc = New-Service -Name $ServiceName `
+        -BinaryPathName "`"$BinaryPath`"" `
+        -DisplayName "Valtrivo LogSeal Endpoint Agent" `
+        -StartupType Automatic `
+        -Description "Valtrivo LogSeal cross-platform endpoint telemetry, asset inventory, and vulnerability agent."
+    Write-Host "[✓] Windows Service registered via native ServiceManager." -ForegroundColor Green
+} catch {
+    Write-Warning "New-Service encountered: $_. Attempting cmd.exe sc.exe fallback..."
+    & cmd.exe /c "sc.exe create $ServiceName binPath= `"\`"$BinaryPath\`"`" start= auto DisplayName= `"Valtrivo LogSeal Endpoint Agent`"" | Out-Null
+    & cmd.exe /c "sc.exe description $ServiceName `"Valtrivo LogSeal cross-platform endpoint telemetry, asset inventory, and vulnerability agent.`"" | Out-Null
+}
 
-# Explicitly configure binPath to guarantee exact quoting in Windows SCM ImagePath
-& sc.exe config $ServiceName binPath= "`"$BinaryPath`"" start= auto | Out-Null
-
-& sc.exe description $ServiceName "Valtrivo LogSeal cross-platform endpoint telemetry, asset inventory, and vulnerability agent." | Out-Null
-& sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
+# Configure failure recovery
+& cmd.exe /c "sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000" | Out-Null
 
 # Start Service
 Write-Host "[*] Starting $ServiceName..." -ForegroundColor Blue

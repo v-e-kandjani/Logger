@@ -254,6 +254,14 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.1** (Windows Ajan Servis Dayanıklılığı & FIM Olay Simülasyonu):
+  - **Windows Servis Kaydı Dayanıklılığı ("Parametre Hatalı" / Hata 87 Düzeltmesi)**:
+    - Windows ajan kurulum betiği (`install-agent.ps1`) ve kurulum sihirbazı (`logger-agent-setup.exe`), yerel PowerShell `New-Service` cmdlet'ini ve güvenli `sc.exe` yedeklerini kullanacak şekilde güncellendi. `sc.exe` tırnak ve komut satırı ayrıştırma hataları giderildi.
+    - Manuel servis kurulum rehberleri ve arayüz kod blokları PowerShell ve CMD için optimize edildi.
+    - `config.json` içinde hem `heartbeat_sec` hem de `heartbeat_interval_sec` anahtarları için geriye dönük tam uyumluluk eklendi.
+  - **FIM Operasyonel Simülasyonu**:
+    - Arayüze ve API'ye (`/api/v1/endpoint/fim/simulate`) tek tıkla test olayı üretme özelliği eklendi; FIM, SIEM ve SOAR zinciri anında canlı olarak doğrulanabilir hale getirildi.
+
 - **v1.9.0** (Dosya ve Kayıt Defteri Bütünlük İzleme - FIM - Phase L ve Uç Nokta Veri Zenginleştirmesi) / **Agent v0.1.6**:
   - **Yerel Çok Platformlu Kriptografik FIM Tarayıcısı (Phase L - Ajan v0.1.6)**:
     - Kritik sistem ikilileri (`/bin`, `/usr/bin`, `C:\Windows\System32`), yapılandırma dosyaları (`/etc`, `/etc/pam.d`, `/etc/ssh`) ve Windows Kayıt Defteri kovanları (`Run`, `RunOnce`, `Services`, `IFEO`) üzerinde SHA-256 özetleri hesaplayan yerel tarayıcı.

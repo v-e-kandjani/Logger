@@ -158,17 +158,39 @@ iwr -useb "http://<LOGSEAL_SERVER>:8080/static/scripts/install-agent.ps1" -OutFi
      "identity_file": "C:\\Program Files\\LOGGER Agent\\identity.json"
    }
    ```
-4. Register the Windows Service using `sc.exe`:
-   ```cmd
-   sc.exe create LoggerAgent binPath= "\"C:\Program Files\LOGGER Agent\logger-agent.exe\" -config \"C:\Program Files\LOGGER Agent\config.json\"" start= auto DisplayName= "LogSeal Endpoint Security Agent"
-   sc.exe description LoggerAgent "Valtrivo LogSeal endpoint telemetry and security daemon"
-   sc.exe failure LoggerAgent reset= 86400 actions= restart/5000/restart/10000/restart/60000
-   net start LoggerAgent
-   ```
-5. Verify service status in PowerShell:
-   ```powershell
-   Get-Service LoggerAgent
-   ```
+4. Register and Start the Windows Service:
+   - **Recommended (PowerShell as Administrator)**:
+     *(Avoids Windows `sc.exe` quoting and parameter error 87 bugs)*
+     ```powershell
+     # Remove previous/broken service registration if exists
+     Stop-Service LoggerAgent -ErrorAction SilentlyContinue
+     & sc.exe delete LoggerAgent 2>&1 | Out-Null
+
+     # Register cleanly via native PowerShell cmdlet
+     New-Service -Name "LoggerAgent" -BinaryPathName '"C:\Program Files\LOGGER Agent\logger-agent.exe"' -DisplayName "Valtrivo LogSeal Endpoint Agent" -StartupType Automatic -Description "Valtrivo LogSeal native endpoint security and continuous telemetry daemon."
+
+     # Configure automatic failure recovery
+     & cmd.exe /c "sc.exe failure LoggerAgent reset= 86400 actions= restart/5000/restart/10000/restart/30000" | Out-Null
+
+     # Start and verify
+     Start-Service LoggerAgent
+     Get-Service LoggerAgent
+     ```
+
+   - **Alternative (Command Prompt `cmd.exe` as Administrator)**:
+     ```cmd
+     sc.exe stop LoggerAgent
+     sc.exe delete LoggerAgent
+     sc.exe create LoggerAgent binPath= "\"C:\Program Files\LOGGER Agent\logger-agent.exe\"" start= auto DisplayName= "Valtrivo LogSeal Endpoint Agent"
+     sc.exe description LoggerAgent "Valtrivo LogSeal native endpoint security and continuous telemetry daemon."
+     sc.exe failure LoggerAgent reset= 86400 actions= restart/5000/restart/10000/restart/30000
+     net start LoggerAgent
+     ```
+
+   > [!TIP]
+   > **Fixing "The parameter is incorrect" (Error 87)**:
+   > If Windows throws `The parameter is incorrect` when running `sc.exe create` or `net start LoggerAgent`, it is caused by bad nested quotes in `binPath=` or running `sc` inside PowerShell where `sc` is an alias for `Set-Content`.
+   > Run the **PowerShell (Administrator)** commands above to delete the invalid service entry and recreate it using `New-Service`.
 
 ---
 

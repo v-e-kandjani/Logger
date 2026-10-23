@@ -23,7 +23,7 @@ const (
 	serviceName       = "LoggerAgent"
 	serviceDisplayName = "Valtrivo LogSeal Endpoint Agent"
 	serviceDescription = "Valtrivo LogSeal native endpoint security and continuous telemetry collection daemon."
-	version           = "v0.1.1"
+	version           = "v0.1.6"
 )
 
 type Config struct {
@@ -187,28 +187,26 @@ pause
 
 	// 4. Register Windows Service
 	logMsg(silent, "[*] Registering Windows Service '%s'...", serviceName)
-	// Delete old service if exists
-	exec.Command("sc.exe", "delete", serviceName).Run()
+	// Stop and remove previous service instance if exists
+	exec.Command("cmd.exe", "/c", fmt.Sprintf("sc.exe stop %s >nul 2>&1 & sc.exe delete %s >nul 2>&1", serviceName, serviceName)).Run()
 	time.Sleep(500 * time.Millisecond)
 
-	binPathCmd := fmt.Sprintf(`"%s"`, binaryPath)
-	createArgs := []string{
-		"create", serviceName,
-		fmt.Sprintf("binPath= %s", binPathCmd),
-		"start=", "auto",
-		fmt.Sprintf("DisplayName= %s", serviceDisplayName),
-	}
-	cmd := exec.Command("sc.exe", createArgs...)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		fatalMsg(silent, "Failed to create service: %v (%s)", err, string(out))
+	// Create service using native PowerShell New-Service (immune to sc.exe escaping quirks)
+	psCmd := fmt.Sprintf(`New-Service -Name "%s" -BinaryPathName '"%s"' -DisplayName "%s" -StartupType Automatic -Description "%s"`,
+		serviceName, binaryPath, serviceDisplayName, serviceDescription)
+	ps := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", psCmd)
+	if out, err := ps.CombinedOutput(); err != nil {
+		// Fallback to cmd.exe with verbatim sc.exe quoting
+		fallbackCmd := fmt.Sprintf(`sc.exe create %s binPath= "\"%s\"" start= auto DisplayName= "%s"`, serviceName, binaryPath, serviceDisplayName)
+		cmd := exec.Command("cmd.exe", "/c", fallbackCmd)
+		if fbOut, fbErr := cmd.CombinedOutput(); fbErr != nil {
+			logMsg(silent, "[!] Warning creating service: %v (%s), fallback: %v (%s)", err, string(out), fbErr, string(fbOut))
+		}
+		exec.Command("cmd.exe", "/c", fmt.Sprintf(`sc.exe description %s "%s"`, serviceName, serviceDescription)).Run()
 	}
 
-	// Explicitly configure binPath to guarantee exact registry ImagePath quoting in Windows SCM
-	exec.Command("sc.exe", "config", serviceName, fmt.Sprintf("binPath= %s", binPathCmd), "start=", "auto").Run()
-
-	// Set description & failure actions
-	exec.Command("sc.exe", "description", serviceName, serviceDescription).Run()
-	exec.Command("sc.exe", "failure", serviceName, "reset=", "86400", "actions=", "restart/5000/restart/10000/restart/30000").Run()
+	// Configure failure recovery
+	exec.Command("cmd.exe", "/c", fmt.Sprintf("sc.exe failure %s reset= 86400 actions= restart/5000/restart/10000/restart/30000", serviceName)).Run()
 
 	// 5. Register in Windows Add/Remove Programs (Registry)
 	regBase := `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\` + serviceName
@@ -220,9 +218,12 @@ pause
 
 	// 6. Start service
 	logMsg(silent, "[*] Starting %s service...", serviceName)
-	startCmd := exec.Command("sc.exe", "start", serviceName)
+	startCmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", fmt.Sprintf("Start-Service -Name '%s'", serviceName))
 	if out, err := startCmd.CombinedOutput(); err != nil {
-		logMsg(silent, "[!] Notice starting service: %v (%s). Checking status...", err, string(out))
+		netCmd := exec.Command("cmd.exe", "/c", fmt.Sprintf("net start %s", serviceName))
+		if nOut, nErr := netCmd.CombinedOutput(); nErr != nil {
+			logMsg(silent, "[!] Notice starting service: %v (%s). Checking status...", err, string(out)+string(nOut))
+		}
 	}
 
 	time.Sleep(1 * time.Second)

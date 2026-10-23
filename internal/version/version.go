@@ -7,15 +7,15 @@ import (
 )
 
 const (
-	DefaultVersion   = "v1.9.0"
+	DefaultVersion   = "v1.9.1"
 	DefaultBuildDate = "2026-10-23"
-	DefaultCommitSHA = "51a8f90"
+	DefaultCommitSHA = "8f39b1a"
 )
 
 var (
-	Version   = "v1.9.0"
+	Version   = "v1.9.1"
 	BuildDate = "2026-10-23"
-	CommitSHA = "51a8f90"
+	CommitSHA = "8f39b1a"
 	Platform  = "Valtrivo LogSeal"
 	Company   = "Valtrivo"
 	Tagline   = "Her kayıt, zamanıyla kanıt."

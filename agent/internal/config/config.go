@@ -14,8 +14,9 @@ type Config struct {
 	EnrollmentToken string `json:"enrollment_token,omitempty"`
 	DataDir         string `json:"data_dir"`
 	IdentityFile    string `json:"identity_file"`
-	HeartbeatSec    int    `json:"heartbeat_sec"`
-	LogLevel        string `json:"log_level"`
+	HeartbeatSec         int    `json:"heartbeat_sec"`
+	HeartbeatIntervalSec int    `json:"heartbeat_interval_sec,omitempty"`
+	LogLevel             string `json:"log_level"`
 }
 
 // DefaultConfig returns reasonable platform defaults
@@ -59,6 +60,9 @@ func LoadConfig(path string) (*Config, error) {
 		if data, err := os.ReadFile(path); err == nil {
 			if err := json.Unmarshal(data, cfg); err != nil {
 				return nil, err
+			}
+			if cfg.HeartbeatSec == 0 && cfg.HeartbeatIntervalSec > 0 {
+				cfg.HeartbeatSec = cfg.HeartbeatIntervalSec
 			}
 		}
 	}

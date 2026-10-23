@@ -158,17 +158,39 @@ iwr -useb "http://<LOGSEAL_SUNUCU>:8080/static/scripts/install-agent.ps1" -OutFi
      "identity_file": "C:\\Program Files\\LOGGER Agent\\identity.json"
    }
    ```
-4. `sc.exe` ile Windows Servisi olarak kaydedin:
-   ```cmd
-   sc.exe create LoggerAgent binPath= "\"C:\Program Files\LOGGER Agent\logger-agent.exe\" -config \"C:\Program Files\LOGGER Agent\config.json\"" start= auto DisplayName= "LogSeal Endpoint Security Agent"
-   sc.exe description LoggerAgent "Valtrivo LogSeal uç nokta telemetrisi ve güvenlik servisi"
-   sc.exe failure LoggerAgent reset= 86400 actions= restart/5000/restart/10000/restart/60000
-   net start LoggerAgent
-   ```
-5. PowerShell ile servis durumunu doğrulayın:
-   ```powershell
-   Get-Service LoggerAgent
-   ```
+4. Windows Servisini Kaydedin ve Başlatın:
+   - **Önerilen (Yönetici Olarak PowerShell)**:
+     *(Windows `sc.exe` tırnak hatası ve Parametre Hatalı / 87 sorununu tamamen önler)*
+     ```powershell
+     # Önceki/hatalı servis kaydını temizleyin:
+     Stop-Service LoggerAgent -ErrorAction SilentlyContinue
+     & sc.exe delete LoggerAgent 2>&1 | Out-Null
+
+     # Yerel PowerShell cmdlet'i ile temiz servis kaydedin:
+     New-Service -Name "LoggerAgent" -BinaryPathName '"C:\Program Files\LOGGER Agent\logger-agent.exe"' -DisplayName "Valtrivo LogSeal Endpoint Agent" -StartupType Automatic -Description "Valtrivo LogSeal uç nokta telemetrisi ve güvenlik servisi"
+
+     # Hata anında otomatik yeniden başlatmayı yapılandırın:
+     & cmd.exe /c "sc.exe failure LoggerAgent reset= 86400 actions= restart/5000/restart/10000/restart/30000" | Out-Null
+
+     # Servisi başlatın ve kontrol edin:
+     Start-Service LoggerAgent
+     Get-Service LoggerAgent
+     ```
+
+   - **Alternatif (Yönetici Olarak Komut İstemi `cmd.exe`)**:
+     ```cmd
+     sc.exe stop LoggerAgent
+     sc.exe delete LoggerAgent
+     sc.exe create LoggerAgent binPath= "\"C:\Program Files\LOGGER Agent\logger-agent.exe\"" start= auto DisplayName= "Valtrivo LogSeal Endpoint Agent"
+     sc.exe description LoggerAgent "Valtrivo LogSeal uç nokta telemetrisi ve güvenlik servisi"
+     sc.exe failure LoggerAgent reset= 86400 actions= restart/5000/restart/10000/restart/30000
+     net start LoggerAgent
+     ```
+
+   > [!TIP]
+   > **"Parametre Hatalı" (The parameter is incorrect / Hata 87) Çözümü**:
+   > `sc.exe create` veya `net start LoggerAgent` çalıştırırken `Parametre hatalı` uyarısı alınıyorsa, `binPath=` içindeki iç içe tırnaklardan veya PowerShell içinde `sc` komutunun `Set-Content` takma adı olmasından kaynaklanır.
+   > Yukarıdaki **PowerShell (Yönetici)** komutlarını çalıştırarak hatalı kaydı temizleyin ve `New-Service` ile oluşturun.
 
 ---
 
