@@ -323,6 +323,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/fim/events", h.requireAuth(h.handleEndpointFIMEvents))
 	mux.HandleFunc("/api/v1/endpoint/fim/events/", h.requireAuth(h.handleEndpointFIMEventDetail))
 	mux.HandleFunc("/api/v1/endpoint/fim/baselines", h.requireAuth(h.handleEndpointFIMBaselines))
+	mux.HandleFunc("/api/v1/endpoint/fim/simulate", h.requireAuth(h.handleEndpointFIMSimulate))
 	mux.HandleFunc("/api/v1/endpoint/tasks", h.requireAuth(h.handleEndpointTasks))
 	mux.HandleFunc("/api/v1/endpoint/tasks/", h.requireAuth(h.handleEndpointTaskDetail))
 	mux.HandleFunc("/api/v1/endpoint/agents/upgrade-all", h.requireAuth(h.handleEndpointAgentUpgradeAll))

@@ -324,8 +324,9 @@ func (db *DB) ListFIMBaselines(ctx context.Context, tenantSlug string, agentID u
 	query := `
 		SELECT id, tenant_slug, agent_id, target_path, target_type, sha256_hash, file_size_bytes, permissions, last_checked
 		FROM endpoint_fim_baselines
-		WHERE agent_id = $1 AND ($2 = '' OR $2 = 'all' OR tenant_slug = $2)
-		ORDER BY target_path ASC
+		WHERE ($1 = '00000000-0000-0000-0000-000000000000'::uuid OR agent_id = $1)
+		  AND ($2 = '' OR $2 = 'all' OR tenant_slug = $2)
+		ORDER BY last_checked DESC, target_path ASC
 		LIMIT 200
 	`
 

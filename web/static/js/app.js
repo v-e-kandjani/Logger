@@ -11036,23 +11036,40 @@ async function loadEndpointFIMSummary() {
         const totalEl = document.getElementById('ep-fim-stat-total');
         if (totalEl) totalEl.textContent = Number(data.total_events || 0).toLocaleString();
 
+        const crit = Number(data.critical_deviations !== undefined ? data.critical_deviations : (data.critical_events || 0)) + Number(data.high_deviations || 0);
         const critEl = document.getElementById('ep-fim-stat-critical');
-        if (critEl) critEl.textContent = Number(data.critical_events || 0).toLocaleString();
+        if (critEl) critEl.textContent = crit.toLocaleString();
 
         const critBadge = document.getElementById('ep-fim-crit-badge');
         if (critBadge) {
-            const crit = Number(data.critical_events || 0);
             critBadge.textContent = `${crit} CRIT`;
             critBadge.className = crit > 0 ? 'badge badge-danger' : 'badge badge-success';
         }
 
+        const monitored = Number(data.monitored_paths_count !== undefined ? data.monitored_paths_count : (data.monitored_items || 0));
         const monEl = document.getElementById('ep-fim-stat-monitored');
-        if (monEl) monEl.textContent = Number(data.monitored_items || 0).toLocaleString();
+        if (monEl) monEl.textContent = monitored.toLocaleString();
 
+        const impacted = Number(data.impacted_agents_count !== undefined ? data.impacted_agents_count : (data.affected_agents || 0));
         const agentsEl = document.getElementById('ep-fim-stat-agents');
-        if (agentsEl) agentsEl.textContent = Number(data.affected_agents || 0).toLocaleString();
+        if (agentsEl) agentsEl.textContent = impacted.toLocaleString();
     } catch (e) {
         console.warn('loadEndpointFIMSummary error:', e);
+    }
+}
+
+async function simulateFIMEvent() {
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/fim/simulate?tenant=${encodeURIComponent(tenant)}`, {
+            method: 'POST'
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        showToast(data.message || 'FIM simülasyon olayı oluşturuldu!', 'success');
+        await loadEndpointFIM();
+    } catch (e) {
+        showToast('Simülasyon hatası: ' + e.message, 'error');
     }
 }
 
@@ -11331,6 +11348,7 @@ window.triggerFIMSOARAction = triggerFIMSOARAction;
 window.openFIMBaselines = openFIMBaselines;
 window.closeFIMBaselines = closeFIMBaselines;
 window.loadFIMBaselinesForSelectedAgent = loadFIMBaselinesForSelectedAgent;
+window.simulateFIMEvent = simulateFIMEvent;
 
 
 

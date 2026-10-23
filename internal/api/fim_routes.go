@@ -214,7 +214,7 @@ func (h *Handler) handleEndpointFIMEventDetail(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusOK, event)
 }
 
-// handleEndpointFIMBaselines returns current hash baselines for an endpoint
+// handleEndpointFIMBaselines returns current hash baselines for an endpoint or all tenant baselines
 func (h *Handler) handleEndpointFIMBaselines(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -223,15 +223,11 @@ func (h *Handler) handleEndpointFIMBaselines(w http.ResponseWriter, r *http.Requ
 
 	tenant := h.tenantScope(r)
 	agentIDStr := strings.TrimSpace(r.URL.Query().Get("agent_id"))
-	if agentIDStr == "" {
-		http.Error(w, "agent_id query parameter required", http.StatusBadRequest)
-		return
-	}
-
-	agentID, err := uuid.Parse(agentIDStr)
-	if err != nil {
-		http.Error(w, "invalid agent_id uuid", http.StatusBadRequest)
-		return
+	var agentID uuid.UUID
+	if agentIDStr != "" {
+		if id, err := uuid.Parse(agentIDStr); err == nil {
+			agentID = id
+		}
 	}
 
 	baselines, err := h.pgDB.ListFIMBaselines(r.Context(), tenant, agentID)
@@ -246,3 +242,99 @@ func (h *Handler) handleEndpointFIMBaselines(w http.ResponseWriter, r *http.Requ
 
 	writeJSON(w, http.StatusOK, baselines)
 }
+
+// handleEndpointFIMSimulate generates a realistic sample FIM deviation event for immediate testing
+func (h *Handler) handleEndpointFIMSimulate(w http.ResponseWriter, r *http.Request) {
+	tenant := h.tenantScope(r)
+
+	// 1. Resolve an existing agent or fallback to a demo agent
+	agents, _, err := h.pgDB.ListAgents(r.Context(), tenant, "", "", "", 1, 0)
+	var targetAgentID uuid.UUID
+	var hostname string = "srv-app-prod01.internal"
+	var ipAddress string = "10.34.33.15"
+
+	if err == nil && len(agents) > 0 {
+		targetAgentID = agents[0].ID
+		if agents[0].Hostname != "" {
+			hostname = agents[0].Hostname
+		}
+		if agents[0].IPAddress != "" {
+			ipAddress = agents[0].IPAddress
+		}
+	} else {
+		targetAgentID = uuid.New()
+	}
+
+	now := time.Now().UTC()
+	prevHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	currHash := "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+
+	sampleEvent := models.FIMEvent{
+		ID:             uuid.New(),
+		TenantSlug:     tenant,
+		AgentID:        targetAgentID,
+		AgentHostname:  hostname,
+		AgentIP:        ipAddress,
+		AgentOS:        "linux",
+		EventType:      "modified",
+		TargetType:     "file",
+		TargetPath:     "/etc/pam.d/common-auth",
+		PreviousHash:   prevHash,
+		CurrentHash:    currHash,
+		FileSizeBytes:  2048,
+		Permissions:    "-rw-r--r-- (root:root)",
+		ProcessName:    "vim",
+		ProcessPID:     4192,
+		UserName:       "root",
+		Severity:       "CRITICAL",
+		MITRETactic:    "Persistence",
+		MITRETechnique: "T1556",
+		Details:        "Kritik PAM kimlik doğrulama konfigürasyon dosyasında izinsiz SHA-256 bütünlük sapması tespit edildi. Saldırgan arka kapı (backdoor) yerleştirmiş olabilir.",
+		Timestamp:      now,
+	}
+
+	sampleBaseline := models.FIMBaselineItem{
+		ID:            uuid.New(),
+		TenantSlug:    tenant,
+		AgentID:       targetAgentID,
+		TargetPath:    "/etc/pam.d/common-auth",
+		TargetType:    "file",
+		SHA256Hash:    currHash,
+		FileSizeBytes: 2048,
+		Permissions:   "-rw-r--r--",
+		LastChecked:   now,
+	}
+
+	_ = h.pgDB.SaveFIMEvents(r.Context(), tenant, targetAgentID, []models.FIMEvent{sampleEvent})
+	_ = h.pgDB.SaveFIMBaselines(r.Context(), tenant, targetAgentID, []models.FIMBaselineItem{sampleBaseline})
+
+	// Dispatch to SIEM Engine
+	if h.siemEngine != nil {
+		alert := &models.SIEMAlert{
+			ID:             uuid.New(),
+			Tenant:         tenant,
+			Severity:       "CRITICAL",
+			RuleName:       "Uç Nokta Dosya Bütünlük İhlali (FIM Tamper)",
+			DeviceName:     hostname,
+			SourceIP:       ipAddress,
+			Category:       "endpoint_fim",
+			EventCount:     1,
+			FirstSeen:      now,
+			LastSeen:       now,
+			Status:         "NEW",
+			MitreTactic:    "Persistence",
+			MitreTechnique: "T1556",
+			RiskScore:      95,
+			Summary:        fmt.Sprintf("Host '%s' üzerinde kritik dosya '/etc/pam.d/common-auth' izinsiz değiştirildi! Eski Hash: %s... -> Yeni Hash: %s...", hostname, prevHash[:8], currHash[:8]),
+			CreatedAt:      now,
+		}
+		h.siemEngine.DispatchDirectAlert(alert)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "ok",
+		"message": "FIM simülasyon olayı ve SIEM alarmı başarıyla oluşturuldu.",
+		"event":   sampleEvent,
+	})
+}
+
