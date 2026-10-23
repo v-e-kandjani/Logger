@@ -253,6 +253,15 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.6** (Uç Nokta Yama Yönetimi Başlık/Açıklama Zenginleştirmesi & UI Çeviri Kapsam İyileştirmesi) / **Ajan v0.1.10**:
+  - **Yama Başlık & Üretici Bilgilerinin Zenginleştirilmesi**:
+    - Windows yama toplayıcısı (`collect_windows.go`), WMIC ve PowerShell `Get-HotFix` üzerinden `Description`, `HotFixID` ve `InstalledOn` bilgilerini toplayacak şekilde geliştirildi.
+    - Sunucu tarafında `endpoint_cve.go` içerisine otomatik başlık ve üretici tamamlama mekanizması eklendi (`Security & Quality Update (KB...)` ve `Microsoft Corporation`).
+    - `endpoint_patches_current` tablosundaki mevcut kayıtlar için otomatik veritabanı geçiş ve doldurma sorgusu uygulandı.
+    - Web arayüzünde (`app.js`) yama durum tablosundaki boş başlık ve üretici alanları için zenginleştirilmiş yedek değer gösterimi eklendi.
+  - **Ağ ve DNS Güvenliği Arayüz Kararlılığı**:
+    - Ağ ve DNS Güvenliği bölümünde yaşanan `Hata: t is not defined` hatası giderildi; global ve yerel çeviri fonksiyonları (`window.t`) tanımlanarak arayüz kararlılığı sağlandı.
+
 - **v1.9.5** (Uç Nokta Ağ Telemetrisi, DNS Sızıntı Koruması & Mikro-İzolasyon - Phase O) / **Ajan v0.1.9**:
   - **Yerel Çok Platformlu Ağ Telemetrisi ve DNS Denetimi (Ajan v0.1.9)**:
     - Linux (`ss -tuanp`), macOS (`lsof -i -P -n`) ve Windows (`netstat -ano`) üzerinde çalışan yüksek hızlı soket keşfi ve süreç (PID) eşleme motoru.

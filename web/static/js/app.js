@@ -34,6 +34,12 @@ function tenantQuerySuffix(prefix = '?') {
     return slug && slug !== 'all' ? `${prefix}tenant=${encodeURIComponent(slug)}` : '';
 }
 
+// Global translation shortcut
+function t(k, fb) {
+    return window.i18n ? window.i18n.t(k, fb) : (fb || k);
+}
+window.t = t;
+
 document.addEventListener('DOMContentLoaded', () => {
     initAuthSession();
     initNavigation();
@@ -9166,9 +9172,16 @@ async function loadEndpointPatches() {
                 ? p.cve_ids.map(c => `<span style="font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); margin-right: 4px;">${escapeHtml(c)}</span>`).join('')
                 : `<span style="color: var(--text-muted);">-</span>`;
 
+            const patchTitle = (p.title && p.title.trim() && p.title !== '-')
+                ? p.title
+                : (`Security & Quality Update (${p.kb_id || p.patch_id})`);
+            const patchVendor = (p.vendor && p.vendor.trim())
+                ? p.vendor
+                : (p.agent_os === 'windows' || (p.kb_id && p.kb_id.startsWith('KB')) || (p.patch_id && p.patch_id.startsWith('KB')) ? 'Microsoft Corporation' : 'System');
+
             let actionBtn = '';
             if (p.status === 'missing') {
-                actionBtn = `<button class="btn btn-sm btn-primary" onclick="openDeployPatchModal('${escapeHtml(p.agent_id)}', '${escapeHtml(p.agent_hostname)}', '${escapeHtml(p.patch_id)}', '${escapeHtml(p.title || '')}', '${escapeHtml(p.agent_os || '')}')" style="font-size: 11px; padding: 3px 8px; font-weight: 600;"><i class="fas fa-wrench"></i> ${t('btn_deploy_patch')}</button>`;
+                actionBtn = `<button class="btn btn-sm btn-primary" onclick="openDeployPatchModal('${escapeHtml(p.agent_id)}', '${escapeHtml(p.agent_hostname)}', '${escapeHtml(p.patch_id)}', '${escapeHtml(patchTitle)}', '${escapeHtml(p.agent_os || '')}')" style="font-size: 11px; padding: 3px 8px; font-weight: 600;"><i class="fas fa-wrench"></i> ${t('btn_deploy_patch')}</button>`;
             } else if (p.status === 'pending_reboot') {
                 actionBtn = `<button class="btn btn-sm btn-danger" onclick="rebootEndpoint('${escapeHtml(p.agent_id)}', '${escapeHtml(p.agent_hostname)}')" style="font-size: 11px; padding: 3px 8px; font-weight: 600;"><i class="fas fa-power-off"></i> ${t('btn_reboot_endpoint')}</button>`;
             } else {
@@ -9185,8 +9198,8 @@ async function loadEndpointPatches() {
                         <strong style="font-family: var(--font-mono); color: var(--accent);">${escapeHtml(p.kb_id || p.patch_id)}</strong>
                     </td>
                     <td style="max-width: 320px; font-size: 12px; line-height: 1.4;">
-                        <div>${escapeHtml(p.title || '-')}</div>
-                        <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(p.vendor || '')}</div>
+                        <div style="font-weight: 600;">${escapeHtml(patchTitle)}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(patchVendor)}</div>
                     </td>
                     <td>
                         <span class="badge" style="background: rgba(148, 163, 184, 0.2);">${escapeHtml(p.severity || 'UNKNOWN')}</span>
@@ -12177,6 +12190,7 @@ async function loadEndpointNetworkConnections() {
     const tbody = document.getElementById('ep-net-conns-tbody');
     const countEl = document.getElementById('ep-net-conns-total-count');
     if (!tbody) return;
+    const t = (k, fb) => (window.i18n ? window.i18n.t(k, fb) : (fb || k));
 
     try {
         const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
@@ -12264,6 +12278,7 @@ async function loadEndpointNetworkDNS() {
     const tbody = document.getElementById('ep-net-dns-tbody');
     const countEl = document.getElementById('ep-net-dns-total-count');
     if (!tbody) return;
+    const t = (k, fb) => (window.i18n ? window.i18n.t(k, fb) : (fb || k));
 
     try {
         const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
@@ -12419,6 +12434,7 @@ function closeNetworkFirewallRulesModal() {
 async function loadNetworkFirewallRules() {
     const tbody = document.getElementById('ep-net-fw-tbody');
     if (!tbody) return;
+    const t = (k, fb) => (window.i18n ? window.i18n.t(k, fb) : (fb || k));
 
     try {
         const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';

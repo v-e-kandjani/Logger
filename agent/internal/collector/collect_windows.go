@@ -98,23 +98,44 @@ func collectPlatformSpecific(req *models.AgentInventoryRequest) {
 
 func collectWindowsPatches(req *models.AgentInventoryRequest) {
 	// Try WMIC first
-	cmd := exec.Command("wmic", "qfe", "get", "HotFixID,InstalledOn", "/format:csv")
+	cmd := exec.Command("wmic", "qfe", "get", "Description,HotFixID,InstalledOn", "/format:csv")
 	out, err := cmd.Output()
 	if err == nil && len(out) > 0 {
 		r := csv.NewReader(bytes.NewReader(out))
 		records, err := r.ReadAll()
 		if err == nil && len(records) > 1 {
+			header := records[0]
+			descIdx := -1
+			hotfixIdx := -1
+			dateIdx := -1
+			for j, h := range header {
+				h = strings.TrimSpace(strings.ToLower(h))
+				if h == "description" {
+					descIdx = j
+				} else if h == "hotfixid" {
+					hotfixIdx = j
+				} else if h == "installedon" {
+					dateIdx = j
+				}
+			}
 			for i := 1; i < len(records); i++ {
 				rec := records[i]
-				if len(rec) >= 3 {
-					kb := strings.TrimSpace(rec[1])
-					date := strings.TrimSpace(rec[2])
-					if strings.HasPrefix(strings.ToUpper(kb), "KB") {
-						req.Patches = append(req.Patches, models.AgentPatchItem{
-							HotFixID:    kb,
-							InstalledOn: date,
-						})
-					}
+				var kb, desc, date string
+				if hotfixIdx >= 0 && hotfixIdx < len(rec) {
+					kb = strings.TrimSpace(rec[hotfixIdx])
+				}
+				if descIdx >= 0 && descIdx < len(rec) {
+					desc = strings.TrimSpace(rec[descIdx])
+				}
+				if dateIdx >= 0 && dateIdx < len(rec) {
+					date = strings.TrimSpace(rec[dateIdx])
+				}
+				if strings.HasPrefix(strings.ToUpper(kb), "KB") {
+					req.Patches = append(req.Patches, models.AgentPatchItem{
+						HotFixID:    kb,
+						Description: desc,
+						InstalledOn: date,
+					})
 				}
 			}
 			if len(req.Patches) > 0 {
@@ -124,16 +145,29 @@ func collectWindowsPatches(req *models.AgentInventoryRequest) {
 	}
 
 	// Fallback to PowerShell Get-HotFix if WMIC is unavailable
-	psCmd := exec.Command("powershell.exe", "-NoProfile", "-Command", "Get-HotFix | Select-Object -ExpandProperty HotFixID")
+	psCmd := exec.Command("powershell.exe", "-NoProfile", "-Command", "Get-HotFix | ForEach-Object { \"$($_.HotFixID)|$($_.Description)|$($_.InstalledOn)\" }")
 	psOut, err := psCmd.Output()
 	if err == nil {
 		lines := strings.Split(string(psOut), "\n")
 		for _, line := range lines {
-			kb := strings.TrimSpace(line)
-			if strings.HasPrefix(strings.ToUpper(kb), "KB") {
-				req.Patches = append(req.Patches, models.AgentPatchItem{
-					HotFixID: kb,
-				})
+			parts := strings.Split(strings.TrimSpace(line), "|")
+			if len(parts) >= 1 {
+				kb := strings.TrimSpace(parts[0])
+				if strings.HasPrefix(strings.ToUpper(kb), "KB") {
+					desc := ""
+					date := ""
+					if len(parts) >= 2 {
+						desc = strings.TrimSpace(parts[1])
+					}
+					if len(parts) >= 3 {
+						date = strings.TrimSpace(parts[2])
+					}
+					req.Patches = append(req.Patches, models.AgentPatchItem{
+						HotFixID:    kb,
+						Description: desc,
+						InstalledOn: date,
+					})
+				}
 			}
 		}
 	}

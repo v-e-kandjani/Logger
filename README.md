@@ -264,6 +264,15 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.6** (Endpoint Patch Management Metadata Enrichment & UI Translation Scope Hardening) / **Agent v0.1.10**:
+  - **Patch Metadata & Title/Vendor Population**:
+    - Enhanced Windows patch collector (`collect_windows.go`) to query `Description`, `HotFixID`, and `InstalledOn` via WMIC and PowerShell `Get-HotFix`.
+    - Added automated server-side title and vendor inference in `endpoint_cve.go` (`Security & Quality Update (KB...)` and `Microsoft Corporation`).
+    - Added database backfill migration for existing patch records in `endpoint_patches_current`.
+    - Enhanced patch UI table in `app.js` with fallback logic preventing empty title and vendor columns.
+  - **Web Dashboard & Network Security Stability**:
+    - Fixed `ReferenceError: t is not defined` in Network & DNS Security views by declaring global and scoped translation helpers `window.t`.
+
 - **v1.9.5** (Endpoint Network Traffic, DNS Exfiltration Protection & Micro-Segmentation - Phase O) / **Agent v0.1.9**:
   - **Native Cross-Platform Network Telemetry & DNS Auditing (Agent v0.1.9)**:
     - High-performance socket enumeration and process PID correlation across Linux (`ss -tuanp`), macOS (`lsof -i -P -n`), and Windows (`netstat -ano`).

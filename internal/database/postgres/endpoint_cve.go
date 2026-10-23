@@ -113,11 +113,21 @@ func (db *DB) IngestAgentInventory(ctx context.Context, agentUUID string, req mo
 			if kb == "" {
 				continue
 			}
+			desc := strings.TrimSpace(p.Description)
+			title := desc
+			if title == "" || strings.EqualFold(title, "Update") || strings.EqualFold(title, "Security Update") {
+				if title != "" {
+					title = fmt.Sprintf("%s (%s)", title, kb)
+				} else {
+					title = fmt.Sprintf("Security & Quality Update (%s)", kb)
+				}
+			}
+			vendor := "Microsoft Corporation"
 			_, err := db.pool.Exec(ctx, `
 				INSERT INTO endpoint_patches_current (
-					agent_id, tenant_slug, patch_id, kb_id, title, status, detected_at
-				) VALUES ($1, $2, $3, $3, $4, 'installed', $5)
-			`, agentID, tenantSlug, kb, p.Description, now)
+					agent_id, tenant_slug, patch_id, kb_id, title, vendor, status, detected_at
+				) VALUES ($1, $2, $3, $3, $4, $5, 'installed', $6)
+			`, agentID, tenantSlug, kb, title, vendor, now)
 			if err == nil {
 				processedPatches++
 			}
@@ -637,7 +647,10 @@ func (db *DB) ListEndpointPatches(ctx context.Context, tenantSlug, status, searc
 	query := fmt.Sprintf(`
 		SELECT 
 			p.id, p.agent_id, a.hostname, a.ip_address, a.os_type,
-			p.patch_id, p.title, COALESCE(p.vendor, ''), COALESCE(p.kb_id, ''),
+			p.patch_id,
+			COALESCE(NULLIF(p.title, ''), 'Security & Quality Update (' || COALESCE(NULLIF(p.kb_id, ''), p.patch_id) || ')') as title,
+			COALESCE(NULLIF(p.vendor, ''), CASE WHEN a.os_type = 'windows' OR p.kb_id LIKE 'KB%%' OR p.patch_id LIKE 'KB%%' THEN 'Microsoft Corporation' ELSE 'System' END) as vendor,
+			COALESCE(p.kb_id, ''),
 			COALESCE(p.severity, 'UNKNOWN'), COALESCE(p.cve_ids, '{}'),
 			p.requires_reboot, p.status, p.installed_at, p.detected_at
 		FROM endpoint_patches_current p

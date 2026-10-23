@@ -355,6 +355,18 @@ func (db *DB) EnsureEndpointSchema(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// Backfill missing title and vendor for patches
+	_, _ = db.pool.Exec(ctx, `
+		UPDATE endpoint_patches_current
+		SET title = 'Security & Quality Update (' || COALESCE(NULLIF(kb_id, ''), patch_id) || ')'
+		WHERE title IS NULL OR title = '' OR title = '-';
+
+		UPDATE endpoint_patches_current
+		SET vendor = 'Microsoft Corporation'
+		WHERE (vendor IS NULL OR vendor = '') AND (kb_id LIKE 'KB%' OR patch_id LIKE 'KB%');
+	`)
+
 	_, _ = db.MergeDuplicateAgents(ctx, "")
 	return nil
 }
