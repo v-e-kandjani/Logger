@@ -1391,7 +1391,7 @@
                     <!-- 1. Devices Tab View -->
                     <div id="usb-subview-devices">
                         <div class="filter-bar" style="margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
-                            <input type="text" id="ep-usb-dev-search" class="form-control" placeholder="Uç nokta adı, IP, üretici, model veya seri no..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointUSBDevices();">
+                            <input type="text" id="ep-usb-dev-search" class="form-control" placeholder="Uç nokta adı, IP, üretici, model veya seri no..." data-i18n-placeholder="usb_search_dev_ph" style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointUSBDevices();">
                             <button class="btn btn-secondary" onclick="loadEndpointUSBDevices()" data-i18n="btn_filter">Filtrele</button>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; color: var(--text-secondary); margin-left: 8px;">
                                 <input type="checkbox" id="ep-usb-filter-connected" checked onchange="loadEndpointUSBDevices()">
@@ -1426,7 +1426,7 @@
                     <!-- 2. Events Tab View -->
                     <div id="usb-subview-events" style="display: none;">
                         <div class="filter-bar" style="margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
-                            <input type="text" id="ep-usb-evt-search" class="form-control" placeholder="Uç nokta, olay detayı veya seri no..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointUSBEvents();">
+                            <input type="text" id="ep-usb-evt-search" class="form-control" placeholder="Uç nokta, olay detayı veya seri no..." data-i18n-placeholder="usb_search_evt_ph" style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointUSBEvents();">
                             <select id="ep-usb-filter-event-type" class="form-control" style="width: 170px;" onchange="loadEndpointUSBEvents()">
                                 <option value="" data-i18n="usb_opt_all_events">Tüm Olaylar</option>
                                 <option value="inserted" data-i18n="usb_opt_inserted">Takıldı (Inserted)</option>
@@ -6122,7 +6122,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                     <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 2fr; gap: 10px; margin-bottom: 10px;">
                         <div>
                             <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_wl_name">Cihaz Adı / Tanımı *</label>
-                            <input type="text" id="wl-form-name" class="form-control" placeholder="ör. IT Kingston DT50" style="width: 100%; font-size: 12px;">
+                            <input type="text" id="wl-form-name" class="form-control" placeholder="ör. IT Kingston DT50" data-i18n-placeholder="wl_name_ph" style="width: 100%; font-size: 12px;">
                         </div>
                         <div>
                             <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px;">Vendor ID (VID)</label>
@@ -6140,7 +6140,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                     <div style="display: flex; gap: 10px; align-items: flex-end;">
                         <div style="flex: 1;">
                             <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_wl_desc">Onay Nedeni / Departman</label>
-                            <input type="text" id="wl-form-desc" class="form-control" placeholder="ör. Bilgi İşlem yedekleme belleği" style="width: 100%; font-size: 12px;">
+                            <input type="text" id="wl-form-desc" class="form-control" placeholder="ör. Bilgi İşlem yedekleme belleği" data-i18n-placeholder="wl_desc_ph" style="width: 100%; font-size: 12px;">
                         </div>
                         <button class="btn btn-primary" onclick="submitAddUSBWhitelist()" style="white-space: nowrap;" data-i18n="btn_add_to_whitelist">Beyaz Listeye Ekle</button>
                     </div>
