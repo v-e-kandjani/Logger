@@ -265,6 +265,18 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.2** (Automated Duplicate Agent Consolidation & Inactive Instance Pruning):
+  - **Automated Duplicate Agent De-Duplication & Data Merge Engine**:
+    - Introduced `MergeDuplicateAgents` consolidating multiple agent records registered from the same physical/virtual host (`tenant_slug`, `hostname`, `ip_address`) due to agent reinstallations or UUID resets.
+    - Seamlessly migrates all child records to the active agent: current inventory, installed software packages, vulnerability findings, missing OS patches, FIM cryptographic baselines, FIM tampering events, remote deployment tasks, and SOAR active mitigation executions.
+    - Preserves historical fleet telemetry, earliest initial host enrollment timestamps (`created_at`), and lowest security health scores.
+    - Automatically purges stale, disconnected, and orphaned agent records from the database.
+  - **Proactive Re-Enrollment Deduplication Guard**:
+    - Enhanced `UpsertEnrolledAgent` to detect existing hosts on re-enrollment, preventing the creation of duplicate rows and keeping the fleet inventory clean.
+  - **Operational Web UI & REST API Controls**:
+    - Added dedicated toolbar action button ("🧹 Mükerrer Ajanları Birleştir / Merge Duplicate Agents") in the Endpoint Agents management view.
+    - Added `/api/v1/endpoint/agents/cleanup-duplicates` endpoint with comprehensive audit logging.
+
 - **v1.9.1** (Windows Agent Service Resilience & FIM Event Simulation):
   - **Windows Service Registration Resilience (Fix for "The parameter is incorrect" / Error 87)**:
     - Updated Windows agent installation script (`install-agent.ps1`) and standalone setup wizard (`logger-agent-setup.exe`) to register services via native PowerShell `New-Service` and properly escaped `sc.exe` fallbacks, eliminating SCM command-line argument parsing and quote breakage.

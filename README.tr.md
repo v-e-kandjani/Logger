@@ -254,6 +254,17 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.2** (Otomatik Mükerrer Ajan Birleştirme & Pasif Kayıt Temizliği):
+  - **Mükerrer Ajanları Birleştirme ve Veri Konsolidasyon Motoru**:
+    - Ajanın kaldırılıp yeniden kurulması veya UUID sıfırlanması durumunda aynı cihazdan (`tenant_slug`, `hostname`, `ip_address`) oluşan mükerrer kayıtları tek bir aktif ajan altında birleştiren `MergeDuplicateAgents` motoru geliştirildi.
+    - Tüm ilişkili alt veriler (Mevcut Envanter, Yüklü Yazılımlar, CVE Güvenlik Açıkları, Eksik İşletim Sistemi Yamaları, FIM Kriptografik Referansları, FIM Değişiklik Olayları, Uzaktan Dağıtım Görevleri ve SOAR Müdahale Kayıtları) en güncel aktif ajana eksiksiz taşınır.
+    - Cihazın ilk kayıt tarihi (`created_at`) ve tespit edilen en kritik güvenlik skoru korunur; eski, bağlantısı kesilmiş pasif ajan kayıtları veritabanından güvenle temizlenir.
+  - **Proaktif Yeniden Kayıt Koruma Mekanizması**:
+    - `UpsertEnrolledAgent` fonksiyonu aynı ana makinenin yeni UUID ile kaydolması durumunda mükerrer satır oluşturmak yerine mevcut kaydı güncelleyecek ve anında birleştirme yapacak şekilde güçlendirildi.
+  - **Web Yönetim Arayüzü ve REST API Entegrasyonu**:
+    - Uç Nokta Ajanları yönetim tablosuna tek tıkla çalıştırma butonu eklendi: "🧹 Mükerrer Ajanları Birleştir".
+    - Tam denetim günlüğü (`audit_logs`) üreten `/api/v1/endpoint/agents/cleanup-duplicates` uç noktası yayınlandı.
+
 - **v1.9.1** (Windows Ajan Servis Dayanıklılığı & FIM Olay Simülasyonu):
   - **Windows Servis Kaydı Dayanıklılığı ("Parametre Hatalı" / Hata 87 Düzeltmesi)**:
     - Windows ajan kurulum betiği (`install-agent.ps1`) ve kurulum sihirbazı (`logger-agent-setup.exe`), yerel PowerShell `New-Service` cmdlet'ini ve güvenli `sc.exe` yedeklerini kullanacak şekilde güncellendi. `sc.exe` tırnak ve komut satırı ayrıştırma hataları giderildi.

@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.1</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.2</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -908,6 +908,9 @@
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                             <button class="btn btn-outline" id="btn-ep-agents-refresh" onclick="loadEndpointAgents()" data-i18n="btn_refresh">🔄 Yenile</button>
+                            <button class="btn btn-outline" id="btn-ep-merge-duplicates" onclick="cleanupDuplicateAgents()" style="border-color: rgba(245, 158, 11, 0.4); color: #f59e0b;" title="Aynı sunucu/IP üzerindeki mükerrer ve eski ajan kayıtlarını birleştirip pasif olanları temizler">
+                                <span data-i18n="btn_merge_duplicate_agents">🧹 Mükerrer Ajanları Birleştir</span>
+                            </button>
                             <button class="btn btn-outline" id="btn-ep-upgrade-all" onclick="triggerAgentUpgradeAll()" style="border-color: rgba(16, 185, 129, 0.4); color: var(--success);" title="Tüm ajanları bağlı oldukları sunucu üzerinden en son sürüme günceller">
                                 <span data-i18n="btn_upgrade_all_agents">🚀 Tüm Ajanları Otomatik Güncelle</span>
                             </button>
@@ -3284,7 +3287,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.1</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.2</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -6690,8 +6693,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.1"></script>
-    <script src="/static/js/translations.js?v=1.9.1"></script>
-    <script src="/static/js/app.js?v=1.9.1"></script>
+    <script src="/static/js/marked.min.js?v=1.9.2"></script>
+    <script src="/static/js/translations.js?v=1.9.2"></script>
+    <script src="/static/js/app.js?v=1.9.2"></script>
 </body>
 </html>

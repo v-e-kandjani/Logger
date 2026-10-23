@@ -9085,6 +9085,7 @@ window.loadEndpointVulnerabilities = loadEndpointVulnerabilities;
 window.loadEndpointPatches = loadEndpointPatches;
 window.triggerPatchScan = triggerPatchScan;
 window.triggerAgentUpgradeAll = triggerAgentUpgradeAll;
+window.cleanupDuplicateAgents = cleanupDuplicateAgents;
 
 // --- Patch Management (Phase G) ---
 async function loadEndpointPatches() {
@@ -9222,6 +9223,24 @@ async function triggerAgentUpgradeAll() {
         const data = await res.json();
         showToast('🚀 ' + (data.message || 'Tüm ajanlar için otomatik güncelleme emri iletildi.'), 'success');
         loadEndpointAgents();
+    } catch (err) {
+        showToast('Hata: ' + err.message, 'error');
+    }
+}
+
+async function cleanupDuplicateAgents() {
+    if (!confirm('Aynı sunucu ve IP adresine ait eski ve pasif mükerrer ajan kayıtları birleştirilecek ve kaldırılacaktır. Devam etmek istiyor musunuz?')) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/v1/endpoint/agents/cleanup-duplicates', { method: 'POST' });
+        if (!res.ok) throw new Error('Mükerrer ajanlar temizlenemedi');
+        const data = await res.json();
+        showToast('🧹 ' + (data.message || 'Mükerrer ajanlar başarıyla birleştirildi.'), 'success');
+        loadEndpointAgents();
+        if (typeof loadEndpointOverview === 'function') loadEndpointOverview();
+        if (typeof loadEndpointFIMSummary === 'function') loadEndpointFIMSummary();
     } catch (err) {
         showToast('Hata: ' + err.message, 'error');
     }

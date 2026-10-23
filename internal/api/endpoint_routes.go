@@ -858,6 +858,32 @@ func (h *Handler) handleEndpointAgentUpgradeAll(w http.ResponseWriter, r *http.R
 	})
 }
 
+// handleEndpointAgentsMergeDuplicates consolidates duplicate agent instances sharing the same hostname and IP
+func (h *Handler) handleEndpointAgentsMergeDuplicates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenant := h.tenantScope(r)
+	removed, err := h.pgDB.MergeDuplicateAgents(r.Context(), tenant)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	h.recordAudit(r, "ENDPOINT_AGENTS_MERGE_DUPLICATES", "endpoint/agents", "SUCCESS", map[string]interface{}{
+		"tenant":  tenant,
+		"removed": removed,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"removed": removed,
+		"message": fmt.Sprintf("%d mükerrer ajan kaydı başarıyla birleştirildi ve pasif olanlar temizlendi.", removed),
+	})
+}
+
 // handleEndpointPolicies lists or creates endpoint policies
 func (h *Handler) handleEndpointPolicies(w http.ResponseWriter, r *http.Request) {
 	tenant := h.tenantScope(r)

@@ -351,7 +351,11 @@ func (db *DB) EnsureEndpointSchema(ctx context.Context) error {
 	`
 
 	_, err := db.pool.Exec(ctx, schema)
-	return err
+	if err != nil {
+		return err
+	}
+	_, _ = db.MergeDuplicateAgents(ctx, "")
+	return nil
 }
 
 // GenerateEnrollmentToken creates a cryptographically secure token: lp_ea_<hex>
@@ -615,7 +619,178 @@ func (db *DB) UpsertEnrolledAgent(ctx context.Context, req models.AgentEnrollReq
 		return nil, fmt.Errorf("upserting agent: %w", err)
 	}
 
+	// Proactively merge any duplicate agents on the same host and IP
+	_, _ = db.MergeDuplicateAgents(ctx, tenantSlug)
+
 	return &a, nil
+}
+
+// MergeDuplicateAgents merges historical/inactive duplicate agents sharing the same hostname and IP
+// into the most recently active agent instance, consolidating software, vulns, patches, and FIM events.
+func (db *DB) MergeDuplicateAgents(ctx context.Context, tenantSlug string) (int, error) {
+	groupQuery := `
+		SELECT tenant_slug, LOWER(hostname) AS l_hostname, ip_address, COUNT(*) as cnt
+		FROM endpoint_agents
+		WHERE ($1 = '' OR tenant_slug = $1) AND ip_address != ''
+		GROUP BY tenant_slug, LOWER(hostname), ip_address
+		HAVING COUNT(*) > 1
+	`
+	rows, err := db.pool.Query(ctx, groupQuery, tenantSlug)
+	if err != nil {
+		return 0, fmt.Errorf("querying duplicate agent groups: %w", err)
+	}
+	defer rows.Close()
+
+	type dupGroup struct {
+		TenantSlug string
+		Hostname   string
+		IPAddress  string
+	}
+	var groups []dupGroup
+	for rows.Next() {
+		var g dupGroup
+		var cnt int
+		if err := rows.Scan(&g.TenantSlug, &g.Hostname, &g.IPAddress, &cnt); err == nil {
+			groups = append(groups, g)
+		}
+	}
+	rows.Close()
+
+	totalRemoved := 0
+
+	for _, g := range groups {
+		agentRows, err := db.pool.Query(ctx, `
+			SELECT id, health_score, created_at
+			FROM endpoint_agents
+			WHERE tenant_slug = $1 AND LOWER(hostname) = $2 AND ip_address = $3
+			ORDER BY last_seen DESC NULLS LAST, created_at DESC
+		`, g.TenantSlug, g.Hostname, g.IPAddress)
+		if err != nil {
+			continue
+		}
+
+		type agentRecord struct {
+			ID          uuid.UUID
+			HealthScore int
+			CreatedAt   time.Time
+		}
+		var agents []agentRecord
+		for agentRows.Next() {
+			var ar agentRecord
+			if err := agentRows.Scan(&ar.ID, &ar.HealthScore, &ar.CreatedAt); err == nil {
+				agents = append(agents, ar)
+			}
+		}
+		agentRows.Close()
+
+		if len(agents) <= 1 {
+			continue
+		}
+
+		winner := agents[0]
+		oldAgents := agents[1:]
+
+		for _, old := range oldAgents {
+			tx, err := db.pool.Begin(ctx)
+			if err != nil {
+				continue
+			}
+
+			// 1. Preserve earliest creation date and lowest health score (highest risk)
+			_, _ = tx.Exec(ctx, `
+				UPDATE endpoint_agents 
+				SET created_at = LEAST(created_at, $1),
+				    health_score = LEAST(health_score, $2)
+				WHERE id = $3
+			`, old.CreatedAt, old.HealthScore, winner.ID)
+
+			// 2. Inventory: If winner doesn't have inventory, take old; else delete old
+			var hasWinnerInv bool
+			_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM endpoint_inventory_current WHERE agent_id = $1)`, winner.ID).Scan(&hasWinnerInv)
+			if hasWinnerInv {
+				_, _ = tx.Exec(ctx, `DELETE FROM endpoint_inventory_current WHERE agent_id = $1`, old.ID)
+			} else {
+				_, _ = tx.Exec(ctx, `UPDATE endpoint_inventory_current SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+			}
+
+			// 3. Software: Delete duplicates, migrate remaining
+			_, _ = tx.Exec(ctx, `
+				DELETE FROM endpoint_software_current old
+				WHERE old.agent_id = $1 AND EXISTS (
+					SELECT 1 FROM endpoint_software_current tgt
+					WHERE tgt.agent_id = $2 AND tgt.name = old.name AND tgt.version = old.version AND tgt.arch = old.arch
+				)
+			`, old.ID, winner.ID)
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_software_current SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 4. Vulnerabilities: Delete duplicates, migrate remaining
+			_, _ = tx.Exec(ctx, `
+				DELETE FROM endpoint_vulnerability_findings old
+				WHERE old.agent_id = $1 AND EXISTS (
+					SELECT 1 FROM endpoint_vulnerability_findings tgt
+					WHERE tgt.agent_id = $2 AND tgt.cve_id = old.cve_id
+					  AND (tgt.software_id = old.software_id OR (tgt.software_id IS NULL AND old.software_id IS NULL))
+				)
+			`, old.ID, winner.ID)
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_vulnerability_findings SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 5. Patches: Delete duplicates, migrate remaining
+			_, _ = tx.Exec(ctx, `
+				DELETE FROM endpoint_patches_current old
+				WHERE old.agent_id = $1 AND EXISTS (
+					SELECT 1 FROM endpoint_patches_current tgt
+					WHERE tgt.agent_id = $2 AND tgt.patch_id = old.patch_id
+				)
+			`, old.ID, winner.ID)
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_patches_current SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 6. FIM Baselines: Delete duplicates, migrate remaining
+			_, _ = tx.Exec(ctx, `
+				DELETE FROM endpoint_fim_baselines old
+				WHERE old.agent_id = $1 AND EXISTS (
+					SELECT 1 FROM endpoint_fim_baselines tgt
+					WHERE tgt.agent_id = $2 AND tgt.target_path = old.target_path
+				)
+			`, old.ID, winner.ID)
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_fim_baselines SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 7. FIM Events
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_fim_events SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 8. Tasks & Results
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_tasks SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_task_results SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 9. Groups: Delete duplicates, migrate remaining
+			_, _ = tx.Exec(ctx, `
+				DELETE FROM endpoint_agent_group_members old
+				WHERE old.agent_id = $1 AND EXISTS (
+					SELECT 1 FROM endpoint_agent_group_members tgt
+					WHERE tgt.agent_id = $2 AND tgt.group_id = old.group_id
+				)
+			`, old.ID, winner.ID)
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_agent_group_members SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 10. Quarantined Files
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_quarantined_files SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 11. SOAR Executions
+			_, _ = tx.Exec(ctx, `UPDATE soar_playbook_executions SET target_agent_id = $1 WHERE target_agent_id = $2`, winner.ID, old.ID)
+
+			// 12. Delete the old inactive agent
+			_, err = tx.Exec(ctx, `DELETE FROM endpoint_agents WHERE id = $1`, old.ID)
+			if err != nil {
+				_ = tx.Rollback(ctx)
+				continue
+			}
+
+			if err := tx.Commit(ctx); err == nil {
+				totalRemoved++
+			}
+		}
+	}
+
+	return totalRemoved, nil
 }
 
 // UpdateAgentHeartbeat updates agent last_seen, metrics, and IP on heartbeat

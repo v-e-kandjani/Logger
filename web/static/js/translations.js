@@ -4,7 +4,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Aktif Kiracı",
-        app_version: "v1.9.1",
+        app_version: "v1.9.2",
         btn_dl_win_setup_exe: "🪟 Windows Setup (.exe) İndir",
         btn_dl_mac_dmg: "🍏 macOS Installer (.dmg) İndir",
         btn_dl_mac_pkg: "📦 macOS Paketi (.pkg) İndir",
@@ -938,6 +938,7 @@ const translations = {
         ep_search_placeholder: "Ajan ara (Hostname, IP, UUID)...",
         btn_filter: "Filtrele",
         btn_upgrade_all_agents: "🚀 Tüm Ajanları Otomatik Güncelle",
+        btn_merge_duplicate_agents: "🧹 Mükerrer Ajanları Birleştir",
         th_agent_health: "Cihaz Sağlığı",
         th_agent_hardware: "Donanım (CPU / RAM / Disk)",
         cve_panel_title: "Merkezi CVE Zafiyet İstihbaratı & Veritabanı",
@@ -1158,7 +1159,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Active Tenant",
-        app_version: "v1.9.1",
+        app_version: "v1.9.2",
         btn_dl_win_setup_exe: "🪟 Download Windows Setup (.exe)",
         btn_dl_mac_dmg: "🍏 Download macOS Installer (.dmg)",
         btn_dl_mac_pkg: "📦 Download macOS Package (.pkg)",
@@ -2092,6 +2093,7 @@ const translations = {
         ep_search_placeholder: "Search agents (Hostname, IP, UUID)...",
         btn_filter: "Filter",
         btn_upgrade_all_agents: "🚀 Auto-Upgrade All Agents",
+        btn_merge_duplicate_agents: "🧹 Merge Duplicate Agents",
         th_agent_health: "Device Health",
         th_agent_hardware: "Hardware (CPU / RAM / Disk)",
         cve_panel_title: "Central CVE Vulnerability Intelligence & Database",

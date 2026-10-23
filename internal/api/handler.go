@@ -327,6 +327,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/tasks", h.requireAuth(h.handleEndpointTasks))
 	mux.HandleFunc("/api/v1/endpoint/tasks/", h.requireAuth(h.handleEndpointTaskDetail))
 	mux.HandleFunc("/api/v1/endpoint/agents/upgrade-all", h.requireAuth(h.handleEndpointAgentUpgradeAll))
+	mux.HandleFunc("/api/v1/endpoint/agents/cleanup-duplicates", h.requireAuth(h.handleEndpointAgentsMergeDuplicates))
 	mux.HandleFunc("/api/v1/endpoint/policies", h.requireAuth(h.handleEndpointPolicies))
 	mux.HandleFunc("/api/v1/endpoint/policies/", h.requireAuth(h.handleEndpointPolicyDetail))
 	mux.HandleFunc("/api/v1/endpoint/policies/assign", h.requireAuth(h.handleEndpointPolicyAssign))
