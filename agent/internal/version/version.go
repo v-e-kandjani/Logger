@@ -10,7 +10,7 @@ const (
 	// This versioning is intentionally decoupled from the LogSeal platform version.
 	DefaultAgentVersion = "v0.1.9"
 	DefaultBuildDate    = "2026-10-23"
-	DefaultCommitSHA    = "f5e1d52"
+	DefaultCommitSHA    = "85b82c1"
 )
 
 var (
