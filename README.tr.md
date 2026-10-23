@@ -254,6 +254,24 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.3** (USB ve Çevre Birim Depolama DLP Denetimi - Phase M) / **Ajan v0.1.7**:
+  - **Yerel Çok Platformlu USB DLP Denetim Motoru (Ajan v0.1.7)**:
+    - Windows (`Win32_DiskDrive`), Linux (`/sys/bus/usb/devices`) ve macOS (`system_profiler`) üzerinde çalışan gerçek zamanlı donanım keşfi ve fark algılama motoru.
+    - Vendor ID (VID), Product ID (PID), üretici, cihaz modeli, seri numarası, sürücü harfi/bağlantı noktası ve disk kapasitesi takibi.
+    - Takılma (`inserted`), çıkarılma (`removed`), engellenme (`blocked`), yazma reddi (`write_denied`) ve yetkisiz donanım (`unauthorized_whitelist`) olaylarını otonom olarak raporlama.
+    - İşletim sistemi seviyesinde kural uygulama desteği:
+      - `allow`: Yalnızca bağlantı ve çıkarma olaylarını denetleme ve günlüğe kaydetme.
+      - `read_only`: Veri sızıntısını önlemek için salt okunur mod (Windows WriteProtect / Linux `mount -o remount,ro`).
+      - `block`: Depolama aygıtının sistemden tamamen engellenmesi ve askıya alınması.
+  - **Kurumsal Onaylı Donanım Beyaz Listesi**:
+    - VID:PID ve Seri Numarası bazında şirket onaylı USB cihaz kayıtları (`endpoint_usb_whitelist`).
+    - İlke bazlı beyaz liste zorunluluğu ile yetkisiz harici belleklerin anında engellenmesi.
+  - **SIEM ve MITRE ATT&CK Korelasyonu**:
+    - Yüksek öncelikli DLP ihlal alarmları (`DLP-USB-VIOLATION`) anında SIEM motoruna aktarılır; MITRE ATT&CK `T1052.001` (Fiziksel Ortam Üzerinden Veri Sızıntısı) ve `T1200` (Yetkisiz Donanım Ekleme) teknikleriyle eşleştirilir.
+  - **Merkezi DLP Operasyon Paneli**:
+    - Ayrıntılı DLP yönetim arayüzü (`#endpoint-sec-usb`), 4 KPI özet kartı (Toplam USB, Aktif Bağlı, Engellenen İhlaller, 24 Saatlik Olaylar).
+    - Cihaz envanteri ve güvenlik olayları akışı sekmeleri, tek tıkla beyaz listeye alma ve operasyonel test simülasyonu (`/api/v1/endpoint/usb/simulate`).
+
 - **v1.9.2** (Otomatik Mükerrer Ajan Birleştirme & Pasif Kayıt Temizliği):
   - **Mükerrer Ajanları Birleştirme ve Veri Konsolidasyon Motoru**:
     - Ajanın kaldırılıp yeniden kurulması veya UUID sıfırlanması durumunda aynı cihazdan (`tenant_slug`, `hostname`, `ip_address`) oluşan mükerrer kayıtları tek bir aktif ajan altında birleştiren `MergeDuplicateAgents` motoru geliştirildi.

@@ -8213,6 +8213,8 @@ function switchEndpointSubSection(targetId) {
         loadEndpointPatches();
     } else if (targetId === 'endpoint-sec-fim') {
         loadEndpointFIM();
+    } else if (targetId === 'endpoint-sec-usb') {
+        loadEndpointUSB();
     } else if (targetId === 'endpoint-sec-policies') {
         loadEndpointPolicies();
     }
@@ -9650,6 +9652,11 @@ function openCreatePolicyModal() {
     document.getElementById('policy-form-log-enabled').checked = true;
     document.getElementById('policy-form-channels').value = 'System, Application, Security';
     document.getElementById('policy-form-channel').value = 'stable';
+    if (document.getElementById('policy-form-usb-enabled')) document.getElementById('policy-form-usb-enabled').checked = true;
+    if (document.getElementById('policy-form-usb-storage-mode')) document.getElementById('policy-form-usb-storage-mode').value = 'allow';
+    if (document.getElementById('policy-form-usb-interval')) document.getElementById('policy-form-usb-interval').value = 30;
+    if (document.getElementById('policy-form-usb-whitelist')) document.getElementById('policy-form-usb-whitelist').checked = false;
+    if (document.getElementById('policy-form-usb-alert')) document.getElementById('policy-form-usb-alert').checked = true;
 
     const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
     const titleEl = document.getElementById('modal-policy-title');
@@ -9680,6 +9687,11 @@ function openEditPolicyModal(policyId) {
     document.getElementById('policy-form-log-enabled').checked = cfg.log_collection_enabled !== false;
     document.getElementById('policy-form-channels').value = (cfg.event_channels && cfg.event_channels.length > 0) ? cfg.event_channels.join(', ') : 'System, Application, Security';
     document.getElementById('policy-form-channel').value = cfg.update_channel || 'stable';
+    if (document.getElementById('policy-form-usb-enabled')) document.getElementById('policy-form-usb-enabled').checked = cfg.usb_control_enabled !== false;
+    if (document.getElementById('policy-form-usb-storage-mode')) document.getElementById('policy-form-usb-storage-mode').value = cfg.usb_storage_mode || 'allow';
+    if (document.getElementById('policy-form-usb-interval')) document.getElementById('policy-form-usb-interval').value = cfg.usb_scan_interval_sec || 30;
+    if (document.getElementById('policy-form-usb-whitelist')) document.getElementById('policy-form-usb-whitelist').checked = !!cfg.usb_enforce_whitelist;
+    if (document.getElementById('policy-form-usb-alert')) document.getElementById('policy-form-usb-alert').checked = cfg.usb_alert_on_insertion !== false;
 
     const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
     const titleEl = document.getElementById('modal-policy-title');
@@ -9724,7 +9736,12 @@ async function savePolicyModal() {
             spool_max_age_hours: parseInt(document.getElementById('policy-form-spool-age').value) || 72,
             log_collection_enabled: document.getElementById('policy-form-log-enabled').checked,
             event_channels: channels,
-            update_channel: document.getElementById('policy-form-channel').value || 'stable'
+            update_channel: document.getElementById('policy-form-channel').value || 'stable',
+            usb_control_enabled: document.getElementById('policy-form-usb-enabled')?.checked !== false,
+            usb_storage_mode: document.getElementById('policy-form-usb-storage-mode')?.value || 'allow',
+            usb_scan_interval_sec: parseInt(document.getElementById('policy-form-usb-interval')?.value) || 30,
+            usb_enforce_whitelist: !!document.getElementById('policy-form-usb-whitelist')?.checked,
+            usb_alert_on_insertion: document.getElementById('policy-form-usb-alert')?.checked !== false
         }
     };
 
@@ -11368,6 +11385,388 @@ window.openFIMBaselines = openFIMBaselines;
 window.closeFIMBaselines = closeFIMBaselines;
 window.loadFIMBaselinesForSelectedAgent = loadFIMBaselinesForSelectedAgent;
 window.simulateFIMEvent = simulateFIMEvent;
+
+// ==========================================
+// PHASE M: USB & PERIPHERAL STORAGE DLP
+// ==========================================
+
+let activeUSBSubTab = 'devices';
+
+function switchUSBSubTab(tab) {
+    activeUSBSubTab = tab;
+    const btnDevices = document.getElementById('btn-usb-tab-devices');
+    const btnEvents = document.getElementById('btn-usb-tab-events');
+    const viewDevices = document.getElementById('usb-subview-devices');
+    const viewEvents = document.getElementById('usb-subview-events');
+
+    if (btnDevices && btnEvents && viewDevices && viewEvents) {
+        if (tab === 'devices') {
+            btnDevices.className = 'btn btn-sm btn-primary';
+            btnEvents.className = 'btn btn-sm btn-outline';
+            viewDevices.style.display = 'block';
+            viewEvents.style.display = 'none';
+            loadEndpointUSBDevices();
+        } else {
+            btnDevices.className = 'btn btn-sm btn-outline';
+            btnEvents.className = 'btn btn-sm btn-primary';
+            viewDevices.style.display = 'none';
+            viewEvents.style.display = 'block';
+            loadEndpointUSBEvents();
+        }
+    }
+}
+
+async function loadEndpointUSB() {
+    loadEndpointUSBStats();
+    if (activeUSBSubTab === 'devices') {
+        loadEndpointUSBDevices();
+    } else {
+        loadEndpointUSBEvents();
+    }
+}
+
+async function loadEndpointUSBStats() {
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/usb/stats?tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const elTotal = document.getElementById('ep-usb-stat-total');
+        if (elTotal) elTotal.textContent = Number(data.total_devices || 0).toLocaleString();
+
+        const elConn = document.getElementById('ep-usb-stat-connected');
+        if (elConn) elConn.textContent = Number(data.connected_devices || 0).toLocaleString();
+
+        const elConnBadge = document.getElementById('ep-usb-conn-badge');
+        if (elConnBadge) elConnBadge.textContent = `${data.connected_devices || 0} Online`;
+
+        const elBlock = document.getElementById('ep-usb-stat-blocked');
+        if (elBlock) elBlock.textContent = Number(data.blocked_devices || 0).toLocaleString();
+
+        const elBlockBadge = document.getElementById('ep-usb-block-badge');
+        if (elBlockBadge) elBlockBadge.textContent = `${data.blocked_devices || 0} BLOCKED`;
+
+        const elEvents = document.getElementById('ep-usb-stat-events');
+        if (elEvents) elEvents.textContent = Number(data.total_events_24h || 0).toLocaleString();
+    } catch (e) {
+        console.error('loadEndpointUSBStats error:', e);
+    }
+}
+
+async function loadEndpointUSBDevices() {
+    const tbody = document.getElementById('ep-usb-dev-tbody');
+    const totalCountEl = document.getElementById('ep-usb-dev-total-count');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const connOnly = document.getElementById('ep-usb-filter-connected') ? document.getElementById('ep-usb-filter-connected').checked : false;
+        const search = (document.getElementById('ep-usb-dev-search')?.value || '').trim();
+
+        let url = `/api/v1/endpoint/usb/devices?tenant=${encodeURIComponent(tenant)}&connected_only=${connOnly}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const devices = await res.json() || [];
+
+        if (totalCountEl) totalCountEl.textContent = `${devices.length} Cihaz`;
+
+        if (devices.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="color: var(--text-muted); padding: 24px;">Kayıtlı USB depolama aygıtı bulunamadı.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = devices.map(d => {
+            const isConn = d.is_connected;
+            const statusBadge = d.access_status === 'blocked' ? '<span class="badge badge-danger">ENGELLENDİ</span>' :
+                               (d.access_status === 'read_only' ? '<span class="badge badge-warning">SALT OKUNUR</span>' :
+                               '<span class="badge badge-success">İZİN VERİLDİ</span>');
+
+            const wlBadge = d.is_whitelisted ? '<span class="badge badge-primary"><i class="fas fa-check"></i> Onaylı</span>' :
+                                                '<span class="badge badge-secondary">Bilinmiyor</span>';
+
+            const connDot = isConn ? '<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--success); margin-right:5px;" title="Şu an Takılı"></span>' :
+                                     '<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--text-muted); margin-right:5px;" title="Çıkarıldı"></span>';
+
+            const lastSeen = d.last_seen ? new Date(d.last_seen).toLocaleString('tr-TR') : '-';
+            const hwId = (d.vendor_id || d.product_id) ? `${d.vendor_id || '????'}:${d.product_id || '????'}` : '-';
+            const capStr = d.capacity_bytes ? (d.capacity_bytes / (1024*1024*1024)).toFixed(1) + ' GB' : '-';
+
+            return `
+                <tr>
+                    <td>
+                        <div style="font-weight: 600; font-size: 12.5px;">${connDot}${escapeHtml(d.agent_hostname || d.agent_id || 'Bilinmiyor')}</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-left: 13px;">${escapeHtml(d.agent_ip || '-')}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 500; font-size: 12.5px;">${escapeHtml(d.product_name || d.device_name || 'USB Disk')}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(d.manufacturer || '-')}</div>
+                    </td>
+                    <td class="mono-code" style="font-size: 11.5px; font-weight: 600; color: var(--accent);">${escapeHtml(hwId)}</td>
+                    <td class="mono-code" style="font-size: 11.5px;">${escapeHtml(d.serial_number || '-')}</td>
+                    <td style="font-size: 12px; font-weight: 500;">${escapeHtml(d.mount_point || d.drive_letter || '-')}</td>
+                    <td style="font-size: 12px;">${capStr}</td>
+                    <td>${statusBadge}</td>
+                    <td>${wlBadge}</td>
+                    <td style="font-size: 11.5px; color: var(--text-muted);">${lastSeen}</td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        ${!d.is_whitelisted ? `
+                            <button class="btn btn-sm btn-outline" style="font-size: 11px; padding: 3px 8px;" onclick="quickAddUSBToWhitelist('${escapeHtml(d.vendor_id || '')}', '${escapeHtml(d.product_id || '')}', '${escapeHtml(d.serial_number || '')}', '${escapeHtml(d.product_name || d.device_name || '')}')" title="Bu aygıtı kurumsal beyaz listeye ekle">
+                                <i class="fas fa-shield-alt"></i> Onayla
+                            </button>
+                        ` : `
+                            <span style="font-size: 11px; color: var(--success);"><i class="fas fa-check-circle"></i> Onaylı</span>
+                        `}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('loadEndpointUSBDevices error:', e);
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="color: var(--danger); padding: 24px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+async function loadEndpointUSBEvents() {
+    const tbody = document.getElementById('ep-usb-evt-tbody');
+    const totalCountEl = document.getElementById('ep-usb-evt-total-count');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const eventType = document.getElementById('ep-usb-filter-event-type')?.value || '';
+        const search = (document.getElementById('ep-usb-evt-search')?.value || '').trim();
+
+        let url = `/api/v1/endpoint/usb/events?tenant=${encodeURIComponent(tenant)}&limit=100`;
+        if (eventType) url += `&event_type=${encodeURIComponent(eventType)}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const events = await res.json() || [];
+
+        if (totalCountEl) totalCountEl.textContent = `${events.length} Olay`;
+
+        if (events.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">DLP denetim olayı bulunamadı.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = events.map(ev => {
+            const dt = ev.timestamp ? new Date(ev.timestamp).toLocaleString('tr-TR') : '-';
+            let typeBadge = '<span class="badge badge-secondary">DİĞER</span>';
+            if (ev.event_type === 'inserted') typeBadge = '<span class="badge badge-info"><i class="fas fa-plug"></i> TAKILDI</span>';
+            else if (ev.event_type === 'removed') typeBadge = '<span class="badge badge-secondary"><i class="fas fa-eject"></i> ÇIKARILDI</span>';
+            else if (ev.event_type === 'blocked') typeBadge = '<span class="badge badge-danger"><i class="fas fa-ban"></i> ENGELLENDİ</span>';
+            else if (ev.event_type === 'write_denied') typeBadge = '<span class="badge badge-warning"><i class="fas fa-pen-slash"></i> YAZMA REDDİ</span>';
+            else if (ev.event_type === 'unauthorized_whitelist') typeBadge = '<span class="badge badge-danger"><i class="fas fa-shield-virus"></i> YETKİSİZ LİSTE</span>';
+
+            const hwId = (ev.vendor_id || ev.product_id) ? `${ev.vendor_id || '????'}:${ev.product_id || '????'}` : '';
+
+            let mitreHtml = '<span class="badge badge-dark">T1052.001</span>';
+            if (ev.mitre_technique) {
+                mitreHtml = `<span class="badge badge-dark" title="${escapeHtml(ev.mitre_tactic || '')}">${escapeHtml(ev.mitre_technique)}</span>`;
+            }
+
+            return `
+                <tr>
+                    <td style="font-size: 11.5px; color: var(--text-muted); white-space: nowrap;">${dt}</td>
+                    <td>
+                        <div style="font-weight: 600; font-size: 12px;">${escapeHtml(ev.agent_hostname || ev.agent_id || 'Bilinmiyor')}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(ev.agent_ip || '-')}</div>
+                    </td>
+                    <td>${typeBadge}</td>
+                    <td>
+                        <div style="font-size: 12px; font-weight: 500;">${escapeHtml(ev.device_name || 'USB Disk')}</div>
+                        <div class="mono-code" style="font-size: 11px; color: var(--accent);">${escapeHtml(hwId)} ${ev.serial_number ? '(' + escapeHtml(ev.serial_number) + ')' : ''}</div>
+                    </td>
+                    <td style="font-size: 12px; font-weight: 500;">${escapeHtml(ev.mount_point || ev.drive_letter || '-')}</td>
+                    <td style="font-size: 12px; font-weight: 600;">${escapeHtml(ev.action_taken || 'audited')}</td>
+                    <td>${mitreHtml}</td>
+                    <td style="font-size: 11.5px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(ev.details || '')}">
+                        ${escapeHtml(ev.details || '-')}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('loadEndpointUSBEvents error:', e);
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--danger); padding: 24px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+function openUSBWhitelistModal() {
+    const modal = document.getElementById('modal-usb-whitelist');
+    if (modal) {
+        modal.style.display = 'flex';
+        loadUSBWhitelist();
+    }
+}
+
+function closeUSBWhitelistModal() {
+    const modal = document.getElementById('modal-usb-whitelist');
+    if (modal) modal.style.display = 'none';
+}
+
+async function loadUSBWhitelist() {
+    const tbody = document.getElementById('ep-usb-wl-tbody');
+    if (!tbody) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/usb/whitelist?tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const list = await res.json() || [];
+
+        if (list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="color: var(--text-muted); padding: 20px;">Tanımlı beyaz liste kaydı bulunmamaktadır. Tüm cihazlar uygulanan genel ilkeye göre değerlendirilir.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = list.map(item => {
+            const hwId = (item.vendor_id || item.product_id) ? `${item.vendor_id || '????'}:${item.product_id || '????'}` : '-';
+            const dt = item.created_at ? new Date(item.created_at).toLocaleDateString('tr-TR') : '-';
+            return `
+                <tr>
+                    <td style="font-weight: 600; font-size: 12.5px;">${escapeHtml(item.device_name || '-')}</td>
+                    <td class="mono-code" style="font-size: 11.5px; color: var(--accent); font-weight: 600;">${escapeHtml(hwId)}</td>
+                    <td class="mono-code" style="font-size: 11.5px;">${escapeHtml(item.serial_number || '*')}</td>
+                    <td style="font-size: 12px; color: var(--text-muted);">${escapeHtml(item.description || '-')}</td>
+                    <td style="font-size: 12px;">${escapeHtml(item.approved_by || 'Admin')}</td>
+                    <td style="font-size: 11.5px; color: var(--text-muted);">${dt}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-sm btn-danger" style="padding: 2px 8px; font-size: 11px;" onclick="deleteUSBWhitelistEntry('${escapeHtml(item.id)}')" title="Listeden Çıkar">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('loadUSBWhitelist error:', e);
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="color: var(--danger); padding: 20px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+async function submitAddUSBWhitelist() {
+    const name = (document.getElementById('wl-form-name')?.value || '').trim();
+    const vid = (document.getElementById('wl-form-vid')?.value || '').trim().toUpperCase();
+    const pid = (document.getElementById('wl-form-pid')?.value || '').trim().toUpperCase();
+    const serial = (document.getElementById('wl-form-serial')?.value || '').trim();
+    const desc = (document.getElementById('wl-form-desc')?.value || '').trim();
+
+    if (!name) {
+        showToast('Lütfen cihaz için bir ad veya tanım giriniz', 'warning');
+        return;
+    }
+    if (!vid && !pid && !serial) {
+        showToast('En az bir Vendor ID, Product ID veya Seri Numarası belirtmelisiniz', 'warning');
+        return;
+    }
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/usb/whitelist?tenant=${encodeURIComponent(tenant)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                device_name: name,
+                vendor_id: vid,
+                product_id: pid,
+                serial_number: serial,
+                description: desc
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        showToast('✓ Cihaz kurumsal beyaz listeye eklendi', 'success');
+
+        // Clear form
+        if (document.getElementById('wl-form-name')) document.getElementById('wl-form-name').value = '';
+        if (document.getElementById('wl-form-vid')) document.getElementById('wl-form-vid').value = '';
+        if (document.getElementById('wl-form-pid')) document.getElementById('wl-form-pid').value = '';
+        if (document.getElementById('wl-form-serial')) document.getElementById('wl-form-serial').value = '';
+        if (document.getElementById('wl-form-desc')) document.getElementById('wl-form-desc').value = '';
+
+        loadUSBWhitelist();
+        loadEndpointUSBDevices();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    }
+}
+
+function quickAddUSBToWhitelist(vid, pid, serial, name) {
+    openUSBWhitelistModal();
+    if (document.getElementById('wl-form-name')) document.getElementById('wl-form-name').value = name || 'Onaylı USB Disk';
+    if (document.getElementById('wl-form-vid')) document.getElementById('wl-form-vid').value = vid || '';
+    if (document.getElementById('wl-form-pid')) document.getElementById('wl-form-pid').value = pid || '';
+    if (document.getElementById('wl-form-serial')) document.getElementById('wl-form-serial').value = serial || '';
+    if (document.getElementById('wl-form-desc')) document.getElementById('wl-form-desc').value = 'Uç nokta tespitinden hızlı onaylandı';
+}
+
+async function deleteUSBWhitelistEntry(id) {
+    if (!id) return;
+    if (!confirm('Bu USB cihazını onaylı beyaz listeden çıkarmak istediğinize emin misiniz?')) return;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/usb/whitelist/${encodeURIComponent(id)}?tenant=${encodeURIComponent(tenant)}`, {
+            method: 'DELETE'
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        showToast('Cihaz beyaz listeden çıkarıldı', 'info');
+        loadUSBWhitelist();
+        loadEndpointUSBDevices();
+    } catch (e) {
+        showToast(`Silme hatası: ${e.message}`, 'error');
+    }
+}
+
+async function simulateUSBEvent() {
+    try {
+        showToast('USB DLP test olayı simüle ediliyor...', 'info');
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/usb/simulate?tenant=${encodeURIComponent(tenant)}`, {
+            method: 'POST'
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        showToast(`✓ Test USB olayı oluşturuldu ve SIEM alarmı tetiklendi!`, 'success');
+        loadEndpointUSB();
+    } catch (e) {
+        showToast(`Simülasyon hatası: ${e.message}`, 'error');
+    }
+}
+
+window.switchUSBSubTab = switchUSBSubTab;
+window.loadEndpointUSB = loadEndpointUSB;
+window.loadEndpointUSBStats = loadEndpointUSBStats;
+window.loadEndpointUSBDevices = loadEndpointUSBDevices;
+window.loadEndpointUSBEvents = loadEndpointUSBEvents;
+window.openUSBWhitelistModal = openUSBWhitelistModal;
+window.closeUSBWhitelistModal = closeUSBWhitelistModal;
+window.loadUSBWhitelist = loadUSBWhitelist;
+window.submitAddUSBWhitelist = submitAddUSBWhitelist;
+window.quickAddUSBToWhitelist = quickAddUSBToWhitelist;
+window.deleteUSBWhitelistEntry = deleteUSBWhitelistEntry;
+window.simulateUSBEvent = simulateUSBEvent;
+
 
 
 

@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.2</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.3</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -92,6 +92,10 @@
                         <a class="nav-subitem" data-endpoint-target="endpoint-sec-fim">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                             <span data-i18n="nav_ep_fim">FIM Bütünlük İzleme</span>
+                        </a>
+                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-usb">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v8M4.93 10.93l1.41 1.41M2 18h2M20 18h2M17.66 12.34l1.41-1.41M12 22a6 6 0 0 0 6-6v-2H6v2a6 6 0 0 0 6 6z"/></svg>
+                            <span data-i18n="nav_ep_usb">DLP &amp; USB Denetimi</span>
                         </a>
                         <a class="nav-subitem" data-endpoint-target="endpoint-sec-policies">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
@@ -771,6 +775,9 @@
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-fim">
                         <span data-i18n="nav_ep_fim">📁 FIM (Bütünlük İzleme)</span>
                     </button>
+                    <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-usb">
+                        <span data-i18n="nav_ep_usb">🛡️ DLP (USB Denetimi)</span>
+                    </button>
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-policies">
                         <span data-i18n="nav_ep_policies">İlkeler (Policies)</span>
                     </button>
@@ -1311,6 +1318,146 @@
                                 <tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;" data-i18n="fim_loading">Bütünlük izleme kayıtları taranıyor...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- 5.6. USB & PERIPHERAL DLP CONTROL VIEW (PHASE M) -->
+                <div class="endpoint-section" id="endpoint-sec-usb" style="display: none;">
+                    <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h4 style="font-size: 15px; font-weight: 600;" data-i18n="ep_usb_title">🛡️ USB ve Çevre Birim DLP Denetimi</h4>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" data-i18n="ep_usb_desc">Uç noktalara takılan USB bellek ve harici depolama aygıtlarını izleyin, salt okunur veya engelleme ilkeleri uygulayın, veri sızıntılarını önleyin</p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-outline" onclick="openUSBWhitelistModal()" data-i18n="btn_usb_view_whitelist"><i class="fas fa-list-check"></i> Onaylı Beyaz Liste</button>
+                            <button class="btn btn-secondary" onclick="simulateUSBEvent()" data-i18n="btn_usb_simulate" title="Simüle edilmiş USB bağlantı olayı oluşturur"><i class="fas fa-flask"></i> ⚡ Test Olayı Oluştur</button>
+                            <button class="btn btn-primary" onclick="loadEndpointUSB()" data-i18n="btn_refresh"><i class="fas fa-sync-alt"></i> Yenile</button>
+                        </div>
+                    </div>
+
+                    <!-- USB Summary Stat Cards -->
+                    <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="usb_stat_total">Toplam Tanımlı USB</span>
+                                <span class="badge badge-info">DLP Devices</span>
+                            </div>
+                            <div class="stat-value" id="ep-usb-stat-total" style="color: var(--accent);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="usb_stat_total_sub">
+                                Keşfedilen tüm depolama aygıtları
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="usb_stat_connected">Aktif Bağlı Cihaz</span>
+                                <span class="badge badge-success" id="ep-usb-conn-badge">0 Online</span>
+                            </div>
+                            <div class="stat-value" id="ep-usb-stat-connected" style="color: var(--success);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="usb_stat_connected_sub">
+                                Şu an uç noktalara takılı olanlar
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="usb_stat_blocked">Engellenen İhlaller</span>
+                                <span class="badge badge-danger" id="ep-usb-block-badge">0 BLOCKED</span>
+                            </div>
+                            <div class="stat-value" id="ep-usb-stat-blocked" style="color: var(--danger);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--danger);" data-i18n="usb_stat_blocked_sub">
+                                Engellenen veya yazması durdurulan aygıtlar
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="usb_stat_events">Toplam DLP Olayı</span>
+                                <span class="badge badge-warning">Audit Log</span>
+                            </div>
+                            <div class="stat-value" id="ep-usb-stat-events" style="color: var(--warning);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="usb_stat_events_sub">
+                                Takılma, çıkarılma ve kural denetimleri
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subtabs: Connected Devices vs DLP Events -->
+                    <div style="display: flex; gap: 10px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <button class="btn btn-sm btn-primary" id="btn-usb-tab-devices" onclick="switchUSBSubTab('devices')" data-i18n="tab_usb_devices">🔌 Bağlı &amp; Geçmiş Cihazlar</button>
+                        <button class="btn btn-sm btn-outline" id="btn-usb-tab-events" onclick="switchUSBSubTab('events')" data-i18n="tab_usb_events">📜 DLP Güvenlik Olayları Akışı</button>
+                    </div>
+
+                    <!-- 1. Devices Tab View -->
+                    <div id="usb-subview-devices">
+                        <div class="filter-bar" style="margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
+                            <input type="text" id="ep-usb-dev-search" class="form-control" placeholder="Uç nokta adı, IP, üretici, model veya seri no..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointUSBDevices();">
+                            <button class="btn btn-secondary" onclick="loadEndpointUSBDevices()" data-i18n="btn_filter">Filtrele</button>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; color: var(--text-secondary); margin-left: 8px;">
+                                <input type="checkbox" id="ep-usb-filter-connected" checked onchange="loadEndpointUSBDevices()">
+                                <span data-i18n="lbl_usb_connected_only">Yalnızca şu an bağlı cihazları göster</span>
+                            </label>
+                            <span style="font-size: 12px; color: var(--text-muted); margin-left: auto; align-self: center;" id="ep-usb-dev-total-count">0 Cihaz</span>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="data-table" id="ep-usb-dev-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="th_host">Uç Nokta</th>
+                                        <th data-i18n="th_usb_device">Cihaz / Model</th>
+                                        <th data-i18n="th_usb_hw_id">Donanım ID (VID:PID)</th>
+                                        <th data-i18n="th_usb_serial">Seri Numarası</th>
+                                        <th data-i18n="th_usb_mount">Sürücü / Yol</th>
+                                        <th data-i18n="th_usb_capacity">Kapasite</th>
+                                        <th data-i18n="th_usb_status">Erişim Durumu</th>
+                                        <th data-i18n="th_usb_whitelist">Beyaz Liste</th>
+                                        <th data-i18n="th_last_seen">Son Görülme</th>
+                                        <th data-i18n="th_actions" style="text-align: right;">İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ep-usb-dev-tbody">
+                                    <tr><td colspan="10" class="text-center" style="color: var(--text-muted); padding: 24px;" data-i18n="usb_loading">USB envanteri yükleniyor...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 2. Events Tab View -->
+                    <div id="usb-subview-events" style="display: none;">
+                        <div class="filter-bar" style="margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
+                            <input type="text" id="ep-usb-evt-search" class="form-control" placeholder="Uç nokta, olay detayı veya seri no..." style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointUSBEvents();">
+                            <select id="ep-usb-filter-event-type" class="form-control" style="width: 170px;" onchange="loadEndpointUSBEvents()">
+                                <option value="" data-i18n="usb_opt_all_events">Tüm Olaylar</option>
+                                <option value="inserted" data-i18n="usb_opt_inserted">Takıldı (Inserted)</option>
+                                <option value="removed" data-i18n="usb_opt_removed">Çıkarıldı (Removed)</option>
+                                <option value="blocked" data-i18n="usb_opt_blocked">Engellendi (Blocked)</option>
+                                <option value="write_denied" data-i18n="usb_opt_write_denied">Yazma Reddedildi (Write Denied)</option>
+                                <option value="unauthorized_whitelist" data-i18n="usb_opt_unauth">Yetkisiz Cihaz (Unauthorized)</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="loadEndpointUSBEvents()" data-i18n="btn_filter">Filtrele</button>
+                            <span style="font-size: 12px; color: var(--text-muted); margin-left: auto; align-self: center;" id="ep-usb-evt-total-count">0 Olay</span>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="data-table" id="ep-usb-evt-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="th_timestamp">Zaman</th>
+                                        <th data-i18n="th_host">Uç Nokta</th>
+                                        <th data-i18n="th_usb_event_type">Olay Türü</th>
+                                        <th data-i18n="th_usb_device">Cihaz / Donanım</th>
+                                        <th data-i18n="th_usb_mount">Sürücü</th>
+                                        <th data-i18n="th_usb_action">Uygulanan Eylem</th>
+                                        <th data-i18n="th_mitre_attack">MITRE ATT&amp;CK</th>
+                                        <th data-i18n="th_details">Detaylar</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ep-usb-evt-tbody">
+                                    <tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;" data-i18n="usb_loading_events">DLP denetim kayıtları yükleniyor...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -3287,7 +3434,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.2</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.3</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -5912,10 +6059,115 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                         </select>
                     </div>
                 </div>
+
+                <!-- USB & Storage DLP Group (Phase M) -->
+                <div style="background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 14px; margin-top: 16px;">
+                    <div style="font-size: 12.5px; font-weight: 700; color: #f87171; margin-bottom: 10px;" data-i18n="grp_usb_dlp">🛡️ USB ve Çevre Birim Depolama DLP Denetimi</div>
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="policy-form-usb-enabled" checked style="transform: scale(1.15);">
+                            <span data-i18n="lbl_usb_dlp_enabled">USB Donanım DLP Denetimi Aktif (DLP Control Enabled)</span>
+                        </label>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_usb_storage_mode">Depolama Erişim Modu</label>
+                            <select id="policy-form-usb-storage-mode" class="form-control" style="width: 100%;">
+                                <option value="allow" data-i18n="usb_mode_allow">İzin Ver (Allow All)</option>
+                                <option value="read_only" data-i18n="usb_mode_read_only">Salt Okunur (Read-Only)</option>
+                                <option value="block" data-i18n="usb_mode_block">Tamamen Engelle (Block All)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_usb_scan_interval">USB Tarama Aralığı (sn)</label>
+                            <input type="number" id="policy-form-usb-interval" class="form-control" style="width: 100%;" min="5" max="300" value="30">
+                            <span style="font-size: 10.5px; color: var(--text-muted);">Önerilen: 15 - 60 sn</span>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="policy-form-usb-whitelist" style="transform: scale(1.15);">
+                            <span data-i18n="lbl_usb_enforce_whitelist">Yalnızca Beyaz Listedeki (Onaylı) Aygıtlara İzin Ver</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="policy-form-usb-alert" checked style="transform: scale(1.15);">
+                            <span data-i18n="lbl_usb_alert_insertion">Her USB Takıldığında Güvenlik Bildirimi &amp; Log Oluştur</span>
+                        </label>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border-color); flex-shrink: 0;">
                 <button class="btn btn-outline" onclick="closePolicyModal()" data-i18n="btn_cancel">İptal</button>
                 <button class="btn btn-primary" onclick="savePolicyModal()" data-i18n="btn_save_policy">Kaydet &amp; Dağıt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: USB Whitelist Management (Phase M) -->
+    <div class="modal-backdrop" id="modal-usb-whitelist" style="display: none; z-index: 1080;">
+        <div class="modal" style="max-width: 820px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem;" data-i18n="usb_modal_whitelist_title">📋 Onaylı USB Donanım Beyaz Listesi</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" data-i18n="usb_modal_whitelist_sub">Kurumsal olarak onaylanmış VID:PID veya Seri Numarasına sahip flash bellek ve depolama aygıtları</div>
+                </div>
+                <button class="btn-close" onclick="closeUSBWhitelistModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1;">
+                <!-- Add New Whitelist Entry Form -->
+                <div style="background: rgba(59, 130, 246, 0.04); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 14px; margin-bottom: 20px;">
+                    <div style="font-size: 12.5px; font-weight: 700; color: var(--accent); margin-bottom: 10px;" data-i18n="lbl_add_whitelist_entry">+ Yeni Onaylı Cihaz Ekle</div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 2fr; gap: 10px; margin-bottom: 10px;">
+                        <div>
+                            <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_wl_name">Cihaz Adı / Tanımı *</label>
+                            <input type="text" id="wl-form-name" class="form-control" placeholder="ör. IT Kingston DT50" style="width: 100%; font-size: 12px;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px;">Vendor ID (VID)</label>
+                            <input type="text" id="wl-form-vid" class="form-control" placeholder="ör. 0951" maxlength="4" style="width: 100%; font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px;">Product ID (PID)</label>
+                            <input type="text" id="wl-form-pid" class="form-control" placeholder="ör. 1666" maxlength="4" style="width: 100%; font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_wl_serial">Seri No (İsteğe bağlı)</label>
+                            <input type="text" id="wl-form-serial" class="form-control" placeholder="ör. 00187D0E..." style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: flex-end;">
+                        <div style="flex: 1;">
+                            <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_wl_desc">Onay Nedeni / Departman</label>
+                            <input type="text" id="wl-form-desc" class="form-control" placeholder="ör. Bilgi İşlem yedekleme belleği" style="width: 100%; font-size: 12px;">
+                        </div>
+                        <button class="btn btn-primary" onclick="submitAddUSBWhitelist()" style="white-space: nowrap;" data-i18n="btn_add_to_whitelist">Beyaz Listeye Ekle</button>
+                    </div>
+                </div>
+
+                <!-- Whitelist Table -->
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="th_name">Cihaz Adı</th>
+                                <th>VID:PID</th>
+                                <th data-i18n="th_usb_serial">Seri No</th>
+                                <th data-i18n="th_description">Açıklama</th>
+                                <th data-i18n="th_approved_by">Onaylayan</th>
+                                <th data-i18n="th_created_at">Tarih</th>
+                                <th style="text-align: right;" data-i18n="th_actions">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ep-usb-wl-tbody">
+                            <tr><td colspan="7" class="text-center" style="color: var(--text-muted); padding: 20px;" data-i18n="usb_wl_loading">Beyaz liste yükleniyor...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border-color); flex-shrink: 0;">
+                <button class="btn btn-secondary" onclick="closeUSBWhitelistModal()" data-i18n="btn_close">Kapat</button>
             </div>
         </div>
     </div>
@@ -6693,8 +6945,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.2"></script>
-    <script src="/static/js/translations.js?v=1.9.2"></script>
-    <script src="/static/js/app.js?v=1.9.2"></script>
+    <script src="/static/js/marked.min.js?v=1.9.3"></script>
+    <script src="/static/js/translations.js?v=1.9.3"></script>
+    <script src="/static/js/app.js?v=1.9.3"></script>
 </body>
 </html>

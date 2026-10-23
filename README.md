@@ -265,6 +265,25 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.3** (USB & Peripheral Storage DLP - Phase M) / **Agent v0.1.7**:
+  - **Native Cross-Platform USB DLP Engine (Agent v0.1.7)**:
+    - Real-time hardware discovery and differential event monitoring across Windows (`Win32_DiskDrive` / `Win32_PnPEntity`), Linux (`/sys/bus/usb/devices`), and macOS (`system_profiler SPUSBDataType`).
+    - Tracks Vendor ID (VID), Product ID (PID), device manufacturer, product name, serial number, volume labels, mount points / drive letters, and disk capacity.
+    - Differential event engine detecting `inserted`, `removed`, `blocked`, `write_denied`, and `unauthorized_whitelist` operations.
+    - Enforces OS-level granular access policies:
+      - `allow`: Audit and log storage connection and removal lifecycles.
+      - `read_only`: Prohibits writes and exfiltration (Windows `StorageDevicePolicies` WriteProtect / Linux `mount -o remount,ro`).
+      - `block`: Complete device suspension and dismount (Windows `USBSTOR` disablement / Linux sysfs `/authorized` revocation).
+  - **Corporate Hardware Whitelist Management**:
+    - Centralized hardware whitelist (`endpoint_usb_whitelist`) supporting VID:PID matching, individual Serial Number authorization, and approval justification notes.
+    - Whitelist enforcement policy flag instantly blocking or alerting on unauthorized flash drives and external storage media.
+  - **SIEM & MITRE ATT&CK Correlation**:
+    - High-severity DLP alerts (`DLP-USB-VIOLATION`) automatically dispatched to the SIEM correlation engine, mapped to MITRE ATT&CK techniques `T1052.001` (Exfiltration Over Physical Medium) and `T1200` (Hardware Additions).
+  - **Centralized DLP Operations Dashboard**:
+    - Dedicated USB & Peripheral Control dashboard view (`#endpoint-sec-usb`) with 4 KPI summary cards (Total Discovered USB, Active Connected, Blocked Violations, Total DLP Events).
+    - Subtabbed views for Connected & Historical Devices vs DLP Security Event Stream with quick 1-click whitelist authorization action.
+    - Built-in simulation tool (`/api/v1/endpoint/usb/simulate`) for end-to-end audit validation.
+
 - **v1.9.2** (Automated Duplicate Agent Consolidation & Inactive Instance Pruning):
   - **Automated Duplicate Agent De-Duplication & Data Merge Engine**:
     - Introduced `MergeDuplicateAgents` consolidating multiple agent records registered from the same physical/virtual host (`tenant_slug`, `hostname`, `ip_address`) due to agent reinstallations or UUID resets.

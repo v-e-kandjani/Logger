@@ -295,6 +295,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/agent/v1/config", h.handleAgentConfig)
 	mux.HandleFunc("/api/agent/v1/inventory", h.handleAgentInventory)
 	mux.HandleFunc("/api/agent/v1/fim", h.handleAgentFIM)
+	mux.HandleFunc("/api/agent/v1/usb", h.handleEndpointAgentUSB)
 	mux.HandleFunc("/api/agent/v1/tasks/result", h.handleAgentTaskResult)
 
 	// Protected Endpoint Security Administrative Endpoints
@@ -324,6 +325,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/fim/events/", h.requireAuth(h.handleEndpointFIMEventDetail))
 	mux.HandleFunc("/api/v1/endpoint/fim/baselines", h.requireAuth(h.handleEndpointFIMBaselines))
 	mux.HandleFunc("/api/v1/endpoint/fim/simulate", h.requireAuth(h.handleEndpointFIMSimulate))
+
+	// USB & Peripheral DLP Control (Phase M)
+	mux.HandleFunc("/api/v1/endpoint/usb/devices", h.requireAuth(h.handleEndpointUSBDevices))
+	mux.HandleFunc("/api/v1/endpoint/usb/events", h.requireAuth(h.handleEndpointUSBEvents))
+	mux.HandleFunc("/api/v1/endpoint/usb/whitelist", h.requireAuth(h.handleEndpointUSBWhitelist))
+	mux.HandleFunc("/api/v1/endpoint/usb/whitelist/", h.requireAuth(h.handleEndpointUSBWhitelistDelete))
+	mux.HandleFunc("/api/v1/endpoint/usb/stats", h.requireAuth(h.handleEndpointUSBStats))
+	mux.HandleFunc("/api/v1/endpoint/usb/simulate", h.requireAuth(h.handleEndpointUSBSimulate))
 	mux.HandleFunc("/api/v1/endpoint/tasks", h.requireAuth(h.handleEndpointTasks))
 	mux.HandleFunc("/api/v1/endpoint/tasks/", h.requireAuth(h.handleEndpointTaskDetail))
 	mux.HandleFunc("/api/v1/endpoint/agents/upgrade-all", h.requireAuth(h.handleEndpointAgentUpgradeAll))

@@ -123,6 +123,15 @@ type EndpointPolicyConfig struct {
 	FIMExcludePaths      []string `json:"fim_exclude_paths"`
 	FIMRegistryKeys      []string `json:"fim_registry_keys"`
 	FIMSeverityThreshold string   `json:"fim_severity_threshold"` // LOW, MEDIUM, HIGH, CRITICAL
+
+	// USB & Storage DLP Control (Phase M)
+	USBControlEnabled   bool     `json:"usb_control_enabled"`
+	USBStorageMode      string   `json:"usb_storage_mode"` // "allow", "read_only", "block"
+	USBEnforceWhitelist bool     `json:"usb_enforce_whitelist"`
+	USBAlertOnInsertion bool     `json:"usb_alert_on_insertion"`
+	USBScanIntervalSec  int      `json:"usb_scan_interval_sec"`
+	USBAllowedDevices   []string `json:"usb_allowed_devices"` // List of VID:PID or Serial numbers
+	USBBlockedClasses   []string `json:"usb_blocked_classes"` // e.g. ["mass_storage", "mtp"]
 }
 
 // EndpointSoftware represents a normalized software package installed on an endpoint
@@ -511,5 +520,71 @@ type QuarantinedFileEntry struct {
 	SizeBytes      int64     `json:"size_bytes"`
 	QuarantinedAt  time.Time `json:"quarantined_at"`
 	Reason         string    `json:"reason,omitempty"`
+}
+
+// EndpointUSBDevice represents a connected or historical USB/peripheral storage device (Phase M)
+type EndpointUSBDevice struct {
+	ID            uuid.UUID `json:"id"`
+	AgentID       uuid.UUID `json:"agent_id"`
+	TenantSlug    string    `json:"tenant_slug"`
+	AgentHostname string    `json:"agent_hostname,omitempty"`
+	AgentIP       string    `json:"agent_ip,omitempty"`
+	DeviceID      string    `json:"device_id"`       // System device identifier (e.g. \\.\PHYSICALDRIVE1 or /dev/sdb)
+	VendorID      string    `json:"vendor_id"`       // 4-char hex (e.g. 0781 for SanDisk)
+	ProductID     string    `json:"product_id"`      // 4-char hex (e.g. 5567 for Cruzer Blade)
+	SerialNumber  string    `json:"serial_number"`
+	VendorName    string    `json:"vendor_name"`
+	ProductName   string    `json:"product_name"`
+	DriveLetter   string    `json:"drive_letter"`    // e.g. "E:" on Windows
+	MountPoint    string    `json:"mount_point"`     // e.g. "/media/usb" on Linux
+	CapacityBytes int64     `json:"capacity_bytes"`
+	FileSystem    string    `json:"file_system"`     // NTFS, FAT32, exFAT, ext4
+	IsBlocked     bool      `json:"is_blocked"`
+	IsReadOnly    bool      `json:"is_read_only"`
+	IsConnected   bool      `json:"is_connected"`
+	IsWhitelisted bool      `json:"is_whitelisted"`
+	FirstSeen     time.Time `json:"first_seen"`
+	LastSeen      time.Time `json:"last_seen"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// EndpointUSBEvent represents a DLP audit event regarding USB/peripheral insertion, removal, or policy violation (Phase M)
+type EndpointUSBEvent struct {
+	ID             uuid.UUID `json:"id"`
+	TenantSlug     string    `json:"tenant_slug"`
+	AgentID        uuid.UUID `json:"agent_id"`
+	AgentHostname  string    `json:"agent_hostname,omitempty"`
+	AgentIP        string    `json:"agent_ip,omitempty"`
+	EventType      string    `json:"event_type"` // "inserted", "removed", "blocked", "write_denied", "unauthorized_whitelist"
+	VendorID       string    `json:"vendor_id"`
+	ProductID      string    `json:"product_id"`
+	SerialNumber   string    `json:"serial_number"`
+	DeviceName     string    `json:"device_name"`
+	DriveLetter    string    `json:"drive_letter"`
+	MountPoint     string    `json:"mount_point"`
+	ActionTaken    string    `json:"action_taken"`    // "allowed", "mounted_ro", "blocked", "unmounted"
+	MitreTechnique string    `json:"mitre_technique"` // T1052.001, T1200
+	Details        string    `json:"details"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+// EndpointUSBWhitelistEntry defines an authorized USB device (Phase M)
+type EndpointUSBWhitelistEntry struct {
+	ID           uuid.UUID `json:"id"`
+	TenantSlug   string    `json:"tenant_slug"`
+	Name         string    `json:"name"`
+	VendorID     string    `json:"vendor_id"`
+	ProductID    string    `json:"product_id"`
+	SerialNumber string    `json:"serial_number"`
+	Description  string    `json:"description"`
+	ApprovedBy   string    `json:"approved_by"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// AgentUSBSubmission represents the payload sent by the agent to report attached USBs and DLP events (Phase M)
+type AgentUSBSubmission struct {
+	AgentUUID string              `json:"agent_uuid"`
+	Devices   []EndpointUSBDevice `json:"devices"`
+	Events    []EndpointUSBEvent  `json:"events"`
 }
 

@@ -114,6 +114,13 @@ func main() {
 		log.Println("[PostgreSQL] File & Registry Integrity Monitoring (FIM) schema verified")
 	}
 
+	// Verify & auto-migrate USB & Storage DLP Control (Phase M) schema
+	if err := pgDB.EnsureUSBSchema(context.Background()); err != nil {
+		log.Printf("[PostgreSQL] Warning ensuring USB DLP schema: %v", err)
+	} else {
+		log.Println("[PostgreSQL] USB & Peripheral Storage DLP (Phase M) schema verified")
+	}
+
 	// 2. Initialize in-memory Device Cache
 	deviceCache := postgres.NewDeviceCache(pgDB)
 	log.Println("[DeviceCache] Initialized active device lookup cache")

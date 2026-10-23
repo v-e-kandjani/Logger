@@ -10,6 +10,7 @@ import (
 
 	"github.com/syslog-platform/logger/agent/internal/collector"
 	"github.com/syslog-platform/logger/agent/internal/config"
+	"github.com/syslog-platform/logger/agent/internal/dlp"
 	"github.com/syslog-platform/logger/agent/internal/fim"
 	"github.com/syslog-platform/logger/agent/internal/identity"
 	"github.com/syslog-platform/logger/agent/internal/transport"
@@ -29,6 +30,8 @@ type Agent struct {
 	invTicker     *time.Ticker
 	fimTicker     *time.Ticker
 	fimScanner    *fim.Scanner
+	dlpTicker     *time.Ticker
+	dlpScanner    *dlp.Scanner
 	isUpgrading   bool
 }
 
@@ -50,6 +53,7 @@ func NewAgent(cfg *config.Config) (*Agent, error) {
 		client:     client,
 		policyRev:  1,
 		fimScanner: fim.NewScanner(),
+		dlpScanner: dlp.NewScanner(),
 	}, nil
 }
 
@@ -91,7 +95,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		log.Printf("[LOGGER Agent] Authenticated with existing credentials (Tenant: %s)", a.identity.TenantSlug)
 	}
 
-	// 2. Heartbeat & Inventory tickers
+	// 2. Heartbeat, Inventory, FIM & DLP tickers
 	interval := time.Duration(a.cfg.HeartbeatSec) * time.Second
 	if a.currentPolicy != nil && a.currentPolicy.HeartbeatIntervalSec >= 5 {
 		interval = time.Duration(a.currentPolicy.HeartbeatIntervalSec) * time.Second
@@ -116,10 +120,18 @@ func (a *Agent) Run(ctx context.Context) error {
 	a.fimTicker = time.NewTicker(fimInterval)
 	defer a.fimTicker.Stop()
 
-	// Initial heartbeat, inventory & FIM scan
+	dlpInterval := 30 * time.Second
+	if a.currentPolicy != nil && a.currentPolicy.USBScanIntervalSec >= 10 {
+		dlpInterval = time.Duration(a.currentPolicy.USBScanIntervalSec) * time.Second
+	}
+	a.dlpTicker = time.NewTicker(dlpInterval)
+	defer a.dlpTicker.Stop()
+
+	// Initial heartbeat, inventory, FIM & DLP scans
 	a.sendHeartbeat(ctx)
 	go a.sendInventory(ctx)
 	go a.sendFIMScan(ctx)
+	go a.sendDLPScan(ctx)
 
 	for {
 		select {
@@ -130,6 +142,8 @@ func (a *Agent) Run(ctx context.Context) error {
 			go a.sendInventory(ctx)
 		case <-a.fimTicker.C:
 			go a.sendFIMScan(ctx)
+		case <-a.dlpTicker.C:
+			go a.sendDLPScan(ctx)
 		case <-a.hbTicker.C:
 			// Apply random jitter (+/- 2 seconds) to avoid synchronization spikes
 			jitter := time.Duration(rand.Intn(4)-2) * time.Second
@@ -261,6 +275,9 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 			if policy.FIMScanIntervalSec >= 30 && a.fimTicker != nil {
 				a.fimTicker.Reset(time.Duration(policy.FIMScanIntervalSec) * time.Second)
 			}
+			if policy.USBScanIntervalSec >= 10 && a.dlpTicker != nil {
+				a.dlpTicker.Reset(time.Duration(policy.USBScanIntervalSec) * time.Second)
+			}
 		} else {
 			log.Printf("[LOGGER Agent] Server reports policy update available (Rev %d)", a.policyRev)
 		}
@@ -322,5 +339,36 @@ func (a *Agent) sendFIMScan(ctx context.Context) {
 	}
 	if err := a.client.PostJSON(ctx, "/api/agent/v1/fim", sub, &resp); err != nil {
 		log.Printf("[LOGGER FIM] Error submitting FIM telemetry: %v", err)
+	}
+}
+
+func (a *Agent) sendDLPScan(ctx context.Context) {
+	if a.currentPolicy != nil && a.currentPolicy.USBControlEnabled == false && a.currentPolicy.USBScanIntervalSec > 0 {
+		return
+	}
+	if a.dlpScanner == nil {
+		return
+	}
+
+	devices, events := a.dlpScanner.Scan(a.currentPolicy)
+	if len(devices) == 0 && len(events) == 0 {
+		return
+	}
+
+	if len(events) > 0 {
+		log.Printf("[LOGGER DLP] Detected %d USB storage hardware events!", len(events))
+	}
+
+	sub := models.AgentUSBSubmission{
+		AgentUUID: a.identity.AgentUUID,
+		Devices:   devices,
+		Events:    events,
+	}
+
+	var resp struct {
+		Status string `json:"status"`
+	}
+	if err := a.client.PostJSON(ctx, "/api/agent/v1/usb", sub, &resp); err != nil {
+		log.Printf("[LOGGER DLP] Error submitting USB telemetry: %v", err)
 	}
 }

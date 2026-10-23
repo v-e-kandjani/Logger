@@ -781,7 +781,22 @@ func (db *DB) MergeDuplicateAgents(ctx context.Context, tenantSlug string) (int,
 			// 12. SOAR Executions
 			_, _ = tx.Exec(ctx, `UPDATE soar_executions SET target_agent_id = $1 WHERE target_agent_id = $2`, winner.ID, old.ID)
 
-			// 13. Delete the old inactive agent
+			// 13. USB Devices: Delete duplicate hardware records, migrate remaining
+			_, _ = tx.Exec(ctx, `
+				DELETE FROM endpoint_usb_devices old
+				WHERE old.agent_id = $1 AND EXISTS (
+					SELECT 1 FROM endpoint_usb_devices tgt
+					WHERE tgt.agent_id = $2 AND tgt.vendor_id = old.vendor_id 
+					  AND tgt.product_id = old.product_id AND tgt.serial_number = old.serial_number
+					  AND tgt.device_id = old.device_id
+				)
+			`, old.ID, winner.ID)
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_usb_devices SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 14. USB DLP Events
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_usb_events SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 15. Delete the old inactive agent
 			_, err = tx.Exec(ctx, `DELETE FROM endpoint_agents WHERE id = $1`, old.ID)
 			if err != nil {
 				log.Printf("[MergeDuplicateAgents] Failed to delete old agent %s: %v", old.ID, err)
