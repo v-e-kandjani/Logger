@@ -121,6 +121,13 @@ func main() {
 		log.Println("[PostgreSQL] USB & Peripheral Storage DLP (Phase M) schema verified")
 	}
 
+	// Verify & auto-migrate Behavioral Anomaly & Script-Based Attack Prevention EDR (Phase N) schema
+	if err := pgDB.EnsureEDRSchema(context.Background()); err != nil {
+		log.Printf("[PostgreSQL] Warning ensuring EDR schema: %v", err)
+	} else {
+		log.Println("[PostgreSQL] Behavioral Anomaly & Script-Based EDR (Phase N) schema verified")
+	}
+
 	// 2. Initialize in-memory Device Cache
 	deviceCache := postgres.NewDeviceCache(pgDB)
 	log.Println("[DeviceCache] Initialized active device lookup cache")

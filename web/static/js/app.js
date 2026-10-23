@@ -3053,6 +3053,7 @@ window.onLanguageChanged = (lang) => {
             else if (currentEndpointSection === 'endpoint-sec-tokens') loadEndpointTokens();
             else if (currentEndpointSection === 'endpoint-sec-fim') loadEndpointFIM();
             else if (currentEndpointSection === 'endpoint-sec-usb') loadEndpointUSB();
+            else if (currentEndpointSection === 'endpoint-sec-edr') loadEndpointEDR();
         }
     } else if (activeTab === 'health') {
         if (typeof loadHealthTelemetry === 'function') loadHealthTelemetry();
@@ -8217,6 +8218,8 @@ function switchEndpointSubSection(targetId) {
         loadEndpointFIM();
     } else if (targetId === 'endpoint-sec-usb') {
         loadEndpointUSB();
+    } else if (targetId === 'endpoint-sec-edr') {
+        loadEndpointEDR();
     } else if (targetId === 'endpoint-sec-policies') {
         loadEndpointPolicies();
     }
@@ -9659,6 +9662,12 @@ function openCreatePolicyModal() {
     if (document.getElementById('policy-form-usb-interval')) document.getElementById('policy-form-usb-interval').value = 30;
     if (document.getElementById('policy-form-usb-whitelist')) document.getElementById('policy-form-usb-whitelist').checked = false;
     if (document.getElementById('policy-form-usb-alert')) document.getElementById('policy-form-usb-alert').checked = true;
+    if (document.getElementById('policy-form-edr-enabled')) document.getElementById('policy-form-edr-enabled').checked = true;
+    if (document.getElementById('policy-form-edr-kill-critical')) document.getElementById('policy-form-edr-kill-critical').checked = true;
+    if (document.getElementById('policy-form-edr-monitor-scripts')) document.getElementById('policy-form-edr-monitor-scripts').checked = true;
+    if (document.getElementById('policy-form-edr-block-lolbins')) document.getElementById('policy-form-edr-block-lolbins').checked = true;
+    if (document.getElementById('policy-form-edr-interval')) document.getElementById('policy-form-edr-interval').value = 15;
+    if (document.getElementById('policy-form-edr-threshold')) document.getElementById('policy-form-edr-threshold').value = 'MEDIUM';
 
     const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
     const titleEl = document.getElementById('modal-policy-title');
@@ -9694,6 +9703,12 @@ function openEditPolicyModal(policyId) {
     if (document.getElementById('policy-form-usb-interval')) document.getElementById('policy-form-usb-interval').value = cfg.usb_scan_interval_sec || 30;
     if (document.getElementById('policy-form-usb-whitelist')) document.getElementById('policy-form-usb-whitelist').checked = !!cfg.usb_enforce_whitelist;
     if (document.getElementById('policy-form-usb-alert')) document.getElementById('policy-form-usb-alert').checked = cfg.usb_alert_on_insertion !== false;
+    if (document.getElementById('policy-form-edr-enabled')) document.getElementById('policy-form-edr-enabled').checked = cfg.edr_behavior_enabled !== false;
+    if (document.getElementById('policy-form-edr-kill-critical')) document.getElementById('policy-form-edr-kill-critical').checked = cfg.edr_kill_on_critical !== false;
+    if (document.getElementById('policy-form-edr-monitor-scripts')) document.getElementById('policy-form-edr-monitor-scripts').checked = cfg.edr_monitor_script_engines !== false;
+    if (document.getElementById('policy-form-edr-block-lolbins')) document.getElementById('policy-form-edr-block-lolbins').checked = cfg.edr_block_lolbins !== false;
+    if (document.getElementById('policy-form-edr-interval')) document.getElementById('policy-form-edr-interval').value = cfg.edr_scan_interval_sec || 15;
+    if (document.getElementById('policy-form-edr-threshold')) document.getElementById('policy-form-edr-threshold').value = cfg.edr_severity_threshold || 'MEDIUM';
 
     const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
     const titleEl = document.getElementById('modal-policy-title');
@@ -9743,7 +9758,13 @@ async function savePolicyModal() {
             usb_storage_mode: document.getElementById('policy-form-usb-storage-mode')?.value || 'allow',
             usb_scan_interval_sec: parseInt(document.getElementById('policy-form-usb-interval')?.value) || 30,
             usb_enforce_whitelist: !!document.getElementById('policy-form-usb-whitelist')?.checked,
-            usb_alert_on_insertion: document.getElementById('policy-form-usb-alert')?.checked !== false
+            usb_alert_on_insertion: document.getElementById('policy-form-usb-alert')?.checked !== false,
+            edr_behavior_enabled: document.getElementById('policy-form-edr-enabled')?.checked !== false,
+            edr_kill_on_critical: document.getElementById('policy-form-edr-kill-critical')?.checked !== false,
+            edr_monitor_script_engines: document.getElementById('policy-form-edr-monitor-scripts')?.checked !== false,
+            edr_block_lolbins: document.getElementById('policy-form-edr-block-lolbins')?.checked !== false,
+            edr_scan_interval_sec: parseInt(document.getElementById('policy-form-edr-interval')?.value) || 15,
+            edr_severity_threshold: document.getElementById('policy-form-edr-threshold')?.value || 'MEDIUM'
         }
     };
 
@@ -11800,6 +11821,279 @@ window.submitAddUSBWhitelist = submitAddUSBWhitelist;
 window.quickAddUSBToWhitelist = quickAddUSBToWhitelist;
 window.deleteUSBWhitelistEntry = deleteUSBWhitelistEntry;
 window.simulateUSBEvent = simulateUSBEvent;
+
+// =========================================================================
+// 5.7. BEHAVIORAL ANOMALY & MALICIOUS SCRIPT EDR (PHASE N)
+// =========================================================================
+let currentEDRAnomalies = [];
+let activeEDRDetail = null;
+
+async function loadEndpointEDR() {
+    loadEndpointEDRStats();
+    loadEndpointEDRAnomalies();
+}
+
+async function loadEndpointEDRStats() {
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/edr/stats?tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) return;
+        const stats = await res.json();
+
+        const totalEl = document.getElementById('ep-edr-stat-total');
+        const critEl = document.getElementById('ep-edr-stat-critical');
+        const critBadge = document.getElementById('ep-edr-stat-crit-badge');
+        const scriptsEl = document.getElementById('ep-edr-stat-scripts');
+        const termEl = document.getElementById('ep-edr-stat-terminated');
+        const agentsEl = document.getElementById('ep-edr-stat-agents');
+
+        if (totalEl) totalEl.textContent = Number(stats.total_detections || 0).toLocaleString();
+        if (critEl) critEl.textContent = Number(stats.critical_threats || 0).toLocaleString();
+        if (critBadge) critBadge.textContent = `${stats.critical_threats || 0} CRITICAL`;
+        if (scriptsEl) scriptsEl.textContent = Number(stats.suspicious_scripts || 0).toLocaleString();
+        if (termEl) termEl.textContent = Number(stats.processes_terminated || 0).toLocaleString();
+        if (agentsEl) agentsEl.textContent = Number(stats.monitored_agents_count || 0).toLocaleString();
+    } catch (e) {
+        console.error('loadEndpointEDRStats error:', e);
+    }
+}
+
+async function loadEndpointEDRAnomalies() {
+    const tbody = document.getElementById('ep-edr-tbody');
+    if (!tbody) return;
+
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const isTr = !window.i18n || window.i18n.currentLang === 'tr';
+
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">${t('edr_loading')}</td></tr>`;
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const searchInput = document.getElementById('ep-edr-search');
+        const search = searchInput ? searchInput.value.trim() : '';
+        const sevSelect = document.getElementById('ep-edr-filter-severity');
+        const severity = sevSelect ? sevSelect.value : 'all';
+
+        let url = `/api/v1/endpoint/edr/anomalies?tenant=${encodeURIComponent(tenant)}&limit=100`;
+        if (severity && severity !== 'all') url += `&severity=${encodeURIComponent(severity)}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        currentEDRAnomalies = data.anomalies || [];
+        const totalCountEl = document.getElementById('ep-edr-total-count');
+        if (totalCountEl) totalCountEl.textContent = `${data.total || 0} ${isTr ? 'Olay' : 'Events'}`;
+
+        if (currentEDRAnomalies.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 28px;">${t('edr_no_data')}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = currentEDRAnomalies.map(a => {
+            const timeStr = a.timestamp ? new Date(a.timestamp).toLocaleString(isTr ? 'tr-TR' : 'en-US') : '-';
+            const sev = (a.severity || 'medium').toLowerCase();
+            let sevBadge = '<span class="badge badge-info">MEDIUM</span>';
+            if (sev === 'critical') sevBadge = '<span class="badge badge-danger">CRITICAL</span>';
+            else if (sev === 'high') sevBadge = '<span class="badge badge-warning">HIGH</span>';
+            else if (sev === 'low') sevBadge = '<span class="badge badge-secondary">LOW</span>';
+
+            const action = (a.action_taken || 'audited').toLowerCase();
+            let actionBadge = '<span class="badge badge-outline">AUDITED</span>';
+            if (action === 'terminated') actionBadge = '<span class="badge badge-success">TERMINATED</span>';
+            else if (action === 'kill_failed') actionBadge = '<span class="badge badge-danger">KILL FAILED</span>';
+
+            const mitreBadge = a.mitre_technique ? `<span class="badge badge-secondary mono-code" style="font-size: 10px; margin-left: 4px;">${escapeHtml(a.mitre_technique)}</span>` : '';
+            const parentDisplay = a.parent_name ? `<div style="font-weight: 600; font-size: 12px;">${escapeHtml(a.parent_name)}</div><div class="mono-code" style="font-size: 10.5px; color: var(--text-muted);">PPID: ${a.parent_pid}</div>` : '<span style="color: var(--text-muted);">-</span>';
+
+            return `
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="white-space: nowrap; font-size: 12px; color: var(--text-muted);">${timeStr}</td>
+                    <td>
+                        <div style="font-weight: 600; font-size: 13px;">${escapeHtml(a.agent_hostname || 'Unknown')}</div>
+                        <div class="mono-code" style="font-size: 11px; color: var(--text-muted);">${escapeHtml(a.agent_ip || '')}</div>
+                    </td>
+                    <td>${sevBadge}</td>
+                    <td>
+                        <div style="font-weight: 600; font-size: 12.5px; color: var(--text-primary);">${escapeHtml(a.rule_name || a.rule_id)}</div>
+                        <div style="display: flex; gap: 4px; align-items: center; margin-top: 2px;">
+                            <span class="mono-code" style="font-size: 11px; color: var(--text-muted);">${escapeHtml(a.rule_id)}</span>
+                            ${mitreBadge}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; font-size: 13px; color: ${sev === 'critical' ? 'var(--danger)' : 'var(--text-primary)'};">${escapeHtml(a.process_name)}</div>
+                        <div class="mono-code" style="font-size: 11px; color: var(--text-muted);">PID: ${a.pid}</div>
+                    </td>
+                    <td>${parentDisplay}</td>
+                    <td>${actionBadge}</td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        <button class="btn btn-sm btn-outline" onclick="openEDRDetail('${a.id}')" title="${t('btn_edr_inspect')}">
+                            <i class="fas fa-eye"></i> ${t('btn_edr_inspect')}
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="killEDRProcess('${a.agent_id}', ${a.pid}, '${escapeHtml(a.process_name)}', '${escapeHtml(a.agent_hostname)}')" title="${t('btn_edr_kill')}" style="margin-left: 4px;">
+                            <i class="fas fa-skull"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('loadEndpointEDRAnomalies error:', e);
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--danger); padding: 24px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+function openEDRDetail(anomalyId) {
+    const a = currentEDRAnomalies.find(x => x.id === anomalyId);
+    if (!a) return;
+    activeEDRDetail = a;
+
+    const isTr = !window.i18n || window.i18n.currentLang === 'tr';
+    const modal = document.getElementById('modal-edr-detail');
+    if (!modal) return;
+
+    // Badges
+    const sevBadge = document.getElementById('edr-detail-severity-badge');
+    if (sevBadge) {
+        const sev = (a.severity || 'medium').toLowerCase();
+        sevBadge.className = `badge badge-${sev === 'critical' ? 'danger' : (sev === 'high' ? 'warning' : 'info')}`;
+        sevBadge.textContent = a.severity.toUpperCase();
+    }
+
+    const actionBadge = document.getElementById('edr-detail-action-badge');
+    if (actionBadge) {
+        const act = (a.action_taken || 'audited').toLowerCase();
+        actionBadge.className = `badge badge-${act === 'terminated' ? 'success' : 'warning'}`;
+        actionBadge.textContent = a.action_taken.toUpperCase();
+    }
+
+    const ruleBadge = document.getElementById('edr-detail-rule-badge');
+    if (ruleBadge) ruleBadge.textContent = a.rule_id || 'EDR';
+
+    const timeEl = document.getElementById('edr-detail-timestamp');
+    if (timeEl) timeEl.textContent = a.timestamp ? new Date(a.timestamp).toLocaleString(isTr ? 'tr-TR' : 'en-US') : '-';
+
+    // Overview
+    const hostEl = document.getElementById('edr-detail-hostname');
+    if (hostEl) hostEl.textContent = a.agent_hostname || 'Unknown';
+    const ipEl = document.getElementById('edr-detail-ip');
+    if (ipEl) ipEl.textContent = a.agent_ip || '';
+    const userEl = document.getElementById('edr-detail-username');
+    if (userEl) userEl.textContent = a.username || 'SYSTEM / ROOT';
+    const ruleNameEl = document.getElementById('edr-detail-rulename');
+    if (ruleNameEl) ruleNameEl.textContent = a.rule_name || a.rule_id;
+    const ruleIdEl = document.getElementById('edr-detail-ruleid');
+    if (ruleIdEl) ruleIdEl.textContent = a.rule_id || '';
+
+    // Process Tree
+    const pNameEl = document.getElementById('edr-detail-process-name');
+    if (pNameEl) pNameEl.textContent = a.process_name || 'unknown';
+    const pidEl = document.getElementById('edr-detail-pid');
+    if (pidEl) pidEl.textContent = `PID: ${a.pid}`;
+    const cmdEl = document.getElementById('edr-detail-commandline');
+    if (cmdEl) cmdEl.textContent = a.command_line || a.process_name;
+
+    const parentNameEl = document.getElementById('edr-detail-parent-name');
+    if (parentNameEl) parentNameEl.textContent = a.parent_name || 'System / init (0)';
+    const parentPidEl = document.getElementById('edr-detail-parent-pid');
+    if (parentPidEl) parentPidEl.textContent = `PPID: ${a.parent_pid}`;
+    const parentCmdEl = document.getElementById('edr-detail-parent-cmd');
+    if (parentCmdEl) parentCmdEl.textContent = a.parent_command_line || a.parent_name || 'No command line recorded';
+
+    // MITRE
+    const mitreTacticEl = document.getElementById('edr-detail-mitre-tactic');
+    if (mitreTacticEl) mitreTacticEl.textContent = a.mitre_tactic || 'Execution';
+    const mitreTechEl = document.getElementById('edr-detail-mitre-technique');
+    if (mitreTechEl) mitreTechEl.textContent = a.mitre_technique || 'T1059';
+    const descEl = document.getElementById('edr-detail-full-desc');
+    if (descEl) descEl.textContent = a.details || 'Behavioral anomaly detected on endpoint.';
+
+    modal.style.display = 'flex';
+}
+
+function closeEDRDetail() {
+    const modal = document.getElementById('modal-edr-detail');
+    if (modal) modal.style.display = 'none';
+    activeEDRDetail = null;
+}
+
+async function executeModalEDRKill() {
+    if (!activeEDRDetail) return;
+    const { agent_id, pid, process_name, agent_hostname } = activeEDRDetail;
+    closeEDRDetail();
+    await killEDRProcess(agent_id, pid, process_name, agent_hostname);
+}
+
+async function killEDRProcess(agentId, pid, processName, hostname) {
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+    const isTr = !window.i18n || window.i18n.currentLang === 'tr';
+
+    const confirmMsg = isTr
+        ? `PID ${pid} (${processName}) sürecini uç noktada (${hostname || 'ajan'}) zorla sonlandırmak istediğinizden emin misiniz?`
+        : `Are you sure you want to forcibly terminate PID ${pid} (${processName}) on endpoint (${hostname || 'agent'})?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        showToast(isTr ? 'Süreç sonlandırma görevi ajana iletiliyor...' : 'Dispatching process termination task...', 'info');
+
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/edr/kill?tenant=${encodeURIComponent(tenant)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agent_id: agentId,
+                pid: pid,
+                process_name: processName,
+                force: true
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        showToast(`✓ ${t('edr_kill_dispatched')}`, 'success');
+        setTimeout(() => loadEndpointEDRAnomalies(), 1200);
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    }
+}
+
+async function simulateEDREvent() {
+    try {
+        const isTr = !window.i18n || window.i18n.currentLang === 'tr';
+        showToast(isTr ? '⚡ EDR Web Shell & LOLBin saldırı senaryosu simüle ediliyor...' : '⚡ Simulating EDR Web Shell & LOLBin attack scenario...', 'info');
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/edr/simulate?tenant=${encodeURIComponent(tenant)}`, {
+            method: 'POST'
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        showToast(isTr ? '✓ Simüle edilmiş saldırı tespiti oluşturuldu ve SIEM alarmı tetiklendi!' : '✓ Simulated attack event generated and SIEM alert dispatched!', 'success');
+        loadEndpointEDR();
+    } catch (e) {
+        showToast(`Simülasyon hatası: ${e.message}`, 'error');
+    }
+}
+
+window.loadEndpointEDR = loadEndpointEDR;
+window.loadEndpointEDRStats = loadEndpointEDRStats;
+window.loadEndpointEDRAnomalies = loadEndpointEDRAnomalies;
+window.openEDRDetail = openEDRDetail;
+window.closeEDRDetail = closeEDRDetail;
+window.executeModalEDRKill = executeModalEDRKill;
+window.killEDRProcess = killEDRProcess;
+window.simulateEDREvent = simulateEDREvent;
+
 
 
 

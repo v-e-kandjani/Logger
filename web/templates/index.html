@@ -19,7 +19,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.3</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.4</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -96,6 +96,10 @@
                         <a class="nav-subitem" data-endpoint-target="endpoint-sec-usb">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v8M4.93 10.93l1.41 1.41M2 18h2M20 18h2M17.66 12.34l1.41-1.41M12 22a6 6 0 0 0 6-6v-2H6v2a6 6 0 0 0 6 6z"/></svg>
                             <span data-i18n="nav_ep_usb">DLP &amp; USB Denetimi</span>
+                        </a>
+                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-edr">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            <span data-i18n="nav_ep_edr">EDR &amp; Davranışsal Analiz</span>
                         </a>
                         <a class="nav-subitem" data-endpoint-target="endpoint-sec-policies">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
@@ -778,6 +782,9 @@
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-usb">
                         <span data-i18n="nav_ep_usb">🛡️ DLP (USB Denetimi)</span>
                     </button>
+                    <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-edr">
+                        <span data-i18n="nav_ep_edr">⚡ EDR (Davranış &amp; Betik)</span>
+                    </button>
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-policies">
                         <span data-i18n="nav_ep_policies">İlkeler (Policies)</span>
                     </button>
@@ -1458,6 +1465,113 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+
+                <!-- 5.7. BEHAVIORAL ANOMALY & MALICIOUS SCRIPT EDR VIEW (PHASE N) -->
+                <div class="endpoint-section" id="endpoint-sec-edr" style="display: none;">
+                    <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h4 style="font-size: 15px; font-weight: 600;" data-i18n="ep_edr_title">⚡ Davranışsal Anomali Tespiti ve Zararlı Betik Önleme (EDR)</h4>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" data-i18n="ep_edr_desc">Office makroları, web kabukları (web shells), Living-off-the-Land (LOLBins) istismarları, gizlenmiş PowerShell ve bellek içi indirme tuzaklarını (download cradles) gerçek zamanlı tespit edin ve durdurun</p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary" onclick="simulateEDREvent()" data-i18n="btn_edr_simulate" title="Simüle edilmiş web shell ve LOLBin atağı oluşturur"><i class="fas fa-flask"></i> ⚡ Test Saldırısı Simüle Et</button>
+                            <button class="btn btn-primary" onclick="loadEndpointEDR()" data-i18n="btn_refresh"><i class="fas fa-sync-alt"></i> Yenile</button>
+                        </div>
+                    </div>
+
+                    <!-- EDR Summary Stat Cards -->
+                    <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="edr_stat_total">Toplam EDR Tespiti</span>
+                                <span class="badge badge-info">Detections</span>
+                            </div>
+                            <div class="stat-value" id="ep-edr-stat-total" style="color: var(--accent);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="edr_stat_total_sub">
+                                Algılanan süreç ve betik anomalileri
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="edr_stat_critical">Kritik Tehditler</span>
+                                <span class="badge badge-danger" id="ep-edr-stat-crit-badge">0 CRITICAL</span>
+                            </div>
+                            <div class="stat-value" id="ep-edr-stat-critical" style="color: var(--danger);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--danger);" data-i18n="edr_stat_critical_sub">
+                                Office makro ve web shell ihlalleri
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="edr_stat_scripts">Şüpheli Betik / LOLBin</span>
+                                <span class="badge badge-warning">Scripts</span>
+                            </div>
+                            <div class="stat-value" id="ep-edr-stat-scripts" style="color: var(--warning);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="edr_stat_scripts_sub">
+                                PowerShell, Cmd, CertUtil, Mshta vb.
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="edr_stat_terminated">Durdurulan Süreç</span>
+                                <span class="badge badge-success">Neutralized</span>
+                            </div>
+                            <div class="stat-value" id="ep-edr-stat-terminated" style="color: var(--success);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="edr_stat_terminated_sub">
+                                Ajan tarafından otomatik sonlandırılan
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="edr_stat_agents">İzlenen Uç Nokta</span>
+                                <span class="badge badge-secondary">Endpoints</span>
+                            </div>
+                            <div class="stat-value" id="ep-edr-stat-agents" style="color: var(--text-primary);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="edr_stat_agents_sub">
+                                EDR telemetrisi gönderen ajanlar
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter & Toolbar -->
+                    <div class="filter-bar" style="margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <input type="text" id="ep-edr-search" class="form-control" placeholder="Uç nokta, süreç adı, komut satırı, kural veya MITRE kodu ara..." data-i18n-placeholder="edr_search_ph" style="flex: 1;" onkeydown="if(event.key==='Enter') loadEndpointEDRAnomalies();">
+                        <select id="ep-edr-filter-severity" class="form-control" style="width: 170px;" onchange="loadEndpointEDRAnomalies()">
+                            <option value="all" data-i18n="edr_opt_all_sev">Tüm Seviyeler</option>
+                            <option value="critical" data-i18n="edr_opt_crit">Kritik (Critical)</option>
+                            <option value="high" data-i18n="edr_opt_high">Yüksek (High)</option>
+                            <option value="medium" data-i18n="edr_opt_med">Orta (Medium)</option>
+                            <option value="low" data-i18n="edr_opt_low">Düşük (Low)</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="loadEndpointEDRAnomalies()" data-i18n="btn_filter">Filtrele</button>
+                        <span style="font-size: 12px; color: var(--text-muted); margin-left: auto; align-self: center;" id="ep-edr-total-count">0 Olay</span>
+                    </div>
+
+                    <!-- Anomalies / Process Hierarchy Table -->
+                    <div class="table-responsive">
+                        <table class="data-table" id="ep-edr-table">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="th_edr_time">Zaman</th>
+                                    <th data-i18n="th_edr_host">Uç Nokta</th>
+                                    <th data-i18n="th_edr_severity">Seviye</th>
+                                    <th data-i18n="th_edr_rule">EDR Kuralı &amp; MITRE</th>
+                                    <th data-i18n="th_edr_process">Süreç &amp; PID</th>
+                                    <th data-i18n="th_edr_parent">Üst Süreç (Parent)</th>
+                                    <th data-i18n="th_edr_action">Eylem</th>
+                                    <th data-i18n="th_edr_actions" style="text-align: right;">İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ep-edr-tbody">
+                                <tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;" data-i18n="edr_loading">EDR davranışsal anomali kayıtları taranıyor...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -3434,7 +3548,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.3</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.4</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -6097,6 +6211,51 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                         </label>
                     </div>
                 </div>
+
+                <!-- EDR Behavioral & Script Attacks Group (Phase N) -->
+                <div style="background: rgba(168, 85, 247, 0.04); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; padding: 14px; margin-top: 16px;">
+                    <div style="font-size: 12.5px; font-weight: 700; color: #c084fc; margin-bottom: 10px;" data-i18n="grp_edr_sec">⚡ EDR Davranışsal Analiz &amp; Zararlı Betik Önleme</div>
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="policy-form-edr-enabled" checked style="transform: scale(1.15);">
+                            <span data-i18n="lbl_edr_enabled">Davranışsal EDR Analizi Aktif (EDR Monitoring Enabled)</span>
+                        </label>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_edr_scan_interval">EDR Tarama Aralığı (sn)</label>
+                            <input type="number" id="policy-form-edr-interval" class="form-control" style="width: 100%;" min="5" max="300" value="15">
+                            <span style="font-size: 10.5px; color: var(--text-muted);">Önerilen: 10 - 30 sn</span>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 11.5px; font-weight: 600; margin-bottom: 4px;" data-i18n="lbl_edr_severity_thresh">Alarm Seviye Eşiği</label>
+                            <select id="policy-form-edr-threshold" class="form-control" style="width: 100%;">
+                                <option value="LOW" data-i18n="sev_low">Düşük ve Üzeri (Tüm Olaylar)</option>
+                                <option value="MEDIUM" selected data-i18n="sev_med">Orta ve Üzeri (Önerilen)</option>
+                                <option value="HIGH" data-i18n="sev_high">Yüksek ve Üzeri (Yalnızca Kritik/Yüksek)</option>
+                                <option value="CRITICAL" data-i18n="sev_crit">Yalnızca Kritik Tehditler</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="policy-form-edr-kill-critical" checked style="transform: scale(1.15);">
+                            <span data-i18n="lbl_edr_kill_critical" style="color: var(--danger);">Kritik Tehditlerde Süreci Otomatik Sonlandır (Autonomous Process Kill)</span>
+                        </label>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="policy-form-edr-monitor-scripts" checked style="transform: scale(1.15);">
+                            <span data-i18n="lbl_edr_monitor_scripts">PowerShell, CMD &amp; Shell Betik Motorlarını İzle (-enc, IEX, curl|bash)</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="policy-form-edr-block-lolbins" checked style="transform: scale(1.15);">
+                            <span data-i18n="lbl_edr_block_lolbins">Living-off-the-Land (LOLBins) İstismarını Algıla (CertUtil, Mshta, Regsvr32)</span>
+                        </label>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border-color); flex-shrink: 0;">
                 <button class="btn btn-outline" onclick="closePolicyModal()" data-i18n="btn_cancel">İptal</button>
@@ -6945,8 +7104,96 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.3"></script>
-    <script src="/static/js/translations.js?v=1.9.3"></script>
-    <script src="/static/js/app.js?v=1.9.3"></script>
+    <!-- MODAL: EDR Behavioral Anomaly & Process Hierarchy Detail (Phase N) -->
+    <div class="modal-backdrop" id="modal-edr-detail" style="display: none; z-index: 1070;">
+        <div class="modal modal-wide" style="max-width: 860px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">⚡</span>
+                    <h3 style="margin: 0; font-size: 15px;" data-i18n="edr_modal_title">EDR Süreç Ağacı ve Davranışsal Tehdit Analizi</h3>
+                </div>
+                <button class="close-btn" onclick="closeEDRDetail()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 18px 22px; max-height: 75vh; overflow-y: auto;">
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
+                    <span id="edr-detail-severity-badge" class="badge badge-danger">CRITICAL</span>
+                    <span id="edr-detail-action-badge" class="badge badge-warning">AUDITED</span>
+                    <span id="edr-detail-rule-badge" class="badge badge-info">RULE</span>
+                    <span id="edr-detail-timestamp" style="font-size: 12px; color: var(--text-muted); margin-left: auto;">-</span>
+                </div>
+
+                <!-- Host & Process Hierarchy Overview -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                    <div class="panel" style="padding: 10px 14px;">
+                        <div style="font-size: 11px; color: var(--text-muted);" data-i18n="th_host">Uç Nokta / Ajan</div>
+                        <div id="edr-detail-hostname" style="font-weight: 600; font-size: 13px; margin-top: 2px;">-</div>
+                        <div id="edr-detail-ip" style="font-size: 11px; color: var(--text-muted);">-</div>
+                    </div>
+                    <div class="panel" style="padding: 10px 14px;">
+                        <div style="font-size: 11px; color: var(--text-muted);">Çalıştıran Kullanıcı</div>
+                        <div id="edr-detail-username" style="font-weight: 600; font-size: 13px; margin-top: 2px;">-</div>
+                    </div>
+                    <div class="panel" style="padding: 10px 14px;">
+                        <div style="font-size: 11px; color: var(--text-muted);">Algılama Kuralı</div>
+                        <div id="edr-detail-rulename" style="font-weight: 600; font-size: 13px; margin-top: 2px;">-</div>
+                        <div id="edr-detail-ruleid" class="mono-code" style="font-size: 11px; color: var(--text-muted);">-</div>
+                    </div>
+                </div>
+
+                <!-- Process Tree Visualizer Box -->
+                <div class="panel" style="padding: 14px; margin-bottom: 16px; border: 1px solid rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.03);">
+                    <div style="font-weight: 600; font-size: 12.5px; color: #c084fc; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                        <span>🌳</span> Süreç Ağacı Hiyerarşisi (Process Tree)
+                    </div>
+
+                    <!-- Parent Process -->
+                    <div style="margin-bottom: 14px; padding-left: 8px; border-left: 2px solid var(--border-color);">
+                        <div style="font-size: 11px; color: var(--text-muted);">Üst Süreç (Parent Process):</div>
+                        <div style="display: flex; gap: 8px; align-items: center; margin-top: 2px;">
+                            <span id="edr-detail-parent-name" style="font-weight: 700; font-size: 13px; color: var(--text-primary);">-</span>
+                            <span id="edr-detail-parent-pid" class="badge badge-secondary mono-code">PPID: -</span>
+                        </div>
+                        <div id="edr-detail-parent-cmd" class="mono-code" style="font-size: 11.5px; word-break: break-all; color: var(--text-muted); background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 4px; margin-top: 4px;">-</div>
+                    </div>
+
+                    <!-- Offending Child Process -->
+                    <div style="padding-left: 20px; border-left: 2px solid var(--danger);">
+                        <div style="font-size: 11px; color: var(--danger); font-weight: 600;">⚠️ Şüpheli / Anormal Çocuk Süreç (Spawned Child Process):</div>
+                        <div style="display: flex; gap: 8px; align-items: center; margin-top: 2px;">
+                            <span id="edr-detail-process-name" style="font-weight: 700; font-size: 14px; color: var(--danger);">-</span>
+                            <span id="edr-detail-pid" class="badge badge-danger mono-code">PID: -</span>
+                        </div>
+                        <div id="edr-detail-commandline" class="mono-code" style="font-size: 12px; word-break: break-all; color: #fca5a5; background: rgba(239, 68, 68, 0.1); padding: 8px 10px; border-radius: 4px; margin-top: 4px; border: 1px solid rgba(239, 68, 68, 0.2);">-</div>
+                    </div>
+                </div>
+
+                <!-- MITRE ATT&CK & Threat Intelligence -->
+                <div class="panel" style="padding: 14px; margin-bottom: 16px;">
+                    <div style="font-weight: 600; font-size: 12px; margin-bottom: 8px;">🎯 MITRE ATT&amp;CK Sınıflandırması &amp; Analist Detayları</div>
+                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <div>
+                            <span style="font-size: 11px; color: var(--text-muted);">Taktik:</span>
+                            <span id="edr-detail-mitre-tactic" class="badge badge-info" style="margin-left: 4px;">-</span>
+                        </div>
+                        <div>
+                            <span style="font-size: 11px; color: var(--text-muted);">Teknik:</span>
+                            <span id="edr-detail-mitre-technique" class="badge badge-secondary mono-code" style="margin-left: 4px;">-</span>
+                        </div>
+                    </div>
+                    <div id="edr-detail-full-desc" style="font-size: 12px; color: var(--text-muted); margin-top: 10px; line-height: 1.5;">-</div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px;">
+                <button class="btn btn-danger btn-sm" id="btn-edr-kill-modal" onclick="executeModalEDRKill()" style="display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-skull"></i> ⚡ Süreci Zorla Sonlandır (Kill Process)
+                </button>
+                <button class="btn btn-outline" onclick="closeEDRDetail()">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/marked.min.js?v=1.9.4"></script>
+    <script src="/static/js/translations.js?v=1.9.4"></script>
+    <script src="/static/js/app.js?v=1.9.4"></script>
 </body>
 </html>

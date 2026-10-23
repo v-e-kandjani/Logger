@@ -265,6 +265,26 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 📖 [**Administrator & Operator Help Guide**](docs/HELP.md) — Operational workflows, troubleshooting procedures, and architecture guidance.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.4** (Behavioral Anomaly Detection & Malicious Script EDR - Phase N) / **Agent v0.1.8**:
+  - **Native Cross-Platform EDR Subsystem (Agent v0.1.8)**:
+    - High-performance, zero-fork process hierarchy tree discovery across Linux (`/proc`), macOS (`ps -A`), and Windows (`wmic` / `Get-CimInstance`).
+    - Heuristic detection rules covering:
+      - Office application child process spawning (`WINWORD`, `EXCEL`, `POWERPNT` launching `cmd.exe`, `powershell.exe`, `wscript.exe`, `mshta.exe` - MITRE `T1204.002`).
+      - Web server / Database server interactive shell execution (`w3wp`, `nginx`, `httpd`, `sqlservr`, `mysqld` spawning `/bin/sh`, `/bin/bash`, `powershell.exe` - MITRE `T1505.003`, `T1059.004`).
+      - Living-off-the-Land Binaries (LOLBins) weaponization (`certutil -urlcache`, `mshta.exe`, `rundll32.exe`, `regsvr32.exe /s /i:http` Squiblydoo, `bitsadmin.exe /transfer`).
+      - Ransomware backup and recovery invalidation (`vssadmin delete shadows`, `wbadmin delete catalog`, `bcdedit ignoreallfailures` - MITRE `T1490`).
+      - Obfuscated base64 PowerShell scripts (`-enc`, `FromBase64String`, `-w hidden`, `-ep bypass` - MITRE `T1027`, `T1059.001`).
+      - In-memory download cradles (`Invoke-Expression` / `IEX` with `DownloadString`, Unix `curl | bash` / `wget | sh` pipes).
+    - Autonomous Threat Neutralization: Agent immediately kills anomalous process trees when critical-severity threats are detected (`EDRKillOnCritical`).
+  - **PostgreSQL EDR Relational Store & Deduplication**:
+    - Relational table `endpoint_process_anomalies` with multi-tenant and agent time-indexed lookups.
+    - Cascading deduplication integration in `MergeDuplicateAgents`.
+  - **SIEM & MITRE ATT&CK Correlation**:
+    - Direct alert ingestion dispatching `EDR-RULE-*` events with MITRE tactics and techniques to the real-time SIEM correlation engine.
+  - **Web Operations Dashboard & Process Tree Visualizer**:
+    - Dedicated EDR dashboard view (`#endpoint-sec-edr`) with 5 KPI summary cards, filter bar, interactive process tree modal (`#modal-edr-detail`), 1-click remote process kill action, and synthetic attack simulation button (`/api/v1/endpoint/edr/simulate`).
+    - Full English & Turkish localization with dynamic language switching support.
+
 - **v1.9.3** (USB & Peripheral Storage DLP - Phase M) / **Agent v0.1.7**:
   - **Native Cross-Platform USB DLP Engine (Agent v0.1.7)**:
     - Real-time hardware discovery and differential event monitoring across Windows (`Win32_DiskDrive` / `Win32_PnPEntity`), Linux (`/sys/bus/usb/devices`), and macOS (`system_profiler SPUSBDataType`).

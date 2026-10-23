@@ -132,6 +132,14 @@ type EndpointPolicyConfig struct {
 	USBScanIntervalSec  int      `json:"usb_scan_interval_sec"`
 	USBAllowedDevices   []string `json:"usb_allowed_devices"` // List of VID:PID or Serial numbers
 	USBBlockedClasses   []string `json:"usb_blocked_classes"` // e.g. ["mass_storage", "mtp"]
+
+	// Behavioral Anomaly & Script-Based Attack Prevention EDR (Phase N)
+	EDRBehaviorEnabled      bool   `json:"edr_behavior_enabled"`
+	EDRKillOnCritical       bool   `json:"edr_kill_on_critical"`       // Autonomous process tree termination
+	EDRMonitorScriptEngines bool   `json:"edr_monitor_script_engines"` // PowerShell, bash, cmd, cscript, mshta
+	EDRBlockLOLBins         bool   `json:"edr_block_lolbins"`          // Living-off-the-Land binary weaponization
+	EDRScanIntervalSec      int    `json:"edr_scan_interval_sec"`
+	EDRSeverityThreshold    string `json:"edr_severity_threshold"`     // "LOW", "MEDIUM", "HIGH", "CRITICAL"
 }
 
 // EndpointSoftware represents a normalized software package installed on an endpoint
@@ -587,4 +595,45 @@ type AgentUSBSubmission struct {
 	Devices   []EndpointUSBDevice `json:"devices"`
 	Events    []EndpointUSBEvent  `json:"events"`
 }
+
+// EndpointProcessAnomaly represents a behavioral anomaly, malicious script execution, or LOLBin abuse (Phase N)
+type EndpointProcessAnomaly struct {
+	ID                uuid.UUID `json:"id"`
+	TenantSlug        string    `json:"tenant_slug"`
+	AgentID           uuid.UUID `json:"agent_id"`
+	AgentHostname     string    `json:"agent_hostname,omitempty"`
+	AgentIP           string    `json:"agent_ip,omitempty"`
+	PID               int       `json:"pid"`
+	ProcessName       string    `json:"process_name"`
+	CommandLine       string    `json:"command_line"`
+	ParentPID         int       `json:"parent_pid"`
+	ParentName        string    `json:"parent_name"`
+	ParentCommandLine string    `json:"parent_command_line"`
+	Username          string    `json:"username"`
+	Severity          string    `json:"severity"` // "low", "medium", "high", "critical"
+	RuleID            string    `json:"rule_id"`
+	RuleName          string    `json:"rule_name"`
+	MitreTactic       string    `json:"mitre_tactic"`    // e.g. "Execution", "Defense Evasion", "Persistence"
+	MitreTechnique    string    `json:"mitre_technique"` // e.g. "T1059.001", "T1218.011", "T1055"
+	ActionTaken       string    `json:"action_taken"`    // "audited", "terminated", "blocked"
+	Details           string    `json:"details"`
+	Timestamp         time.Time `json:"timestamp"`
+	CreatedAt         time.Time `json:"created_at"`
+}
+
+// AgentBehaviorSubmission represents the payload sent by the agent to report behavioral anomalies and script threats (Phase N)
+type AgentBehaviorSubmission struct {
+	AgentUUID string                   `json:"agent_uuid"`
+	Anomalies []EndpointProcessAnomaly `json:"anomalies"`
+}
+
+// EDRStats represents aggregate metrics for Phase N Behavioral EDR
+type EDRStats struct {
+	TotalDetections      int64 `json:"total_detections"`
+	CriticalThreats      int64 `json:"critical_threats"`
+	SuspiciousScripts    int64 `json:"suspicious_scripts"`
+	ProcessesTerminated  int64 `json:"processes_terminated"`
+	MonitoredAgentsCount int64 `json:"monitored_agents_count"`
+}
+
 

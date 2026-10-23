@@ -254,6 +254,26 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 📖 [**Yönetici ve Operatör Yardım Kılavuzu**](docs/HELP.tr.md) — Operasyonel iş akışları, sorun giderme prosedürleri ve mimari rehber.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.4** (Davranışsal Anomali Tespiti ve Zararlı Betik Önleme EDR - Phase N) / **Ajan v0.1.8**:
+  - **Yerel Çok Platformlu EDR Alt Sistemi (Ajan v0.1.8)**:
+    - Linux (`/proc`), macOS (`ps -A`) ve Windows (`wmic` / `Get-CimInstance`) üzerinde sıfır alt-süreç çatallanmasıyla çalışan yüksek hızlı süreç hiyerarşisi ağaç keşfi.
+    - Sezgisel algılama kuralları:
+      - Office uygulamalarının komut satırı veya betik motoru başlatması (`WINWORD`, `EXCEL`, `POWERPNT` üzerinden `cmd.exe`, `powershell.exe`, `wscript.exe`, `mshta.exe` - MITRE `T1204.002`).
+      - Web sunucusu / Veritabanı süreçlerinin etkileşimli kabuk açması (`w3wp`, `nginx`, `httpd`, `sqlservr`, `mysqld` üzerinden `/bin/sh`, `/bin/bash`, `powershell.exe` - MITRE `T1505.003`, `T1059.004` Web Shell tespiti).
+      - Living-off-the-Land (LOLBins) istismarlarının tespiti (`certutil -urlcache`, `mshta.exe`, `rundll32.exe`, `regsvr32.exe /s /i:http` Squiblydoo, `bitsadmin.exe /transfer`).
+      - Fidye yazılımların (Ransomware) gölge kopyaları silme girişimleri (`vssadmin delete shadows`, `wbadmin delete catalog`, `bcdedit ignoreallfailures` - MITRE `T1490`).
+      - Gizlenmiş Base64 PowerShell yürütmeleri (`-enc`, `FromBase64String`, `-w hidden`, `-ep bypass` - MITRE `T1027`, `T1059.001`).
+      - Bellek içi doğrudan indirme tuzakları (`Invoke-Expression` / `IEX` ile `DownloadString`, Unix `curl | bash` / `wget | sh` boru hatları).
+    - Otonom Tehdit Etkisizleştirme: Kritik tehdit algılandığında ajanın süreci anında sonlandırması (`EDRKillOnCritical`).
+  - **PostgreSQL EDR İlişkisel Veritabanı & Mükerrer Birleştirme**:
+    - Çok kiracılı ve zaman indeksli `endpoint_process_anomalies` tablosu.
+    - Mükerrer ajanlar birleştirildiğinde süreç anomalilerinin yeni ajana basamaklı aktarımı.
+  - **SIEM ve MITRE ATT&CK Korelasyonu**:
+    - Algılanan `EDR-RULE-*` olaylarının MITRE taktik ve teknikleriyle doğrudan SIEM motoruna aktarılması.
+  - **Merkezi EDR Operasyon Paneli ve Süreç Ağacı Görselleştirici**:
+    - Ayrıntılı EDR yönetim arayüzü (`#endpoint-sec-edr`), 5 KPI özet kartı, arama & önem filtresi, etkileşimli süreç ağacı modalı (`#modal-edr-detail`), tek tıkla uzaktan süreç sonlandırma ve saldırı simülasyonu (`/api/v1/endpoint/edr/simulate`).
+    - Dinamik dil geçişini destekleyen tam Türkçe ve İngilizce yerelleştirme.
+
 - **v1.9.3** (USB ve Çevre Birim Depolama DLP Denetimi - Phase M) / **Ajan v0.1.7**:
   - **Yerel Çok Platformlu USB DLP Denetim Motoru (Ajan v0.1.7)**:
     - Windows (`Win32_DiskDrive`), Linux (`/sys/bus/usb/devices`) ve macOS (`system_profiler`) üzerinde çalışan gerçek zamanlı donanım keşfi ve fark algılama motoru.

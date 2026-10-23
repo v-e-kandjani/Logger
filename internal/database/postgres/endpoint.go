@@ -796,7 +796,10 @@ func (db *DB) MergeDuplicateAgents(ctx context.Context, tenantSlug string) (int,
 			// 14. USB DLP Events
 			_, _ = tx.Exec(ctx, `UPDATE endpoint_usb_events SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
 
-			// 15. Delete the old inactive agent
+			// 15. EDR Process Anomalies (Phase N)
+			_, _ = tx.Exec(ctx, `UPDATE endpoint_process_anomalies SET agent_id = $1 WHERE agent_id = $2`, winner.ID, old.ID)
+
+			// 16. Delete the old inactive agent
 			_, err = tx.Exec(ctx, `DELETE FROM endpoint_agents WHERE id = $1`, old.ID)
 			if err != nil {
 				log.Printf("[MergeDuplicateAgents] Failed to delete old agent %s: %v", old.ID, err)

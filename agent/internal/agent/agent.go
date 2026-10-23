@@ -11,6 +11,7 @@ import (
 	"github.com/syslog-platform/logger/agent/internal/collector"
 	"github.com/syslog-platform/logger/agent/internal/config"
 	"github.com/syslog-platform/logger/agent/internal/dlp"
+	"github.com/syslog-platform/logger/agent/internal/edr"
 	"github.com/syslog-platform/logger/agent/internal/fim"
 	"github.com/syslog-platform/logger/agent/internal/identity"
 	"github.com/syslog-platform/logger/agent/internal/transport"
@@ -32,6 +33,8 @@ type Agent struct {
 	fimScanner    *fim.Scanner
 	dlpTicker     *time.Ticker
 	dlpScanner    *dlp.Scanner
+	edrTicker     *time.Ticker
+	edrScanner    *edr.Scanner
 	isUpgrading   bool
 }
 
@@ -54,6 +57,7 @@ func NewAgent(cfg *config.Config) (*Agent, error) {
 		policyRev:  1,
 		fimScanner: fim.NewScanner(),
 		dlpScanner: dlp.NewScanner(),
+		edrScanner: edr.NewScanner(),
 	}, nil
 }
 
@@ -127,11 +131,19 @@ func (a *Agent) Run(ctx context.Context) error {
 	a.dlpTicker = time.NewTicker(dlpInterval)
 	defer a.dlpTicker.Stop()
 
-	// Initial heartbeat, inventory, FIM & DLP scans
+	edrInterval := 15 * time.Second
+	if a.currentPolicy != nil && a.currentPolicy.EDRScanIntervalSec >= 5 {
+		edrInterval = time.Duration(a.currentPolicy.EDRScanIntervalSec) * time.Second
+	}
+	a.edrTicker = time.NewTicker(edrInterval)
+	defer a.edrTicker.Stop()
+
+	// Initial heartbeat, inventory, FIM, DLP & EDR scans
 	a.sendHeartbeat(ctx)
 	go a.sendInventory(ctx)
 	go a.sendFIMScan(ctx)
 	go a.sendDLPScan(ctx)
+	go a.sendEDRScan(ctx)
 
 	for {
 		select {
@@ -144,6 +156,8 @@ func (a *Agent) Run(ctx context.Context) error {
 			go a.sendFIMScan(ctx)
 		case <-a.dlpTicker.C:
 			go a.sendDLPScan(ctx)
+		case <-a.edrTicker.C:
+			go a.sendEDRScan(ctx)
 		case <-a.hbTicker.C:
 			// Apply random jitter (+/- 2 seconds) to avoid synchronization spikes
 			jitter := time.Duration(rand.Intn(4)-2) * time.Second
@@ -278,6 +292,9 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 			if policy.USBScanIntervalSec >= 10 && a.dlpTicker != nil {
 				a.dlpTicker.Reset(time.Duration(policy.USBScanIntervalSec) * time.Second)
 			}
+			if policy.EDRScanIntervalSec >= 5 && a.edrTicker != nil {
+				a.edrTicker.Reset(time.Duration(policy.EDRScanIntervalSec) * time.Second)
+			}
 		} else {
 			log.Printf("[LOGGER Agent] Server reports policy update available (Rev %d)", a.policyRev)
 		}
@@ -370,5 +387,33 @@ func (a *Agent) sendDLPScan(ctx context.Context) {
 	}
 	if err := a.client.PostJSON(ctx, "/api/agent/v1/usb", sub, &resp); err != nil {
 		log.Printf("[LOGGER DLP] Error submitting USB telemetry: %v", err)
+	}
+}
+
+func (a *Agent) sendEDRScan(ctx context.Context) {
+	if a.currentPolicy != nil && a.currentPolicy.EDRBehaviorEnabled == false && a.currentPolicy.EDRScanIntervalSec > 0 {
+		return
+	}
+	if a.edrScanner == nil {
+		return
+	}
+
+	anomalies := a.edrScanner.Scan(a.currentPolicy)
+	if len(anomalies) == 0 {
+		return
+	}
+
+	log.Printf("[LOGGER EDR] Detected %d behavioral anomaly / malicious script events!", len(anomalies))
+
+	sub := models.AgentBehaviorSubmission{
+		AgentUUID: a.identity.AgentUUID,
+		Anomalies: anomalies,
+	}
+
+	var resp struct {
+		Status string `json:"status"`
+	}
+	if err := a.client.PostJSON(ctx, "/api/agent/v1/behavior", sub, &resp); err != nil {
+		log.Printf("[LOGGER EDR] Error submitting behavior telemetry: %v", err)
 	}
 }
