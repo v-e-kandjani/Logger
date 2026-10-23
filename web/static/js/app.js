@@ -11469,9 +11469,12 @@ async function loadEndpointUSBDevices() {
 
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const devices = await res.json() || [];
+        const data = await res.json();
+        const devices = Array.isArray(data) ? data : (data && Array.isArray(data.devices) ? data.devices : []);
+        const total = (data && data.total !== undefined) ? data.total : devices.length;
 
-        if (totalCountEl) totalCountEl.textContent = `${devices.length} Cihaz`;
+        const devUnit = (window.currentLang === 'en' || (typeof currentLanguage !== 'undefined' && currentLanguage === 'en')) ? 'Devices' : 'Cihaz';
+        if (totalCountEl) totalCountEl.textContent = `${total} ${devUnit}`;
 
         if (devices.length === 0) {
             tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="color: var(--text-muted); padding: 24px;">Kayıtlı USB depolama aygıtı bulunamadı.</td></tr>`;
@@ -11545,9 +11548,12 @@ async function loadEndpointUSBEvents() {
 
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const events = await res.json() || [];
+        const data = await res.json();
+        const events = Array.isArray(data) ? data : (data && Array.isArray(data.events) ? data.events : []);
+        const total = (data && data.total !== undefined) ? data.total : events.length;
 
-        if (totalCountEl) totalCountEl.textContent = `${events.length} Olay`;
+        const evtUnit = (window.currentLang === 'en' || (typeof currentLanguage !== 'undefined' && currentLanguage === 'en')) ? 'Events' : 'Olay';
+        if (totalCountEl) totalCountEl.textContent = `${total} ${evtUnit}`;
 
         if (events.length === 0) {
             tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">DLP denetim olayı bulunamadı.</td></tr>`;
@@ -11618,7 +11624,8 @@ async function loadUSBWhitelist() {
         const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
         const res = await fetch(`/api/v1/endpoint/usb/whitelist?tenant=${encodeURIComponent(tenant)}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const list = await res.json() || [];
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data && Array.isArray(data.whitelist) ? data.whitelist : []);
 
         if (list.length === 0) {
             tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="color: var(--text-muted); padding: 20px;">Tanımlı beyaz liste kaydı bulunmamaktadır. Tüm cihazlar uygulanan genel ilkeye göre değerlendirilir.</td></tr>`;
