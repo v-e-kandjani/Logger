@@ -35,10 +35,11 @@ type SocketConnection struct {
 
 // BeaconTracker records timestamp history of outbound flows to detect C2 heartbeats
 type BeaconTracker struct {
-	RemoteIP   string
-	RemotePort int
-	PID        int
-	Timestamps []time.Time
+	RemoteIP      string
+	RemotePort    int
+	PID           int
+	LastLocalPort int
+	Timestamps    []time.Time
 }
 
 // Scanner performs socket enumeration, DNS inspection, DGA detection, and firewall enforcement
@@ -241,48 +242,58 @@ func (s *Scanner) evaluateSocketThreat(sock SocketConnection, policy *models.End
 
 	// 4. C2 Beaconing Detection (periodic regular intervals)
 	if isOutbound && (policy == nil || policy.EDRDetectC2Beaconing) {
-		beaconKey := fmt.Sprintf("%d:%s:%d", sock.PID, sock.RemoteIP, sock.RemotePort)
-		tracker, exists := s.beaconHistory[beaconKey]
-		if !exists {
-			tracker = &BeaconTracker{
-				RemoteIP:   sock.RemoteIP,
-				RemotePort: sock.RemotePort,
-				PID:        sock.PID,
-				Timestamps: []time.Time{now},
-			}
-			s.beaconHistory[beaconKey] = tracker
-		} else {
-			tracker.Timestamps = append(tracker.Timestamps, now)
-			if len(tracker.Timestamps) > 10 {
-				tracker.Timestamps = tracker.Timestamps[len(tracker.Timestamps)-10:]
-			}
+		// Ignore standard web browsers and OS system push notification services on standard web/push ports (443, 80, 5228, 8443)
+		standardWebProcs := map[string]bool{
+			"chrome.exe": true, "msedge.exe": true, "firefox.exe": true, "brave.exe": true,
+			"opera.exe": true, "svchost.exe": true, "system": true, "chrome": true, "msedge": true, "firefox": true,
+		}
+		isStandardWebPort := (sock.RemotePort == 443 || sock.RemotePort == 80 || sock.RemotePort == 5228 || sock.RemotePort == 8443)
+		isBrowserOrSystem := standardWebProcs[procLower]
 
-			// If at least 3 intervals exist, calculate delta variance
-			if len(tracker.Timestamps) >= 3 {
-				intervals := make([]float64, len(tracker.Timestamps)-1)
-				for i := 0; i < len(intervals); i++ {
-					intervals[i] = tracker.Timestamps[i+1].Sub(tracker.Timestamps[i]).Seconds()
+		if !(isBrowserOrSystem && isStandardWebPort) {
+			beaconKey := fmt.Sprintf("%d:%s:%d", sock.PID, sock.RemoteIP, sock.RemotePort)
+			tracker, exists := s.beaconHistory[beaconKey]
+			if !exists {
+				tracker = &BeaconTracker{
+					RemoteIP:   sock.RemoteIP,
+					RemotePort: sock.RemotePort,
+					PID:        sock.PID,
+					Timestamps: []time.Time{now},
 				}
-				// Compute average & standard deviation
-				var sum float64
-				for _, v := range intervals {
-					sum += v
+				s.beaconHistory[beaconKey] = tracker
+			} else {
+				tracker.Timestamps = append(tracker.Timestamps, now)
+				if len(tracker.Timestamps) > 10 {
+					tracker.Timestamps = tracker.Timestamps[len(tracker.Timestamps)-10:]
 				}
-				avg := sum / float64(len(intervals))
 
-				var varianceSum float64
-				for _, v := range intervals {
-					varianceSum += math.Pow(v-avg, 2)
-				}
-				stdDev := math.Sqrt(varianceSum / float64(len(intervals)))
+				// If at least 3 intervals exist, calculate delta variance
+				if len(tracker.Timestamps) >= 3 {
+					intervals := make([]float64, len(tracker.Timestamps)-1)
+					for i := 0; i < len(intervals); i++ {
+						intervals[i] = tracker.Timestamps[i+1].Sub(tracker.Timestamps[i]).Seconds()
+					}
+					// Compute average & standard deviation
+					var sum float64
+					for _, v := range intervals {
+						sum += v
+					}
+					avg := sum / float64(len(intervals))
 
-				// If regular beaconing pattern detected (low std deviation relative to avg interval)
-				if avg >= 5.0 && avg <= 300.0 && stdDev <= 3.5 {
-					severity = "critical"
-					reason = fmt.Sprintf("Periodic C2 Beaconing pattern detected to %s:%d (avg interval: %.1fs, jitter variance: %.2fs)", sock.RemoteIP, sock.RemotePort, avg, stdDev)
-					if policy != nil && policy.EDRBlockMaliciousIPs {
-						actionTaken = "blocked"
-						s.enforceBlockIP(sock.RemoteIP, reason)
+					var varianceSum float64
+					for _, v := range intervals {
+						varianceSum += math.Pow(v-avg, 2)
+					}
+					stdDev := math.Sqrt(varianceSum / float64(len(intervals)))
+
+					// If regular beaconing pattern detected (low std deviation relative to avg interval)
+					if avg >= 5.0 && avg <= 300.0 && stdDev <= 3.5 {
+						severity = "critical"
+						reason = fmt.Sprintf("Periodic C2 Beaconing pattern detected to %s:%d (avg interval: %.1fs, jitter variance: %.2fs)", sock.RemoteIP, sock.RemotePort, avg, stdDev)
+						if policy != nil && policy.EDRBlockMaliciousIPs {
+							actionTaken = "blocked"
+							s.enforceBlockIP(sock.RemoteIP, reason)
+						}
 					}
 				}
 			}
