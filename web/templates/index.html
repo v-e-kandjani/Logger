@@ -5,9 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=3.5">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.9">
+    <link rel="stylesheet" href="/static/css/components.css?v=1.9.9">
+    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.9">
+    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.9">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="dark-theme">
@@ -19,7 +23,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.8</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.9</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -109,6 +113,10 @@
                         <a class="nav-subitem" data-endpoint-target="endpoint-sec-network">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                             <span data-i18n="nav_ep_network">Ağ &amp; DNS Güvenliği</span>
+                        </a>
+                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-ransomware">
+                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/><polyline points="12 15 12 17 14 17"/></svg>
+                            <span data-i18n="nav_ep_ransomware">Fidye Kalkanı &amp; Yemler</span>
                         </a>
                         <a class="nav-subitem" data-endpoint-target="endpoint-sec-policies">
                             <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
@@ -808,6 +816,9 @@
                     </button>
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-network">
                         <span data-i18n="nav_ep_network">🌐 Ağ &amp; DNS EDR</span>
+                    </button>
+                    <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-ransomware">
+                        <span data-i18n="nav_ep_ransomware">🪤 Fidye Kalkanı (Canary)</span>
                     </button>
                     <button class="btn btn-outline endpoint-nav-btn" data-target="endpoint-sec-policies">
                         <span data-i18n="nav_ep_policies">İlkeler (Policies)</span>
@@ -1750,6 +1761,126 @@
                     </div>
                 </div>
 
+                <!-- 5.9. ENDPOINT ANTI-RANSOMWARE SHIELD & DECOY CANARY DEFENSE VIEW (PHASE P) -->
+                <div class="endpoint-section" id="endpoint-sec-ransomware" style="display: none;">
+                    <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h4 style="font-size: 15px; font-weight: 600;" data-i18n="ep_ransomware_title">🪤 Fidye Yazılımı Kalkanı &amp; Yem Dosya (Canary) Savunması</h4>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" data-i18n="ep_ransomware_desc">Şifreleme aktivitesini anında yakalayan tuzak dosyalar (canary token), yüksek Shannon entropisi analizi ve otonom süreç durdurma ile fidye yazılımlarına karşı aktif savunma.</p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary" onclick="openRansomwareSimulateModal()" data-i18n="btn_ransomware_simulate"><i class="fas fa-flask"></i> ⚡ Fidye Saldırısı Simüle Et</button>
+                            <button class="btn btn-primary" onclick="loadEndpointRansomware()" data-i18n="btn_refresh"><i class="fas fa-sync-alt"></i> Yenile</button>
+                        </div>
+                    </div>
+
+                    <!-- Ransomware Summary Stat Cards -->
+                    <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 20px;">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="stat_ransomware_incidents">Fidye Olayları</span>
+                                <span class="badge badge-danger">Incidents</span>
+                            </div>
+                            <div class="stat-value" id="ep-ransomware-stat-incidents" style="color: var(--danger);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="stat_ransomware_incidents_sub">
+                                Tespit edilen şifreleme ve kurcalama olayları
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="stat_ransomware_armed">Kurulu Yem Dosyalar</span>
+                                <span class="badge badge-success">Canaries</span>
+                            </div>
+                            <div class="stat-value" id="ep-ransomware-stat-canaries-armed" style="color: var(--success);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="stat_ransomware_armed_sub">
+                                Aktif izlenen tuzak belgeler (docx, xlsx, pdf)
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="stat_ransomware_tampered">Tetiklenen Yemler</span>
+                                <span class="badge badge-warning">Tripwires</span>
+                            </div>
+                            <div class="stat-value" id="ep-ransomware-stat-canaries-tampered" style="color: var(--warning);">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--warning);" data-i18n="stat_ransomware_tampered_sub">
+                                Değiştirilen veya şifrelenen tuzak dosyalar
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <span class="stat-title" data-i18n="stat_ransomware_terminated">Durdurulan Süreçler</span>
+                                <span class="badge badge-primary">Terminated</span>
+                            </div>
+                            <div class="stat-value" id="ep-ransomware-stat-terminated" style="color: #6366f1;">0</div>
+                            <div class="stat-footer" style="margin-top: 10px; font-size: 11px; color: var(--text-muted);" data-i18n="stat_ransomware_terminated_sub">
+                                Otonom olarak öldürülen zararlı süreçler
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Canaries Card -->
+                    <div class="card" style="margin-bottom: 24px;">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 14px; font-weight: 600;" data-i18n="card_canary_tokens_title">🪤 Aktif Yem Dosyalar (Decoy Honeypots)</h3>
+                                <p style="font-size: 11.5px; color: var(--text-muted); margin: 2px 0 0 0;" data-i18n="card_canary_tokens_desc">Dosya sisteminde gizlenen ve herhangi bir değişiklikte anında alarm veren kriptografik tuzak belgeler</p>
+                            </div>
+                            <span class="badge badge-info" id="ep-ransomware-canaries-count">0 Yem</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="th_ransomware_host">Uç Nokta</th>
+                                        <th data-i18n="th_ransomware_canary_path">Tuzak Dosya Yolu</th>
+                                        <th data-i18n="th_ransomware_file_type">Tür</th>
+                                        <th data-i18n="th_ransomware_hash">Beklenen SHA-256</th>
+                                        <th data-i18n="th_ransomware_status">Durum</th>
+                                        <th data-i18n="th_ransomware_last_check">Son Denetim</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ep-ransomware-canaries-tbody">
+                                    <tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 24px;" data-i18n="ransomware_loading_canaries">Tuzak yem dosyaları yükleniyor...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Incidents Stream Card -->
+                    <div class="card">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 14px; font-weight: 600;" data-i18n="card_ransomware_incidents_title">🚨 Fidye Yazılımı Olay Günlüğü (Ransomware Incidents)</h3>
+                                <p style="font-size: 11.5px; color: var(--text-muted); margin: 2px 0 0 0;" data-i18n="card_ransomware_incidents_desc">Ajanlar tarafından yakalanan yüksek entropili yazma hareketleri ve otonom müdahaleler</p>
+                            </div>
+                            <span class="badge badge-danger" id="ep-ransomware-incidents-count">0 Olay</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="th_ransomware_time">Zaman Damgası</th>
+                                        <th data-i18n="th_ransomware_host">Uç Nokta</th>
+                                        <th data-i18n="th_ransomware_process">Süreç</th>
+                                        <th data-i18n="th_ransomware_pid">PID</th>
+                                        <th data-i18n="th_ransomware_trigger">Tetikleyici</th>
+                                        <th data-i18n="th_ransomware_target">Hedef Dosya</th>
+                                        <th data-i18n="th_ransomware_entropy">Entropi</th>
+                                        <th data-i18n="th_ransomware_action">Müdahale</th>
+                                        <th data-i18n="th_ransomware_severity">Önem</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ep-ransomware-incidents-tbody">
+                                    <tr><td colspan="9" class="text-center" style="color: var(--text-muted); padding: 24px;" data-i18n="ransomware_loading_incidents">Fidye olay günlüğü yükleniyor...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 6. POLICIES VIEW -->
                 <div class="endpoint-section" id="endpoint-sec-policies" style="display: none;">
                     <div class="section-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -2345,7 +2476,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                         <h3 data-i18n="reports_header" style="margin: 0 0 4px 0;">SIEM & SOC Raporlama ve Adli Bilişim Merkezi</h3>
                         <p class="subtitle" style="margin: 0; font-size: 12px; color: var(--text-muted);" data-i18n="reports_subheader">5 Standart SOC Şablonu, Adli Kanıt Zinciri, 5651 Zaman Damgası ve Çoklu Format Dışa Aktarma</p>
                     </div>
-                    <span class="badge badge-outline" id="reports-active-tenant-badge" style="font-size: 11px;">Aktif Kiracı: Default</span>
+                    <span class="badge badge-outline" id="reports-active-tenant-badge" style="font-size: 11px;" data-i18n="reports_active_tenant_default">Aktif Kiracı: Default</span>
                     <span class="badge badge-info" style="font-size: 11px;">PDF • DOCX • CSV • JSON • TXT</span>
                 </div>
 
@@ -2392,7 +2523,16 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                         </div>
 
                         <!-- Parameters Form Row -->
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;" data-i18n="reports_language_label">Rapor Dili:</label>
+                                <select class="form-control" id="report-language-select">
+                                    <option value="app" selected data-i18n="opt_report_lang_app">🌐 Uygulama Dili ile Aynı</option>
+                                    <option value="tr" data-i18n="opt_report_lang_tr">🇹🇷 Türkçe (TR)</option>
+                                    <option value="en" data-i18n="opt_report_lang_en">🇬🇧 English (EN)</option>
+                                </select>
+                            </div>
+
                             <div class="form-group" style="margin: 0;">
                                 <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;" data-i18n="reports_timeframe_label">Zaman Aralığı:</label>
                                 <select class="form-control" id="report-timeframe-select">
@@ -2440,23 +2580,23 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                             <div style="margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap;">
                                 <button class="btn btn-danger" id="btn-report-export-pdf" style="display: flex; align-items: center; gap: 6px; font-weight: 600;" title="Adli PDF Olarak İndir">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                    <span>PDF İndir</span>
+                                    <span data-i18n="btn_export_pdf">PDF İndir</span>
                                 </button>
                                 <button class="btn btn-outline" id="btn-report-export-docx" style="display: flex; align-items: center; gap: 6px; border-color: #2563eb; color: #3b82f6;" title="Microsoft Word Olarak İndir">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
-                                    <span>Word (DOCX)</span>
+                                    <span data-i18n="btn_export_docx">Word (DOCX)</span>
                                 </button>
                                 <button class="btn btn-outline" id="btn-report-export-csv" style="display: flex; align-items: center; gap: 6px; border-color: #059669; color: #10b981;" title="RFC 4180 CSV Olarak İndir">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>
-                                    <span>CSV İndir</span>
+                                    <span data-i18n="btn_export_csv">CSV İndir</span>
                                 </button>
                                 <button class="btn btn-outline" id="btn-report-export-json" style="display: flex; align-items: center; gap: 6px;" title="Yapılandırılmış JSON Olarak İndir">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                                    <span>JSON</span>
+                                    <span data-i18n="btn_export_json">JSON</span>
                                 </button>
                                 <button class="btn btn-outline" id="btn-report-export-txt" style="display: flex; align-items: center; gap: 6px;" title="Düz Metin Olarak İndir">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/></svg>
-                                    <span>TXT</span>
+                                    <span data-i18n="btn_export_txt">TXT</span>
                                 </button>
                             </div>
                         </div>
@@ -2471,8 +2611,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                             <span data-i18n="reports_preview_title">Canlı Rapor Önizleme Alanı</span>
                         </h4>
                         <div style="display: flex; gap: 6px;">
-                            <button class="btn btn-outline btn-sm active" id="btn-preview-mode-visual" style="font-size: 11px;">Görsel Düzen</button>
-                            <button class="btn btn-outline btn-sm" id="btn-preview-mode-raw" style="font-size: 11px;">Ham Metin (Terminal)</button>
+                            <button class="btn btn-outline btn-sm active" id="btn-preview-mode-visual" style="font-size: 11px;" data-i18n="reports_preview_visual">Görsel Düzen</button>
+                            <button class="btn btn-outline btn-sm" id="btn-preview-mode-raw" style="font-size: 11px;" data-i18n="reports_preview_raw">Ham Metin (Terminal)</button>
                         </div>
                     </div>
                     <div class="panel-body">
@@ -2501,19 +2641,19 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                                 </p>
                                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
                                     <div class="stat-card" style="padding: 10px;">
-                                        <div class="stat-header" style="font-size: 11px;">MTTD (Tespit)</div>
+                                        <div class="stat-header" style="font-size: 11px;" data-i18n="reports_kpi_mttd">MTTD (Tespit)</div>
                                         <div class="stat-value" id="report-kpi-mttd" style="font-size: 1.3rem;">4 min</div>
                                     </div>
                                     <div class="stat-card" style="padding: 10px;">
-                                        <div class="stat-header" style="font-size: 11px;">MTTA (Müdahale)</div>
+                                        <div class="stat-header" style="font-size: 11px;" data-i18n="reports_kpi_mtta">MTTA (Müdahale)</div>
                                         <div class="stat-value" id="report-kpi-mtta" style="font-size: 1.3rem;">8 min</div>
                                     </div>
                                     <div class="stat-card" style="padding: 10px;">
-                                        <div class="stat-header" style="font-size: 11px;">MTTR (İyileştirme)</div>
+                                        <div class="stat-header" style="font-size: 11px;" data-i18n="reports_kpi_mttr">MTTR (İyileştirme)</div>
                                         <div class="stat-value" id="report-kpi-mttr" style="font-size: 1.3rem;">18 min</div>
                                     </div>
                                     <div class="stat-card" style="padding: 10px;">
-                                        <div class="stat-header" style="font-size: 11px;">5651 Yasal Durum</div>
+                                        <div class="stat-header" style="font-size: 11px;" data-i18n="reports_kpi_legal">5651 Yasal Durum</div>
                                         <div class="stat-value" id="report-kpi-legal" style="font-size: 1.1rem; color: var(--success);">Mühürlendi (.zd)</div>
                                     </div>
                                 </div>
@@ -2526,11 +2666,11 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                                     <table class="data-table" style="font-size: 12px;">
                                         <thead>
                                             <tr>
-                                                <th>Taktik</th>
-                                                <th>Teknik ID</th>
-                                                <th>Teknik Adı</th>
-                                                <th>SIEM Algılama Kuralı</th>
-                                                <th>D3FEND Savunma</th>
+                                                <th data-i18n="reports_th_tactic">Taktik</th>
+                                                <th data-i18n="reports_th_tech_id">Teknik ID</th>
+                                                <th data-i18n="reports_th_tech_name">Teknik Adı</th>
+                                                <th data-i18n="reports_th_rule_name">SIEM Algılama Kuralı</th>
+                                                <th data-i18n="reports_th_d3fend">D3FEND Savunma</th>
                                             </tr>
                                         </thead>
                                         <tbody id="report-preview-threat-body">
@@ -2547,11 +2687,11 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                                     <table class="data-table" style="font-size: 12px;">
                                         <thead>
                                             <tr>
-                                                <th>Tür</th>
-                                                <th>Gösterge / Değer</th>
-                                                <th>Güvenilirlik</th>
-                                                <th>İtibar / Besleme</th>
-                                                <th>Alınan Aksiyon</th>
+                                                <th data-i18n="reports_th_type">Tür</th>
+                                                <th data-i18n="reports_th_indicator">Gösterge / Değer</th>
+                                                <th data-i18n="reports_th_confidence">Güvenilirlik</th>
+                                                <th data-i18n="reports_th_reputation">İtibar / Besleme</th>
+                                                <th data-i18n="reports_th_action">Alınan Aksiyon</th>
                                             </tr>
                                         </thead>
                                         <tbody id="report-preview-ioc-body">
@@ -2568,12 +2708,12 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                                     <table class="data-table" style="font-size: 12px;">
                                         <thead>
                                             <tr>
-                                                <th>Kanıt ID</th>
-                                                <th>Eser Türü</th>
-                                                <th>Kaynak / Cihaz</th>
-                                                <th>SHA-256 Özeti</th>
-                                                <th>TSA Zaman Damgası (.zd)</th>
-                                                <th>Muhafız</th>
+                                                <th data-i18n="reports_th_ev_id">Kanıt ID</th>
+                                                <th data-i18n="reports_th_artifact_type">Eser Türü</th>
+                                                <th data-i18n="reports_th_source">Kaynak / Cihaz</th>
+                                                <th data-i18n="reports_th_sha256">SHA-256 Özeti</th>
+                                                <th data-i18n="reports_th_tsa_token">TSA Zaman Damgası (.zd)</th>
+                                                <th data-i18n="reports_th_custodian">Muhafız</th>
                                             </tr>
                                         </thead>
                                         <tbody id="report-preview-custody-body">
@@ -2611,18 +2751,18 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                         <table class="data-table" id="report-history-table">
                             <thead>
                                 <tr>
-                                    <th>Rapor ID</th>
-                                    <th>Şablon Türü</th>
-                                    <th>Kiracı</th>
-                                    <th>Sınıflandırma</th>
-                                    <th>Format</th>
-                                    <th>Oluşturan</th>
-                                    <th>Tarih (UTC)</th>
-                                    <th>İşlemler</th>
+                                    <th data-i18n="reports_th_rep_id">Rapor ID</th>
+                                    <th data-i18n="reports_th_template">Şablon Türü</th>
+                                    <th data-i18n="reports_th_tenant">Kiracı</th>
+                                    <th data-i18n="reports_th_class">Sınıflandırma</th>
+                                    <th data-i18n="reports_th_format">Format</th>
+                                    <th data-i18n="reports_th_author">Oluşturan</th>
+                                    <th data-i18n="reports_th_date">Tarih (UTC)</th>
+                                    <th data-i18n="reports_th_actions">İşlemler</th>
                                 </tr>
                             </thead>
                             <tbody id="report-history-body">
-                                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Henüz oluşturulmuş rapor kaydı bulunmuyor.</td></tr>
+                                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);" data-i18n="reports_no_history">Henüz oluşturulmuş rapor kaydı bulunmuyor.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -3723,13 +3863,13 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.8</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.9</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_commit">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">51a8f90</div>
-                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-24</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">f524a8b</div>
+                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-25</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_repo">GitHub Repository</div>
@@ -7499,8 +7639,39 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.8"></script>
-    <script src="/static/js/translations.js?v=1.9.8"></script>
-    <script src="/static/js/app.js?v=1.9.8"></script>
+    <!-- MODAL: Ransomware Attack Simulator -->
+    <div class="modal-backdrop" id="modal-ransomware-simulate" style="display: none; z-index: 1070;">
+        <div class="modal" style="max-width: 520px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 15px;"><i class="fas fa-flask"></i> <span data-i18n="ransomware_modal_sim_title">Fidye Yazılımı Saldırı Simülatörü</span></h3>
+                <button class="close-btn" onclick="closeRansomwareSimulateModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px;">
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;" data-i18n="ransomware_sim_intro">
+                    Canlı sistemlere zarar vermeden decoy tuzak belgelerinin bozulmasını, şifreleme ve otonom süreç durdurma yeteneklerini test edin.
+                </p>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: 600;" data-i18n="lbl_ransomware_sim_type">Saldırı Vektörü:</label>
+                    <select id="ransomware-sim-scenario" class="form-control" style="margin-top: 4px; width: 100%;">
+                        <option value="CANARY_TAMPER">🪤 Tuzak Belge Modifikasyonu (Canary Tripwire Modification)</option>
+                        <option value="HIGH_ENTROPY_BURST">⚡ Yüksek Entropili Hızlı Şifreleme (LockBit / BlackCat Heuristic)</option>
+                        <option value="MASS_RENAME">📁 Toplu Dosya Uzantısı Değiştirme (.locked / .enc Append)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: 600;" data-i18n="lbl_ransomware_sim_target_host">Hedef Uç Nokta (Opsiyonel):</label>
+                    <input type="text" id="ransomware-sim-hostname" class="form-control" placeholder="Varsayılan: İlk aktif ajan" style="margin-top: 4px; width: 100%;">
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px;">
+                <button class="btn btn-outline" onclick="closeRansomwareSimulateModal()" data-i18n="btn_cancel">İptal</button>
+                <button class="btn btn-primary" onclick="executeRansomwareSimulation()" data-i18n="btn_launch_sim"><i class="fas fa-play"></i> Simülasyonu Başlat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/marked.min.js?v=1.9.9"></script>
+    <script src="/static/js/translations.js?v=1.9.9"></script>
+    <script src="/static/js/app.js?v=1.9.9"></script>
 </body>
 </html>

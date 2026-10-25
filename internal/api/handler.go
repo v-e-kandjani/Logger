@@ -298,6 +298,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/agent/v1/usb", h.handleEndpointAgentUSB)
 	mux.HandleFunc("/api/agent/v1/behavior", h.handleEndpointAgentBehavior)
 	mux.HandleFunc("/api/agent/v1/network", h.handleEndpointAgentNetwork)
+	mux.HandleFunc("/api/agent/v1/ransomware", h.handleEndpointAgentRansomware)
 	mux.HandleFunc("/api/agent/v1/tasks/result", h.handleAgentTaskResult)
 
 	// Protected Endpoint Security Administrative Endpoints
@@ -351,6 +352,13 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/network/firewall/rules/", h.requireAuth(h.handleEndpointNetworkFirewallRuleDelete))
 	mux.HandleFunc("/api/v1/endpoint/network/firewall/block", h.requireAuth(h.handleEndpointNetworkFirewallBlock))
 	mux.HandleFunc("/api/v1/endpoint/network/simulate", h.requireAuth(h.handleEndpointNetworkSimulate))
+
+	// Anti-Ransomware Shield & Decoy Canary Defense (Phase P)
+	mux.HandleFunc("/api/v1/endpoint/ransomware/incidents", h.requireAuth(h.handleEndpointRansomwareIncidents))
+	mux.HandleFunc("/api/v1/endpoint/ransomware/canaries", h.requireAuth(h.handleEndpointCanaries))
+	mux.HandleFunc("/api/v1/endpoint/ransomware/stats", h.requireAuth(h.handleEndpointRansomwareStats))
+	mux.HandleFunc("/api/v1/endpoint/ransomware/simulate", h.requireAuth(h.handleEndpointRansomwareSimulate))
+
 	mux.HandleFunc("/api/v1/endpoint/tasks", h.requireAuth(h.handleEndpointTasks))
 	mux.HandleFunc("/api/v1/endpoint/tasks/", h.requireAuth(h.handleEndpointTaskDetail))
 	mux.HandleFunc("/api/v1/endpoint/agents/upgrade-all", h.requireAuth(h.handleEndpointAgentUpgradeAll))
@@ -370,12 +378,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/soar/executions/approve", h.requireAuth(h.handleSOARExecutionApprove))
 	mux.HandleFunc("/api/v1/soar/executions/reject", h.requireAuth(h.handleSOARExecutionReject))
 
-	// Static Assets (Public so login page can load CSS/JS)
+	// Static Assets (Public so login page can load CSS/JS) with Gzip & Cache-Control optimization
 	fs := http.FileServer(http.Dir("./web/static"))
-	mux.Handle("/static/", http.StripPrefix("/static/", fs))
+	mux.Handle("/static/", gzipMiddleware(http.StripPrefix("/static/", fs)))
 
-	// Protected Dashboard UI (Redirects to /login if unauthenticated)
-	mux.HandleFunc("/", h.requireAuth(h.handleDashboardUI))
+	// Protected Dashboard UI (Redirects to /login if unauthenticated) with Gzip compression
+	mux.Handle("/", gzipMiddleware(h.requireAuth(h.handleDashboardUI)))
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

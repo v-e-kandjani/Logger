@@ -264,6 +264,20 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.9** (Anti-Ransomware Shield, Decoy Canary Defense, Reports Tenant Isolation & Web Asset Optimization) / **Agent v0.1.11**:
+  - **Phase P: Anti-Ransomware Shield & Decoy Honeypot Defense**:
+    - **Shannon Entropy Engine**: Implemented mathematical entropy analyzer ($H(X) = -\sum P(x) \log_2 P(x)$) calculating random byte dispersion to identify rapid ransomware encryption patterns (LockBit, BlackCat, Akira) in real-time.
+    - **Canary Honeypot Tripwires**: Deployed hidden decoy office documents (`.docx`, `.xlsx`, `.pdf`) across user directories with cryptographic SHA-256 baseline verification, triggering high-priority tripwires upon unauthorized modification or overwrite attempts.
+    - **Autonomous Rogue Process Termination**: Added proactive containment terminating malicious ransomware process trees and PIDs (`taskkill` / `kill -9`) upon honeypot tripping or entropy spikes, paired with secure quarantine isolation vaults (`/var/logseal/quarantine`).
+    - **SIEM & SOC Ingestion Pipeline**: Created `/api/agent/v1/ransomware` ingestion with automated `EDR-RANSOMWARE-DETECTED` SIEM correlation alert generation, alongside operator query APIs and simulation test harnesses.
+    - **Ransomware UI Dashboard**: Integrated dedicated subtab `#endpoint-sec-ransomware` with 4 KPI metrics (Incidents, Armed Canaries, Tripwires Triggered, Terminated Processes), real-time active decoy table, and ransomware incident audit ledger.
+  - **Reports Scope Lock & Tenant Isolation**:
+    - Strictly decoupled SIEM & SOC Report generation from dynamic sidebar tenant switching, enforcing immutable root `Default` tenant scoping across telemetry and PDF/Excel exports.
+    - Added dedicated Report Language Override selector (`report-language-select`) and comprehensive bilingual dictionaries in `translations.js` (`reports_*`).
+  - **Web Performance & Asset Modularization**:
+    - Integrated gzip response compression middleware (`gzipMiddleware`) with public asset caching headers (`Cache-Control: public, max-age=86400`), reducing dashboard wire transfer sizes from ~1.4 MB to ~200 KB (~7x speedup).
+    - Modularized core styles into componentized stylesheets (`components.css`, `endpoint.css`, `reports.css`) with font preloading tags in HTML `<head>`.
+
 - **v1.9.8** (Remote Microsoft Patching Orchestration, Fleet-Wide Remote Patch Console & Structured Sidebar Navigation):
   - **Microsoft Remote Patch Deployment & Seeding**:
     - Seeded real-world critical Microsoft security updates (`KB5034441` BitLocker/WinRE Bypass, `KB5035853` Kerberos/Hyper-V RCE, `KB5036893` Security Rollup, `KB5037768` DWM Privilege Escalation) for Windows endpoints with CVE correlation (`CVE-2024-20666`, `CVE-2024-21408`, etc.) as remediable missing patches.

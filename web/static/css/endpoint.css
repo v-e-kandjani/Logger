@@ -1,0 +1,181 @@
+/* ============================================================================
+   VALTRIVO LOGSEAL - ENDPOINT SECURITY & EDR SUBSYSTEM STYLES
+   (Agents, Inventory, Vulnerabilities, Patches, FIM, DLP, EDR, Network Firewall)
+   ============================================================================ */
+
+/* Endpoint Navigation Subtab Buttons */
+.endpoint-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    padding: 6px 12px;
+}
+
+.endpoint-nav-btn.active {
+    background: var(--primary) !important;
+    border-color: var(--primary) !important;
+    color: white !important;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+
+.endpoint-section {
+    animation: fadeInSection 0.15s ease;
+}
+
+@keyframes fadeInSection {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Endpoint Status Dots */
+.ep-status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+
+.ep-status-dot.online {
+    background-color: var(--success);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.ep-status-dot.offline {
+    background-color: var(--danger);
+    opacity: 0.8;
+}
+
+.ep-status-dot.isolated {
+    background-color: var(--warning);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+/* Process Tree Visualization (EDR) */
+.edr-process-tree {
+    background: #0B0F19;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.8;
+    overflow-x: auto;
+}
+
+.edr-tree-node {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 6px;
+    border-radius: 4px;
+}
+
+.edr-tree-node:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.edr-tree-node.malicious {
+    background: rgba(239, 68, 68, 0.12);
+    border-left: 3px solid var(--danger);
+    color: #F87171;
+}
+
+.edr-tree-node.suspicious {
+    background: rgba(245, 158, 11, 0.12);
+    border-left: 3px solid var(--warning);
+    color: #FBBF24;
+}
+
+.edr-tree-node.clean {
+    color: var(--text-muted);
+}
+
+/* FIM Cryptographic Hash & Tamper Badge */
+.fim-tamper-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.fim-tamper-modified { background: rgba(245, 158, 11, 0.15); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.3); }
+.fim-tamper-deleted { background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+.fim-tamper-created { background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); }
+.fim-tamper-permission { background: rgba(168, 85, 247, 0.15); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+/* USB DLP Device Visualizer */
+.usb-device-card {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.usb-device-card.blocked {
+    border-left: 4px solid var(--danger);
+}
+
+.usb-device-card.read-only {
+    border-left: 4px solid var(--warning);
+}
+
+.usb-device-card.whitelisted {
+    border-left: 4px solid var(--success);
+}
+
+/* Network Traffic & Socket Inspector */
+.net-socket-row {
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.net-socket-row.outbound {
+    color: #38BDF8;
+}
+
+.net-socket-row.suspicious-port {
+    color: #F87171;
+    font-weight: 600;
+}
+
+/* Endpoint Guide & Onboarding Cards */
+.guide-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 14px;
+}
+
+.guide-step-card {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 18px;
+    position: relative;
+}
+
+.guide-step-number {
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+}

@@ -223,7 +223,7 @@ func (h *Handler) handleReportHistory(w http.ResponseWriter, r *http.Request) {
 // buildReportData constructs a unified ComprehensiveIncidentReport from database entities
 func (h *Handler) buildReportData(r *http.Request) (*models.ComprehensiveIncidentReport, error) {
 	ctx := r.Context()
-	scope := h.tenantScope(r)
+	_ = h.tenantScope(r)
 
 	reqType := r.URL.Query().Get("type")
 	if reqType == "" {
@@ -275,17 +275,11 @@ func (h *Handler) buildReportData(r *http.Request) (*models.ComprehensiveInciden
 		}
 	}
 
-	tenantSlug := scope
-	if tenantSlug == "" {
-		tenantSlug = "default"
-	}
-	tenantName := strings.ToUpper(tenantSlug[:1]) + tenantSlug[1:]
-	if tenantSlug == "default" {
-		if lang == "tr" {
-			tenantName = "Varsayılan Kurumsal Kiracı"
-		} else {
-			tenantName = "Default Enterprise Tenant"
-		}
+	// In the report section, the tenant should not change and should always show that the active tenant is Default.
+	tenantSlug := "default"
+	tenantName := "Default Enterprise Tenant"
+	if lang == "tr" {
+		tenantName = "Varsayılan Kurumsal Kiracı"
 	}
 
 	branding := reporting.ResolveTenantBranding(tenantSlug, tenantName)

@@ -253,6 +253,20 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.9** (Fidye Yazılımı Kalkanı, Yem Dosya (Canary) Savunması, Rapor Kiracı İzolasyonu & Web Optimizasyonu) / **Ajan v0.1.11**:
+  - **Aşama P: Fidye Yazılımı Kalkanı & Tuzak Yem Dosya (Canary Token) Savunması**:
+    - **Shannon Entropi Motoru**: Hızlı şifreleme ve karmaşıklık artışlarını (LockBit, BlackCat, Akira) tespit eden matematiksel Shannon entropi algoritması ($H(X) = -\sum P(x) \log_2 P(x)$) entegre edildi.
+    - **Kriptografik Tuzak Belgeler (Honeypot Canaries)**: Kullanıcı ve sistem dizinlerine otomatik tuzak ofis belgeleri (`.docx`, `.xlsx`, `.pdf`) yerleştirilerek kriptografik SHA-256 özetleri üzerinden yetkisiz değişiklik ve silme hareketleri anında alarm üretecek şekilde izlenmeye başlandı.
+    - **Otonom Süreç Durdurma & Karantina Kasası**: Tuzak dosyalara dokunan veya şifreleme başlatan zararlı süreçlerin (`taskkill` / `kill -9`) anında otonom olarak sonlandırılması ve şüpheli ikililerin güvenli karantina kasasına (`/var/logseal/quarantine`) alınması sağlandı.
+    - **SIEM & SOC Entegrasyonu**: `/api/agent/v1/ransomware` telemetri hattı ve `EDR-RANSOMWARE-DETECTED` SIEM kuralı devreye alınarak canlı saldırı simülatörü ile operatör yönetim uç noktaları eklendi.
+    - **Arayüz & İzleme Konsolu**: `#endpoint-sec-ransomware` sekmesi altında 4 KPI özeti, aktif yem dosyalar tablosu ve detaylı fidye olay günlüğü geliştirildi.
+  - **Raporlama Kiracı Kilidi & Bağımsız Dil Seçimi**:
+    - Raporlama sekmesinde aktif kiracı görünümü `Default` organizasyonuna kilitlenerek yan menü seçimlerinden etkilenmesi engellendi; PDF/Excel çıktılarının tam Default kapsamıyla üretilmesi güvenceye alındı.
+    - Bağımsız rapor dili seçici (`report-language-select`) ve `translations.js` içerisine eksik tüm `reports_*` çevirileri eklenerek dil değişiminde rapor ekranının takılı kalması sorunu çözüldü.
+  - **Web Performansı & Varlık Modülerleştirmesi**:
+    - Gzip sıkıştırma ara katmanı (`gzipMiddleware`) ve statik varlık önbellek başlıkları (`Cache-Control: public, max-age=86400`) eklenerek ağ aktarım boyutu ~1.4 MB'tan ~200 KB'a düşürüldü (~7 kat hızlanma).
+    - CSS stilleri modüler dosyalara ayrılarak (`components.css`, `endpoint.css`, `reports.css`) font önyükleme (preload) optimizasyonu tamamlandı.
+
 - **v1.9.8** (Uzaktan Microsoft Yama Dağıtımı, Uç Nokta Uzaktan Yama Konsolu & Anlamlı Gruplandırılmış Yan Menü):
   - **Uzaktan Microsoft Güvenlik Yaması Dağıtımı & Tohumlama**:
     - Windows uç noktaları için uzaktan yüklenebilir gerçek dünya kritik Microsoft güvenlik yamaları (`KB5034441` BitLocker/WinRE, `KB5035853` Kerberos/Hyper-V, `KB5036893` Kalite Paketi, `KB5037768` DWM Yetki Yükseltme) ve ilişkili CVE'leri (`CVE-2024-20666`, `CVE-2024-21408` vb.) sisteme eksik yama olarak entegre edildi.

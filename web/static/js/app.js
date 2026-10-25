@@ -7446,8 +7446,8 @@ let reportsInitialized = false;
 function loadReportsView() {
     const badge = document.getElementById('reports-active-tenant-badge');
     if (badge) {
-        const slug = (window.currentTenantSlug || 'default');
-        badge.textContent = `Aktif Kiracı: ${escapeHtml(slug.toUpperCase())}`;
+        const isEn = (window.i18n && window.i18n.currentLang === 'en') || localStorage.getItem('logseal_lang') === 'en';
+        badge.textContent = isEn ? 'Active Tenant: Default' : 'Aktif Kiracı: Default';
     }
 
     if (!reportsInitialized) {
@@ -7491,6 +7491,14 @@ function initReportsEventListeners() {
         });
     }
 
+    // Report Language selector
+    const langSelect = document.getElementById('report-language-select');
+    if (langSelect) {
+        langSelect.addEventListener('change', () => {
+            generateReportPreview();
+        });
+    }
+
     // Preview Mode Toggle (Visual vs Raw Text)
     const btnVisual = document.getElementById('btn-preview-mode-visual');
     const btnRaw = document.getElementById('btn-preview-mode-raw');
@@ -7529,8 +7537,13 @@ function getReportFilterParams() {
     const selectedRadio = document.querySelector('input[name="report_template_type"]:checked');
     params.set('type', selectedRadio ? selectedRadio.value : 'incident_rca');
 
-    const appLang = (window.i18n && window.i18n.currentLang) || localStorage.getItem('logseal_lang') || 'tr';
-    params.set('lang', appLang);
+    // Language selection: explicit selector or fallback to app language
+    const langSelect = document.getElementById('report-language-select');
+    let reportLang = langSelect ? langSelect.value : 'app';
+    if (!reportLang || reportLang === 'app') {
+        reportLang = (window.i18n && window.i18n.currentLang) || localStorage.getItem('logseal_lang') || 'tr';
+    }
+    params.set('lang', reportLang);
 
     const timeframe = document.getElementById('report-timeframe-select')?.value || '24h';
     params.set('timeframe', timeframe);
@@ -7548,9 +7561,8 @@ function getReportFilterParams() {
     const incident = document.getElementById('report-incident-select')?.value;
     if (incident) params.set('incident_id', incident);
 
-    if (window.currentTenantSlug) {
-        params.set('tenant', window.currentTenantSlug);
-    }
+    // In report section, the tenant should not change and should always be Default
+    params.set('tenant', 'default');
 
     return params;
 }
@@ -8231,6 +8243,8 @@ function switchEndpointSubSection(targetId) {
         loadEndpointEDR();
     } else if (targetId === 'endpoint-sec-network') {
         loadEndpointNetwork();
+    } else if (targetId === 'endpoint-sec-ransomware') {
+        loadEndpointRansomware();
     } else if (targetId === 'endpoint-sec-policies') {
         loadEndpointPolicies();
     }
@@ -12696,6 +12710,176 @@ window.executeNetworkSimulation = executeNetworkSimulation;
 window.openNetworkFirewallRulesModal = openNetworkFirewallRulesModal;
 window.closeNetworkFirewallRulesModal = closeNetworkFirewallRulesModal;
 window.deleteNetworkFirewallRule = deleteNetworkFirewallRule;
+
+// ============================================================================
+// PHASE P: ENDPOINT ANTI-RANSOMWARE SHIELD & DECOY CANARY DEFENSE
+// ============================================================================
+
+async function loadEndpointRansomware() {
+    loadRansomwareStats();
+    loadRansomwareCanaries();
+    loadRansomwareIncidents();
+}
+
+async function loadRansomwareStats() {
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/ransomware/stats?tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const elIncidents = document.getElementById('ep-ransomware-stat-incidents');
+        const elArmed = document.getElementById('ep-ransomware-stat-canaries-armed');
+        const elTampered = document.getElementById('ep-ransomware-stat-canaries-tampered');
+        const elTerminated = document.getElementById('ep-ransomware-stat-terminated');
+
+        if (elIncidents) elIncidents.textContent = (data.total_incidents || 0).toLocaleString();
+        if (elArmed) elArmed.textContent = (data.canaries_armed || 0).toLocaleString();
+        if (elTampered) elTampered.textContent = (data.canaries_tampered || 0).toLocaleString();
+        if (elTerminated) elTerminated.textContent = (data.processes_terminated || 0).toLocaleString();
+    } catch (e) {
+        console.error('loadRansomwareStats error:', e);
+    }
+}
+
+async function loadRansomwareCanaries() {
+    const tbody = document.getElementById('ep-ransomware-canaries-tbody');
+    const countEl = document.getElementById('ep-ransomware-canaries-count');
+    if (!tbody) return;
+    const t = (k, fb) => (window.i18n ? window.i18n.t(k, fb) : (fb || k));
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/ransomware/canaries?tenant=${encodeURIComponent(tenant)}&limit=100`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const canaries = data.canaries || [];
+        if (countEl) countEl.textContent = `${data.total || canaries.length} ${t('ransomware_unit_canaries') || 'Yem'}`;
+
+        if (canaries.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 24px;">${t('ransomware_no_canaries') || 'Henüz dağıtılmış tuzak yem dosya bulunmuyor. Ajan bağlandığında otomatik konuşlandırılır.'}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = canaries.map(c => {
+            const timeStr = formatDateTime(c.last_checked_at || c.created_at);
+            const statusBadge = c.status === 'TRIGGERED' 
+                ? `<span class="badge badge-danger" style="animation: pulse 1.5s infinite;"><i class="fas fa-exclamation-triangle"></i> TRIGGERED</span>`
+                : `<span class="badge badge-success"><i class="fas fa-check-circle"></i> ARMED</span>`;
+            
+            const hashShort = c.expected_hash ? (c.expected_hash.substring(0, 14) + '...') : '-';
+
+            return `<tr>
+                <td><strong>${escapeHtml(c.hostname || '-')}</strong></td>
+                <td><code style="font-size: 11px;">${escapeHtml(c.file_path || '-')}</code></td>
+                <td><span class="badge badge-secondary">${escapeHtml(c.file_type ? c.file_type.toUpperCase() : '-')}</span></td>
+                <td><code title="${escapeHtml(c.expected_hash || '')}">${escapeHtml(hashShort)}</code></td>
+                <td>${statusBadge}</td>
+                <td style="color: var(--text-muted); font-size: 11.5px;">${timeStr}</td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--danger); padding: 24px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+async function loadRansomwareIncidents() {
+    const tbody = document.getElementById('ep-ransomware-incidents-tbody');
+    const countEl = document.getElementById('ep-ransomware-incidents-count');
+    if (!tbody) return;
+    const t = (k, fb) => (window.i18n ? window.i18n.t(k, fb) : (fb || k));
+
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/endpoint/ransomware/incidents?tenant=${encodeURIComponent(tenant)}&limit=100`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const incidents = data.incidents || [];
+        if (countEl) countEl.textContent = `${data.total || incidents.length} ${t('ransomware_unit_incidents') || 'Olay'}`;
+
+        if (incidents.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="color: var(--text-muted); padding: 24px;">${t('ransomware_no_incidents') || 'Harika! Uç noktalarda henüz hiçbir fidye yazılımı veya tuzak müdahalesi kaydedilmedi.'}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = incidents.map(inc => {
+            const timeStr = formatDateTime(inc.detected_at || inc.created_at);
+            const actionBadge = inc.action_taken === 'TERMINATED'
+                ? `<span class="badge badge-danger"><i class="fas fa-skull"></i> TERMINATED</span>`
+                : inc.action_taken === 'QUARANTINED'
+                ? `<span class="badge badge-warning"><i class="fas fa-box"></i> QUARANTINED</span>`
+                : `<span class="badge badge-secondary">${escapeHtml(inc.action_taken || 'ALERTED')}</span>`;
+
+            const triggerBadge = inc.trigger_type === 'CANARY_MODIFIED'
+                ? `<span class="badge badge-warning" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;"><i class="fas fa-bomb"></i> CANARY_MODIFIED</span>`
+                : `<span class="badge badge-danger" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;"><i class="fas fa-bolt"></i> ${escapeHtml(inc.trigger_type || 'ENTROPY')}</span>`;
+
+            const entropyDisplay = inc.entropy > 0 ? inc.entropy.toFixed(3) : '-';
+
+            return `<tr>
+                <td style="color: var(--text-muted); font-size: 11.5px; white-space: nowrap;">${timeStr}</td>
+                <td><strong>${escapeHtml(inc.hostname || '-')}</strong></td>
+                <td><code style="color: var(--accent);">${escapeHtml(inc.process_name || '-')}</code></td>
+                <td><code>${inc.process_pid || '-'}</code></td>
+                <td>${triggerBadge}</td>
+                <td><code style="font-size: 11px;">${escapeHtml(inc.target_file || '-')}</code></td>
+                <td><span class="badge badge-outline">${escapeHtml(entropyDisplay)}</span></td>
+                <td>${actionBadge}</td>
+                <td><span class="badge badge-danger">${escapeHtml(inc.severity || 'CRITICAL')}</span></td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="color: var(--danger); padding: 24px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+function openRansomwareSimulateModal() {
+    const m = document.getElementById('modal-ransomware-simulate');
+    if (m) m.style.display = 'flex';
+}
+
+function closeRansomwareSimulateModal() {
+    const m = document.getElementById('modal-ransomware-simulate');
+    if (m) m.style.display = 'none';
+}
+
+async function executeRansomwareSimulation() {
+    const isTr = !window.i18n || window.i18n.currentLang === 'tr';
+    const attackType = document.getElementById('ransomware-sim-scenario') ? document.getElementById('ransomware-sim-scenario').value : 'CANARY_TAMPER';
+    const hostname = document.getElementById('ransomware-sim-hostname') ? document.getElementById('ransomware-sim-hostname').value.trim() : '';
+
+    try {
+        const res = await fetch('/api/v1/endpoint/ransomware/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                attack_type: attackType,
+                hostname: hostname
+            })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        closeRansomwareSimulateModal();
+        showToast(isTr ? `✓ ${data.message || 'Simülasyon başarıyla tamamlandı!'}` : `✓ ${data.message || 'Simulation completed successfully!'}`, 'success');
+
+        loadEndpointRansomware();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    }
+}
+
+window.loadEndpointRansomware = loadEndpointRansomware;
+window.loadRansomwareStats = loadRansomwareStats;
+window.loadRansomwareCanaries = loadRansomwareCanaries;
+window.loadRansomwareIncidents = loadRansomwareIncidents;
+window.openRansomwareSimulateModal = openRansomwareSimulateModal;
+window.closeRansomwareSimulateModal = closeRansomwareSimulateModal;
+window.executeRansomwareSimulation = executeRansomwareSimulation;
+
 
 
 

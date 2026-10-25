@@ -15,6 +15,7 @@ import (
 	"github.com/syslog-platform/logger/agent/internal/fim"
 	"github.com/syslog-platform/logger/agent/internal/identity"
 	"github.com/syslog-platform/logger/agent/internal/netmon"
+	"github.com/syslog-platform/logger/agent/internal/ransomware"
 	"github.com/syslog-platform/logger/agent/internal/transport"
 	"github.com/syslog-platform/logger/agent/internal/updater"
 	"github.com/syslog-platform/logger/agent/internal/version"
@@ -38,6 +39,8 @@ type Agent struct {
 	edrScanner    *edr.Scanner
 	netmonTicker  *time.Ticker
 	netmonScanner *netmon.Scanner
+	ransomTicker  *time.Ticker
+	shield        *ransomware.Shield
 	isUpgrading   bool
 }
 
@@ -62,6 +65,7 @@ func NewAgent(cfg *config.Config) (*Agent, error) {
 		dlpScanner:    dlp.NewScanner(),
 		edrScanner:    edr.NewScanner(),
 		netmonScanner: netmon.NewScanner(),
+		shield:        ransomware.NewShield(),
 	}, nil
 }
 
@@ -146,13 +150,18 @@ func (a *Agent) Run(ctx context.Context) error {
 	a.netmonTicker = time.NewTicker(netmonInterval)
 	defer a.netmonTicker.Stop()
 
-	// Initial heartbeat, inventory, FIM, DLP, EDR & NetMon scans
+	ransomInterval := 30 * time.Second
+	a.ransomTicker = time.NewTicker(ransomInterval)
+	defer a.ransomTicker.Stop()
+
+	// Initial heartbeat, inventory, FIM, DLP, EDR, NetMon & Anti-Ransomware scans
 	a.sendHeartbeat(ctx)
 	go a.sendInventory(ctx)
 	go a.sendFIMScan(ctx)
 	go a.sendDLPScan(ctx)
 	go a.sendEDRScan(ctx)
 	go a.sendNetworkScan(ctx)
+	go a.sendRansomwareScan(ctx)
 
 	for {
 		select {
@@ -169,6 +178,8 @@ func (a *Agent) Run(ctx context.Context) error {
 			go a.sendEDRScan(ctx)
 		case <-a.netmonTicker.C:
 			go a.sendNetworkScan(ctx)
+		case <-a.ransomTicker.C:
+			go a.sendRansomwareScan(ctx)
 		case <-a.hbTicker.C:
 			// Apply random jitter (+/- 2 seconds) to avoid synchronization spikes
 			jitter := time.Duration(rand.Intn(4)-2) * time.Second
@@ -457,6 +468,26 @@ func (a *Agent) sendNetworkScan(ctx context.Context) {
 	}
 	if err := a.client.PostJSON(ctx, "/api/agent/v1/network", sub, &resp); err != nil {
 		log.Printf("[LOGGER NetMon] Error submitting network telemetry: %v", err)
+	}
+}
+
+func (a *Agent) sendRansomwareScan(ctx context.Context) {
+	if a.shield == nil {
+		return
+	}
+
+	submission := a.shield.Inspect()
+	submission.AgentUUID = a.identity.AgentUUID
+
+	if len(submission.Incidents) > 0 {
+		log.Printf("[LOGGER Anti-Ransomware] ⚠️ SHIELD ALERT: %d ransomware incident(s) detected and contained!", len(submission.Incidents))
+	}
+
+	var resp struct {
+		Status string `json:"status"`
+	}
+	if err := a.client.PostJSON(ctx, "/api/agent/v1/ransomware", submission, &resp); err != nil {
+		log.Printf("[LOGGER Anti-Ransomware] Error submitting ransomware telemetry: %v", err)
 	}
 }
 

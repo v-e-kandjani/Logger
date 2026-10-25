@@ -729,5 +729,61 @@ type EDRNetworkStats struct {
 	IsolatedEndpoints        int64 `json:"isolated_endpoints"`
 }
 
+// EndpointRansomwareIncident represents an active or neutralized ransomware attack (Phase P)
+type EndpointRansomwareIncident struct {
+	ID                uuid.UUID `json:"id"`
+	TenantSlug        string    `json:"tenant_slug"`
+	AgentID           uuid.UUID `json:"agent_id"`
+	AgentHostname     string    `json:"agent_hostname"`
+	AgentIP           string    `json:"agent_ip"`
+	ProcessName       string    `json:"process_name"`
+	ProcessPID        int       `json:"process_pid"`
+	ProcessPath       string    `json:"process_path"`
+	CommandLine       string    `json:"command_line,omitempty"`
+	TriggerType       string    `json:"trigger_type"` // "canary_tripwire", "mass_encryption", "known_ransomware_extension", "high_entropy"
+	TargetFile        string    `json:"target_file"`
+	ExtensionDetected string    `json:"extension_detected,omitempty"`
+	EntropyScore      float64   `json:"entropy_score"`
+	FilesAffected     int       `json:"files_affected"`
+	ActionTaken       string    `json:"action_taken"` // "TERMINATED", "QUARANTINED", "ISOLATED", "ALERTED"
+	Severity          string    `json:"severity"`     // "CRITICAL", "HIGH"
+	MitreTactic       string    `json:"mitre_tactic"` // "Impact", "Inhibit System Recovery"
+	MitreTechnique    string    `json:"mitre_technique"` // "T1486", "T1490"
+	CreatedAt         time.Time `json:"created_at"`
+}
+
+// EndpointCanaryToken represents a deployed decoy honeypot file on an endpoint (Phase P)
+type EndpointCanaryToken struct {
+	ID            uuid.UUID  `json:"id"`
+	TenantSlug    string     `json:"tenant_slug"`
+	AgentID       uuid.UUID  `json:"agent_id"`
+	AgentHostname string     `json:"agent_hostname"`
+	FilePath      string     `json:"file_path"`
+	FileType      string     `json:"file_type"` // "docx", "xlsx", "pdf"
+	InitialHash   string     `json:"initial_hash"`
+	Status        string     `json:"status"` // "ARMED", "TRIGGERED", "CLEARED"
+	LastCheckedAt time.Time  `json:"last_checked_at"`
+	TriggeredAt   *time.Time `json:"triggered_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
+
+// AgentRansomwareSubmission represents the telemetry sent by native agent when ransomware or canary tripwire is detected (Phase P)
+type AgentRansomwareSubmission struct {
+	AgentUUID string                       `json:"agent_uuid"`
+	Incidents []EndpointRansomwareIncident `json:"incidents"`
+	Canaries  []EndpointCanaryToken        `json:"canaries"`
+}
+
+// RansomwareStats represents aggregate metrics for Phase P Anti-Ransomware Shield
+type RansomwareStats struct {
+	TotalRansomwareIncidents int64 `json:"total_ransomware_incidents"`
+	CanariesArmed            int64 `json:"canaries_armed"`
+	CanariesTriggered        int64 `json:"canaries_triggered"`
+	ProcessesTerminated      int64 `json:"processes_terminated"`
+	BinariesQuarantined      int64 `json:"binaries_quarantined"`
+	HostsIsolated            int64 `json:"hosts_isolated"`
+}
+
+
 
 

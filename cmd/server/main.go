@@ -135,6 +135,13 @@ func main() {
 		log.Println("[PostgreSQL] Network & DNS Protection / Micro-Segmentation EDR (Phase O) schema verified")
 	}
 
+	// Verify & auto-migrate Anti-Ransomware Shield & Decoy Canary Defense (Phase P) schema
+	if err := pgDB.EnsureRansomwareSchema(context.Background()); err != nil {
+		log.Printf("[PostgreSQL] Warning ensuring Ransomware schema: %v", err)
+	} else {
+		log.Println("[PostgreSQL] Anti-Ransomware Shield & Decoy Canary Defense (Phase P) schema verified")
+	}
+
 	// 2. Initialize in-memory Device Cache
 	deviceCache := postgres.NewDeviceCache(pgDB)
 	log.Println("[DeviceCache] Initialized active device lookup cache")
