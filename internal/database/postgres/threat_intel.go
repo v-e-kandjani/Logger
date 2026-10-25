@@ -91,9 +91,9 @@ func (db *DB) EnsureThreatIntelSchema(ctx context.Context) error {
 			category    string
 			confidence  int
 		}{
-			{"CISA Known Exploited Vulnerabilities (KEV)", "cisa_kev", "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json", 360, "mixed", "vulnerability_exploit", 95},
-			{"URLhaus Recent Malware URLs & Domains", "csv", "https://urlhaus.abuse.ch/downloads/csv_recent/", 60, "domain", "malicious_url_domain", 90},
-			{"Tor Exit Nodes Blocklist", "plain_list", "https://check.torproject.org/torbulkexitlist", 120, "ip", "anonymizer_tor", 85},
+			{"CISA Known Exploited Vulnerabilities (KEV)", "cisa_kev", "https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json", 360, "mixed", "vulnerability_exploit", 95},
+			{"URLhaus Active Malware URLs & Domains", "plain_list", "https://raw.githubusercontent.com/curbengh/urlhaus-filter/master/urlhaus-filter-online.txt", 60, "domain", "malicious_url_domain", 90},
+			{"Tor Exit Nodes Blocklist", "plain_list", "https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst", 120, "ip", "anonymizer_tor", 85},
 			{"Emerging Threats Compromised IPs", "plain_list", "https://rules.emergingthreats.net/blockrules/compromised-ips.txt", 120, "ip", "compromised_host", 85},
 			{"Feodo Tracker Botnet C2 IP Blocklist", "plain_list", "https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt", 120, "ip", "botnet_c2", 95},
 			{"AbuseIPDB Verified Blacklist", "abuseipdb", "https://api.abuseipdb.com/api/v2/blacklist", 240, "ip", "botnet_c2", 90},
@@ -103,9 +103,28 @@ func (db *DB) EnsureThreatIntelSchema(ctx context.Context) error {
 			_, _ = db.pool.Exec(ctx, `
 				INSERT INTO ti_feeds (name, feed_type, url, poll_interval_minutes, is_enabled, indicator_type, threat_category, default_confidence)
 				VALUES ($1, $2, $3, $4, true, $5, $6, $7)
-				ON CONFLICT (name) DO NOTHING`,
+				ON CONFLICT (name) DO UPDATE SET
+					feed_type = EXCLUDED.feed_type,
+					url = EXCLUDED.url`,
 				f.name, f.feedType, f.url, f.pollMin, f.indType, f.category, f.confidence)
 		}
+
+		// Auto-migrate historical feeds to modern reliable endpoints
+		_, _ = db.pool.Exec(ctx, `
+			UPDATE ti_feeds SET 
+				name = 'URLhaus Active Malware URLs & Domains',
+				feed_type = 'plain_list',
+				url = 'https://raw.githubusercontent.com/curbengh/urlhaus-filter/master/urlhaus-filter-online.txt'
+			WHERE name = 'URLhaus Recent Malware URLs & Domains' OR url LIKE '%urlhaus.abuse.ch%';
+			
+			UPDATE ti_feeds SET
+				url = 'https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json'
+			WHERE url LIKE '%cisa.gov%known_exploited_vulnerabilities.json';
+
+			UPDATE ti_feeds SET
+				url = 'https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst'
+			WHERE url LIKE '%torproject.org%torbulkexitlist';
+		`)
 	}
 
 	return nil

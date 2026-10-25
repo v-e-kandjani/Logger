@@ -54,7 +54,9 @@ func (h *Harvester) FetchFeed(ctx context.Context, feed *models.TIFeed) ([]model
 		return nil, fmt.Errorf("invalid feed url: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "Valtrivo-LogSeal-ThreatIntel/v1.10.0 (+https://valtrivo.com)")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "application/json,text/plain,text/html,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	if feed.APIKey != "" {
 		if feed.FeedType == "abuseipdb" {
 			req.Header.Set("Key", feed.APIKey)
