@@ -95,6 +95,7 @@ func (db *DB) EnsureThreatIntelSchema(ctx context.Context) error {
 			{"URLhaus Recent Malware URLs & Domains", "csv", "https://urlhaus.abuse.ch/downloads/csv_recent/", 60, "domain", "malicious_url_domain", 90},
 			{"Tor Exit Nodes Blocklist", "plain_list", "https://check.torproject.org/torbulkexitlist", 120, "ip", "anonymizer_tor", 85},
 			{"Emerging Threats Compromised IPs", "plain_list", "https://rules.emergingthreats.net/blockrules/compromised-ips.txt", 120, "ip", "compromised_host", 85},
+			{"Feodo Tracker Botnet C2 IP Blocklist", "plain_list", "https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt", 120, "ip", "botnet_c2", 95},
 			{"AbuseIPDB Verified Blacklist", "abuseipdb", "https://api.abuseipdb.com/api/v2/blacklist", 240, "ip", "botnet_c2", 90},
 		}
 
