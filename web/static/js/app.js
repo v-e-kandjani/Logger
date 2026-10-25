@@ -11631,6 +11631,8 @@ async function loadEndpointFIMEvents() {
     const tbody = document.getElementById('ep-fim-tbody');
     if (!tbody) return;
 
+    const isTr = (window.i18n && window.i18n.currentLang === 'tr');
+
     try {
         const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
         const searchInput = document.getElementById('ep-fim-search');
@@ -11649,7 +11651,7 @@ async function loadEndpointFIMEvents() {
         if (changeType) params.append('event_type', changeType);
         if (severity) params.append('severity', severity);
 
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">Bütünlük izleme kayıtları taranıyor...</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">${t('fim_loading', isTr ? 'Bütünlük izleme kayıtları taranıyor...' : 'Scanning integrity monitoring records...')}</td></tr>`;
 
         const res = await fetch(`/api/v1/endpoint/fim/events?${params.toString()}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -11657,10 +11659,10 @@ async function loadEndpointFIMEvents() {
         const events = data.events || [];
 
         const countEl = document.getElementById('ep-fim-total-count');
-        if (countEl) countEl.textContent = `${(data.total || events.length).toLocaleString()} Olay`;
+        if (countEl) countEl.textContent = `${(data.total || events.length).toLocaleString()} ${t('fim_unit_events', isTr ? 'Olay' : 'Events')}`;
 
         if (events.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">Henüz kayıtlı dosya veya bütünlük sapması bulunmuyor.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--text-muted); padding: 24px;">${t('fim_empty', isTr ? 'Henüz kayıtlı dosya veya bütünlük sapması bulunmuyor.' : 'No file or integrity deviations recorded yet.')}</td></tr>`;
             return;
         }
 
@@ -11684,7 +11686,7 @@ async function loadEndpointFIMEvents() {
             let hashDev = '-';
             if (ev.previous_hash || ev.current_hash) {
                 const prevShort = ev.previous_hash ? ev.previous_hash.substring(0, 7) + '..' : '∅';
-                const currShort = ev.current_hash ? ev.current_hash.substring(0, 7) + '..' : 'silindi';
+                const currShort = ev.current_hash ? ev.current_hash.substring(0, 7) + '..' : t('fim_deleted_label', isTr ? 'silindi' : 'deleted');
                 hashDev = `<span class="mono-code" style="font-size:11px; color:var(--text-muted);">${escapeHtml(prevShort)}</span> &rarr; <span class="mono-code" style="font-size:11px; font-weight:600; color:var(--danger);">${escapeHtml(currShort)}</span>`;
             }
 
@@ -11695,10 +11697,10 @@ async function loadEndpointFIMEvents() {
             }
 
             // Time formatted
-            const dt = ev.timestamp ? new Date(ev.timestamp).toLocaleString('tr-TR') : '-';
+            const dt = ev.timestamp ? new Date(ev.timestamp).toLocaleString(isTr ? 'tr-TR' : 'en-US') : '-';
 
             // Host info
-            const hostDisplay = escapeHtml(ev.agent_hostname || 'Uç Nokta');
+            const hostDisplay = escapeHtml(ev.agent_hostname || t('fim_unknown_endpoint', isTr ? 'Uç Nokta' : 'Endpoint'));
             const ipDisplay = ev.agent_ip ? `<span style="font-size:11px; color:var(--text-muted); display:block;">${escapeHtml(ev.agent_ip)}</span>` : '';
 
             return `
@@ -11725,12 +11727,14 @@ async function loadEndpointFIMEvents() {
         }).join('');
     } catch (e) {
         console.error('loadEndpointFIMEvents error:', e);
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--danger); padding: 24px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: var(--danger); padding: 24px;">${isTr ? 'Hata' : 'Error'}: ${escapeHtml(e.message)}</td></tr>`;
     }
 }
 
+
 async function openFIMDetail(eventId) {
     if (!eventId) return;
+    const isTr = (window.i18n && window.i18n.currentLang === 'tr');
     try {
         const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
         const res = await fetch(`/api/v1/endpoint/fim/events/${encodeURIComponent(eventId)}?tenant=${encodeURIComponent(tenant)}`);
@@ -11753,7 +11757,7 @@ async function openFIMDetail(eventId) {
         if (targetTypeBadge) targetTypeBadge.textContent = (ev.target_type || 'FILE').toUpperCase();
 
         const timeEl = document.getElementById('fim-detail-timestamp');
-        if (timeEl) timeEl.textContent = ev.timestamp ? new Date(ev.timestamp).toLocaleString('tr-TR') : '-';
+        if (timeEl) timeEl.textContent = ev.timestamp ? new Date(ev.timestamp).toLocaleString(isTr ? 'tr-TR' : 'en-US') : '-';
 
         const pathEl = document.getElementById('fim-detail-target-path');
         if (pathEl) pathEl.textContent = ev.target_path || '-';
@@ -11768,19 +11772,19 @@ async function openFIMDetail(eventId) {
         if (osEl) osEl.textContent = ev.agent_os || 'Cross-Platform';
 
         const procEl = document.getElementById('fim-detail-process');
-        if (procEl) procEl.textContent = ev.process_name ? `${ev.process_name} (PID: ${ev.process_pid || 0})` : 'Bilinmiyor / Arka Plan';
+        if (procEl) procEl.textContent = ev.process_name ? `${ev.process_name} (PID: ${ev.process_pid || 0})` : (isTr ? 'Bilinmiyor / Arka Plan' : 'Unknown / Background');
 
         const userEl = document.getElementById('fim-detail-user');
-        if (userEl) userEl.textContent = ev.user_name ? `Kullanıcı: ${ev.user_name}` : '';
+        if (userEl) userEl.textContent = ev.user_name ? `${isTr ? 'Kullanıcı: ' : 'User: '}${ev.user_name}` : '';
 
         const prevHashEl = document.getElementById('fim-detail-prev-hash');
-        if (prevHashEl) prevHashEl.textContent = ev.previous_hash || '(Referans hash yok / Yeni dosya)';
+        if (prevHashEl) prevHashEl.textContent = ev.previous_hash || (isTr ? '(Referans hash yok / Yeni dosya)' : '(No baseline hash / New file)');
 
         const currHashEl = document.getElementById('fim-detail-curr-hash');
-        if (currHashEl) currHashEl.textContent = ev.current_hash || '(Dosya silindi / Hash yok)';
+        if (currHashEl) currHashEl.textContent = ev.current_hash || (isTr ? '(Dosya silindi / Hash yok)' : '(File deleted / No hash)');
 
         const sizeEl = document.getElementById('fim-detail-size');
-        if (sizeEl) sizeEl.textContent = ev.file_size_bytes ? `${Number(ev.file_size_bytes).toLocaleString()} bayt` : '-';
+        if (sizeEl) sizeEl.textContent = ev.file_size_bytes ? `${Number(ev.file_size_bytes).toLocaleString()} ${isTr ? 'bayt' : 'bytes'}` : '-';
 
         const permsEl = document.getElementById('fim-detail-perms');
         if (permsEl) permsEl.textContent = ev.permissions || '-';
@@ -11792,7 +11796,7 @@ async function openFIMDetail(eventId) {
         if (mitreTechEl) mitreTechEl.textContent = ev.mitre_technique || 'N/A';
 
         const extraDescEl = document.getElementById('fim-detail-extra-desc');
-        if (extraDescEl) extraDescEl.textContent = ev.details || 'Kriptografik bütünlük sapması tespit edildi. Dosya içeriği veya metaverileri referans durumundan farklılık gösteriyor.';
+        if (extraDescEl) extraDescEl.textContent = ev.details || (isTr ? 'Kriptografik bütünlük sapması tespit edildi. Dosya içeriği veya metaverileri referans durumundan farklılık gösteriyor.' : 'Cryptographic integrity deviation detected. File contents or metadata differ from baseline state.');
 
         const modal = document.getElementById('modal-fim-detail');
         if (modal) {
@@ -11800,7 +11804,7 @@ async function openFIMDetail(eventId) {
             modal.style.display = 'flex';
         }
     } catch (e) {
-        showToast('FIM detay yükleme hatası: ' + e.message, 'error');
+        showToast((isTr ? 'FIM detay yükleme hatası: ' : 'FIM detail load error: ') + e.message, 'error');
     }
 }
 
@@ -11819,24 +11823,26 @@ function triggerFIMSOARAction() {
     if (typeof openSOARRunModal === 'function') {
         openSOARRunModal(null, agId);
     } else {
-        showToast('SOAR modülü hazır değil.', 'warning');
+        const isTr = (window.i18n && window.i18n.currentLang === 'tr');
+        showToast(isTr ? 'SOAR modülü hazır değil.' : 'SOAR module is not ready.', 'warning');
     }
 }
 
 async function openFIMBaselines(agentId) {
+    const isTr = (window.i18n && window.i18n.currentLang === 'tr');
     const modal = document.getElementById('modal-fim-baselines');
     if (modal) modal.style.display = 'flex';
 
     // Populate agent select dropdown
     const select = document.getElementById('fim-baseline-agent-select');
     if (select) {
-        select.innerHTML = '<option value="">Yükleniyor...</option>';
+        select.innerHTML = `<option value="">${isTr ? 'Yükleniyor...' : 'Loading...'}</option>`;
         try {
             const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
             const res = await fetch(`/api/v1/endpoint/agents?tenant=${encodeURIComponent(tenant)}`);
             if (res.ok) {
                 const agents = await res.json();
-                select.innerHTML = '<option value="">-- Uç Nokta Seçin --</option>' + 
+                select.innerHTML = `<option value="">-- ${isTr ? 'Uç Nokta Seçin' : 'Select Endpoint'} --</option>` + 
                     agents.map(a => `<option value="${escapeHtml(a.id)}" ${agentId && a.id === agentId ? 'selected' : ''}>${escapeHtml(a.hostname)} (${escapeHtml(a.ip_address || a.os_type || '')})</option>`).join('');
                 if (agentId) {
                     select.value = agentId;
@@ -11853,31 +11859,32 @@ async function openFIMBaselines(agentId) {
 }
 
 async function loadFIMBaselinesForSelectedAgent() {
+    const isTr = (window.i18n && window.i18n.currentLang === 'tr');
     const select = document.getElementById('fim-baseline-agent-select');
     const tbody = document.getElementById('ep-fim-baselines-tbody');
     if (!select || !tbody) return;
 
     const agentId = select.value;
     if (!agentId) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 20px;">Lütfen bir uç nokta seçin.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 20px;">${isTr ? 'Lütfen bir uç nokta seçin.' : 'Please select an endpoint.'}</td></tr>`;
         return;
     }
 
     try {
         const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 20px;">Kriptografik referanslar alınıyor...</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 20px;">${isTr ? 'Kriptografik referanslar alınıyor...' : 'Fetching cryptographic baselines...'}</td></tr>`;
         const res = await fetch(`/api/v1/endpoint/fim/baselines?tenant=${encodeURIComponent(tenant)}&agent_id=${encodeURIComponent(agentId)}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const baselines = await res.json();
 
         if (!baselines || baselines.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 20px;">Bu uç nokta için henüz referans verisi kaydedilmemiş. Ajan FIM tarama döngüsünü tamamladığında referanslar buraya otomatik işlenecektir.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--text-muted); padding: 20px;">${isTr ? 'Bu uç nokta için henüz referans verisi kaydedilmemiş. Ajan FIM tarama döngüsünü tamamladığında referanslar buraya otomatik işlenecektir.' : 'No baseline data recorded for this endpoint yet. Baselines will automatically appear here once the agent completes its FIM scan cycle.'}</td></tr>`;
             return;
         }
 
         tbody.innerHTML = baselines.map(b => {
             const shortHash = b.sha256_hash ? b.sha256_hash.substring(0, 16) + '...' : '-';
-            const dt = b.last_seen ? new Date(b.last_seen).toLocaleString('tr-TR') : '-';
+            const dt = b.last_seen ? new Date(b.last_seen).toLocaleString(isTr ? 'tr-TR' : 'en-US') : '-';
             return `
                 <tr>
                     <td class="mono-code" style="font-size: 12px; color: var(--accent);">${escapeHtml(b.target_path || '')}</td>
@@ -11890,7 +11897,7 @@ async function loadFIMBaselinesForSelectedAgent() {
             `;
         }).join('');
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--danger); padding: 20px;">Hata: ${escapeHtml(e.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="color: var(--danger); padding: 20px;">${isTr ? 'Hata' : 'Error'}: ${escapeHtml(e.message)}</td></tr>`;
     }
 }
 

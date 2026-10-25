@@ -253,6 +253,15 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.17** (FIM Dosya Bütünlük İzleme `isTr` Referans Hatası Düzeltmesi ve Tam Çok Dilli Yerelleştirme):
+  - **FIM Çalışma Zamanı Hatası Çözümü (`web/static/js/app.js`)**:
+    - `loadEndpointFIMEvents()` fonksiyonu içerisindeki `ReferenceError: isTr is not defined` hatası giderildi; FIM tablosunda olayların listelenmesini engelleyen ve kırmızı hata mesajı basan istisna sonlandırıldı.
+    - Tüm FIM fonksiyonlarında (`loadEndpointFIMEvents`, `openFIMDetail`, `openFIMBaselines`, `loadFIMBaselinesForSelectedAgent`) aktif dil bağlamı `const isTr = (window.i18n && window.i18n.currentLang === 'tr')` tanımlandı.
+  - **Eksiksiz İngilizce ve Türkçe Yerelleştirme**:
+    - FIM arama girişine `data-i18n-placeholder="fim_search_ph"` eklenerek İngilizce seçildiğinde arama metninin Türkçe kalması engellendi.
+    - Olay sayaçları (`X Events` / `X Olay`), tablo başlıkları, referans (baseline) modal pencereleri, hata önekleri ve detay modalı alanları her iki dilde tam uyumlu hale getirildi.
+    - `translations.js` dosyasına FIM olay türleri, temel çizgiler ve SOAR yanıt butonları için sözlük anahtarları eklendi.
+
 - **v1.9.16** (2 Yeni Tema Paleti - Solar Amber & Deep Nebula ile Tam Karanlık ve Aydınlık Mod Desteği):
   - **Solar Amber (Siber Altın) Tema Paleti (`amber`)**:
     - Klasik CRT güvenlik monitörlerinden ve aviyonik siber telemetriden esinlenen yüksek kontrastlı kehribar-altın teması.

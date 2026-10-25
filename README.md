@@ -264,6 +264,15 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.17** (FIM Integrity Monitoring `isTr` ReferenceError Fix & Full Internationalization):
+  - **FIM Runtime Exception Resolution (`web/static/js/app.js`)**:
+    - Resolved `ReferenceError: isTr is not defined` inside `loadEndpointFIMEvents()`, which caused the FIM table to render a red error banner instead of displaying integrity events.
+    - Defined active language context `const isTr = (window.i18n && window.i18n.currentLang === 'tr')` across all FIM modules (`loadEndpointFIMEvents`, `openFIMDetail`, `openFIMBaselines`, and `loadFIMBaselinesForSelectedAgent`).
+  - **Complete English & Turkish Localization**:
+    - Added `data-i18n-placeholder="fim_search_ph"` to the FIM filter input to ensure the search placeholder dynamically switches between English (`Search endpoint name, IP, file path or hash...`) and Turkish (`Uç nokta adı, IP, dosya yolu veya hash ara...`).
+    - Localized FIM event counts (`X Events` vs `X Olay`), table column headers, baseline modal tables, error prefixes, and detail modal metadata.
+    - Added comprehensive dictionary keys for FIM change types, baseline tables, and SOAR response action buttons in `web/static/js/translations.js`.
+
 - **v1.9.16** (2 New Theme Palettes - Solar Amber & Deep Nebula with Full Dark & Light Modes):
   - **Solar Amber (Cyber Gold) Theme Palette (`amber`)**:
     - High-visibility warm amber-gold theme inspired by classic CRT security monitors and aerospace cyber telemetry.
