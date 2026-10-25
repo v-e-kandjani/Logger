@@ -264,6 +264,21 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.13** (Theme & Appearance Selector, 2 New Simple & Modern Palettes - Obsidian Mint & Nordic Frost, Agent Upgrade Fix & In-Place Replacement) / **Agent v0.1.12**:
+  - **System & Administration Theme Selector (`#nav-tab-appearance` / `#pane-appearance`)**:
+    - Added dedicated **Theme & Appearance** menu item under the System & Administration sidebar navigation group.
+    - Integrated visual Theme Palette cards with live swatches and instant zero-reload theme switching.
+    - Added Display Mode selector: Dark Mode (🌙), Light Mode (☀️), and System Auto Mode (💻) tracking OS `prefers-color-scheme` changes.
+    - Added live interactive Component Preview sandbox demonstrating real-time metric tiles, status badges, and sample buttons.
+  - **2 New Simple & Modern Themes**:
+    - **Obsidian Mint (Cyber Emerald)**: Pitch obsidian background (`#090d16`), dark slate cards (`#0f1624`), electric emerald green accents (`#10b981`), and high-clarity mint typography.
+    - **Nordic Frost (Polar Sky)**: Cool Scandinavian polar slate (`#111827`), icy glacier surfaces (`#1e293b`), and vibrant sky blue accents (`#38bdf8`) for an airy, hyper-legible modern cloud aesthetic.
+  - **Agent Auto-Upgrade & In-Place Binary Replacement Fix (`v0.1.12`)**:
+    - Resolved `ETXTBSY (Text file busy)` error on Linux/Unix by safely unlinking/renaming executing binary to `.old` before atomic replacement across filesystems and mounts.
+    - Replaced hardcoded `"v0.1.4"` target version in `endpoint.go` and `endpoint_routes.go` with dynamic `version.LatestAgentVersion` and semantic `IsAgentVersionNewer` validation, preventing downgrade loops.
+    - Added dual service & standalone daemon restart fallbacks across Linux (`systemctl` / direct respawn), macOS (`launchctl` / respawn), and Windows (`net stop/start` / launch).
+    - Recompiled and published native agent standalone binaries (`linux-amd64`, `linux-arm64`, `windows-amd64.exe`, `darwin-universal`) to `web/static/bin/`.
+
 - **v1.9.12** (Honeypot Decoy Shield Configuration, Anti-Ransomware Tuning, Fleet-Wide Canary Re-arming & Clean Menu UI):
   - **Honeypot & Anti-Ransomware Shield Configuration (`#modal-honeypot-config`)**:
     - Added dedicated administrator configuration modal and REST endpoints (`GET` and `POST` on `/api/v1/endpoint/ransomware/config`).

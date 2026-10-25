@@ -323,7 +323,7 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 	}
 
 	// Auto-Update check: server offers newer version
-	if resp.UpgradeAvailable && resp.TargetVersion != "" && resp.TargetVersion != version.Version && !a.isUpgrading {
+	if resp.UpgradeAvailable && resp.TargetVersion != "" && version.IsNewer(resp.TargetVersion, version.Version) && !a.isUpgrading {
 		a.isUpgrading = true
 		go func() {
 			log.Printf("[LOGGER Agent] Server offered auto-upgrade to %s (Current: %s). Starting download...",

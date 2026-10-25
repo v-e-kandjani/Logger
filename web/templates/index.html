@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-palette="classic">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=1.9.12">
-    <link rel="stylesheet" href="/static/css/theme.css?v=1.9.12">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.12">
-    <link rel="stylesheet" href="/static/css/components.css?v=1.9.12">
-    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.12">
-    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.12">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=1.9.13">
+    <link rel="stylesheet" href="/static/css/theme.css?v=1.9.13">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.13">
+    <link rel="stylesheet" href="/static/css/components.css?v=1.9.13">
+    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.13">
+    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.13">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
@@ -25,7 +25,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.12</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.13</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -264,6 +264,10 @@
                             <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                             <span data-i18n="nav_updates">System Upgrade</span>
                             <span class="badge badge-primary" id="update-indicator-badge" style="display: none; font-size: 10px; margin-left: auto;">New</span>
+                        </a>
+                        <a href="#appearance" class="nav-item" data-tab="appearance" id="nav-tab-appearance">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/></svg>
+                            <span data-i18n="nav_appearance">Theme &amp; Appearance</span>
                         </a>
                     </div>
                 </div>
@@ -3918,12 +3922,12 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.12</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.13</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_commit">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">f276f21</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">077b73a</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-25</div>
                     </div>
                     <div class="stat-card">
@@ -4002,6 +4006,156 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                         <pre style="background: #0f172a; color: #38bdf8; padding: 14px 16px; border-radius: 6px; font-size: 13px; overflow-x: auto; border: 1px solid #1e293b; margin: 0;"><code id="upgrade-cli-code">cd ~/Logger && sudo bash upgrade.sh</code></pre>
                         <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
                             Or manual Docker Compose command: <code>git pull origin main && sudo docker compose build syslog-app && sudo docker compose up -d</code>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: Theme & Appearance -->
+            <section class="tab-pane" id="pane-appearance">
+                <div class="section-actions">
+                    <div>
+                        <h3 data-i18n="view_title_appearance">Tema &amp; Görünüm</h3>
+                        <p class="subtitle" data-i18n="view_subtitle_appearance">LogSeal SIEM ve yönetim arayüzünün renk paletini, kontrastını ve aydınlık/karanlık modunu özelleştirin.</p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" id="btn-theme-reset" onclick="resetThemeDefaults()" style="display: inline-flex; align-items: center; gap: 6px;">
+                            <span>🔄</span> <span data-i18n="btn_theme_reset">Varsayılana Sıfırla</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Palette Selection Card -->
+                <div class="panel" style="margin-bottom: 20px;">
+                    <div class="panel-header">
+                        <div>
+                            <h3 data-i18n="appearance_palettes_title">🎨 Tasarım Paletleri (Color Palettes)</h3>
+                            <p class="subtitle" style="margin-top: 4px; font-size: 0.85rem;" data-i18n="appearance_palettes_subtitle">Sistem genelinde kullanılacak birincil renk paletini seçin. Seçiminiz anında uygulanır ve tarayıcınızda saklanır.</p>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="theme-palette-grid">
+                            <!-- Palette 1: Classic -->
+                            <div class="theme-card active" data-palette-choice="classic" onclick="selectThemePalette('classic')">
+                                <div class="theme-card-header">
+                                    <div class="theme-card-title">
+                                        <span data-i18n="palette_classic_name">LogSeal Classic</span>
+                                        <span class="badge badge-primary" data-i18n="badge_default">Varsayılan</span>
+                                    </div>
+                                    <div class="theme-check-radio"></div>
+                                </div>
+                                <div class="theme-swatch-row">
+                                    <div class="theme-swatch-chip" style="background: #0f172a;" title="Arka Plan / Background (#0f172a)"></div>
+                                    <div class="theme-swatch-chip" style="background: #1e293b;" title="Yüzey / Surface (#1e293b)"></div>
+                                    <div class="theme-swatch-chip" style="background: #42c5d2;" title="Vurgu / Accent (#42c5d2)"></div>
+                                </div>
+                                <p class="theme-card-desc" data-i18n="palette_classic_desc">
+                                    Resmi LogSeal lacivert &amp; turkuaz kurumsal paleti. Görev kritik güvenlik operasyon merkezleri (SOC) için optimize edilmiştir.
+                                </p>
+                            </div>
+
+                            <!-- Palette 2: Obsidian Mint -->
+                            <div class="theme-card" data-palette-choice="emerald" onclick="selectThemePalette('emerald')">
+                                <div class="theme-card-header">
+                                    <div class="theme-card-title">
+                                        <span data-i18n="palette_emerald_name">Obsidian Mint</span>
+                                        <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981;" data-i18n="badge_cyber_soc">Siber SOC</span>
+                                    </div>
+                                    <div class="theme-check-radio"></div>
+                                </div>
+                                <div class="theme-swatch-row">
+                                    <div class="theme-swatch-chip" style="background: #090d16;" title="Arka Plan / Background (#090d16)"></div>
+                                    <div class="theme-swatch-chip" style="background: #0f1624;" title="Yüzey / Surface (#0f1624)"></div>
+                                    <div class="theme-swatch-chip" style="background: #10b981;" title="Vurgu / Accent (#10b981)"></div>
+                                </div>
+                                <p class="theme-card-desc" data-i18n="palette_emerald_desc">
+                                    Zifiri siyah zemin ve canlı zümrüt yeşili vurgularla yüksek görsel odaklanma sağlayan sade, modern terminal estetiği.
+                                </p>
+                            </div>
+
+                            <!-- Palette 3: Nordic Frost -->
+                            <div class="theme-card" data-palette-choice="nordic" onclick="selectThemePalette('nordic')">
+                                <div class="theme-card-header">
+                                    <div class="theme-card-title">
+                                        <span data-i18n="palette_nordic_name">Nordic Frost</span>
+                                        <span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8;" data-i18n="badge_nordic">Minimalist</span>
+                                    </div>
+                                    <div class="theme-check-radio"></div>
+                                </div>
+                                <div class="theme-swatch-row">
+                                    <div class="theme-swatch-chip" style="background: #111827;" title="Arka Plan / Background (#111827)"></div>
+                                    <div class="theme-swatch-chip" style="background: #1e293b;" title="Yüzey / Surface (#1e293b)"></div>
+                                    <div class="theme-swatch-chip" style="background: #38bdf8;" title="Vurgu / Accent (#38bdf8)"></div>
+                                </div>
+                                <p class="theme-card-desc" data-i18n="palette_nordic_desc">
+                                    İskandinav kayrak grisi ve kutup mavisi tonlarıyla ferah, göz yormayan ve hiper-okunabilir modern bulut teması.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Display Mode Selection Card -->
+                <div class="panel" style="margin-bottom: 20px;">
+                    <div class="panel-header">
+                        <div>
+                            <h3 data-i18n="appearance_mode_title">🌓 Aydınlık / Karanlık Modu (Display Mode)</h3>
+                            <p class="subtitle" style="margin-top: 4px; font-size: 0.85rem;" data-i18n="appearance_mode_subtitle">Arayüz parlaklık modunu manuel seçin veya işletim sistemi temanızı otomatik takip etmesini sağlayın.</p>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="theme-mode-segmented">
+                            <button type="button" class="theme-mode-btn" data-mode-choice="dark" onclick="selectThemeMode('dark')">
+                                <span>🌙</span> <span data-i18n="mode_dark">Karanlık (Dark)</span>
+                            </button>
+                            <button type="button" class="theme-mode-btn" data-mode-choice="light" onclick="selectThemeMode('light')">
+                                <span>☀️</span> <span data-i18n="mode_light">Aydınlık (Light)</span>
+                            </button>
+                            <button type="button" class="theme-mode-btn" data-mode-choice="system" onclick="selectThemeMode('system')">
+                                <span>💻</span> <span data-i18n="mode_system">Sistem Otomatik (OS Auto)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Preview & Sandbox -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3 data-i18n="appearance_preview_title">👁️ Canlı Bileşen Önizleme (Component Preview)</h3>
+                            <p class="subtitle" style="margin-top: 4px; font-size: 0.85rem;" data-i18n="appearance_preview_subtitle">Seçtiğiniz palet ve modun metrik kartlarında, durum rozetlerinde ve butonlarda nasıl göründüğünü anlık inceleyin.</p>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="theme-live-preview">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                                <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+                                    <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;" data-i18n="preview_eps">Canlı EPS Akışı</div>
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-top: 4px;">1,480 <span style="font-size: 0.85rem; color: var(--accent);">evt/s</span></div>
+                                </div>
+                                <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+                                    <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;" data-i18n="preview_endpoints">Aktif Uç Noktalar</div>
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-top: 4px;">14 <span style="font-size: 0.85rem; color: var(--text-muted);">/ 14 Online</span></div>
+                                </div>
+                                <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+                                    <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;" data-i18n="preview_siem">SIEM Tehdit Durumu</div>
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-top: 4px;">0 <span style="font-size: 0.85rem; color: var(--success);" data-i18n="preview_safe">Korumada</span></div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
+                                <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;" data-i18n="preview_badges_label">Rozetler:</span>
+                                <span class="badge badge-success" data-i18n="badge_healthy">Sağlıklı</span>
+                                <span class="badge badge-warning" data-i18n="badge_warning">Uyarı</span>
+                                <span class="badge badge-danger" data-i18n="badge_critical">Kritik Alarm</span>
+                                <span class="badge badge-primary" data-i18n="badge_active">Aktif Palet</span>
+                            </div>
+
+                            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;" data-i18n="preview_buttons_label">Butonlar:</span>
+                                <button class="btn btn-primary" data-i18n="btn_primary_sample">Birincil Eylem</button>
+                                <button class="btn btn-outline" data-i18n="btn_secondary_sample">İkincil Eylem</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -7822,8 +7976,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.12"></script>
-    <script src="/static/js/translations.js?v=1.9.12"></script>
-    <script src="/static/js/app.js?v=1.9.12"></script>
+    <script src="/static/js/marked.min.js?v=1.9.13"></script>
+    <script src="/static/js/translations.js?v=1.9.13"></script>
+    <script src="/static/js/app.js?v=1.9.13"></script>
 </body>
 </html>

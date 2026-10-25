@@ -1,21 +1,23 @@
 package version
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 )
 
 const (
-	DefaultVersion   = "v1.9.12"
-	DefaultBuildDate = "2026-10-25"
-	DefaultCommitSHA = "f276f21"
+	DefaultVersion     = "v1.9.13"
+	DefaultBuildDate   = "2026-10-25"
+	DefaultCommitSHA   = "077b73a"
+	LatestAgentVersion = "v0.1.12"
 )
 
 var (
-	Version   = "v1.9.12"
+	Version   = "v1.9.13"
 	BuildDate = "2026-10-25"
-	CommitSHA = "f276f21"
+	CommitSHA = "077b73a"
 	Platform  = "Valtrivo LogSeal"
 	Company   = "Valtrivo"
 	Tagline   = "Her kayıt, zamanıyla kanıt."
@@ -23,6 +25,37 @@ var (
 	RepoName  = "Logger"
 	Branch    = "main"
 )
+
+// IsAgentVersionNewer returns true if target represents a higher semantic version than current.
+func IsAgentVersionNewer(target, current string) bool {
+	tNorm := strings.TrimPrefix(strings.TrimSpace(target), "v")
+	cNorm := strings.TrimPrefix(strings.TrimSpace(current), "v")
+	if tNorm == "" || cNorm == "" || tNorm == cNorm {
+		return false
+	}
+	tParts := strings.Split(tNorm, ".")
+	cParts := strings.Split(cNorm, ".")
+	maxLen := len(tParts)
+	if len(cParts) > maxLen {
+		maxLen = len(cParts)
+	}
+	for i := 0; i < maxLen; i++ {
+		var tVal, cVal int
+		if i < len(tParts) {
+			_, _ = fmt.Sscanf(tParts[i], "%d", &tVal)
+		}
+		if i < len(cParts) {
+			_, _ = fmt.Sscanf(cParts[i], "%d", &cVal)
+		}
+		if tVal > cVal {
+			return true
+		}
+		if tVal < cVal {
+			return false
+		}
+	}
+	return false
+}
 
 func init() {
 	ReloadRuntimeVersion()

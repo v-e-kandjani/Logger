@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/syslog-platform/logger/internal/database/postgres"
 	"github.com/syslog-platform/logger/internal/models"
+	"github.com/syslog-platform/logger/internal/version"
 )
 
 // --- Agent Gateway Handlers ---
@@ -847,14 +848,15 @@ func (h *Handler) handleEndpointAgentUpgradeAll(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	targetVer := version.LatestAgentVersion
 	h.recordAudit(r, "ENDPOINT_AGENTS_UPGRADE_ALL", "endpoint/agents", "SUCCESS", map[string]interface{}{
-		"target_version": "v0.1.4",
+		"target_version": targetVer,
 	})
 
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":         "upgrade_triggered",
-		"target_version": "v0.1.4",
-		"message":        "Tüm uç noktalar bağlı oldukları sunucu üzerinden v0.1.4 sürümüne otomatik güncelleniyor.",
+		"target_version": targetVer,
+		"message":        fmt.Sprintf("Tüm uç noktalar bağlı oldukları sunucu üzerinden %s sürümüne otomatik güncelleniyor.", targetVer),
 	})
 }
 

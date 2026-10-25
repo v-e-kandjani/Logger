@@ -90,17 +90,17 @@ func ApplyUpgrade(ctx context.Context, serverURL, downloadPath, targetVersion st
 			return fmt.Errorf("renaming running binary to .old: %w", err)
 		}
 
-		// Move temp file to execPath
-		if err := copyAndRemove(tempPath, execPath); err != nil {
+		// Move or copy temp file to execPath
+		if err := installBinary(tempPath, execPath); err != nil {
 			// Rollback rename
 			_ = os.Rename(oldPath, execPath)
 			return fmt.Errorf("installing new binary: %w", err)
 		}
 
-		log.Printf("[LOGGER Auto-Updater] Binary successfully updated to %s! Triggering service restart...", targetVersion)
+		log.Printf("[LOGGER Auto-Updater] Binary successfully updated to %s! Triggering service/process restart...", targetVersion)
 
-		// Spawn helper to restart service after this process exits
-		restartScript := fmt.Sprintf(`ping 127.0.0.1 -n 3 > nul & net stop LoggerAgent & net start LoggerAgent`)
+		// Spawn helper to restart service or relaunch binary after this process exits
+		restartScript := fmt.Sprintf(`ping 127.0.0.1 -n 3 > nul & (net stop LoggerAgent && net start LoggerAgent) || start "" "%s"`, execPath)
 		cmd := exec.Command("cmd.exe", "/C", restartScript)
 		_ = cmd.Start()
 
@@ -111,18 +111,39 @@ func ApplyUpgrade(ctx context.Context, serverURL, downloadPath, targetVersion st
 		return nil
 	}
 
-	// Linux / macOS / Unix: atomic move over execPath
-	if err := copyAndRemove(tempPath, execPath); err != nil {
-		return fmt.Errorf("atomic rename failed: %w", err)
+	// Linux / macOS / Unix: atomic move over execPath with fallback for text-file-busy (ETXTBSY)
+	if err := installBinary(tempPath, execPath); err != nil {
+		return fmt.Errorf("installing new binary failed: %w", err)
 	}
-	_ = os.Chmod(execPath, 0755)
 
 	log.Printf("[LOGGER Auto-Updater] Binary successfully updated to %s! Restarting daemon...", targetVersion)
 
 	if runtime.GOOS == "linux" {
-		_ = exec.Command("systemctl", "restart", "logger-agent").Start()
+		// Attempt systemctl service restart first; fallback to direct process respawn if not managed by systemd
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			cmd := exec.Command("systemctl", "restart", "logger-agent")
+			if err := cmd.Run(); err != nil {
+				// Standalone or non-systemd fallback
+				respawnCmd := exec.Command(execPath, os.Args[1:]...)
+				respawnCmd.Stdout = os.Stdout
+				respawnCmd.Stderr = os.Stderr
+				_ = respawnCmd.Start()
+			}
+			os.Exit(0)
+		}()
+		return nil
 	} else if runtime.GOOS == "darwin" {
-		_ = exec.Command("launchctl", "kickstart", "-k", "system/com.valtrivo.logger-agent").Start()
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			cmd := exec.Command("launchctl", "kickstart", "-k", "system/com.valtrivo.logger-agent")
+			if err := cmd.Run(); err != nil {
+				respawnCmd := exec.Command(execPath, os.Args[1:]...)
+				_ = respawnCmd.Start()
+			}
+			os.Exit(0)
+		}()
+		return nil
 	}
 
 	go func() {
@@ -133,28 +154,57 @@ func ApplyUpgrade(ctx context.Context, serverURL, downloadPath, targetVersion st
 	return nil
 }
 
-func copyAndRemove(src, dst string) error {
-	// Try rename first
+// installBinary safely places the new binary at dst, handling cross-device mounts and ETXTBSY on Unix
+func installBinary(src, dst string) error {
+	// 1. Try atomic rename first (fast path when on same filesystem)
 	if err := os.Rename(src, dst); err == nil {
+		_ = os.Chmod(dst, 0755)
 		return nil
 	}
 
-	// Cross-device fallback
+	// 2. Cross-device or busy file handling:
+	// In Unix, opening an active executing binary for writing (O_TRUNC/O_WRONLY) returns ETXTBSY.
+	// But unlinking (os.Remove) or renaming the existing destination directory entry is fully supported
+	// by the kernel because the active process retains its open file descriptor to the old inode.
+	dstOld := dst + ".old"
+	_ = os.Remove(dstOld)
+	renamed := false
+	if err := os.Rename(dst, dstOld); err == nil {
+		renamed = true
+	} else {
+		_ = os.Remove(dst)
+	}
+
+	// 3. Copy src to dst
 	in, err := os.Open(src)
 	if err != nil {
-		return err
+		if renamed {
+			_ = os.Rename(dstOld, dst)
+		}
+		return fmt.Errorf("opening downloaded temp binary: %w", err)
 	}
 	defer in.Close()
 
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
-		return err
+		if renamed {
+			_ = os.Rename(dstOld, dst)
+		}
+		return fmt.Errorf("creating target binary: %w", err)
 	}
-	defer out.Close()
 
 	if _, err := io.Copy(out, in); err != nil {
-		return err
+		out.Close()
+		if renamed {
+			_ = os.Rename(dstOld, dst)
+		}
+		return fmt.Errorf("copying binary stream: %w", err)
 	}
+	_ = out.Close()
+	_ = os.Chmod(dst, 0755)
+
+	// Clean up
 	_ = os.Remove(src)
+	_ = os.Remove(dstOld)
 	return nil
 }

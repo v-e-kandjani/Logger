@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/syslog-platform/logger/internal/models"
+	"github.com/syslog-platform/logger/internal/version"
 )
 
 // EnsureEndpointSchema creates all required tables and default records for Endpoint Security
@@ -986,8 +987,8 @@ func (db *DB) UpdateAgentHeartbeat(ctx context.Context, hb models.AgentHeartbeat
 	}
 
 	// Auto-Update check: Offer latest agent binary if connected agent is running an older build
-	latestAgentVer := "v0.1.4"
-	if hb.AgentVersion != "" && hb.AgentVersion != latestAgentVer {
+	latestAgentVer := version.LatestAgentVersion
+	if hb.AgentVersion != "" && version.IsAgentVersionNewer(latestAgentVer, hb.AgentVersion) {
 		downloadURL := "/static/bin/logger-agent-linux-amd64"
 		if strings.EqualFold(osType, "windows") {
 			downloadURL = "/static/bin/logger-agent-windows-amd64.exe"

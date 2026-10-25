@@ -74,3 +74,75 @@
   --ls-success: #bbf7d0;
   --ls-info: #bfdbfe;
 }
+
+/* -------------------------------------------------------------------------- */
+/* THEME PALETTE 2: Obsidian Mint (Cyber Emerald)                             */
+/* High-contrast terminal pitch black with vivid emerald / neon mint accents  */
+/* -------------------------------------------------------------------------- */
+[data-palette="emerald"][data-theme="dark"] {
+  color-scheme: dark;
+  --ls-bg: #090d16;
+  --ls-surface: #0f1624;
+  --ls-surface-alt: #182338;
+  --ls-border: #1e293b;
+  --ls-text: #f0fdf4;
+  --ls-muted: #94a3b8;
+  --ls-accent: #10b981;
+  --ls-accent-text: #022c22;
+  --ls-danger: #f87171;
+  --ls-warning: #fbbf24;
+  --ls-success: #34d399;
+  --ls-info: #38bdf8;
+}
+
+[data-palette="emerald"][data-theme="light"] {
+  color-scheme: light;
+  --ls-bg: #f8fafc;
+  --ls-surface: #ffffff;
+  --ls-surface-alt: #ecfdf5;
+  --ls-border: #cbd5e1;
+  --ls-text: #064e3b;
+  --ls-muted: #475569;
+  --ls-accent: #059669;
+  --ls-accent-text: #ffffff;
+  --ls-danger: #dc2626;
+  --ls-warning: #d97706;
+  --ls-success: #059669;
+  --ls-info: #2563eb;
+}
+
+/* -------------------------------------------------------------------------- */
+/* THEME PALETTE 3: Nordic Frost (Polar Sky)                                  */
+/* Minimalist Scandinavian slate & polar sky blue for airy modern legibility  */
+/* -------------------------------------------------------------------------- */
+[data-palette="nordic"][data-theme="dark"] {
+  color-scheme: dark;
+  --ls-bg: #111827;
+  --ls-surface: #1e293b;
+  --ls-surface-alt: #334155;
+  --ls-border: #334155;
+  --ls-text: #f8fafc;
+  --ls-muted: #94a3b8;
+  --ls-accent: #38bdf8;
+  --ls-accent-text: #082f49;
+  --ls-danger: #fca5a5;
+  --ls-warning: #fde047;
+  --ls-success: #86efac;
+  --ls-info: #7dd3fc;
+}
+
+[data-palette="nordic"][data-theme="light"] {
+  color-scheme: light;
+  --ls-bg: #f8fafc;
+  --ls-surface: #ffffff;
+  --ls-surface-alt: #f0f9ff;
+  --ls-border: #cbd5e1;
+  --ls-text: #0f172a;
+  --ls-muted: #64748b;
+  --ls-accent: #0284c7;
+  --ls-accent-text: #ffffff;
+  --ls-danger: #ef4444;
+  --ls-warning: #f59e0b;
+  --ls-success: #10b981;
+  --ls-info: #0284c7;
+}

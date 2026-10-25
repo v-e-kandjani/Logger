@@ -40,14 +40,63 @@ function t(k, fb) {
 }
 window.t = t;
 
-// LogSeal Theme Manager (Dark / Light with System Fallback & Guarded LocalStorage)
-function getAppTheme() {
+// LogSeal Theme & Palette Manager (Dark / Light with System Fallback & Multi-Palette Engine)
+function getAppPalette() {
     try {
-        return localStorage.getItem('logseal-theme') ||
-               (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        return localStorage.getItem('logseal-palette') || 'classic';
     } catch (e) {
+        return 'classic';
+    }
+}
+
+function setAppPalette(palette) {
+    if (!['classic', 'emerald', 'nordic'].includes(palette)) {
+        palette = 'classic';
+    }
+    document.documentElement.setAttribute('data-palette', palette);
+    try {
+        localStorage.setItem('logseal-palette', palette);
+    } catch (e) {}
+
+    // Synchronize UI active card state
+    document.querySelectorAll('.theme-card').forEach(card => {
+        if (card.getAttribute('data-palette-choice') === palette) {
+            card.classList.add('active');
+        } else {
+            card.classList.remove('active');
+        }
+    });
+}
+
+function selectThemePalette(palette) {
+    setAppPalette(palette);
+    const names = {
+        classic: 'LogSeal Classic (Navy & Teal)',
+        emerald: 'Obsidian Mint (Cyber Emerald)',
+        nordic: 'Nordic Frost (Polar Sky)'
+    };
+    if (typeof showToast === 'function') {
+        const msg = (window.i18n && window.i18n.currentLang === 'tr')
+            ? `Tema paleti başarıyla uygulandı: ${names[palette] || palette}`
+            : `Theme palette applied: ${names[palette] || palette}`;
+        showToast(msg, 'success');
+    }
+}
+
+function getAppModeSetting() {
+    try {
+        return localStorage.getItem('logseal-theme-mode') || 'dark';
+    } catch (e) {
+        return 'dark';
+    }
+}
+
+function getAppTheme() {
+    const modeSetting = getAppModeSetting();
+    if (modeSetting === 'system') {
         return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
     }
+    return modeSetting === 'light' ? 'light' : 'dark';
 }
 
 function setAppTheme(theme) {
@@ -67,8 +116,76 @@ function setAppTheme(theme) {
     } catch (e) {}
 }
 
+function selectThemeMode(mode) {
+    if (!['dark', 'light', 'system'].includes(mode)) mode = 'dark';
+    try {
+        localStorage.setItem('logseal-theme-mode', mode);
+    } catch (e) {}
+
+    if (mode === 'system') {
+        const sysTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        setAppTheme(sysTheme);
+    } else {
+        setAppTheme(mode);
+    }
+
+    // Synchronize UI segmented buttons
+    document.querySelectorAll('.theme-mode-btn').forEach(btn => {
+        if (btn.getAttribute('data-mode-choice') === mode) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    if (typeof showToast === 'function') {
+        const labels = {
+            dark: (window.i18n && window.i18n.currentLang === 'tr') ? 'Karanlık Mod' : 'Dark Mode',
+            light: (window.i18n && window.i18n.currentLang === 'tr') ? 'Aydınlık Mod' : 'Light Mode',
+            system: (window.i18n && window.i18n.currentLang === 'tr') ? 'Sistem Otomatik Modu' : 'System Auto Mode'
+        };
+        const msg = (window.i18n && window.i18n.currentLang === 'tr')
+            ? `Görünüm modu güncellendi: ${labels[mode]}`
+            : `Appearance mode updated: ${labels[mode]}`;
+        showToast(msg, 'success');
+    }
+}
+
+function resetThemeDefaults() {
+    selectThemePalette('classic');
+    selectThemeMode('dark');
+    if (typeof showToast === 'function') {
+        const msg = (window.i18n && window.i18n.currentLang === 'tr')
+            ? 'Tema ve görünüm ayarları varsayılana sıfırlandı.'
+            : 'Theme and appearance settings reset to default.';
+        showToast(msg, 'info');
+    }
+}
+
+function updateThemeUI() {
+    const curPalette = getAppPalette();
+    document.querySelectorAll('.theme-card').forEach(card => {
+        if (card.getAttribute('data-palette-choice') === curPalette) {
+            card.classList.add('active');
+        } else {
+            card.classList.remove('active');
+        }
+    });
+
+    const curMode = getAppModeSetting();
+    document.querySelectorAll('.theme-mode-btn').forEach(btn => {
+        if (btn.getAttribute('data-mode-choice') === curMode) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
 function initTheme() {
+    setAppPalette(getAppPalette());
     setAppTheme(getAppTheme());
+    updateThemeUI();
 
     const toggleBtn = document.getElementById('theme-toggle');
     if (toggleBtn && !toggleBtn.dataset.themeBound) {
@@ -76,16 +193,16 @@ function initTheme() {
         toggleBtn.addEventListener('click', (e) => {
             e.preventDefault();
             const current = document.documentElement.getAttribute('data-theme') || 'dark';
-            setAppTheme(current === 'dark' ? 'light' : 'dark');
+            const next = current === 'dark' ? 'light' : 'dark';
+            selectThemeMode(next);
         });
     }
 
     try {
         if (window.matchMedia) {
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                let hasStored = false;
-                try { hasStored = !!localStorage.getItem('logseal-theme'); } catch (_) {}
-                if (!hasStored) {
+                const modeSetting = getAppModeSetting();
+                if (modeSetting === 'system') {
                     setAppTheme(e.matches ? 'dark' : 'light');
                 }
             });
@@ -93,8 +210,9 @@ function initTheme() {
     } catch (e) {}
 }
 
-// Early theme application to avoid FOUC
+// Early theme and palette application to avoid FOUC
 try {
+    setAppPalette(getAppPalette());
     setAppTheme(getAppTheme());
 } catch (e) {}
 
@@ -284,6 +402,7 @@ function switchTab(tab, targetSectionId = null) {
         if (tab === 'dashboard') fetchAndRenderTelemetryCharts();
         if (tab === 'search') document.getElementById('btn-search-exec')?.click();
         if (tab === 'siem') loadSIEMData();
+        if (tab === 'appearance') updateThemeUI();
         if (tab === 'endpoint') {
             loadEndpointDashboard();
             loadEndpointAgents();

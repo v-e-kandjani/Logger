@@ -253,6 +253,21 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.13** (Tema & Görünüm Seçici, 2 Yeni Sade ve Modern Palet - Obsidian Mint & Nordic Frost, Ajan Güncelleme & Çalışırken İkili Değiştirme Düzeltmesi) / **Ajan v0.1.12**:
+  - **Sistem & Yönetim Tema Seçici Arayüzü (`#nav-tab-appearance` / `#pane-appearance`)**:
+    - Sistem & Yönetim yan menü grubu altına doğrudan **Tema & Görünüm** menü öğesi eklendi.
+    - Canlı renk örneklerine ve anında sayfa yenilemesiz geçişe sahip görsel Tema Paleti kartları entegre edildi.
+    - Parlaklık Modu Seçici: Koyu Mod (🌙), Açık Mod (☀️) ve işletim sistemi temasını dinamik izleyen Sistem Otomatik Modu (💻).
+    - Canlı Bileşen Önizleme Alanı: Metrik kutuları, durum rozetleri ve butonların anlık görünüm simülasyonu sağlandı.
+  - **2 Yeni Sade ve Modern Tema Paleti**:
+    - **Obsidian Mint (Siber Zümrüt)**: Zifiri siyah zemin (`#090d16`), koyu arduvaz kartlar (`#0f1624`), parlak zümrüt yeşili vurgular (`#10b981`) ve yüksek odaklanma sağlayan nane rengi tipografi.
+    - **Nordic Frost (Kutup Mavisi)**: İskandinav soğuk arduvaz (`#111827`), buzul mavisi yüzeyler (`#1e293b`) ve canlı kutup mavisi vurgularla (`#38bdf8`) ferah ve hiper-okunabilir modern bulut teması.
+  - **Ajan Otomatik Güncelleme & Çalışırken İkili Değiştirme Düzeltmesi (`v0.1.12`)**:
+    - Linux/Unix'te çalışan ikilinin üzerine yazılmasını engelleyen `ETXTBSY (Text file busy)` hatası, çalışan dosyanın bağlamdan güvenle ayrılıp (unlink/rename `.old`) atomik yeni ikilinin yerleştirilmesiyle çözüldü.
+    - Sunucudaki `endpoint.go` ve `endpoint_routes.go` içerisindeki sabitlenmiş `"v0.1.4"` hedef sürümü, dinamik `version.LatestAgentVersion` ve semantik `IsAgentVersionNewer` kontrolü ile güncellenerek sürüm düşürme döngüleri engellendi.
+    - Linux (`systemctl` / doğrudan respawn), macOS (`launchctl` / respawn) ve Windows (`net stop/start` / launch) için çift servis ve bağımsız süreç yeniden başlatma koruması eklendi.
+    - Derlenen güncel ajan ikilileri (`linux-amd64`, `linux-arm64`, `windows-amd64.exe`, `darwin-universal`) `web/static/bin/` dizinine yerleştirildi.
+
 - **v1.9.12** (Honeypot Tuzak Yem Yapılandırması, Fidye Kalkanı Hassasiyet Ayarları, Filo Çapında Yem Yenileme & Sade Menü Görünümü):
   - **Honeypot & Fidye Kalkanı Yapılandırma Paneli (`#modal-honeypot-config`)**:
     - Yönetici yapılandırma arayüzü ve REST API uç noktaları (`GET` ve `POST` `/api/v1/endpoint/ransomware/config`) eklendi.
