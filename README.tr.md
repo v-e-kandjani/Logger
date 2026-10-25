@@ -253,6 +253,21 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.10** (Katlanabilir ve Akordeon Yan Menü Grupları, Kalıcı Durum Hafızası & Erişilebilirlik):
+  - **Katlanabilir Akordeon Yan Menü (Sidebar) Grupları**:
+    - Yan menüdeki 6 ana kategori bağımsız olarak katlanabilir/açılabilir (foldable accordion) hale getirildi:
+      1. **İzleme & Analiz** (`#nav-sec-monitoring`: Dashboard, Canlı Akış, Log Arama)
+      2. **Güvenlik & Tehdit** (`#nav-sec-security`: SIEM & SOC, Uç Nokta Güvenliği, SIEM & SOC Raporları)
+      3. **Varlık & Envanter** (`#nav-sec-assets`: Kayıtlı Cihazlar, Bilinmeyen Kaynaklar)
+      4. **Kanuni Uyum (5651)** (`#nav-sec-compliance`: Zaman Damgalı Arşivler & Delil)
+      5. **Sistem & Yönetim** (`#nav-sec-system`: Sistem Sağlığı, Kullanıcılar, Ayarlar & KamuSM, Güncelleme)
+      6. **Destek & Kılavuz** (`#nav-sec-support`: Yardım & Kılavuzlar, Destek & Hata Ayıklama)
+    - Akıcı CSS geçiş efektleri (`cubic-bezier(0.4, 0, 0.2, 1)`) ve animasyonlu ok göstergeleri (chevron) entegre edildi.
+    - **Kalıcı Durum Hafızası**: Kullanıcının hangi menüleri açık veya kapalı bıraktığı `localStorage` (`sidebar_foldable_sections`) üzerinde saklanarak sayfa yenilendiğinde korunur.
+    - **Bağlam Duyarlı Otomatik Açılma**: Herhangi bir sekmeye geçildiğinde (URL hash'i veya doğrudan bağlantı ile) aktif sekmenin içinde bulunduğu grup otomatik olarak açılır ve aktif sekme görünür kalır.
+    - **Erişilebilirlik & Klavye Desteği**: `role="button"`, `tabindex="0"`, `aria-expanded` özellikleri ve klavye Enter / Boşluk (Space) tuş kontrolü sağlandı.
+    - **Çoklu Dil Uyumlu Yapı**: Başlık metinleri SVG simgelerinden ayrı bir `<span>` içerisine alınarak dil değişimlerinde ok simgelerinin kaybolması engellendi.
+
 - **v1.9.9** (Fidye Yazılımı Kalkanı, Yem Dosya (Canary) Savunması, Rapor Kiracı İzolasyonu & Web Optimizasyonu) / **Ajan v0.1.11**:
   - **Aşama P: Fidye Yazılımı Kalkanı & Tuzak Yem Dosya (Canary Token) Savunması**:
     - **Shannon Entropi Motoru**: Hızlı şifreleme ve karmaşıklık artışlarını (LockBit, BlackCat, Akira) tespit eden matematiksel Shannon entropi algoritması ($H(X) = -\sum P(x) \log_2 P(x)$) entegre edildi.

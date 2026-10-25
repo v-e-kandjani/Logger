@@ -253,25 +253,85 @@ body.dark-theme {
     background: rgba(148, 163, 184, 0.45);
 }
 
-/* Sidebar Nav Section Titles & Grouping */
+/* Sidebar Nav Section Titles & Foldable Grouping */
+.nav-section-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 2px;
+}
+
+.nav-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px 4px 10px;
+    margin: 2px 4px 0 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.nav-section-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-section-header:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+}
+
 .nav-section-title {
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-muted);
-    opacity: 0.65;
-    padding: 14px 14px 4px 14px;
-    margin-top: 4px;
+    opacity: 0.7;
+    pointer-events: none;
+    transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.nav-section-header:hover .nav-section-title {
+    color: var(--text-main);
+    opacity: 0.95;
+}
+
+.nav-section-chevron {
+    width: 12px;
+    height: 12px;
+    stroke: var(--text-muted);
+    opacity: 0.55;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.15s ease, opacity 0.15s ease;
+    flex-shrink: 0;
+}
+
+.nav-section-header:hover .nav-section-chevron {
+    stroke: var(--text-main);
+    opacity: 0.95;
+}
+
+.nav-section-group.collapsed .nav-section-chevron {
+    transform: rotate(-90deg);
+}
+
+.nav-section-items {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    user-select: none;
+    flex-direction: column;
+    gap: 3px;
+    overflow: hidden;
+    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, margin 0.2s ease;
+    max-height: 900px;
+    opacity: 1;
 }
-.nav-section-title:first-of-type {
-    margin-top: 0;
-    padding-top: 2px;
+
+.nav-section-group.collapsed .nav-section-items {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    pointer-events: none;
 }
+
 .nav-section-divider {
     height: 1px;
     background: var(--border-color);

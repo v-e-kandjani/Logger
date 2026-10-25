@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.9">
-    <link rel="stylesheet" href="/static/css/components.css?v=1.9.9">
-    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.9">
-    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.9">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.10">
+    <link rel="stylesheet" href="/static/css/components.css?v=1.9.10">
+    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.10">
+    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.10">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
@@ -23,7 +23,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.9</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.10</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -47,201 +47,243 @@
 
             <nav class="nav-menu">
                 <!-- Group 1: Monitoring & Analysis -->
-                <div class="nav-section-title" data-i18n="nav_sec_monitoring">İzleme &amp; Analiz</div>
-                <a href="#dashboard" class="nav-item active" data-tab="dashboard">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-                    <span data-i18n="nav_dashboard">Dashboard</span>
-                </a>
-                <a href="#live" class="nav-item" data-tab="live">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    <span data-i18n="nav_live">Live Stream</span>
-                    <span class="live-dot"></span>
-                </a>
-                <a href="#search" class="nav-item" data-tab="search">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <span data-i18n="nav_search">Log Search</span>
-                </a>
+                <div class="nav-section-group" id="nav-sec-monitoring" data-section="monitoring">
+                    <div class="nav-section-header" role="button" tabindex="0" aria-expanded="true" title="İzleme &amp; Analiz">
+                        <span class="nav-section-title" data-i18n="nav_sec_monitoring">İzleme &amp; Analiz</span>
+                        <svg class="nav-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="nav-section-items">
+                        <a href="#dashboard" class="nav-item active" data-tab="dashboard">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                            <span data-i18n="nav_dashboard">Dashboard</span>
+                        </a>
+                        <a href="#live" class="nav-item" data-tab="live">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            <span data-i18n="nav_live">Live Stream</span>
+                            <span class="live-dot"></span>
+                        </a>
+                        <a href="#search" class="nav-item" data-tab="search">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <span data-i18n="nav_search">Log Search</span>
+                        </a>
+                    </div>
+                </div>
 
                 <!-- Group 2: Security & SOC -->
-                <div class="nav-section-title" data-i18n="nav_sec_security">Güvenlik &amp; Tehdit</div>
-                <a href="#siem" class="nav-item" data-tab="siem" id="nav-tab-siem">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                    <span data-i18n="nav_siem">SIEM &amp; SOC</span>
-                    <span class="badge badge-danger" id="siem-active-badge" style="display: none; font-size: 10px; margin-left: auto;">0</span>
-                </a>
+                <div class="nav-section-group" id="nav-sec-security" data-section="security">
+                    <div class="nav-section-header" role="button" tabindex="0" aria-expanded="true" title="Güvenlik &amp; Tehdit">
+                        <span class="nav-section-title" data-i18n="nav_sec_security">Güvenlik &amp; Tehdit</span>
+                        <svg class="nav-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="nav-section-items">
+                        <a href="#siem" class="nav-item" data-tab="siem" id="nav-tab-siem">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <span data-i18n="nav_siem">SIEM &amp; SOC</span>
+                            <span class="badge badge-danger" id="siem-active-badge" style="display: none; font-size: 10px; margin-left: auto;">0</span>
+                        </a>
 
-                <!-- Endpoint Security Group with Submenu -->
-                <div class="nav-group" id="nav-group-endpoint">
-                    <a href="#endpoint" class="nav-item" data-tab="endpoint" id="nav-tab-endpoint">
-                        <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                        <span data-i18n="nav_endpoint">Endpoint Security</span>
-                        <svg class="menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                    </a>
-                    <div class="nav-submenu" id="nav-submenu-endpoint">
-                        <a class="nav-subitem active" data-endpoint-target="endpoint-sec-dashboard">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-                            <span data-i18n="nav_ep_dashboard">Genel Bakış (Dashboard)</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-agents">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-                            <span data-i18n="nav_ep_agents">Ajanlar (Agents)</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-inventory">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                            <span data-i18n="nav_ep_inventory">Varlık Envanteri (Inventory)</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-vulnerabilities">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                            <span data-i18n="nav_ep_vulns">Zafiyetler (CVEs)</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-patches">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span data-i18n="nav_ep_patches">Yama Durumu (Patches)</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-fim">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                            <span data-i18n="nav_ep_fim">FIM Bütünlük İzleme</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-usb">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v8M4.93 10.93l1.41 1.41M2 18h2M20 18h2M17.66 12.34l1.41-1.41M12 22a6 6 0 0 0 6-6v-2H6v2a6 6 0 0 0 6 6z"/></svg>
-                            <span data-i18n="nav_ep_usb">DLP &amp; USB Denetimi</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-edr">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                            <span data-i18n="nav_ep_edr">EDR &amp; Davranışsal Analiz</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-network">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                            <span data-i18n="nav_ep_network">Ağ &amp; DNS Güvenliği</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-ransomware">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/><polyline points="12 15 12 17 14 17"/></svg>
-                            <span data-i18n="nav_ep_ransomware">Fidye Kalkanı &amp; Yemler</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-policies">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
-                            <span data-i18n="nav_ep_policies">İlkeler (Policies)</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-tokens">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            <span data-i18n="nav_ep_tokens">Kurulum &amp; Belirteçler</span>
-                        </a>
-                        <a class="nav-subitem" data-endpoint-target="endpoint-sec-guide">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                            <span data-i18n="nav_ep_guide">Kurulum Kılavuzu</span>
+                        <!-- Endpoint Security Group with Submenu -->
+                        <div class="nav-group" id="nav-group-endpoint">
+                            <a href="#endpoint" class="nav-item" data-tab="endpoint" id="nav-tab-endpoint">
+                                <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                <span data-i18n="nav_endpoint">Endpoint Security</span>
+                                <svg class="menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                            </a>
+                            <div class="nav-submenu" id="nav-submenu-endpoint">
+                                <a class="nav-subitem active" data-endpoint-target="endpoint-sec-dashboard">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                                    <span data-i18n="nav_ep_dashboard">Genel Bakış (Dashboard)</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-agents">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                                    <span data-i18n="nav_ep_agents">Ajanlar (Agents)</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-inventory">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                                    <span data-i18n="nav_ep_inventory">Varlık Envanteri (Inventory)</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-vulnerabilities">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                    <span data-i18n="nav_ep_vulns">Zafiyetler (CVEs)</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-patches">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+                                    <span data-i18n="nav_ep_patches">Yama Durumu (Patches)</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-fim">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                    <span data-i18n="nav_ep_fim">FIM Bütünlük İzleme</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-usb">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v8M4.93 10.93l1.41 1.41M2 18h2M20 18h2M17.66 12.34l1.41-1.41M12 22a6 6 0 0 0 6-6v-2H6v2a6 6 0 0 0 6 6z"/></svg>
+                                    <span data-i18n="nav_ep_usb">DLP &amp; USB Denetimi</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-edr">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                    <span data-i18n="nav_ep_edr">EDR &amp; Davranışsal Analiz</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-network">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                    <span data-i18n="nav_ep_network">Ağ &amp; DNS Güvenliği</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-ransomware">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/><polyline points="12 15 12 17 14 17"/></svg>
+                                    <span data-i18n="nav_ep_ransomware">Fidye Kalkanı &amp; Yemler</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-policies">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+                                    <span data-i18n="nav_ep_policies">İlkeler (Policies)</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-tokens">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    <span data-i18n="nav_ep_tokens">Kurulum &amp; Belirteçler</span>
+                                </a>
+                                <a class="nav-subitem" data-endpoint-target="endpoint-sec-guide">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                    <span data-i18n="nav_ep_guide">Kurulum Kılavuzu</span>
+                                </a>
+                            </div>
+                        </div>
+                        <a href="#reports" class="nav-item" data-tab="reports" id="nav-tab-reports">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            <span data-i18n="nav_reports">SIEM &amp; SOC Reports</span>
                         </a>
                     </div>
                 </div>
-                <a href="#reports" class="nav-item" data-tab="reports" id="nav-tab-reports">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    <span data-i18n="nav_reports">SIEM &amp; SOC Reports</span>
-                </a>
 
                 <!-- Group 3: Network & Assets -->
-                <div class="nav-section-title" data-i18n="nav_sec_assets">Varlık &amp; Envanter</div>
-                <a href="#devices" class="nav-item" data-tab="devices">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-                    <span data-i18n="nav_devices">Registered Devices</span>
-                </a>
-                <a href="#unregistered" class="nav-item" data-tab="unregistered">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    <span data-i18n="nav_unknown">Unknown Sources</span>
-                    <span class="badge badge-warning" id="unknown-count-badge">0</span>
-                </a>
-
-                <!-- Group 4: Compliance & Legal -->
-                <div class="nav-section-title" data-i18n="nav_sec_compliance">Kanuni Uyum (5651)</div>
-                <a href="#archives" class="nav-item" data-tab="archives">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-                    <span data-i18n="nav_archives">Archives &amp; Evidence</span>
-                </a>
-
-                <!-- Group 5: Administration & Settings -->
-                <div class="nav-section-title" data-i18n="nav_sec_system">Sistem &amp; Yönetim</div>
-                <a href="#health" class="nav-item" data-tab="health">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                    <span data-i18n="nav_health">System Health</span>
-                </a>
-                <a href="#users" class="nav-item" data-tab="users" id="nav-tab-users">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    <span data-i18n="nav_users">Users &amp; Access</span>
-                </a>
-
-                <!-- Settings Group with Submenu -->
-                <div class="nav-group" id="nav-group-settings">
-                    <a href="#settings" class="nav-item" data-tab="settings" id="nav-tab-settings">
-                        <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                        <span data-i18n="nav_settings">Settings &amp; KamuSM</span>
-                        <svg class="menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                    </a>
-                    <div class="nav-submenu" id="nav-submenu-settings">
-                        <a class="nav-subitem" data-target="all">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                            <span data-i18n="nav_sub_all">Tüm Ayarlar</span>
+                <div class="nav-section-group" id="nav-sec-assets" data-section="assets">
+                    <div class="nav-section-header" role="button" tabindex="0" aria-expanded="true" title="Varlık &amp; Envanter">
+                        <span class="nav-section-title" data-i18n="nav_sec_assets">Varlık &amp; Envanter</span>
+                        <svg class="nav-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="nav-section-items">
+                        <a href="#devices" class="nav-item" data-tab="devices">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                            <span data-i18n="nav_devices">Registered Devices</span>
                         </a>
-                        <a class="nav-subitem" data-target="setting-section-kamusm">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                            <span data-i18n="nav_sub_kamusm">TÜBİTAK KamuSM &amp; E-İmza</span>
-                        </a>
-                        <a class="nav-subitem" data-target="setting-section-ingestion">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            <span data-i18n="nav_sub_ingestion">Syslog Dinleyicileri &amp; Filtre</span>
-                        </a>
-                        <a class="nav-subitem" data-target="setting-section-https">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
-                            <span data-i18n="nav_sub_https">HTTPS &amp; TLS Sertifikaları</span>
-                        </a>
-                        <a class="nav-subitem" data-target="setting-section-fqdn">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                            <span data-i18n="nav_sub_fqdn">FQDN Alan Adı Erişimi</span>
-                        </a>
-                        <a class="nav-subitem" data-target="setting-section-cache">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                            <span data-i18n="nav_sub_cache">Sorgu Önbelleği (%60 RAM)</span>
-                        </a>
-                        <a class="nav-subitem" data-target="setting-section-ad">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                            <span data-i18n="nav_sub_ad">Active Directory &amp; LDAP</span>
-                        </a>
-                        <a class="nav-subitem" data-target="setting-section-mfa">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            <span data-i18n="nav_sub_mfa">MFA &amp; TOTP Güvenliği</span>
-                        </a>
-                        <a class="nav-subitem" data-target="setting-section-retention">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-                            <span data-i18n="nav_sub_retention">Depolama &amp; Saklama İlkesi</span>
-                        </a>
-                        <a class="nav-subitem" data-target="setting-section-smtp">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                            <span data-i18n="nav_sub_smtp">E-Posta Bildirimleri &amp; SMTP</span>
-                        </a>
-                        <a class="nav-subitem" data-target="setting-section-edge">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                            <span data-i18n="nav_sub_edge">Edge Proxy Düğümleri</span>
-                        </a>
-                        <a class="nav-subitem" data-target="setting-section-tenants">
-                            <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
-                            <span data-i18n="nav_sub_tenants">Kiracı Yönetimi (Tenants)</span>
+                        <a href="#unregistered" class="nav-item" data-tab="unregistered">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span data-i18n="nav_unknown">Unknown Sources</span>
+                            <span class="badge badge-warning" id="unknown-count-badge">0</span>
                         </a>
                     </div>
                 </div>
 
-                <a href="#updates" class="nav-item" data-tab="updates" id="nav-tab-updates">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                    <span data-i18n="nav_updates">System Upgrade</span>
-                    <span class="badge badge-primary" id="update-indicator-badge" style="display: none; font-size: 10px; margin-left: auto;">New</span>
-                </a>
+                <!-- Group 4: Compliance & Legal -->
+                <div class="nav-section-group" id="nav-sec-compliance" data-section="compliance">
+                    <div class="nav-section-header" role="button" tabindex="0" aria-expanded="true" title="Kanuni Uyum (5651)">
+                        <span class="nav-section-title" data-i18n="nav_sec_compliance">Kanuni Uyum (5651)</span>
+                        <svg class="nav-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="nav-section-items">
+                        <a href="#archives" class="nav-item" data-tab="archives">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                            <span data-i18n="nav_archives">Archives &amp; Evidence</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Group 5: Administration & Settings -->
+                <div class="nav-section-group" id="nav-sec-system" data-section="system">
+                    <div class="nav-section-header" role="button" tabindex="0" aria-expanded="true" title="Sistem &amp; Yönetim">
+                        <span class="nav-section-title" data-i18n="nav_sec_system">Sistem &amp; Yönetim</span>
+                        <svg class="nav-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="nav-section-items">
+                        <a href="#health" class="nav-item" data-tab="health">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                            <span data-i18n="nav_health">System Health</span>
+                        </a>
+                        <a href="#users" class="nav-item" data-tab="users" id="nav-tab-users">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            <span data-i18n="nav_users">Users &amp; Access</span>
+                        </a>
+
+                        <!-- Settings Group with Submenu -->
+                        <div class="nav-group" id="nav-group-settings">
+                            <a href="#settings" class="nav-item" data-tab="settings" id="nav-tab-settings">
+                                <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                <span data-i18n="nav_settings">Settings &amp; KamuSM</span>
+                                <svg class="menu-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                            </a>
+                            <div class="nav-submenu" id="nav-submenu-settings">
+                                <a class="nav-subitem" data-target="all">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                                    <span data-i18n="nav_sub_all">Tüm Ayarlar</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-kamusm">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    <span data-i18n="nav_sub_kamusm">TÜBİTAK KamuSM &amp; E-İmza</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-ingestion">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    <span data-i18n="nav_sub_ingestion">Syslog Dinleyicileri &amp; Filtre</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-https">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                                    <span data-i18n="nav_sub_https">HTTPS &amp; TLS Sertifikaları</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-fqdn">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                    <span data-i18n="nav_sub_fqdn">FQDN Alan Adı Erişimi</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-cache">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                    <span data-i18n="nav_sub_cache">Sorgu Önbelleği (%60 RAM)</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-ad">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                    <span data-i18n="nav_sub_ad">Active Directory &amp; LDAP</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-mfa">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    <span data-i18n="nav_sub_mfa">MFA &amp; TOTP Güvenliği</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-retention">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                                    <span data-i18n="nav_sub_retention">Depolama &amp; Saklama İlkesi</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-smtp">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                    <span data-i18n="nav_sub_smtp">E-Posta Bildirimleri &amp; SMTP</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-edge">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                                    <span data-i18n="nav_sub_edge">Edge Proxy Düğümleri</span>
+                                </a>
+                                <a class="nav-subitem" data-target="setting-section-tenants">
+                                    <svg class="sub-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
+                                    <span data-i18n="nav_sub_tenants">Kiracı Yönetimi (Tenants)</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <a href="#updates" class="nav-item" data-tab="updates" id="nav-tab-updates">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                            <span data-i18n="nav_updates">System Upgrade</span>
+                            <span class="badge badge-primary" id="update-indicator-badge" style="display: none; font-size: 10px; margin-left: auto;">New</span>
+                        </a>
+                    </div>
+                </div>
 
                 <!-- Group 6: Support & Help -->
-                <div class="nav-section-title" data-i18n="nav_sec_support">Destek &amp; Kılavuz</div>
-                <a href="#help" class="nav-item" data-tab="help" id="nav-tab-help">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    <span data-i18n="nav_help">Yardım &amp; Kılavuzlar</span>
-                </a>
-                <a href="#support" class="nav-item" data-tab="support" id="nav-tab-support">
-                    <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/></svg>
-                    <span data-i18n="nav_support">Destek &amp; Hata Ayıklama</span>
-                </a>
+                <div class="nav-section-group" id="nav-sec-support" data-section="support">
+                    <div class="nav-section-header" role="button" tabindex="0" aria-expanded="true" title="Destek &amp; Kılavuz">
+                        <span class="nav-section-title" data-i18n="nav_sec_support">Destek &amp; Kılavuz</span>
+                        <svg class="nav-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="nav-section-items">
+                        <a href="#help" class="nav-item" data-tab="help" id="nav-tab-help">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span data-i18n="nav_help">Yardım &amp; Kılavuzlar</span>
+                        </a>
+                        <a href="#support" class="nav-item" data-tab="support" id="nav-tab-support">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/></svg>
+                            <span data-i18n="nav_support">Destek &amp; Hata Ayıklama</span>
+                        </a>
+                    </div>
+                </div>
             </nav>
 
             <div class="sidebar-footer">
@@ -3863,12 +3905,12 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.9</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.10</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_commit">Installed Commit</div>
-                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">f524a8b</div>
+                        <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">aaa4c42</div>
                         <div class="stat-sub" id="upd-build-date">Build: 2026-10-25</div>
                     </div>
                     <div class="stat-card">
@@ -7670,8 +7712,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.9"></script>
-    <script src="/static/js/translations.js?v=1.9.9"></script>
-    <script src="/static/js/app.js?v=1.9.9"></script>
+    <script src="/static/js/marked.min.js?v=1.9.10"></script>
+    <script src="/static/js/translations.js?v=1.9.10"></script>
+    <script src="/static/js/app.js?v=1.9.10"></script>
 </body>
 </html>

@@ -264,6 +264,21 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.10** (Collapsible & Foldable Sidebar Navigation Groups, Persistent State & Accessibility):
+  - **Accordion Foldable Sidebar Navigation Groups**:
+    - Converted all 6 primary navigation groups into independently collapsible accordion sections:
+      1. **Monitoring & Logs** (`#nav-sec-monitoring`: Dashboard, Live Stream, Log Search)
+      2. **Security & Threats** (`#nav-sec-security`: SIEM & SOC, Endpoint Security, SIEM & SOC Reports)
+      3. **Asset Inventory** (`#nav-sec-assets`: Registered Devices, Unknown Sources)
+      4. **Compliance & Legal** (`#nav-sec-compliance`: Archives & Legal Evidence - 5651)
+      5. **System & Administration** (`#nav-sec-system`: System Health, Users & Access, Settings & KamuSM, System Upgrade)
+      6. **Support & Help** (`#nav-sec-support`: Help & Guides, Support & Diagnostics)
+    - Integrated smooth CSS height & opacity transitions (`cubic-bezier(0.4, 0, 0.2, 1)`) with interactive rotating chevrons.
+    - **Local State Persistence**: Folded/unfolded states are saved in `localStorage` (`sidebar_foldable_sections`) across page reloads.
+    - **Context-Aware Auto-Expansion**: Navigating to any tab (via URL hash, direct link, or programmatic switch) automatically expands its parent section group so the active tab is never hidden.
+    - **Keyboard & Accessibility Support**: Full `role="button"`, `tabindex="0"`, `aria-expanded`, and keyboard Enter/Space activation support.
+    - **Localization-Safe DOM Structure**: Isolated title text in dedicated `<span class="nav-section-title">` to ensure dynamic i18n switches preserve chevron SVGs.
+
 - **v1.9.9** (Anti-Ransomware Shield, Decoy Canary Defense, Reports Tenant Isolation & Web Asset Optimization) / **Agent v0.1.11**:
   - **Phase P: Anti-Ransomware Shield & Decoy Honeypot Defense**:
     - **Shannon Entropy Engine**: Implemented mathematical entropy analyzer ($H(X) = -\sum P(x) \log_2 P(x)$) calculating random byte dispersion to identify rapid ransomware encryption patterns (LockBit, BlackCat, Akira) in real-time.

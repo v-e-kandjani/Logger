@@ -206,6 +206,11 @@ function switchTab(tab, targetSectionId = null) {
         }
     }
 
+    // Auto-expand parent section group if user navigates to a tab inside a collapsed section
+    if (typeof ensureActiveNavSectionExpanded === 'function') {
+        ensureActiveNavSectionExpanded(tab);
+    }
+
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     const targetPane = document.getElementById(`pane-${tab}`);
     if (targetPane) targetPane.classList.add('active');
@@ -290,7 +295,85 @@ function scrollToSettingsSection(targetId) {
     displaySettingsSection(targetId);
 }
 
+// Foldable Nav Section Groups Controller
+function initSidebarFoldableSections() {
+    let savedStates = {};
+    try {
+        const raw = localStorage.getItem('sidebar_foldable_sections');
+        if (raw) savedStates = JSON.parse(raw);
+    } catch (e) {
+        savedStates = {};
+    }
+
+    const groups = document.querySelectorAll('.nav-section-group');
+    groups.forEach(group => {
+        const secId = group.getAttribute('data-section');
+        const header = group.querySelector('.nav-section-header');
+        const hasActiveItem = group.querySelector('.nav-item.active') !== null;
+        if (savedStates[secId] === 'collapsed' && !hasActiveItem) {
+            group.classList.add('collapsed');
+            if (header) header.setAttribute('aria-expanded', 'false');
+        } else {
+            group.classList.remove('collapsed');
+            if (header) header.setAttribute('aria-expanded', 'true');
+        }
+
+        if (header && !header.dataset.foldBound) {
+            header.dataset.foldBound = 'true';
+            header.addEventListener('click', (e) => {
+                e.preventDefault();
+                toggleSidebarSection(secId);
+            });
+            header.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleSidebarSection(secId);
+                }
+            });
+        }
+    });
+}
+
+function toggleSidebarSection(secId) {
+    const group = document.querySelector(`.nav-section-group[data-section="${secId}"]`);
+    if (!group) return;
+    const isCollapsed = group.classList.toggle('collapsed');
+    const header = group.querySelector('.nav-section-header');
+    if (header) {
+        header.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+    }
+    try {
+        let savedStates = {};
+        const raw = localStorage.getItem('sidebar_foldable_sections');
+        if (raw) savedStates = JSON.parse(raw);
+        savedStates[secId] = isCollapsed ? 'collapsed' : 'open';
+        localStorage.setItem('sidebar_foldable_sections', JSON.stringify(savedStates));
+    } catch (e) {}
+}
+
+function ensureActiveNavSectionExpanded(tab) {
+    const activeItem = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+    if (!activeItem) return;
+    const parentGroup = activeItem.closest('.nav-section-group');
+    if (parentGroup && parentGroup.classList.contains('collapsed')) {
+        const secId = parentGroup.getAttribute('data-section');
+        parentGroup.classList.remove('collapsed');
+        const header = parentGroup.querySelector('.nav-section-header');
+        if (header) header.setAttribute('aria-expanded', 'true');
+        try {
+            let savedStates = {};
+            const raw = localStorage.getItem('sidebar_foldable_sections');
+            if (raw) savedStates = JSON.parse(raw);
+            savedStates[secId] = 'open';
+            localStorage.setItem('sidebar_foldable_sections', JSON.stringify(savedStates));
+        } catch (e) {}
+    }
+}
+
 function initNavigation() {
+    // 0. Initialize Foldable Section Groups
+    initSidebarFoldableSections();
+
     // 1. Primary Nav Items
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
@@ -12879,6 +12962,9 @@ window.loadRansomwareIncidents = loadRansomwareIncidents;
 window.openRansomwareSimulateModal = openRansomwareSimulateModal;
 window.closeRansomwareSimulateModal = closeRansomwareSimulateModal;
 window.executeRansomwareSimulation = executeRansomwareSimulation;
+window.toggleSidebarSection = toggleSidebarSection;
+window.initSidebarFoldableSections = initSidebarFoldableSections;
+window.ensureActiveNavSectionExpanded = ensureActiveNavSectionExpanded;
 
 
 
