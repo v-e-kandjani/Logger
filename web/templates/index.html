@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=1.10.0">
-    <link rel="stylesheet" href="/static/css/theme.css?v=1.10.0">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.10.0">
-    <link rel="stylesheet" href="/static/css/components.css?v=1.10.0">
-    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.10.0">
-    <link rel="stylesheet" href="/static/css/reports.css?v=1.10.0">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=1.11.0">
+    <link rel="stylesheet" href="/static/css/theme.css?v=1.11.0">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.11.0">
+    <link rel="stylesheet" href="/static/css/components.css?v=1.11.0">
+    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.11.0">
+    <link rel="stylesheet" href="/static/css/reports.css?v=1.11.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
@@ -25,7 +25,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.10.0</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.11.0</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -148,6 +148,10 @@
                         <a href="#threat-intel" class="nav-item" data-tab="threat-intel" id="nav-tab-threat-intel">
                             <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                             <span data-i18n="nav_threat_intel">Tehdit İstihbaratı (Threat Intel)</span>
+                        </a>
+                        <a href="#ueba" class="nav-item" data-tab="ueba" id="nav-tab-ueba">
+                            <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <span data-i18n="nav_ueba">Kullanıcı Davranış Analizi (UEBA)</span>
                         </a>
                         <a href="#reports" class="nav-item" data-tab="reports" id="nav-tab-reports">
                             <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -3068,6 +3072,179 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 </div>
             </section>
 
+            <!-- TAB: User & Entity Behavior Analytics - UEBA (Phase R) -->
+            <section class="tab-pane" id="pane-ueba">
+                <!-- Header Toolbar -->
+                <div class="panel" style="margin-bottom: 16px; padding: 16px 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="font-size: 2rem;">👤</div>
+                            <div>
+                                <h3 data-i18n="ueba_header" style="margin: 0 0 4px 0;">Kullanıcı &amp; Varlık Davranış Analitiği (UEBA)</h3>
+                                <p class="subtitle" style="margin: 0; font-size: 12px; color: var(--text-muted);" data-i18n="ueba_subheader">Yapay zeka tabanlı kullanıcı profilleme, imkansız seyahat tespiti, mesai dışı aktivite sapmaları ve dinamik risk skorlama.</p>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-outline btn-sm" onclick="loadUEBAView()" id="btn-ueba-refresh" style="display: inline-flex; align-items: center; gap: 6px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                <span data-i18n="ueba_btn_refresh">Yenile</span>
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="openUEBASimulateModal()" id="btn-ueba-simulate" style="display: inline-flex; align-items: center; gap: 6px;">
+                                <span>⚡</span>
+                                <span data-i18n="ueba_btn_simulate">Anomali Simülasyonu</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4 Executive KPI Cards -->
+                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                    <div class="stat-card">
+                        <div class="stat-header" data-i18n="ueba_kpi_high_risk">Yüksek Riskli Kimlikler (Risk &gt; 70)</div>
+                        <div class="stat-value" id="ueba-stat-high-risk" style="color: #ef4444;">0</div>
+                        <div class="stat-desc" style="font-size: 11px; color: var(--text-muted);" data-i18n="ueba_kpi_high_risk_sub">Anında İnceleme Gerektirir</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header" data-i18n="ueba_kpi_anomalies_today">Bugünkü Davranışsal Anomaliler</div>
+                        <div class="stat-value" id="ueba-stat-anomalies-today" style="color: #f59e0b;">0</div>
+                        <div class="stat-desc" style="font-size: 11px; color: var(--text-muted);" data-i18n="ueba_kpi_anomalies_today_sub">Seyahat &amp; Mesai Dışı Sapmalar</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header" data-i18n="ueba_kpi_monitored_users">İzlenen Aktif Kimlik Profili</div>
+                        <div class="stat-value" id="ueba-stat-monitored-users" style="color: #38bdf8;">0</div>
+                        <div class="stat-desc" style="font-size: 11px; color: var(--text-muted);" data-i18n="ueba_kpi_monitored_users_sub">Davranış Temeli (Baseline) Oluşturulan</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header" data-i18n="ueba_kpi_avg_risk">Ortalama Risk Skoru</div>
+                        <div class="stat-value" id="ueba-stat-avg-score" style="color: var(--accent);">0</div>
+                        <div class="stat-desc" style="font-size: 11px; color: var(--text-muted);" data-i18n="ueba_kpi_avg_risk_sub">100 Üzerinden Genel Güvenlik Skoru</div>
+                    </div>
+                </div>
+
+                <!-- Subtab Navigation -->
+                <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
+                    <button class="btn btn-outline btn-sm active" id="ueba-tab-btn-leaderboard" onclick="switchUEBATab('leaderboard')" style="border-bottom: 2px solid var(--accent); border-radius: 6px 6px 0 0;" data-i18n="ueba_subtab_leaderboard">🏆 Risk Sıralaması (Risk Leaderboard)</button>
+                    <button class="btn btn-outline btn-sm" id="ueba-tab-btn-anomalies" onclick="switchUEBATab('anomalies')" style="border-radius: 6px 6px 0 0;" data-i18n="ueba_subtab_anomalies">🚨 Davranışsal Anomaliler (Anomalies)</button>
+                    <button class="btn btn-outline btn-sm" id="ueba-tab-btn-profiles" onclick="switchUEBATab('profiles')" style="border-radius: 6px 6px 0 0;" data-i18n="ueba_subtab_profiles">👥 Kullanıcı Temel Profilleri (Baselines)</button>
+                </div>
+
+                <!-- Subtab 1: Risk Leaderboard -->
+                <div id="ueba-view-leaderboard">
+                    <div class="panel">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 600;" data-i18n="ueba_leaderboard_title">En Yüksek Riskli Kullanıcılar ve Varlıklar</span>
+                            <span class="badge badge-secondary" id="ueba-leaderboard-count-badge">0 Kullanıcı</span>
+                        </div>
+                        <div class="table-container" style="overflow-x: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">#</th>
+                                        <th data-i18n="ueba_th_username">Kullanıcı Kimliği (Username)</th>
+                                        <th data-i18n="ueba_th_tenant">Kiracı</th>
+                                        <th data-i18n="ueba_th_risk_score">Risk Skoru (0-100)</th>
+                                        <th data-i18n="ueba_th_risk_level">Risk Seviyesi</th>
+                                        <th data-i18n="ueba_th_anomaly_count">Toplam Anomali</th>
+                                        <th data-i18n="ueba_th_last_anomaly">Son Anomali Zamanı</th>
+                                        <th data-i18n="ueba_th_actions">İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ueba-leaderboard-tbody">
+                                    <tr><td colspan="8" style="text-align: center; color: var(--text-muted);" data-i18n="ueba_loading_leaderboard">Risk sıralaması yükleniyor...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subtab 2: Behavioral Anomalies -->
+                <div id="ueba-view-anomalies" style="display: none;">
+                    <div class="panel">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="status-indicator status-online"></span>
+                                <span style="font-weight: 600;" data-i18n="ueba_anomalies_title">Tespit Edilen Davranışsal Anomaliler ve Kanıtlar</span>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                <select id="ueba-filter-type" class="form-control" style="font-size: 11px; padding: 4px 8px;" onchange="loadUEBAAnomalies(1)">
+                                    <option value="" data-i18n="ueba_opt_all_types">Tüm Anomali Türleri</option>
+                                    <option value="IMPOSSIBLE_TRAVEL">İmkansız Seyahat (Geo-Velocity)</option>
+                                    <option value="OFF_HOURS_BURST">Mesai Dışı Aktivite Patlaması</option>
+                                    <option value="DORMANT_REACTIVATED">Uyuyan Hesap Canlanması</option>
+                                    <option value="HIGH_RISK_THRESHOLD">Kritik Risk Eşiği Aşımı</option>
+                                </select>
+                                <button class="btn btn-outline btn-sm" onclick="loadUEBAAnomalies(1)" style="font-size: 11px;">🔄 Yenile</button>
+                            </div>
+                        </div>
+                        <div class="table-container" style="overflow-x: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="ueba_th_time">Zaman (UTC)</th>
+                                        <th data-i18n="ueba_th_user">Kullanıcı</th>
+                                        <th data-i18n="ueba_th_tenant">Kiracı</th>
+                                        <th data-i18n="ueba_th_anomaly_type">Anomali Türü</th>
+                                        <th data-i18n="ueba_th_severity">Ciddiyet</th>
+                                        <th data-i18n="ueba_th_points">+Risk Puanı</th>
+                                        <th data-i18n="ueba_th_evidence">Kanıt ve Metrikler</th>
+                                        <th data-i18n="ueba_th_actions">İşlem</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ueba-anomalies-tbody">
+                                    <tr><td colspan="8" style="text-align: center; color: var(--text-muted);" data-i18n="ueba_loading_anomalies">Anomaliler yükleniyor...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border-color);">
+                            <span style="font-size: 11.5px; color: var(--text-muted);" id="ueba-anomalies-page-info">Sayfa 1</span>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn btn-outline btn-sm" id="btn-ueba-anom-prev" onclick="changeUEBAAnomalyPage(-1)">Önceki</button>
+                                <button class="btn btn-outline btn-sm" id="btn-ueba-anom-next" onclick="changeUEBAAnomalyPage(1)">Sonraki</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subtab 3: User Baselines / Profiles -->
+                <div id="ueba-view-profiles" style="display: none;">
+                    <div class="panel">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <span style="font-weight: 600;" data-i18n="ueba_profiles_title">Kullanıcı Davranış Profilleri (Baselines)</span>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="ueba-profile-search" class="form-control" placeholder="Kullanıcı ara..." style="font-size: 11px; padding: 4px 8px; width: 180px;" onkeyup="if(event.key==='Enter') loadUEBAProfiles(1)">
+                                <button class="btn btn-outline btn-sm" onclick="loadUEBAProfiles(1)" style="font-size: 11px;">🔍 Ara</button>
+                            </div>
+                        </div>
+                        <div class="table-container" style="overflow-x: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="ueba_th_username">Kullanıcı</th>
+                                        <th data-i18n="ueba_th_tenant">Kiracı</th>
+                                        <th data-i18n="ueba_th_first_seen">İlk Görülme</th>
+                                        <th data-i18n="ueba_th_last_seen">Son Etkinlik</th>
+                                        <th data-i18n="ueba_th_total_events">Toplam Olay</th>
+                                        <th data-i18n="ueba_th_known_ips">Bilinen IP Sayısı</th>
+                                        <th data-i18n="ueba_th_last_location">Son Bilinen Konum</th>
+                                        <th data-i18n="ueba_th_actions">İşlem</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ueba-profiles-tbody">
+                                    <tr><td colspan="8" style="text-align: center; color: var(--text-muted);" data-i18n="ueba_loading_profiles">Profiller yükleniyor...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border-color);">
+                            <span style="font-size: 11.5px; color: var(--text-muted);" id="ueba-profiles-page-info">Sayfa 1</span>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn btn-outline btn-sm" id="btn-ueba-prof-prev" onclick="changeUEBAProfilePage(-1)">Önceki</button>
+                                <button class="btn btn-outline btn-sm" id="btn-ueba-prof-next" onclick="changeUEBAProfilePage(1)">Sonraki</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- TAB: Health -->
             <section class="tab-pane" id="pane-health">
                 <div class="panel">
@@ -4173,13 +4350,13 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.10.0</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.11.0</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_commit">Installed Commit</div>
                         <div class="stat-value mono-code" id="upd-current-commit" style="font-size: 1.3rem;">077b73a</div>
-                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-25</div>
+                        <div class="stat-sub" id="upd-build-date">Build: 2026-10-26</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_repo">GitHub Repository</div>
@@ -8416,8 +8593,44 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.10.0.1"></script>
-    <script src="/static/js/translations.js?v=1.10.0.1"></script>
-    <script src="/static/js/app.js?v=1.10.0.1"></script>
+    <!-- MODAL: UEBA Anomaly Simulation Test -->
+    <div class="modal-backdrop" id="modal-ueba-simulate" style="display: none; z-index: 1080;">
+        <div class="modal" style="max-width: 520px; width: 95%;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 15px;">⚡ <span data-i18n="ueba_modal_sim_title">UEBA Davranışsal Anomali Simülatörü</span></h3>
+                <button class="close-btn" onclick="closeUEBASimulateModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px;">
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;" data-i18n="ueba_sim_intro">
+                    Seçilen kimlik üzerinde yapay zeka davranış motorunun geo-velocity (imkansız seyahat), mesai dışı aktivite veya uyuyan hesap canlanması anomalisi tespitini ve SIEM entegrasyonunu test edin.
+                </p>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: 600;" data-i18n="ueba_lbl_sim_scenario">Anomali Senaryosu:</label>
+                    <select id="ueba-sim-scenario" class="form-control" style="margin-top: 4px; width: 100%;">
+                        <option value="IMPOSSIBLE_TRAVEL">İmkansız Seyahat (Londra ➔ Tokyo, 30 dk içinde 9,500+ km)</option>
+                        <option value="OFF_HOURS_BURST">Mesai Dışı Kritik Aktivite Patlaması (Gece 03:00 admin işlemleri)</option>
+                        <option value="DORMANT_REACTIVATED">Uyuyan Hesap Canlanması (45 gündür inaktif hesabın ani girişi)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 12px; font-weight: 600;" data-i18n="ueba_lbl_sim_user">Test Edilecek Kullanıcı (Username):</label>
+                    <input type="text" id="ueba-sim-user" class="form-control mono-code" value="admin.support@valtrivo.internal" placeholder="kullanici@kurum.com" style="margin-top: 4px; width: 100%;">
+                </div>
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label style="font-size: 12px; font-weight: 600;" data-i18n="ueba_lbl_sim_ip">Kaynak IP (Opsiyonel):</label>
+                    <input type="text" id="ueba-sim-ip" class="form-control mono-code" placeholder="133.242.18.55 (Tokyo)" style="margin-top: 4px; width: 100%;">
+                </div>
+                <div id="ueba-sim-result-box" style="display: none; padding: 10px 12px; border-radius: 6px; font-size: 12px; margin-top: 10px;"></div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px;">
+                <button class="btn btn-outline" onclick="closeUEBASimulateModal()" data-i18n="btn_cancel">Kapat</button>
+                <button class="btn btn-primary" onclick="executeUEBASimulation()" id="btn-ueba-sim-run" data-i18n="ueba_btn_run_sim">⚡ Simülasyonu Başlat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/marked.min.js?v=1.11.0"></script>
+    <script src="/static/js/translations.js?v=1.11.0"></script>
+    <script src="/static/js/app.js?v=1.11.0"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@ import (
 	"github.com/syslog-platform/logger/internal/syslog/detector"
 	"github.com/syslog-platform/logger/internal/syslog/parser"
 	"github.com/syslog-platform/logger/internal/ti"
+	"github.com/syslog-platform/logger/internal/ueba"
 )
 
 // RawPacket represents an incoming unparsed datagram or stream frame
@@ -59,6 +60,9 @@ type Pipeline struct {
 
 	// Threat Intelligence & External IOC Feeds Engine (Phase Q)
 	tiEngine *ti.Engine
+
+	// User & Entity Behavior Analytics (UEBA) Engine (Phase R)
+	uebaEngine *ueba.Engine
 
 	// Cooldown cache for rate-limiting PostgreSQL device metadata writes
 	lastDeviceSeen sync.Map
@@ -120,6 +124,16 @@ func (p *Pipeline) SetThreatIntelEngine(engine *ti.Engine) {
 // GetThreatIntelEngine returns the active Threat Intelligence engine
 func (p *Pipeline) GetThreatIntelEngine() *ti.Engine {
 	return p.tiEngine
+}
+
+// SetUEBAEngine connects the User & Entity Behavior Analytics engine (Phase R)
+func (p *Pipeline) SetUEBAEngine(engine *ueba.Engine) {
+	p.uebaEngine = engine
+}
+
+// GetUEBAEngine returns the active UEBA engine
+func (p *Pipeline) GetUEBAEngine() *ueba.Engine {
+	return p.uebaEngine
 }
 
 // Ingest submits a raw packet into the non-blocking ring buffer
@@ -314,6 +328,15 @@ func (p *Pipeline) workerLoop() {
 			// 4. Stream Cross-Matching in Threat Intelligence Engine (Phase Q)
 			if p.tiEngine != nil {
 				p.tiEngine.ProcessSyslogMatch(context.Background(), event.Tenant, event.SourceIP.String(), "", event.Hostname, event.DeviceName, event.RawMessage)
+			}
+
+			// 5. Evaluate User & Entity Behavior Analytics (Phase R)
+			if p.uebaEngine != nil {
+				u := event.Facility
+				if event.ApplicationName != "" && event.ApplicationName != "-" {
+					u = event.ApplicationName
+				}
+				p.uebaEngine.ProcessEvent(context.Background(), event.Tenant, u, event.SourceIP.String(), event.DeviceName, event.ApplicationName, event.RawMessage, event.EventTimestamp)
 			}
 		}
 	}

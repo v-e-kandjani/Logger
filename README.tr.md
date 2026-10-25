@@ -253,6 +253,26 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.11.0** (Faz R: Kullanıcı & Varlık Davranış Analitiği — UEBA):
+  - **Dinamik Kimlik Temel Profilleri & Davranış Modelleri (`internal/models/ueba.go` & `internal/database/postgres/ueba.go`)**:
+    - Makine öğrenimi ve istatistiksel temel profiller (`ueba_user_profiles`); ilk/son etkinlik zamanları, toplam olay hacmi, benzersiz IP dağılımı, GeoIP koordinatları (şehir, ülke, enlem, boylam) ve 24 saatlik aktivite histogramları.
+    - Dinamik risk skorlama motoru (`ueba_risk_scores`); kimlik başına kayan risk puanı (0–100), risk seviyeleri (Düşük, Orta, Yüksek, Kritik), anomali sayaçları ve günlük otomatik risk puanı sönümleme (decay) zamanlayıcısı (`DecayUEBARiskScores`).
+    - Detaylı davranışsal anomali defteri (`ueba_anomalies`); anomali türleri, önem dereceleri, kanıt metinleri, risk puan artışları ve çok kiracılı (tenant) veri izolasyonu.
+  - **İmkansız Seyahat & Geo-Velocity Motoru (`internal/ueba/geovelocity.go`)**:
+    - Ardışık kimlik doğrulama veya işlem olayları arasındaki seyahat hızını hesaplayan Haversine küresel mesafe algoritması ve hız denetleyicisi.
+    - İstemci IP'lerini anında küresel koordinatlara haritalayan yerleşik hızlı GeoIP çözümleyici; 900 km/s üzerindeki hızları kritik imkansız seyahat anomalisi olarak işaretler.
+  - **Zamansal & Mesai Dışı Anomali Değerlendiricisi (`internal/ueba/temporal.go`)**:
+    - 24 saatlik aktivite dağılım histogramı sapma analizi.
+    - Standart çalışma saatleri dışındaki (22:00–06:00 ve hafta sonları) şüpheli yönetici (admin) aktivite patlamalarını tespit eder.
+  - **Çekirdek UEBA Motoru & SIEM Alarm Entegrasyonu (`internal/ueba/engine.go` & `internal/siem/catalog/catalog.go`)**:
+    - Syslog akış halka tamponuna doğrudan bağlanan gerçek zamanlı olay işleyici (`internal/syslog/pipeline/pipeline.go`).
+    - Özel MITRE ATT&CK kuralları eklendi: `UEBA-IMPOSSIBLE-TRAVEL` (P1 / Kritik, T1078), `UEBA-SUSPICIOUS-OFFHOURS-ADMIN` (P2 / Yüksek, T1078), `UEBA-DORMANT-ACCOUNT-REACTIVATION` (P2 / Yüksek, T1078) ve `UEBA-USER-HIGH-RISK-THRESHOLD` (P1 / Kritik, T1078).
+    - Sentetik anomali simülatörü (`SimulateAnomaly`) ve operatör risk skoru sıfırlama uç noktası (`ResetUEBARiskScore`).
+  - **UEBA Web Operasyon Konsolu (`web/templates/index.html`, `web/static/js/app.js` & `translations.js`)**:
+    - 4 yönetici KPI kartı (Yüksek Riskli Kimlikler, Bugünkü Anomaliler, İzlenen Profiller, Ortalama Risk Skoru) içeren özel UEBA paneli.
+    - 3 Etkileşimli Alt Sekme: Tek tıkla risk sıfırlama ve log aramalı Risk Sıralaması (Leaderboard), tür filtreli ve sayfalamalı Davranışsal Anomaliler ve Öğrenilen Kullanıcı Profilleri.
+    - Güvenlik ekiplerinin anomali tespitini ve SIEM alarm üretimini test etmesini sağlayan Etkileşimli Anomali Simülatörü modalı.
+
 - **v1.10.0** (Faz Q: Bulut Tehdit İstihbaratı & Harici IOC Beslemeleri):
   - **Bellek İçi Kilitsiz Tehdit Eşleştirici (`internal/ti/matcher.go`)**:
     - IP adresleri (IPv4/IPv6), alan adları (joker karakterli üst/alt alan adı eşleştirme), URL yolları ve kriptografik dosya özetleri (MD5, SHA-1, SHA-256) için atomik anlık görüntü (atomic snapshot) tabanlı yüksek başarımlı arama motoru.

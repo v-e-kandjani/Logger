@@ -36,6 +36,7 @@ import (
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 	"github.com/syslog-platform/logger/internal/ti"
 	"github.com/syslog-platform/logger/internal/timestamp"
+	"github.com/syslog-platform/logger/internal/ueba"
 	"github.com/syslog-platform/logger/internal/version"
 )
 
@@ -65,6 +66,7 @@ type Handler struct {
 	soarEngine       *soar.Engine
 	siemEngine       *correlation.Engine
 	tiEngine         *ti.Engine
+	uebaEngine       *ueba.Engine
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
@@ -98,6 +100,10 @@ func (h *Handler) SetSIEMEngine(e *correlation.Engine) {
 
 func (h *Handler) SetThreatIntelEngine(e *ti.Engine) {
 	h.tiEngine = e
+}
+
+func (h *Handler) SetUEBAEngine(e *ueba.Engine) {
+	h.uebaEngine = e
 }
 
 func NewHandler(
@@ -377,6 +383,14 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/ti/matches", h.requireAuth(h.handleTIMatches))
 	mux.HandleFunc("/api/v1/ti/stats", h.requireAuth(h.handleTIStats))
 	mux.HandleFunc("/api/v1/ti/simulate", h.requireAuth(h.handleTISimulate))
+
+	// User & Entity Behavior Analytics - UEBA (Phase R)
+	mux.HandleFunc("/api/v1/ueba/stats", h.requireAuth(h.handleUEBAStats))
+	mux.HandleFunc("/api/v1/ueba/leaderboard", h.requireAuth(h.handleUEBARiskLeaderboard))
+	mux.HandleFunc("/api/v1/ueba/profiles", h.requireAuth(h.handleUEBAProfiles))
+	mux.HandleFunc("/api/v1/ueba/anomalies", h.requireAuth(h.handleUEBAAnomalies))
+	mux.HandleFunc("/api/v1/ueba/simulate", h.requireAuth(h.handleUEBASimulate))
+	mux.HandleFunc("/api/v1/ueba/reset-risk", h.requireAuth(h.handleUEBAResetRisk))
 
 	mux.HandleFunc("/api/v1/endpoint/tasks", h.requireAuth(h.handleEndpointTasks))
 	mux.HandleFunc("/api/v1/endpoint/tasks/", h.requireAuth(h.handleEndpointTaskDetail))

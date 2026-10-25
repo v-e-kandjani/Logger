@@ -416,6 +416,7 @@ function switchTab(tab, targetSectionId = null) {
         if (tab === 'archives') loadArchives();
         if (tab === 'reports') loadReportsView();
         if (tab === 'threat-intel') loadThreatIntelView();
+        if (tab === 'ueba') loadUEBAView();
         if (tab === 'health') loadHealthTelemetry();
         if (tab === 'settings') {
             loadSettings();
@@ -3396,6 +3397,8 @@ window.onLanguageChanged = (lang) => {
         if (typeof loadReportsView === 'function') loadReportsView();
     } else if (activeTab === 'threat-intel') {
         if (typeof loadThreatIntelView === 'function') loadThreatIntelView();
+    } else if (activeTab === 'ueba') {
+        if (typeof loadUEBAView === 'function') loadUEBAView();
     } else if (activeTab === 'endpoint') {
         loadEndpointDashboard();
         if (typeof currentEndpointSection !== 'undefined') {
@@ -14118,6 +14121,414 @@ window.openTISimulateModal = openTISimulateModal;
 window.closeTISimulateModal = closeTISimulateModal;
 window.executeTISimulation = executeTISimulation;
 window.jumpToLogSearch = jumpToLogSearch;
+
+/* =========================================================================
+   USER & ENTITY BEHAVIOR ANALYTICS (UEBA - PHASE R)
+   ========================================================================= */
+
+let currentUEBATab = 'leaderboard';
+let uebaAnomaliesPage = 1;
+let uebaProfilesPage = 1;
+const UEBA_PAGE_SIZE = 25;
+
+async function loadUEBAView() {
+    await loadUEBAStats();
+    if (currentUEBATab === 'leaderboard') {
+        loadUEBALeaderboard();
+    } else if (currentUEBATab === 'anomalies') {
+        loadUEBAAnomalies(uebaAnomaliesPage);
+    } else if (currentUEBATab === 'profiles') {
+        loadUEBAProfiles(uebaProfilesPage);
+    }
+}
+
+async function loadUEBAStats() {
+    try {
+        const res = await fetch('/api/v1/ueba/stats');
+        if (!res.ok) throw new Error('Failed to load UEBA stats');
+        const data = await res.json();
+        
+        const highRiskEl = document.getElementById('ueba-stat-high-risk');
+        if (highRiskEl) highRiskEl.textContent = (data.high_risk_users || 0).toLocaleString();
+
+        const anomTodayEl = document.getElementById('ueba-stat-anomalies-today');
+        if (anomTodayEl) anomTodayEl.textContent = (data.anomalies_today || 0).toLocaleString();
+
+        const monitoredEl = document.getElementById('ueba-stat-monitored-users');
+        if (monitoredEl) monitoredEl.textContent = (data.monitored_users || 0).toLocaleString();
+
+        const avgScoreEl = document.getElementById('ueba-stat-avg-score');
+        if (avgScoreEl) {
+            const avg = typeof data.average_risk_score === 'number' ? data.average_risk_score.toFixed(1) : '0.0';
+            avgScoreEl.textContent = avg + ' / 100';
+        }
+    } catch (err) {
+        console.error('Error loading UEBA stats:', err);
+    }
+}
+
+function switchUEBATab(tabName) {
+    currentUEBATab = tabName;
+    ['leaderboard', 'anomalies', 'profiles'].forEach(t => {
+        const btn = document.getElementById(`ueba-tab-btn-${t}`);
+        const view = document.getElementById(`ueba-view-${t}`);
+        if (btn) {
+            if (t === tabName) {
+                btn.classList.add('active');
+                btn.style.borderBottom = '2px solid var(--accent)';
+            } else {
+                btn.classList.remove('active');
+                btn.style.borderBottom = 'none';
+            }
+        }
+        if (view) {
+            view.style.display = (t === tabName) ? 'block' : 'none';
+        }
+    });
+
+    if (tabName === 'leaderboard') loadUEBALeaderboard();
+    else if (tabName === 'anomalies') loadUEBAAnomalies(1);
+    else if (tabName === 'profiles') loadUEBAProfiles(1);
+}
+
+function getUEBARiskBadge(score, level) {
+    let color = '#22c55e';
+    let bg = 'rgba(34, 197, 94, 0.15)';
+    let text = level || 'LOW';
+    if (score >= 80 || level === 'CRITICAL') {
+        color = '#ef4444';
+        bg = 'rgba(239, 68, 68, 0.2)';
+        text = 'CRITICAL';
+    } else if (score >= 60 || level === 'HIGH') {
+        color = '#f97316';
+        bg = 'rgba(249, 115, 22, 0.2)';
+        text = 'HIGH';
+    } else if (score >= 30 || level === 'MEDIUM') {
+        color = '#eab308';
+        bg = 'rgba(234, 179, 8, 0.2)';
+        text = 'MEDIUM';
+    }
+    return `<span class="badge" style="background: ${bg}; color: ${color}; font-weight: 700; border: 1px solid ${color};">${score} (${text})</span>`;
+}
+
+async function loadUEBALeaderboard() {
+    const tbody = document.getElementById('ueba-leaderboard-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Yükleniyor...</td></tr>`;
+
+    try {
+        const res = await fetch('/api/v1/ueba/leaderboard?limit=30');
+        if (!res.ok) throw new Error('Failed to fetch leaderboard');
+        const data = await res.json();
+        const items = data.items || [];
+
+        const countBadge = document.getElementById('ueba-leaderboard-count-badge');
+        if (countBadge) countBadge.textContent = `${items.length} Kullanıcı`;
+
+        if (items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Henüz yüksek riskli kullanıcı tespit edilmedi.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = items.map((item, idx) => {
+            const lastTime = item.last_anomaly_at ? new Date(item.last_anomaly_at).toLocaleString() : '-';
+            const riskBadge = getUEBARiskBadge(item.risk_score, item.risk_level);
+            const escapedUser = escapeHtml(item.username);
+            return `
+                <tr>
+                    <td style="font-weight: 600; color: var(--text-muted);">${idx + 1}</td>
+                    <td>
+                        <strong style="color: var(--accent); cursor: pointer;" onclick="jumpToLogSearch('${escapedUser}')">${escapedUser}</strong>
+                    </td>
+                    <td><span class="badge badge-secondary">${escapeHtml(item.tenant_slug || 'default')}</span></td>
+                    <td>${riskBadge}</td>
+                    <td><span style="font-weight: 600;">${item.risk_level || 'LOW'}</span></td>
+                    <td><span class="badge" style="background: var(--bg-card);">${item.anomaly_count || 0}</span></td>
+                    <td style="font-size: 11.5px; color: var(--text-muted);">${lastTime}</td>
+                    <td>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn btn-outline btn-sm" style="font-size: 11px; padding: 2px 6px;" onclick="resetUserRisk('${escapedUser}')" title="Riski Sıfırla">
+                                ↺ Sıfırla
+                            </button>
+                            <button class="btn btn-outline btn-sm" style="font-size: 11px; padding: 2px 6px;" onclick="jumpToLogSearch('${escapedUser}')" title="Loglarda Ara">
+                                🔍 Loglar
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('Error loading UEBA leaderboard:', err);
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 24px;">Hata: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+async function loadUEBAAnomalies(page = 1) {
+    uebaAnomaliesPage = page;
+    const tbody = document.getElementById('ueba-anomalies-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Yükleniyor...</td></tr>`;
+
+    const filterType = document.getElementById('ueba-filter-type')?.value || '';
+    let url = `/api/v1/ueba/anomalies?page=${page}&limit=${UEBA_PAGE_SIZE}`;
+    if (filterType) url += `&type=${encodeURIComponent(filterType)}`;
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to load anomalies');
+        const data = await res.json();
+        const anomalies = data.anomalies || [];
+        const total = data.total || 0;
+
+        const pageInfo = document.getElementById('ueba-anomalies-page-info');
+        if (pageInfo) {
+            const maxPage = Math.max(1, Math.ceil(total / UEBA_PAGE_SIZE));
+            pageInfo.textContent = `Sayfa ${page} / ${maxPage} (Toplam ${total} anomali)`;
+        }
+
+        const prevBtn = document.getElementById('btn-ueba-anom-prev');
+        const nextBtn = document.getElementById('btn-ueba-anom-next');
+        if (prevBtn) prevBtn.disabled = page <= 1;
+        if (nextBtn) nextBtn.disabled = page * UEBA_PAGE_SIZE >= total;
+
+        if (anomalies.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Kayıtlı anomali bulunamadı.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = anomalies.map(a => {
+            const time = a.created_at ? new Date(a.created_at).toLocaleString() : '-';
+            let sevColor = '#38bdf8';
+            if (a.severity === 'critical') sevColor = '#ef4444';
+            else if (a.severity === 'high') sevColor = '#f97316';
+            else if (a.severity === 'medium') sevColor = '#eab308';
+
+            let typeBadge = `<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">${escapeHtml(a.anomaly_type)}</span>`;
+            if (a.anomaly_type === 'IMPOSSIBLE_TRAVEL') {
+                typeBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">✈️ İmkansız Seyahat</span>`;
+            } else if (a.anomaly_type === 'OFF_HOURS_BURST') {
+                typeBadge = `<span class="badge" style="background: rgba(249, 115, 22, 0.2); color: #f97316;">🌙 Mesai Dışı Admin</span>`;
+            } else if (a.anomaly_type === 'DORMANT_REACTIVATED') {
+                typeBadge = `<span class="badge" style="background: rgba(234, 179, 8, 0.2); color: #eab308;">💤 Uyuyan Hesap Canlanması</span>`;
+            }
+
+            const escapedUser = escapeHtml(a.username);
+            const evidence = escapeHtml(a.evidence || a.description || '-');
+
+            return `
+                <tr>
+                    <td style="font-size: 11.5px; color: var(--text-muted); white-space: nowrap;">${time}</td>
+                    <td><strong style="color: var(--accent); cursor: pointer;" onclick="jumpToLogSearch('${escapedUser}')">${escapedUser}</strong></td>
+                    <td><span class="badge badge-secondary">${escapeHtml(a.tenant_slug || 'default')}</span></td>
+                    <td>${typeBadge}</td>
+                    <td><span class="badge" style="border: 1px solid ${sevColor}; color: ${sevColor};">${escapeHtml(a.severity).toUpperCase()}</span></td>
+                    <td><strong style="color: #ef4444;">+${a.risk_points}</strong></td>
+                    <td style="font-size: 11.5px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${evidence}">${evidence}</td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" style="font-size: 11px; padding: 2px 6px;" onclick="jumpToLogSearch('${escapedUser}')">
+                            🔍 Loglar
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('Error loading UEBA anomalies:', err);
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 24px;">Hata: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function changeUEBAAnomalyPage(delta) {
+    const newPage = uebaAnomaliesPage + delta;
+    if (newPage >= 1) {
+        loadUEBAAnomalies(newPage);
+    }
+}
+
+async function loadUEBAProfiles(page = 1) {
+    uebaProfilesPage = page;
+    const tbody = document.getElementById('ueba-profiles-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Yükleniyor...</td></tr>`;
+
+    const search = document.getElementById('ueba-profile-search')?.value || '';
+    let url = `/api/v1/ueba/profiles?page=${page}&limit=${UEBA_PAGE_SIZE}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to load profiles');
+        const data = await res.json();
+        const profiles = data.profiles || [];
+        const total = data.total || 0;
+
+        const pageInfo = document.getElementById('ueba-profiles-page-info');
+        if (pageInfo) {
+            const maxPage = Math.max(1, Math.ceil(total / UEBA_PAGE_SIZE));
+            pageInfo.textContent = `Sayfa ${page} / ${maxPage} (Toplam ${total} profil)`;
+        }
+
+        const prevBtn = document.getElementById('btn-ueba-prof-prev');
+        const nextBtn = document.getElementById('btn-ueba-prof-next');
+        if (prevBtn) prevBtn.disabled = page <= 1;
+        if (nextBtn) nextBtn.disabled = page * UEBA_PAGE_SIZE >= total;
+
+        if (profiles.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Profil bulunamadı.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = profiles.map(p => {
+            const firstSeen = p.first_seen ? new Date(p.first_seen).toLocaleDateString() : '-';
+            const lastSeen = p.last_seen ? new Date(p.last_seen).toLocaleString() : '-';
+            const ipCount = Array.isArray(p.known_ips) ? p.known_ips.length : 0;
+            const location = (p.last_city || p.last_country) ? `${p.last_city || ''}${p.last_city ? ', ' : ''}${p.last_country || ''}` : '-';
+            const escapedUser = escapeHtml(p.username);
+
+            return `
+                <tr>
+                    <td><strong style="color: var(--accent); cursor: pointer;" onclick="jumpToLogSearch('${escapedUser}')">${escapedUser}</strong></td>
+                    <td><span class="badge badge-secondary">${escapeHtml(p.tenant_slug || 'default')}</span></td>
+                    <td style="font-size: 11.5px; color: var(--text-muted);">${firstSeen}</td>
+                    <td style="font-size: 11.5px; color: var(--text-muted);">${lastSeen}</td>
+                    <td><strong>${(p.total_events || 0).toLocaleString()}</strong></td>
+                    <td><span class="badge" style="background: var(--bg-card);">${ipCount} IP</span></td>
+                    <td style="font-size: 11.5px;">📍 ${escapeHtml(location)}</td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" style="font-size: 11px; padding: 2px 6px;" onclick="jumpToLogSearch('${escapedUser}')">
+                            🔍 Loglar
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error('Error loading UEBA profiles:', err);
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 24px;">Hata: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function changeUEBAProfilePage(delta) {
+    const newPage = uebaProfilesPage + delta;
+    if (newPage >= 1) {
+        loadUEBAProfiles(newPage);
+    }
+}
+
+function openUEBASimulateModal() {
+    const modal = document.getElementById('modal-ueba-simulate');
+    if (modal) {
+        modal.style.display = 'flex';
+        const resBox = document.getElementById('ueba-sim-result-box');
+        if (resBox) resBox.style.display = 'none';
+    }
+}
+
+function closeUEBASimulateModal() {
+    const modal = document.getElementById('modal-ueba-simulate');
+    if (modal) modal.style.display = 'none';
+}
+
+async function executeUEBASimulation() {
+    const scenario = document.getElementById('ueba-sim-scenario')?.value || 'IMPOSSIBLE_TRAVEL';
+    const user = document.getElementById('ueba-sim-user')?.value.trim() || 'admin.support@valtrivo.internal';
+    const ip = document.getElementById('ueba-sim-ip')?.value.trim() || '';
+    const runBtn = document.getElementById('btn-ueba-sim-run');
+    const resBox = document.getElementById('ueba-sim-result-box');
+
+    if (runBtn) {
+        runBtn.disabled = true;
+        runBtn.innerHTML = '⏳ Simüle Ediliyor...';
+    }
+
+    try {
+        const payload = {
+            username: user,
+            anomaly_type: scenario,
+            source_ip: ip
+        };
+
+        const res = await fetch('/api/v1/ueba/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Simülasyon başarısız');
+
+        if (resBox) {
+            resBox.style.display = 'block';
+            resBox.style.background = 'rgba(34, 197, 94, 0.15)';
+            resBox.style.border = '1px solid #22c55e';
+            resBox.style.color = '#22c55e';
+            resBox.innerHTML = `
+                <div style="font-weight: 600; margin-bottom: 4px;">✅ Simülasyon Başarılı &amp; SIEM Alarmı Tetiklendi!</div>
+                <div style="font-size: 11.5px; color: var(--text-main);">
+                    <strong>Anomali:</strong> ${escapeHtml(data.anomaly?.anomaly_type || scenario)}<br>
+                    <strong>Ciddiyet:</strong> ${escapeHtml(data.anomaly?.severity || 'HIGH').toUpperCase()}<br>
+                    <strong>Eklenen Risk:</strong> +${data.anomaly?.risk_points || 35} Puan<br>
+                    <strong>Kanıt:</strong> ${escapeHtml(data.anomaly?.evidence || '')}
+                </div>
+            `;
+        }
+
+        // Refresh UEBA telemetry
+        loadUEBAView();
+        if (typeof playNotificationSound === 'function') playNotificationSound();
+    } catch (err) {
+        console.error('UEBA Simulation error:', err);
+        if (resBox) {
+            resBox.style.display = 'block';
+            resBox.style.background = 'rgba(239, 68, 68, 0.15)';
+            resBox.style.border = '1px solid #ef4444';
+            resBox.style.color = '#ef4444';
+            resBox.textContent = `Hata: ${err.message}`;
+        }
+    } finally {
+        if (runBtn) {
+            runBtn.disabled = false;
+            runBtn.innerHTML = '⚡ Simülasyonu Başlat';
+        }
+    }
+}
+
+async function resetUserRisk(username) {
+    if (!username) return;
+    const confirmMsg = `"${username}" ${window.i18n ? window.i18n.t('ueba_reset_confirm') : "adlı kullanıcının risk skorunu 0'a sıfırlamak istediğinize emin misiniz?"}`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const res = await fetch('/api/v1/ueba/reset-risk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Sıfırlama başarısız');
+
+        alert(`"${username}" için risk skoru başarıyla sıfırlandı.`);
+        loadUEBAView();
+    } catch (err) {
+        console.error('Error resetting user risk:', err);
+        alert(`Hata: ${err.message}`);
+    }
+}
+
+window.loadUEBAView = loadUEBAView;
+window.switchUEBATab = switchUEBATab;
+window.loadUEBAStats = loadUEBAStats;
+window.loadUEBALeaderboard = loadUEBALeaderboard;
+window.loadUEBAAnomalies = loadUEBAAnomalies;
+window.changeUEBAAnomalyPage = changeUEBAAnomalyPage;
+window.loadUEBAProfiles = loadUEBAProfiles;
+window.changeUEBAProfilePage = changeUEBAProfilePage;
+window.openUEBASimulateModal = openUEBASimulateModal;
+window.closeUEBASimulateModal = closeUEBASimulateModal;
+window.executeUEBASimulation = executeUEBASimulation;
+window.resetUserRisk = resetUserRisk;
+
 
 
 

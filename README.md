@@ -264,6 +264,26 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.11.0** (Phase R: User & Entity Behavior Analytics — UEBA):
+  - **Dynamic Identity Baselining & Behavioral Models (`internal/models/ueba.go` & `internal/database/postgres/ueba.go`)**:
+    - Machine learning & statistical baseline profiles (`ueba_user_profiles`) capturing first/last activity timestamps, aggregate event volumes, unique IP distributions, GeoIP coordinates (cities, countries, latitudes, longitudes), and 24-hour hourly activity histograms.
+    - Dynamic risk scoring engine (`ueba_risk_scores`) maintaining sliding risk scores (0–100) per identity, risk severity categorization (Low, Medium, High, Critical), anomaly counters, and automated daily risk score decay ticker (`DecayUEBARiskScores`).
+    - Granular behavioral anomaly ledger (`ueba_anomalies`) indexing anomaly types, severities, evidence strings, delta risk points, and tenant scoping.
+  - **Impossible Travel & Geo-Velocity Engine (`internal/ueba/geovelocity.go`)**:
+    - Haversine great-circle distance algorithm and velocity calculator evaluating travel speeds between consecutive authentication/activity events.
+    - Embedded fast GeoIP resolver mapping client IPs to global coordinates; flags speed exceeding 900 km/h as critical impossible travel anomalies.
+  - **Temporal & Off-Hours Anomaly Evaluator (`internal/ueba/temporal.go`)**:
+    - 24-hour activity distribution histogram drift analysis.
+    - Detects anomalous administrative activity bursts outside standard business hours (22:00–06:00 and weekends).
+  - **Core UEBA Engine & SIEM Alert Integration (`internal/ueba/engine.go` & `internal/siem/catalog/catalog.go`)**:
+    - Real-time event processor wired directly into the syslog streaming ring buffer pipeline (`internal/syslog/pipeline/pipeline.go`).
+    - Added dedicated MITRE ATT&CK rules: `UEBA-IMPOSSIBLE-TRAVEL` (P1 / Critical, T1078), `UEBA-SUSPICIOUS-OFFHOURS-ADMIN` (P2 / High, T1078), `UEBA-DORMANT-ACCOUNT-REACTIVATION` (P2 / High, T1078), and `UEBA-USER-HIGH-RISK-THRESHOLD` (P1 / Critical, T1078).
+    - Synthetic anomaly simulator (`SimulateAnomaly`) and operator risk score reset endpoint (`ResetUEBARiskScore`).
+  - **UEBA Web Operations Console (`web/templates/index.html`, `web/static/js/app.js` & `translations.js`)**:
+    - Dedicated UEBA dashboard with 4 executive KPI cards (High-Risk Users, Anomalies Today, Monitored Identities, Average Risk Score).
+    - 3 Interactive Subtabs: Risk Leaderboard with 1-click risk reset and log search, Behavioral Anomalies explorer with type filtering and pagination, and Learned User Baselines.
+    - Interactive Anomaly Simulator modal allowing security teams to test and verify UEBA detections and SIEM alert dispatches.
+
 - **v1.10.0** (Phase Q: Cloud Threat Intelligence & External IOC Feeds):
   - **In-Memory Lock-Free Threat Matcher (`internal/ti/matcher.go`)**:
     - High-throughput atomic snapshot lookups supporting IP addresses (IPv4/IPv6), domain names (with wildcard parent/subdomain matching), URL paths, and cryptographic file hashes (MD5, SHA-1, SHA-256).

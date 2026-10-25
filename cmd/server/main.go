@@ -31,6 +31,7 @@ import (
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
 	"github.com/syslog-platform/logger/internal/ti"
 	"github.com/syslog-platform/logger/internal/timestamp"
+	"github.com/syslog-platform/logger/internal/ueba"
 )
 
 func main() {
@@ -150,6 +151,13 @@ func main() {
 		log.Println("[PostgreSQL] Cloud Threat Intelligence & External IOC Feeds (Phase Q) schema verified")
 	}
 
+	// Verify & auto-migrate User & Entity Behavior Analytics (Phase R) schema
+	if err := pgDB.EnsureUEBASchema(context.Background()); err != nil {
+		log.Printf("[PostgreSQL] Warning ensuring UEBA schema: %v", err)
+	} else {
+		log.Println("[PostgreSQL] User & Entity Behavior Analytics - UEBA (Phase R) schema verified")
+	}
+
 	// 2. Initialize in-memory Device Cache
 	deviceCache := postgres.NewDeviceCache(pgDB)
 	log.Println("[DeviceCache] Initialized active device lookup cache")
@@ -240,6 +248,14 @@ func main() {
 	pipe.SetThreatIntelEngine(tiEngine)
 	log.Println("[Threat Intel] Cloud Threat Intelligence & External IOC Feeds Engine active with sub-microsecond stream matching")
 
+	// Initialize User & Entity Behavior Analytics (UEBA) Engine (Phase R)
+	uebaEngine := ueba.NewEngine(pgDB)
+	uebaEngine.SetSIEMDispatcher(siemEngine)
+	uebaEngine.Start()
+	defer uebaEngine.Stop()
+	pipe.SetUEBAEngine(uebaEngine)
+	log.Println("[UEBA] User & Entity Behavior Analytics Engine active with dynamic risk scoring")
+
 	// Start background critical alert SMTP broadcast listener
 	go func() {
 		alertCh := siemEngine.SubscribeAlerts()
@@ -320,6 +336,7 @@ func main() {
 	apiHandler.SetSOAREngine(soarEngine)
 	apiHandler.SetSIEMEngine(siemEngine)
 	apiHandler.SetThreatIntelEngine(tiEngine)
+	apiHandler.SetUEBAEngine(uebaEngine)
 	apiHandler.StartMitreAutoSync(appCtx)
 	apiHandler.StartSupportBundleCleaner(appCtx)
 	apiHandler.StartEdgeHealthMonitor(appCtx)
