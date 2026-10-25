@@ -151,6 +151,45 @@ func (e *Engine) ReconcilePendingArchives(ctx context.Context) int {
 	return reconciled
 }
 
+// ReconcileArchiveByID stamps a single archive on-demand given its UUID.
+func (e *Engine) ReconcileArchiveByID(ctx context.Context, id uuid.UUID) (*models.LogArchive, error) {
+	if e.provider == nil || e.pgDB == nil {
+		return nil, fmt.Errorf("archive engine or database not initialized")
+	}
+	arch, err := e.pgDB.GetArchive(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("archive not found: %w", err)
+	}
+	archivePath := arch.ArchivePath
+	if archivePath == "" {
+		return nil, fmt.Errorf("archive path is empty in database for %s", id)
+	}
+	if _, err := os.Stat(archivePath); err != nil {
+		// Fallback check in baseDir
+		fallbackPath := filepath.Join(e.baseDir, filepath.Base(archivePath))
+		if _, fbErr := os.Stat(fallbackPath); fbErr == nil {
+			archivePath = fallbackPath
+		} else {
+			return nil, fmt.Errorf("archive file not found on disk at %s: %w", arch.ArchivePath, err)
+		}
+	}
+
+	res, err := e.provider.Timestamp(ctx, archivePath)
+	if err != nil {
+		_ = e.pgDB.UpdateArchiveTimestamp(ctx, arch.ID, "FAILED", "", err.Error())
+		return nil, fmt.Errorf("timestamp provider error: %w", err)
+	}
+	status := "STAMPED"
+	if res.EvidenceFile == "" {
+		status = "ARCHIVED_NO_STAMP"
+	}
+	_ = e.pgDB.UpdateArchiveTimestamp(ctx, arch.ID, status, res.EvidenceFile, "")
+	arch.TimestampStatus = status
+	arch.TimestampEvidencePath = res.EvidenceFile
+	log.Printf("[Archive Engine] Reconciled individual archive %s (%s) -> %s", arch.ID, arch.ArchiveName, status)
+	return arch, nil
+}
+
 // CreateArchiveSlice queries an immutable time slice for default tenant
 func (e *Engine) CreateArchiveSlice(ctx context.Context, start, end time.Time) (*models.LogArchive, error) {
 	return e.CreateArchiveSliceForTenant(ctx, "default", start, end)

@@ -264,6 +264,14 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.15** (Law 5651 Single-Archive On-Demand Sealing & Robust API Error Handling, EDR Netmon Browser False-Positive Prevention):
+  - **Single-Archive On-Demand Reconcile (`POST /api/v1/archives/reconcile?id=<uuid>`)**:
+    - Enhanced `ReconcileArchiveByID` to target individual pending log archives directly from the table row action button (`🔄 Seal Now`), providing instant feedback without triggering timeouts or processing the entire pending batch.
+    - Updated `handleReconcileArchives` to strictly return JSON in all error and success states (`Content-Type: application/json`), eliminating plain-text responses.
+    - Hardened UI `reconcileArchives(archiveId)` in `app.js` with content-type sniffing and fallback HTTP error extraction to prevent `JSON.parse: unexpected character at line 1 column 1` exceptions.
+  - **EDR Network Threat Engine False-Positive Refinement (`agent/internal/netmon/netmon.go`)**:
+    - Refined periodic C2 beaconing detection heuristic to exempt persistent TCP keep-alive sockets established by standard web browsers (`chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`, `opera.exe`) and OS system services (`svchost.exe`, `system`) communicating over standard web/push notification ports (`80`, `443`, `5228`, `8443`).
+
 - **v1.9.14** (Law 5651 Forensic Archive Pending Resolution, Distributed Lease Recovery & Adaptive Auto-Fallback):
   - **Archive Lease Recovery & Resilience Engine (`ClaimNextArchiveJob` / `internal/database/postgres/postgres.go`)**:
     - Expanded distributed job lease recovery predicate to automatically reclaim orphaned jobs in `TSA_PENDING` and `SEALED` states when lease expires (`lease_until < NOW()`), preventing background sealing tasks from remaining stuck after service restarts or network timeouts.

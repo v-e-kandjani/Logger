@@ -1406,11 +1406,33 @@ func (h *Handler) handleCreateArchiveNow(w http.ResponseWriter, r *http.Request)
 
 func (h *Handler) handleReconcileArchives(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"status": "error", "message": "Method not allowed"})
 		return
 	}
 	ctx, cancel := contextWithTimeout(r, 60*time.Second)
 	defer cancel()
+
+	idStr := r.URL.Query().Get("id")
+	if idStr != "" {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"status": "error", "message": "Geçersiz arşiv ID / Invalid archive ID"})
+			return
+		}
+		if h.archEngine != nil {
+			arch, err := h.archEngine.ReconcileArchiveByID(ctx, id)
+			if err != nil {
+				writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "Mühürleme hatası: " + err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{
+				"status":     "success",
+				"reconciled": 1,
+				"message":    fmt.Sprintf("Arşiv başarıyla mühürlendi / Archive %s successfully stamped (%s)", arch.ArchiveName, arch.TimestampStatus),
+			})
+			return
+		}
+	}
 
 	reconciled := 0
 	if h.archEngine != nil {

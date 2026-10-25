@@ -253,6 +253,14 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.15** (5651 Sayılı Kanun Tekil Arşiv İsteğe Bağlı Mühürleme & Güçlendirilmiş API Hata Yönetimi, EDR Netmon Tarayıcı Yanlış Pozitif Engelleme):
+  - **Tekil Arşiv İsteğe Bağlı Uzlaştırma (`POST /api/v1/archives/reconcile?id=<uuid>`)**:
+    - Arşiv tablosundaki satır bazlı aksiyon butonuna (`🔄 Mühürle / Seal Now`) doğrudan hedef arşivi tekil olarak damgalayan `ReconcileArchiveByID` yeteneği kazandırıldı; tüm bekleyen havuzunu beklemeksizin anlık geri bildirim sağlandı.
+    - `handleReconcileArchives` uç noktasının tüm başarı ve hata durumlarında katı şekilde JSON (`Content-Type: application/json`) döndürmesi garanti altına alındı.
+    - `app.js` içerisindeki `reconcileArchives(archiveId)` fonksiyonu içerik türü kontrolü ve HTTP durum çözümlemesi ile zırhlandırılarak `JSON.parse: unexpected character at line 1 column 1` hataları tamamen giderildi.
+  - **EDR Ağ Tehdit Motoru Yanlış Pozitif İyileştirmesi (`agent/internal/netmon/netmon.go`)**:
+    - Standart web tarayıcıları (`chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`, `opera.exe`) ve işletim sistemi servislerinin (`svchost.exe`, `system`) standart web/bildirim portları (`80`, `443`, `5228`, `8443`) üzerinden kurduğu kalıcı TCP keep-alive bağlantıları C2 beaconing heuristiğinden muaf tutuldu.
+
 - **v1.9.14** (5651 Sayılı Kanun Bekleyen Arşiv Düzeltmesi, Dağıtık Kiralama Kurtarma & Uyarlanabilir Otomatik Yedekleme):
   - **Arşiv Kiralama Kurtarma & Dayanıklılık Motoru (`ClaimNextArchiveJob` / `internal/database/postgres/postgres.go`)**:
     - Dağıtık arka plan kiralama kurtarma koşulu genişletilerek kiralama süresi dolduğunda (`lease_until < NOW()`) askıda kalan `TSA_PENDING` ve `SEALED` durumundaki görevlerin otomatik olarak yeniden talep edilmesi sağlandı; sunucu yeniden başlatmaları veya ağ kesintilerinde mühürleme işlerinin takılı kalması engellendi.

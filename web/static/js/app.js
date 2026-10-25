@@ -1263,7 +1263,7 @@ async function loadArchives() {
                         <a href="/api/v1/archives/download?id=${a.id}&type=evidence" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download legal proof / KamuSM timestamp (.zd)" download>
                             ${t('btn_evidence_dl', '🛡️ Evidence (.zd)')}
                         </a>` : `
-                        <button onclick="reconcileArchives()" class="btn btn-warning" style="padding: 3px 8px; font-size: 11px;" title="Bekleyen arşivi yeniden mühürle / Re-stamp pending archive">
+                        <button onclick="reconcileArchives('${a.id}')" class="btn btn-warning" style="padding: 3px 8px; font-size: 11px;" title="Bekleyen arşivi yeniden mühürle / Re-stamp pending archive">
                             🔄 ${t('btn_restamp', 'Mühürle')}
                         </button>`}
                     </div>
@@ -1275,17 +1275,37 @@ async function loadArchives() {
     }
 }
 
-window.reconcileArchives = async function() {
+window.reconcileArchives = async function(archiveId) {
     const t = (k, fb) => (window.i18n ? window.i18n.t(k) : (fb || k));
     showToast(t('reconcile_starting', 'Bekleyen arşivler mühürleniyor...'), 'info');
     try {
-        const res = await fetch('/api/v1/archives/reconcile', { method: 'POST' });
-        const data = await res.json();
-        if (data.status === 'success') {
+        const url = archiveId ? `/api/v1/archives/reconcile?id=${encodeURIComponent(archiveId)}` : '/api/v1/archives/reconcile';
+        const res = await fetch(url, { method: 'POST' });
+        
+        let data = null;
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            try {
+                data = await res.json();
+            } catch (parseErr) {
+                data = null;
+            }
+        }
+        
+        if (!data) {
+            const rawText = await res.text();
+            if (!res.ok) {
+                showToast(`Hata (${res.status}): ${rawText ? rawText.substring(0, 120) : res.statusText}`, 'error');
+                return;
+            }
+            throw new Error(`Invalid response format from server (${res.status})`);
+        }
+
+        if (res.ok && data.status === 'success') {
             showToast(`✓ ${data.message}`, 'success');
             if (typeof loadArchives === 'function') loadArchives();
         } else {
-            showToast(`Hata: ${data.message || 'Mühürleme başarısız'}`, 'error');
+            showToast(`Hata: ${data.message || data.error || 'Mühürleme başarısız'}`, 'error');
         }
     } catch (e) {
         showToast(`Hata: ${e.message}`, 'error');
