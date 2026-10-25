@@ -3356,8 +3356,15 @@ function updateViewHeader(tab) {
     const subEl = document.getElementById('view-subtitle');
     if (!titleEl || !subEl) return;
     const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
-    titleEl.textContent = t(`view_title_${tab}`) || tab.toUpperCase();
-    subEl.textContent = t(`view_subtitle_${tab}`) || '';
+    const norm = (tab || '').replace(/-/g, '_');
+    const title = (t(`view_title_${tab}`) !== `view_title_${tab}` ? t(`view_title_${tab}`) : null) ||
+                  (t(`view_title_${norm}`) !== `view_title_${norm}` ? t(`view_title_${norm}`) : null) ||
+                  (tab || '').toUpperCase();
+    const sub = (t(`view_subtitle_${tab}`) !== `view_subtitle_${tab}` ? t(`view_subtitle_${tab}`) : null) ||
+                (t(`view_subtitle_${norm}`) !== `view_subtitle_${norm}` ? t(`view_subtitle_${norm}`) : null) ||
+                '';
+    titleEl.textContent = title;
+    subEl.textContent = sub;
 }
 
 window.onLanguageChanged = (lang) => {
