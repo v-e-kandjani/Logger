@@ -358,6 +358,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/ransomware/canaries", h.requireAuth(h.handleEndpointCanaries))
 	mux.HandleFunc("/api/v1/endpoint/ransomware/stats", h.requireAuth(h.handleEndpointRansomwareStats))
 	mux.HandleFunc("/api/v1/endpoint/ransomware/simulate", h.requireAuth(h.handleEndpointRansomwareSimulate))
+	mux.HandleFunc("/api/v1/endpoint/ransomware/config", h.requireAuth(h.handleEndpointHoneypotConfig))
+	mux.HandleFunc("/api/v1/endpoint/ransomware/arm", h.requireAuth(h.handleEndpointArmFleetCanaries))
 
 	mux.HandleFunc("/api/v1/endpoint/tasks", h.requireAuth(h.handleEndpointTasks))
 	mux.HandleFunc("/api/v1/endpoint/tasks/", h.requireAuth(h.handleEndpointTaskDetail))

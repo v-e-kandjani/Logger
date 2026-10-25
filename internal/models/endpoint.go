@@ -784,6 +784,21 @@ type RansomwareStats struct {
 	HostsIsolated            int64 `json:"hosts_isolated"`
 }
 
+// EndpointHoneypotConfig represents administrative honeypot and anti-ransomware shield configuration
+type EndpointHoneypotConfig struct {
+	TenantSlug       string    `json:"tenant_slug"`
+	Enabled          bool      `json:"enabled"`
+	CanariesEnabled  bool      `json:"canaries_enabled"`
+	AutonomousKill   bool      `json:"autonomous_kill"`
+	EntropyThreshold float64   `json:"entropy_threshold"`
+	ActionMode       string    `json:"action_mode"` // "TERMINATE", "QUARANTINE_ONLY", "ALERT_ONLY"
+	DecoyTypes       string    `json:"decoy_types"` // comma-separated e.g. "docx,xlsx,pdf"
+	CustomPath       string    `json:"custom_path"`
+	RearmIntervalSec int       `json:"rearm_interval_sec"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+
 
 
 

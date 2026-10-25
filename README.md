@@ -264,6 +264,19 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.12** (Honeypot Decoy Shield Configuration, Anti-Ransomware Tuning, Fleet-Wide Canary Re-arming & Clean Menu UI):
+  - **Honeypot & Anti-Ransomware Shield Configuration (`#modal-honeypot-config`)**:
+    - Added dedicated administrator configuration modal and REST endpoints (`GET` and `POST` on `/api/v1/endpoint/ransomware/config`).
+    - Configurable tripwire protection: Canary Files Decoy Plugin toggle, Shannon Entropy Anomaly Plugin toggle, and Autonomous Rogue Process Containment toggle.
+    - Mathematical Shannon entropy sensitivity slider (`5.0` to `8.0` bits/byte, default `7.20`) for granular precision against modern ransomware encryption ciphers.
+    - Proactive Containment Action Modes: Proactive Kill & Isolate, Alert & Quarantine Binary Only, or Monitor & Audit Only (Dry-Run).
+    - Decoy formats selection (`.docx`, `.xlsx`, `.pdf`, `.sql`, `.key`), custom canary directory override, and automatic re-arm interval scheduling (`10m`, `30m`, `1h`, `4h`, `24h`).
+    - Fleet-Wide Immediate Arming (`POST /api/v1/endpoint/ransomware/arm`): Triggers canary file planting and tripwire sensor synchronizations across all registered endpoint agents.
+  - **Streamlined Navigation**:
+    - Omitted leading icon before the "Ransomware & Canaries" sidebar menu item for visual simplicity and clean aesthetics across both English and Turkish interfaces.
+  - **Database Persistence**:
+    - Created `endpoint_honeypot_config` table in PostgreSQL with multi-tenant isolation, default configuration seeding, and atomic UPSERT queries.
+
 - **v1.9.11** (LogSeal SIEM Design Tokens, Dark & Light Mode Theme Engine & Offline Component Demo):
   - **Reusable SIEM Design Tokens (`tokens.css`)**:
     - Established core design token system (`--ls-font`, `--ls-mono`, `--ls-space-1` to `--ls-space-6`, `--ls-radius`, `--ls-shadow`, `--ls-sidebar-width`).

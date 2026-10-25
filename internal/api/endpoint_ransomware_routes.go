@@ -253,3 +253,106 @@ func (h *Handler) handleEndpointRansomwareSimulate(w http.ResponseWriter, r *htt
 		"canary":   canary,
 	})
 }
+
+// handleEndpointHoneypotConfig handles GET (retrieve) and POST (save) for honeypot settings
+func (h *Handler) handleEndpointHoneypotConfig(w http.ResponseWriter, r *http.Request) {
+	tenantSlug := h.tenantScope(r)
+	if tenantSlug == "" || tenantSlug == "all" {
+		tenantSlug = "default"
+	}
+
+	if r.Method == http.MethodGet {
+		cfg, err := h.pgDB.GetHoneypotConfig(r.Context(), tenantSlug)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, cfg)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var cfg models.EndpointHoneypotConfig
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+			return
+		}
+		cfg.TenantSlug = tenantSlug
+		if err := h.pgDB.SaveHoneypotConfig(r.Context(), &cfg); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":  "saved",
+			"config":  cfg,
+			"message": "Honeypot ve Fidye Kalkanı yapılandırması başarıyla kaydedildi.",
+		})
+		return
+	}
+
+	http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+}
+
+// handleEndpointArmFleetCanaries triggers fleet-wide re-arming and seeding of honeypot canaries
+func (h *Handler) handleEndpointArmFleetCanaries(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tenantSlug := h.tenantScope(r)
+	if tenantSlug == "" || tenantSlug == "all" {
+		tenantSlug = "default"
+	}
+
+	agents, _, err := h.pgDB.ListAgents(r.Context(), tenantSlug, "", "", "", 100, 0)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	now := time.Now().UTC()
+	var seededCanaries []models.EndpointCanaryToken
+
+	standardDecoys := []struct {
+		name string
+		ext  string
+	}{
+		{"Confidential_Q4_Financial_Ledger", "xlsx"},
+		{"Executive_Payroll_Master_Records", "docx"},
+		{"Domain_Admin_Emergency_Recovery_Keys", "pdf"},
+	}
+
+	for _, ag := range agents {
+		baseDir := `C:\Users\Public\Documents\.canaries`
+		if ag.OSType != "windows" {
+			baseDir = "/var/logseal/canaries"
+		}
+		for _, dec := range standardDecoys {
+			seededCanaries = append(seededCanaries, models.EndpointCanaryToken{
+				TenantSlug:    tenantSlug,
+				AgentID:       ag.ID,
+				AgentHostname: ag.Hostname,
+				FilePath:      fmt.Sprintf("%s/%s.%s", baseDir, dec.name, dec.ext),
+				FileType:      dec.ext,
+				InitialHash:   "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				Status:        "ARMED",
+				LastCheckedAt: now,
+				CreatedAt:     now,
+			})
+		}
+	}
+
+	if len(seededCanaries) > 0 {
+		_ = h.pgDB.UpsertCanaryTokens(r.Context(), seededCanaries)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":         "armed",
+		"agents_reached": len(agents),
+		"canaries_armed": len(seededCanaries),
+		"message":        fmt.Sprintf("%d uç nokta için toplam %d tuzak yem başarıyla dağıtıldı ve silahlandırıldı.", len(agents), len(seededCanaries)),
+	})
+}
+

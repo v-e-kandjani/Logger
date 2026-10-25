@@ -49,6 +49,18 @@ func (db *DB) EnsureRansomwareSchema(ctx context.Context) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			CONSTRAINT uq_canary_agent_path UNIQUE (agent_id, file_path)
 		);`,
+		`CREATE TABLE IF NOT EXISTS endpoint_honeypot_config (
+			tenant_slug VARCHAR(64) PRIMARY KEY,
+			enabled BOOLEAN NOT NULL DEFAULT true,
+			canaries_enabled BOOLEAN NOT NULL DEFAULT true,
+			autonomous_kill BOOLEAN NOT NULL DEFAULT true,
+			entropy_threshold DOUBLE PRECISION NOT NULL DEFAULT 7.5,
+			action_mode VARCHAR(32) NOT NULL DEFAULT 'TERMINATE',
+			decoy_types TEXT NOT NULL DEFAULT 'docx,xlsx,pdf',
+			custom_path TEXT NOT NULL DEFAULT '',
+			rearm_interval_sec INT NOT NULL DEFAULT 60,
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);`,
 		`CREATE INDEX IF NOT EXISTS idx_ransomware_incidents_tenant_time ON endpoint_ransomware_incidents(tenant_slug, created_at DESC);`,
 		`CREATE INDEX IF NOT EXISTS idx_ransomware_incidents_agent ON endpoint_ransomware_incidents(agent_id, created_at DESC);`,
 		`CREATE INDEX IF NOT EXISTS idx_ransomware_incidents_trigger ON endpoint_ransomware_incidents(trigger_type);`,
@@ -324,3 +336,103 @@ func (db *DB) GetRansomwareStats(ctx context.Context, tenantSlug string) (*model
 
 	return stats, nil
 }
+
+// GetHoneypotConfig returns honeypot & shield parameters for a tenant (or global default)
+func (db *DB) GetHoneypotConfig(ctx context.Context, tenantSlug string) (*models.EndpointHoneypotConfig, error) {
+	if tenantSlug == "" || tenantSlug == "all" {
+		tenantSlug = "default"
+	}
+
+	cfg := &models.EndpointHoneypotConfig{
+		TenantSlug:       tenantSlug,
+		Enabled:          true,
+		CanariesEnabled:  true,
+		AutonomousKill:   true,
+		EntropyThreshold: 7.5,
+		ActionMode:       "TERMINATE",
+		DecoyTypes:       "docx,xlsx,pdf",
+		CustomPath:       "",
+		RearmIntervalSec: 60,
+		UpdatedAt:        time.Now().UTC(),
+	}
+
+	query := `
+		SELECT enabled, canaries_enabled, autonomous_kill, entropy_threshold,
+		       action_mode, decoy_types, custom_path, rearm_interval_sec, updated_at
+		FROM endpoint_honeypot_config
+		WHERE tenant_slug = $1
+	`
+	err := db.pool.QueryRow(ctx, query, tenantSlug).Scan(
+		&cfg.Enabled,
+		&cfg.CanariesEnabled,
+		&cfg.AutonomousKill,
+		&cfg.EntropyThreshold,
+		&cfg.ActionMode,
+		&cfg.DecoyTypes,
+		&cfg.CustomPath,
+		&cfg.RearmIntervalSec,
+		&cfg.UpdatedAt,
+	)
+	if err != nil && err != pgx.ErrNoRows {
+		return nil, fmt.Errorf("failed querying honeypot config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+// SaveHoneypotConfig upserts honeypot configuration for a tenant
+func (db *DB) SaveHoneypotConfig(ctx context.Context, cfg *models.EndpointHoneypotConfig) error {
+	if cfg.TenantSlug == "" || cfg.TenantSlug == "all" {
+		cfg.TenantSlug = "default"
+	}
+	if cfg.EntropyThreshold <= 0 {
+		cfg.EntropyThreshold = 7.5
+	}
+	if cfg.ActionMode == "" {
+		cfg.ActionMode = "TERMINATE"
+	}
+	if cfg.DecoyTypes == "" {
+		cfg.DecoyTypes = "docx,xlsx,pdf"
+	}
+	if cfg.RearmIntervalSec <= 0 {
+		cfg.RearmIntervalSec = 60
+	}
+	cfg.UpdatedAt = time.Now().UTC()
+
+	query := `
+		INSERT INTO endpoint_honeypot_config (
+			tenant_slug, enabled, canaries_enabled, autonomous_kill,
+			entropy_threshold, action_mode, decoy_types, custom_path,
+			rearm_interval_sec, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (tenant_slug) DO UPDATE SET
+			enabled = EXCLUDED.enabled,
+			canaries_enabled = EXCLUDED.canaries_enabled,
+			autonomous_kill = EXCLUDED.autonomous_kill,
+			entropy_threshold = EXCLUDED.entropy_threshold,
+			action_mode = EXCLUDED.action_mode,
+			decoy_types = EXCLUDED.decoy_types,
+			custom_path = EXCLUDED.custom_path,
+			rearm_interval_sec = EXCLUDED.rearm_interval_sec,
+			updated_at = EXCLUDED.updated_at
+	`
+
+	_, err := db.pool.Exec(ctx, query,
+		cfg.TenantSlug,
+		cfg.Enabled,
+		cfg.CanariesEnabled,
+		cfg.AutonomousKill,
+		cfg.EntropyThreshold,
+		cfg.ActionMode,
+		cfg.DecoyTypes,
+		cfg.CustomPath,
+		cfg.RearmIntervalSec,
+		cfg.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed saving honeypot config: %w", err)
+	}
+
+	return nil
+}
+

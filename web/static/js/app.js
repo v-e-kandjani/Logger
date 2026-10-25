@@ -13014,6 +13014,107 @@ async function executeRansomwareSimulation() {
     }
 }
 
+function openHoneypotConfigModal() {
+    const m = document.getElementById('modal-honeypot-config');
+    if (m) m.style.display = 'flex';
+
+    // Fetch existing settings
+    fetch('/api/v1/endpoint/ransomware/config')
+        .then(res => res.json())
+        .then(cfg => {
+            if (!cfg) return;
+            if (document.getElementById('hp-cfg-enabled')) document.getElementById('hp-cfg-enabled').checked = cfg.enabled !== false;
+            if (document.getElementById('hp-cfg-canaries-enabled')) document.getElementById('hp-cfg-canaries-enabled').checked = cfg.canaries_enabled !== false;
+            if (document.getElementById('hp-cfg-autonomous-kill')) document.getElementById('hp-cfg-autonomous-kill').checked = cfg.autonomous_kill !== false;
+            if (document.getElementById('hp-cfg-action-mode')) document.getElementById('hp-cfg-action-mode').value = cfg.action_mode || 'TERMINATE';
+            if (document.getElementById('hp-cfg-entropy')) {
+                const ent = cfg.entropy_threshold || 7.5;
+                document.getElementById('hp-cfg-entropy').value = ent;
+                if (document.getElementById('hp-cfg-entropy-val')) {
+                    document.getElementById('hp-cfg-entropy-val').textContent = parseFloat(ent).toFixed(2);
+                }
+            }
+            if (document.getElementById('hp-cfg-custom-path')) document.getElementById('hp-cfg-custom-path').value = cfg.custom_path || '';
+            if (document.getElementById('hp-cfg-interval')) document.getElementById('hp-cfg-interval').value = String(cfg.rearm_interval_sec || 60);
+
+            // Decoy types checkboxes
+            const types = (cfg.decoy_types || 'docx,xlsx,pdf').split(',').map(s => s.trim().toLowerCase());
+            document.querySelectorAll('.hp-decoy-cb').forEach(cb => {
+                cb.checked = types.includes(cb.value.toLowerCase());
+            });
+        })
+        .catch(err => {
+            console.warn('[Honeypot] Could not fetch config:', err);
+        });
+}
+
+function closeHoneypotConfigModal() {
+    const m = document.getElementById('modal-honeypot-config');
+    if (m) m.style.display = 'none';
+}
+
+async function saveHoneypotConfig() {
+    const isTr = !window.i18n || window.i18n.currentLang === 'tr';
+    const btn = document.getElementById('btn-save-hp-cfg');
+    if (btn) btn.disabled = true;
+
+    const decoyList = [];
+    document.querySelectorAll('.hp-decoy-cb:checked').forEach(cb => {
+        decoyList.push(cb.value);
+    });
+
+    const payload = {
+        enabled: document.getElementById('hp-cfg-enabled') ? document.getElementById('hp-cfg-enabled').checked : true,
+        canaries_enabled: document.getElementById('hp-cfg-canaries-enabled') ? document.getElementById('hp-cfg-canaries-enabled').checked : true,
+        autonomous_kill: document.getElementById('hp-cfg-autonomous-kill') ? document.getElementById('hp-cfg-autonomous-kill').checked : true,
+        action_mode: document.getElementById('hp-cfg-action-mode') ? document.getElementById('hp-cfg-action-mode').value : 'TERMINATE',
+        entropy_threshold: document.getElementById('hp-cfg-entropy') ? parseFloat(document.getElementById('hp-cfg-entropy').value) : 7.5,
+        decoy_types: decoyList.length > 0 ? decoyList.join(',') : 'docx,xlsx,pdf',
+        custom_path: document.getElementById('hp-cfg-custom-path') ? document.getElementById('hp-cfg-custom-path').value.trim() : '',
+        rearm_interval_sec: document.getElementById('hp-cfg-interval') ? parseInt(document.getElementById('hp-cfg-interval').value, 10) : 60
+    };
+
+    try {
+        const res = await fetch('/api/v1/endpoint/ransomware/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        closeHoneypotConfigModal();
+        showToast(isTr ? `✓ ${data.message || 'Honeypot yapılandırması başarıyla kaydedildi!'}` : `✓ ${data.message || 'Honeypot configuration saved successfully!'}`, 'success');
+        loadEndpointRansomware();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function armFleetCanaries() {
+    const isTr = !window.i18n || window.i18n.currentLang === 'tr';
+    const btn = document.getElementById('btn-arm-fleet');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/v1/endpoint/ransomware/arm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        showToast(isTr ? `✓ ${data.message || 'Tüm filoya tuzak yemler dağıtıldı ve silahlandırıldı!'}` : `✓ ${data.message || 'Canary decoys deployed and armed fleet-wide!'}`, 'success');
+        loadEndpointRansomware();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
 window.loadEndpointRansomware = loadEndpointRansomware;
 window.loadRansomwareStats = loadRansomwareStats;
 window.loadRansomwareCanaries = loadRansomwareCanaries;
@@ -13021,12 +13122,17 @@ window.loadRansomwareIncidents = loadRansomwareIncidents;
 window.openRansomwareSimulateModal = openRansomwareSimulateModal;
 window.closeRansomwareSimulateModal = closeRansomwareSimulateModal;
 window.executeRansomwareSimulation = executeRansomwareSimulation;
+window.openHoneypotConfigModal = openHoneypotConfigModal;
+window.closeHoneypotConfigModal = closeHoneypotConfigModal;
+window.saveHoneypotConfig = saveHoneypotConfig;
+window.armFleetCanaries = armFleetCanaries;
 window.toggleSidebarSection = toggleSidebarSection;
 window.initSidebarFoldableSections = initSidebarFoldableSections;
 window.ensureActiveNavSectionExpanded = ensureActiveNavSectionExpanded;
 window.setAppTheme = setAppTheme;
 window.getAppTheme = getAppTheme;
 window.initTheme = initTheme;
+
 
 
 

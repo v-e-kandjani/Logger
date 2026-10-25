@@ -253,6 +253,19 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.12** (Honeypot Tuzak Yem Yapılandırması, Fidye Kalkanı Hassasiyet Ayarları, Filo Çapında Yem Yenileme & Sade Menü Görünümü):
+  - **Honeypot & Fidye Kalkanı Yapılandırma Paneli (`#modal-honeypot-config`)**:
+    - Yönetici yapılandırma arayüzü ve REST API uç noktaları (`GET` ve `POST` `/api/v1/endpoint/ransomware/config`) eklendi.
+    - Modüler tuzak koruması: Tuzak Yem Dosyaları (Canary Files) Eklentisi açma/kapama, Shannon Entropi Anomali Tespiti Eklentisi açma/kapama ve Otonom Zararlı Süreç Durdurma açma/kapama.
+    - Modern fidye şifreleme algoritmalarına karşı hassas koruma sağlayan dinamik Shannon entropi eşiği kaydırıcısı (`5.0` - `8.0` bit/bayt, varsayılan `7.20`).
+    - Otonom Müdahale Modları: Proaktif Durdur & İzolasyon, Yalnızca Uyar & İkiliyi Karantinaya Al, veya Yalnızca İzle & Denetle (Simülasyon/Dry-Run).
+    - Tuzak dosya uzantıları seçimi (`.docx`, `.xlsx`, `.pdf`, `.sql`, `.key`), özel yem dizini belirleme ve otomatik yem yenileme aralığı (`10dk`, `30dk`, `1sa`, `4sa`, `24sa`).
+    - Filo Çapında Canlı Yem Yenileme (`POST /api/v1/endpoint/ransomware/arm`): Kayıtlı tüm uç nokta ajanlarına anında yem dosyası yerleştirme ve tuzak sensörlerini yeniden kurma sinyali gönderir.
+  - **Sadeleştirilmiş Menü**:
+    - "Fidye Kalkanı & Yemler" yan menü öğesi önündeki simge kaldırılarak sade ve yalın bir görünüm elde edildi.
+  - **Veritabanı Kalıcılığı**:
+    - PostgreSQL üzerinde çok kiracılı izolasyona, varsayılan tohumlama ve atomik UPSERT sorgularına sahip `endpoint_honeypot_config` tablosu oluşturuldu.
+
 - **v1.9.11** (LogSeal SIEM Tasarım Belirteçleri (Tokens), Açık & Koyu Tema Motoru & Çevrimdışı Bileşen Demosu):
   - **Yeniden Kullanılabilir SIEM Tasarım Belirteçleri (`tokens.css`)**:
     - Tipografi, boşluk, köşe yuvarlama ve gölge belirteçleri (`--ls-font`, `--ls-mono`, `--ls-space-1` - `--ls-space-6`, `--ls-radius`, `--ls-shadow`) sisteme kazandırıldı.
