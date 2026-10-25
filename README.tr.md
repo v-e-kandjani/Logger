@@ -253,6 +253,19 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.16** (2 Yeni Tema Paleti - Solar Amber & Deep Nebula ile Tam Karanlık ve Aydınlık Mod Desteği):
+  - **Solar Amber (Siber Altın) Tema Paleti (`amber`)**:
+    - Klasik CRT güvenlik monitörlerinden ve aviyonik siber telemetriden esinlenen yüksek kontrastlı kehribar-altın teması.
+    - Karanlık mod: derin obsidian kömür zemin (`#0c0d12`), arduvaz kartlar (`#141721`) ve parıldayan altın-kehribar vurgular (`#f59e0b`).
+    - Aydınlık mod: sıcak fildişi zemin (`#fffdf5`), temiz beyaz kartlar (`#ffffff`), yumuşak kehribar tonlamalı yüzeyler (`#fef3c7`) ve derin espresso-sepya tipografi (`#451a03`).
+  - **Deep Nebula (Kadife İndigo) Tema Paleti (`nebula`)**:
+    - Yeni nesil tehdit istihbaratı ve SOC gözetimi için tasarlanan fütüristik yıldızlararası mor-indigo teması.
+    - Karanlık mod: dipsiz gece moru zemin (`#090814`), kadife indigo kartlar (`#121026`) ve elektrikli neon ametist vurgular (`#a855f7`).
+    - Aydınlık mod: porselen lavanta zemin (`#faf5ff`), temiz beyaz kartlar (`#ffffff`) ve zengin kraliyet menekşesi tipografi (`#2e1065`).
+  - **Tema Sistemi Entegrasyonu**:
+    - `#pane-appearance` tema seçici paneline özel tema kartları ve renk çipi önizlemeleri eklendi.
+    - Paletler `tokens.css`, `dashboard.css`, `app.js` ve çok dilli sözlük yapılarına eksiksiz kaydedildi.
+
 - **v1.9.15** (5651 Sayılı Kanun Tekil Arşiv İsteğe Bağlı Mühürleme & Güçlendirilmiş API Hata Yönetimi, EDR Netmon Tarayıcı Yanlış Pozitif Engelleme):
   - **Tekil Arşiv İsteğe Bağlı Uzlaştırma (`POST /api/v1/archives/reconcile?id=<uuid>`)**:
     - Arşiv tablosundaki satır bazlı aksiyon butonuna (`🔄 Mühürle / Seal Now`) doğrudan hedef arşivi tekil olarak damgalayan `ReconcileArchiveByID` yeteneği kazandırıldı; tüm bekleyen havuzunu beklemeksizin anlık geri bildirim sağlandı.

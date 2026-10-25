@@ -264,6 +264,19 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.16** (2 New Theme Palettes - Solar Amber & Deep Nebula with Full Dark & Light Modes):
+  - **Solar Amber (Cyber Gold) Theme Palette (`amber`)**:
+    - High-visibility warm amber-gold theme inspired by classic CRT security monitors and aerospace cyber telemetry.
+    - Dark mode: deep obsidian charcoal (`#0c0d12`), slate cards (`#141721`), and glowing golden amber accents (`#f59e0b`).
+    - Light mode: crisp warm ivory (`#fffdf5`), clean cards (`#ffffff`), soft amber tints (`#fef3c7`), and deep espresso-sepia typography (`#451a03`).
+  - **Deep Nebula (Velvet Violet) Theme Palette (`nebula`)**:
+    - Futuristic interstellar purple-indigo theme designed for next-generation threat intelligence and SOC monitoring.
+    - Dark mode: abyssal violet midnight (`#090814`), velvet indigo cards (`#121026`), and electric neon amethyst accents (`#a855f7`).
+    - Light mode: porcelain lavender (`#faf5ff`), clean white cards (`#ffffff`), and rich royal violet typography (`#2e1065`).
+  - **Theme System Integration**:
+    - Added dedicated theme cards and swatch previews to the `#pane-appearance` theme selector.
+    - Registered palettes in `tokens.css`, `dashboard.css`, `app.js`, and multi-lingual dictionary tables.
+
 - **v1.9.15** (Law 5651 Single-Archive On-Demand Sealing & Robust API Error Handling, EDR Netmon Browser False-Positive Prevention):
   - **Single-Archive On-Demand Reconcile (`POST /api/v1/archives/reconcile?id=<uuid>`)**:
     - Enhanced `ReconcileArchiveByID` to target individual pending log archives directly from the table row action button (`🔄 Seal Now`), providing instant feedback without triggering timeouts or processing the entire pending batch.

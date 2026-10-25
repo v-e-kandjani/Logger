@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=1.9.15">
-    <link rel="stylesheet" href="/static/css/theme.css?v=1.9.15">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.15">
-    <link rel="stylesheet" href="/static/css/components.css?v=1.9.15">
-    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.15">
-    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.15">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=1.9.16">
+    <link rel="stylesheet" href="/static/css/theme.css?v=1.9.16">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.16">
+    <link rel="stylesheet" href="/static/css/components.css?v=1.9.16">
+    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.16">
+    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.16">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
@@ -25,7 +25,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.15</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.16</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -3923,7 +3923,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.15</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.16</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -4090,6 +4090,44 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                                 </div>
                                 <p class="theme-card-desc" data-i18n="palette_nordic_desc">
                                     İskandinav kayrak grisi ve kutup mavisi tonlarıyla ferah, göz yormayan ve hiper-okunabilir modern bulut teması.
+                                </p>
+                            </div>
+
+                            <!-- Palette 4: Solar Amber -->
+                            <div class="theme-card" data-palette-choice="amber" onclick="selectThemePalette('amber')">
+                                <div class="theme-card-header">
+                                    <div class="theme-card-title">
+                                        <span data-i18n="palette_amber_name">Solar Amber</span>
+                                        <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b;" data-i18n="badge_solar">Siber Altın</span>
+                                    </div>
+                                    <div class="theme-check-radio"></div>
+                                </div>
+                                <div class="theme-swatch-row">
+                                    <div class="theme-swatch-chip" style="background: #0c0d12;" title="Arka Plan / Background (#0c0d12)"></div>
+                                    <div class="theme-swatch-chip" style="background: #141721;" title="Yüzey / Surface (#141721)"></div>
+                                    <div class="theme-swatch-chip" style="background: #f59e0b;" title="Vurgu / Accent (#f59e0b)"></div>
+                                </div>
+                                <p class="theme-card-desc" data-i18n="palette_amber_desc">
+                                    Klasik CRT güvenlik monitörlerinden ilham alan, derin karbon zemin ve parlak kehribar-altın tonlarıyla sıcak siber estetik.
+                                </p>
+                            </div>
+
+                            <!-- Palette 5: Deep Nebula -->
+                            <div class="theme-card" data-palette-choice="nebula" onclick="selectThemePalette('nebula')">
+                                <div class="theme-card-header">
+                                    <div class="theme-card-title">
+                                        <span data-i18n="palette_nebula_name">Deep Nebula</span>
+                                        <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7;" data-i18n="badge_nebula">Fütüristik</span>
+                                    </div>
+                                    <div class="theme-check-radio"></div>
+                                </div>
+                                <div class="theme-swatch-row">
+                                    <div class="theme-swatch-chip" style="background: #090814;" title="Arka Plan / Background (#090814)"></div>
+                                    <div class="theme-swatch-chip" style="background: #121026;" title="Yüzey / Surface (#121026)"></div>
+                                    <div class="theme-swatch-chip" style="background: #a855f7;" title="Vurgu / Accent (#a855f7)"></div>
+                                </div>
+                                <p class="theme-card-desc" data-i18n="palette_nebula_desc">
+                                    Yıldızlararası kadife gece moru zemin ve neon ametist vurgularla yeni nesil tehdit avcılığı ve fütüristik SIEM tasarımı.
                                 </p>
                             </div>
                         </div>
@@ -7977,8 +8015,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.15"></script>
-    <script src="/static/js/translations.js?v=1.9.15"></script>
-    <script src="/static/js/app.js?v=1.9.15"></script>
+    <script src="/static/js/marked.min.js?v=1.9.16"></script>
+    <script src="/static/js/translations.js?v=1.9.16"></script>
+    <script src="/static/js/app.js?v=1.9.16"></script>
 </body>
 </html>

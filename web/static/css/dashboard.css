@@ -2122,6 +2122,29 @@ input:checked + .slider:before {
     --accent: #0284c7;
 }
 
+:root[data-palette="amber"] {
+    --primary: #f59e0b;
+    --primary-hover: #d97706;
+    --accent: #f59e0b;
+}
+:root[data-palette="amber"][data-theme="light"] {
+    --primary: #d97706;
+    --primary-hover: #b45309;
+    --accent: #d97706;
+}
+
+:root[data-palette="nebula"] {
+    --primary: #8b5cf6;
+    --primary-hover: #7c3aed;
+    --accent: #a855f7;
+}
+:root[data-palette="nebula"][data-theme="light"] {
+    --primary: #7c3aed;
+    --primary-hover: #6d28d9;
+    --accent: #7c3aed;
+}
+
+
 /* Theme & Appearance View Styles */
 .theme-palette-grid {
     display: grid;

@@ -50,7 +50,7 @@ function getAppPalette() {
 }
 
 function setAppPalette(palette) {
-    if (!['classic', 'emerald', 'nordic'].includes(palette)) {
+    if (!['classic', 'emerald', 'nordic', 'amber', 'nebula'].includes(palette)) {
         palette = 'classic';
     }
     document.documentElement.setAttribute('data-palette', palette);
@@ -73,7 +73,9 @@ function selectThemePalette(palette) {
     const names = {
         classic: 'LogSeal Classic (Navy & Teal)',
         emerald: 'Obsidian Mint (Cyber Emerald)',
-        nordic: 'Nordic Frost (Polar Sky)'
+        nordic: 'Nordic Frost (Polar Sky)',
+        amber: 'Solar Amber (Cyber Gold)',
+        nebula: 'Deep Nebula (Velvet Violet)'
     };
     if (typeof showToast === 'function') {
         const msg = (window.i18n && window.i18n.currentLang === 'tr')

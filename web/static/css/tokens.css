@@ -146,3 +146,76 @@
   --ls-success: #10b981;
   --ls-info: #0284c7;
 }
+
+/* -------------------------------------------------------------------------- */
+/* THEME PALETTE 4: Solar Amber (Cyber Gold)                                  */
+/* High-contrast amber-gold CRT terminal with deep carbon warmth & radiance   */
+/* -------------------------------------------------------------------------- */
+[data-palette="amber"][data-theme="dark"] {
+  color-scheme: dark;
+  --ls-bg: #0c0d12;
+  --ls-surface: #141721;
+  --ls-surface-alt: #1f2433;
+  --ls-border: #2a3145;
+  --ls-text: #fef3c7;
+  --ls-muted: #94a3b8;
+  --ls-accent: #f59e0b;
+  --ls-accent-text: #451a03;
+  --ls-danger: #f87171;
+  --ls-warning: #fbbf24;
+  --ls-success: #34d399;
+  --ls-info: #38bdf8;
+}
+
+[data-palette="amber"][data-theme="light"] {
+  color-scheme: light;
+  --ls-bg: #fffdf5;
+  --ls-surface: #ffffff;
+  --ls-surface-alt: #fef3c7;
+  --ls-border: #fde68a;
+  --ls-text: #451a03;
+  --ls-muted: #78350f;
+  --ls-accent: #d97706;
+  --ls-accent-text: #ffffff;
+  --ls-danger: #dc2626;
+  --ls-warning: #d97706;
+  --ls-success: #059669;
+  --ls-info: #2563eb;
+}
+
+/* -------------------------------------------------------------------------- */
+/* THEME PALETTE 5: Deep Nebula (Velvet Violet)                               */
+/* Futuristic interstellar deep purple-indigo with vivid electric neon violet  */
+/* -------------------------------------------------------------------------- */
+[data-palette="nebula"][data-theme="dark"] {
+  color-scheme: dark;
+  --ls-bg: #090814;
+  --ls-surface: #121026;
+  --ls-surface-alt: #1b1738;
+  --ls-border: #29244f;
+  --ls-text: #f5f3ff;
+  --ls-muted: #9ca3af;
+  --ls-accent: #a855f7;
+  --ls-accent-text: #2e1065;
+  --ls-danger: #f87171;
+  --ls-warning: #fbbf24;
+  --ls-success: #34d399;
+  --ls-info: #818cf8;
+}
+
+[data-palette="nebula"][data-theme="light"] {
+  color-scheme: light;
+  --ls-bg: #faf5ff;
+  --ls-surface: #ffffff;
+  --ls-surface-alt: #f3e8ff;
+  --ls-border: #e9d5ff;
+  --ls-text: #2e1065;
+  --ls-muted: #6b21a8;
+  --ls-accent: #7c3aed;
+  --ls-accent-text: #ffffff;
+  --ls-danger: #dc2626;
+  --ls-warning: #d97706;
+  --ls-success: #059669;
+  --ls-info: #4f46e5;
+}
+
