@@ -141,7 +141,7 @@ func (e *Engine) ReconcilePendingArchives(ctx context.Context) int {
 		}
 	}
 
-	pendingList, err := e.pgDB.ListPendingArchives(ctx, 50)
+	pendingList, err := e.pgDB.ListPendingArchives(ctx, 200)
 	if err != nil || len(pendingList) == 0 {
 		return 0
 	}
@@ -168,10 +168,44 @@ func (e *Engine) ReconcilePendingArchives(ctx context.Context) int {
 				if _, dfErr := os.Stat(dateFallback); dfErr == nil {
 					archivePath = dateFallback
 				} else {
-					log.Printf("[Archive Engine] Pending archive %s file not found at %s or fallback paths: %v", a.ID, a.ArchivePath, err)
-					continue
+					// Fallback check 3: Tenant subdirectory
+					tenantFallback := filepath.Join(e.baseDir, a.Tenant, filepath.Base(archivePath))
+					if _, tfErr := os.Stat(tenantFallback); tfErr == nil {
+						archivePath = tenantFallback
+					} else {
+						log.Printf("[Archive Engine] Pending archive %s file not found at %s or fallback paths: %v", a.ID, a.ArchivePath, err)
+						continue
+					}
 				}
 			}
+		}
+
+		// Check if evidence already exists on disk (.zd, .tst, or manifest.json.tst)
+		evidencePath := ""
+		candidates := []string{
+			archivePath + ".zd",
+			archivePath + ".tst",
+			strings.TrimSuffix(archivePath, "_evidence.log.gz") + "_manifest.json.tst",
+			filepath.Join(filepath.Dir(archivePath), strings.TrimSuffix(filepath.Base(archivePath), "_evidence.log.gz")+"_manifest.json.tst"),
+			filepath.Join(e.baseDir, a.Tenant, strings.TrimSuffix(filepath.Base(archivePath), "_evidence.log.gz")+"_manifest.json.tst"),
+		}
+		for _, cand := range candidates {
+			if fi, err := os.Stat(cand); err == nil && !fi.IsDir() && fi.Size() > 0 {
+				evidencePath = cand
+				break
+			}
+		}
+
+		if evidencePath != "" {
+			status := "VERIFIED"
+			if a.TimestampStatus == "STAMPED" {
+				status = "STAMPED"
+			}
+			_ = e.pgDB.UpdateArchiveTimestamp(ctx, a.ID, status, evidencePath, "")
+			_ = e.pgDB.SyncArchiveJobCommitted(ctx, a.Tenant, a.StartTimestamp, a.EndTimestamp)
+			reconciled++
+			log.Printf("[Archive Engine] Linked existing evidence for archive %s (%s) -> %s (evidence: %s)", a.ID, a.ArchiveName, status, evidencePath)
+			continue
 		}
 
 		res, err := e.provider.Timestamp(ctx, archivePath)
@@ -203,16 +237,63 @@ func (e *Engine) ReconcileArchiveByID(ctx context.Context, id uuid.UUID) (*model
 	}
 	archivePath := arch.ArchivePath
 	if archivePath == "" {
-		return nil, fmt.Errorf("archive path is empty in database for %s", id)
+		archivePath = filepath.Join(e.baseDir, arch.ArchiveName+".jsonl.gz")
 	}
 	if _, err := os.Stat(archivePath); err != nil {
-		// Fallback check in baseDir
+		// Fallback check 1: BaseDir root
 		fallbackPath := filepath.Join(e.baseDir, filepath.Base(archivePath))
 		if _, fbErr := os.Stat(fallbackPath); fbErr == nil {
 			archivePath = fallbackPath
 		} else {
-			return nil, fmt.Errorf("archive file not found on disk at %s: %w", arch.ArchivePath, err)
+			// Fallback check 2: Date-based path /archive/YYYY/MM/DD/
+			dateDir := filepath.Join(
+				e.baseDir,
+				fmt.Sprintf("%04d", arch.StartTimestamp.Year()),
+				fmt.Sprintf("%02d", arch.StartTimestamp.Month()),
+				fmt.Sprintf("%02d", arch.StartTimestamp.Day()),
+			)
+			dateFallback := filepath.Join(dateDir, filepath.Base(archivePath))
+			if _, dfErr := os.Stat(dateFallback); dfErr == nil {
+				archivePath = dateFallback
+			} else {
+				// Fallback check 3: Tenant subdirectory
+				tenantFallback := filepath.Join(e.baseDir, arch.Tenant, filepath.Base(archivePath))
+				if _, tfErr := os.Stat(tenantFallback); tfErr == nil {
+					archivePath = tenantFallback
+				} else {
+					return nil, fmt.Errorf("archive file not found on disk at %s: %w", arch.ArchivePath, err)
+				}
+			}
 		}
+	}
+
+	// Check if evidence already exists on disk (.zd, .tst, or manifest.json.tst)
+	evidencePath := ""
+	candidates := []string{
+		archivePath + ".zd",
+		archivePath + ".tst",
+		strings.TrimSuffix(archivePath, "_evidence.log.gz") + "_manifest.json.tst",
+		filepath.Join(filepath.Dir(archivePath), strings.TrimSuffix(filepath.Base(archivePath), "_evidence.log.gz")+"_manifest.json.tst"),
+		filepath.Join(e.baseDir, arch.Tenant, strings.TrimSuffix(filepath.Base(archivePath), "_evidence.log.gz")+"_manifest.json.tst"),
+	}
+	for _, cand := range candidates {
+		if fi, err := os.Stat(cand); err == nil && !fi.IsDir() && fi.Size() > 0 {
+			evidencePath = cand
+			break
+		}
+	}
+
+	if evidencePath != "" {
+		status := "VERIFIED"
+		if arch.TimestampStatus == "STAMPED" {
+			status = "STAMPED"
+		}
+		_ = e.pgDB.UpdateArchiveTimestamp(ctx, arch.ID, status, evidencePath, "")
+		_ = e.pgDB.SyncArchiveJobCommitted(ctx, arch.Tenant, arch.StartTimestamp, arch.EndTimestamp)
+		arch.TimestampStatus = status
+		arch.TimestampEvidencePath = evidencePath
+		log.Printf("[Archive Engine] Reconciled and linked existing evidence for archive %s (%s) -> %s (evidence: %s)", arch.ID, arch.ArchiveName, status, evidencePath)
+		return arch, nil
 	}
 
 	res, err := e.provider.Timestamp(ctx, archivePath)
@@ -225,6 +306,7 @@ func (e *Engine) ReconcileArchiveByID(ctx context.Context, id uuid.UUID) (*model
 		status = "ARCHIVED_NO_STAMP"
 	}
 	_ = e.pgDB.UpdateArchiveTimestamp(ctx, arch.ID, status, res.EvidenceFile, "")
+	_ = e.pgDB.SyncArchiveJobCommitted(ctx, arch.Tenant, arch.StartTimestamp, arch.EndTimestamp)
 	arch.TimestampStatus = status
 	arch.TimestampEvidencePath = res.EvidenceFile
 	log.Printf("[Archive Engine] Reconciled individual archive %s (%s) -> %s", arch.ID, arch.ArchiveName, status)

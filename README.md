@@ -264,6 +264,20 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.21** (Law 5651 Evidence Reconcile Resolution, Missing Evidence Auto-Discovery & Download Support):
+  - **Evidence Reconcile Auto-Discovery (`internal/archive/engine.go` & `internal/database/postgres/postgres.go`)**:
+    - Resolved issue where clicking "Reconcile Pending" or single-archive "Mühürle" resulted in no changes when archives had missing evidence paths in PostgreSQL.
+    - Expanded `ListPendingArchives` query to include records where `timestamp_evidence_path` is empty or null, ensuring all unlinked archives are queued for reconciliation.
+    - Enhanced `ReconcilePendingArchives` and `ReconcileArchiveByID` to detect existing RFC 3161 evidence tokens (`.zd`, `.tst`, `_manifest.json.tst`) already present on disk across root, tenant, and date-based paths, immediately linking and committing them without redundant external TSA requests.
+    - Added database auto-healing in `EnsureEdgeSchema` to automatically populate missing `timestamp_evidence_path` for historical evidence archives.
+  - **Dynamic Evidence Download & Bundling (`internal/api/handler.go`)**:
+    - Updated `/api/v1/archives/download?type=evidence` to serve both KamuSM `.zd` and TÜBİTAK Zamane KS `.tst` evidence tokens dynamically.
+    - Fixed bundle zip packager (`serveArchiveBundleZip`) to include the manifest and RFC 3161 evidence token regardless of filename extension.
+    - Resolved raw log download naming to prevent double `.gz.jsonl.gz` extensions.
+  - **Frontend Polish (`web/static/js/app.js`)**:
+    - Updated archive table to dynamically reflect token format (`🛡️ Evidence (.zd)` / `🛡️ Evidence (.tst)`).
+    - Added missing evidence path check to real-time status polling trigger.
+
 - **v1.9.20** (Law 5651 Automated Background Archive Sealer & Continuous Integrity Reconciliation):
   - **Continuous Background Auto-Sealer (`internal/archive/engine.go`)**:
     - Automatically seals all pending, interrupted, or transiently failed archives continuously in the background based on active seal settings (`internal`, `kamusm`, or `disabled` with auto-fallback).

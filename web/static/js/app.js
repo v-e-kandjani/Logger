@@ -1262,8 +1262,8 @@ async function loadArchives() {
                             ${t('btn_logs_dl', '📄 Logs (.gz)')}
                         </a>
                         ${isStamped && a.timestamp_evidence_path ? `
-                        <a href="/api/v1/archives/download?id=${a.id}&type=evidence" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download legal proof / KamuSM timestamp (.zd)" download>
-                            ${t('btn_evidence_dl', '🛡️ Evidence (.zd)')}
+                        <a href="/api/v1/archives/download?id=${a.id}&type=evidence" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download legal proof / RFC 3161 timestamp evidence" download>
+                            🛡️ Evidence${a.timestamp_evidence_path.endsWith('.tst') ? ' (.tst)' : ' (.zd)'}
                         </a>` : `
                         <button onclick="reconcileArchives('${a.id}')" class="btn btn-warning" style="padding: 3px 8px; font-size: 11px;" title="Bekleyen arşivi yeniden mühürle / Re-stamp pending archive">
                             🔄 ${t('btn_restamp', 'Mühürle')}
@@ -1273,7 +1273,7 @@ async function loadArchives() {
             </tr>
         `}).join('');
 
-        const hasPending = list.some(a => a.timestamp_status === 'PENDING' || a.timestamp_status === 'TSA_PENDING' || a.timestamp_status === 'TIMESTAMP_FAILED');
+        const hasPending = list.some(a => a.timestamp_status === 'PENDING' || a.timestamp_status === 'TSA_PENDING' || a.timestamp_status === 'TIMESTAMP_FAILED' || (a.timestamp_status === 'FAILED' && (a.retry_count || 0) < 10) || !a.timestamp_evidence_path);
         if (hasPending) {
             if (window._archiveRefreshTimer) clearTimeout(window._archiveRefreshTimer);
             window._archiveRefreshTimer = setTimeout(() => {

@@ -1509,19 +1509,35 @@ func (h *Handler) handleDownloadArchive(w http.ResponseWriter, r *http.Request) 
 
 	switch fileType {
 	case "evidence":
-		targetPath := arch.ArchivePath + ".zd"
-		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		targetPath := arch.TimestampEvidencePath
+		if targetPath == "" || !fileExists(targetPath) {
+			if fileExists(arch.ArchivePath + ".zd") {
+				targetPath = arch.ArchivePath + ".zd"
+			} else if fileExists(arch.ArchivePath + ".tst") {
+				targetPath = arch.ArchivePath + ".tst"
+			} else {
+				manifestTst := strings.TrimSuffix(arch.ArchivePath, "_evidence.log.gz") + "_manifest.json.tst"
+				if fileExists(manifestTst) {
+					targetPath = manifestTst
+				}
+			}
+		}
+		if targetPath == "" || !fileExists(targetPath) {
 			http.Error(w, "evidence file does not exist (archive may be unstamped)", http.StatusNotFound)
 			return
 		}
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.zd\"", arch.ArchiveName))
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		ext := filepath.Ext(targetPath)
+		if ext == "" {
+			ext = ".zd"
+		}
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s%s\"", arch.ArchiveName, ext))
+		w.Header().Set("Content-Type", "application/octet-stream")
 		http.ServeFile(w, r, targetPath)
 		return
 
 	case "hash":
 		targetPath := arch.ArchivePath + ".sha256"
-		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		if !fileExists(targetPath) {
 			http.Error(w, "hash file does not exist", http.StatusNotFound)
 			return
 		}
@@ -1536,15 +1552,27 @@ func (h *Handler) handleDownloadArchive(w http.ResponseWriter, r *http.Request) 
 
 	default: // "archive" or empty
 		targetPath := arch.ArchivePath
-		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		if !fileExists(targetPath) {
 			http.Error(w, "archive file not found on disk", http.StatusNotFound)
 			return
 		}
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.jsonl.gz\"", arch.ArchiveName))
+		dlName := arch.ArchiveName
+		if !strings.HasSuffix(dlName, ".gz") {
+			dlName += ".jsonl.gz"
+		}
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", dlName))
 		w.Header().Set("Content-Type", "application/gzip")
 		http.ServeFile(w, r, targetPath)
 		return
 	}
+}
+
+func fileExists(p string) bool {
+	if p == "" {
+		return false
+	}
+	fi, err := os.Stat(p)
+	return err == nil && !fi.IsDir()
 }
 
 func (h *Handler) serveArchiveBundleZip(w http.ResponseWriter, r *http.Request, arch *models.LogArchive) {
@@ -1554,13 +1582,47 @@ func (h *Handler) serveArchiveBundleZip(w http.ResponseWriter, r *http.Request, 
 	zw := zip.NewWriter(w)
 	defer zw.Close()
 
+	archiveDlName := arch.ArchiveName
+	if !strings.HasSuffix(archiveDlName, ".gz") {
+		archiveDlName += ".jsonl.gz"
+	}
+
 	filesToBundle := []struct {
 		diskPath string
 		zipName  string
 	}{
-		{arch.ArchivePath, arch.ArchiveName + ".jsonl.gz"},
-		{arch.ArchivePath + ".zd", arch.ArchiveName + ".jsonl.gz.zd"},
+		{arch.ArchivePath, archiveDlName},
 		{arch.ArchivePath + ".sha256", arch.ArchiveName + ".sha256"},
+	}
+
+	// Add evidence token (.zd, .tst)
+	evidencePath := arch.TimestampEvidencePath
+	if evidencePath == "" || !fileExists(evidencePath) {
+		if fileExists(arch.ArchivePath + ".zd") {
+			evidencePath = arch.ArchivePath + ".zd"
+		} else if fileExists(arch.ArchivePath + ".tst") {
+			evidencePath = arch.ArchivePath + ".tst"
+		} else {
+			manifestTst := strings.TrimSuffix(arch.ArchivePath, "_evidence.log.gz") + "_manifest.json.tst"
+			if fileExists(manifestTst) {
+				evidencePath = manifestTst
+			}
+		}
+	}
+	if evidencePath != "" && fileExists(evidencePath) {
+		filesToBundle = append(filesToBundle, struct {
+			diskPath string
+			zipName  string
+		}{evidencePath, filepath.Base(evidencePath)})
+	}
+
+	// Add manifest if present
+	manifestFile := strings.TrimSuffix(arch.ArchivePath, "_evidence.log.gz") + "_manifest.json"
+	if fileExists(manifestFile) {
+		filesToBundle = append(filesToBundle, struct {
+			diskPath string
+			zipName  string
+		}{manifestFile, filepath.Base(manifestFile)})
 	}
 
 	for _, f := range filesToBundle {

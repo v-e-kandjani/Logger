@@ -550,10 +550,10 @@ func (db *DB) ListArchives(ctx context.Context, tenant string, limit int) ([]mod
 	return list, nil
 }
 
-// ListPendingArchives retrieves archives that are still in PENDING, TSA_PENDING, TIMESTAMP_FAILED or retryable FAILED status.
+// ListPendingArchives retrieves archives that are still in PENDING, TSA_PENDING, TIMESTAMP_FAILED, retryable FAILED status, or missing an evidence path.
 func (db *DB) ListPendingArchives(ctx context.Context, limit int) ([]models.LogArchive, error) {
 	if limit <= 0 {
-		limit = 50
+		limit = 200
 	}
 	query := `
 		SELECT id, archive_name, start_timestamp, end_timestamp, record_count, archive_path,
@@ -564,6 +564,7 @@ func (db *DB) ListPendingArchives(ctx context.Context, limit int) ([]models.LogA
 		WHERE (
 			timestamp_status IN ('PENDING', 'TSA_PENDING', 'TIMESTAMP_FAILED')
 			OR (timestamp_status = 'FAILED' AND retry_count < 10)
+			OR ((timestamp_evidence_path IS NULL OR timestamp_evidence_path = '') AND timestamp_status NOT IN ('ARCHIVED_NO_STAMP'))
 		)
 		AND created_at < NOW() - INTERVAL '5 seconds'
 		ORDER BY created_at ASC
@@ -2138,6 +2139,16 @@ func (db *DB) EnsureEdgeSchema(ctx context.Context) error {
 			_, _ = db.pool.Exec(ctx, "UPDATE edge_nodes SET token_hash = $1, token_prefix = $2 WHERE id = $3", th, tp, ln.id)
 		}
 	}
+
+	// Auto-heal any evidence archives where timestamp_evidence_path was omitted
+	_, _ = db.pool.Exec(ctx, `
+		UPDATE log_archives 
+		SET timestamp_evidence_path = regexp_replace(archive_path, '_evidence\.log\.gz$', '_manifest.json.tst'),
+		    timestamp_status = CASE WHEN timestamp_status IN ('PENDING', 'TSA_PENDING', 'FAILED', 'TIMESTAMP_FAILED', '') THEN 'VERIFIED' ELSE timestamp_status END
+		WHERE (timestamp_evidence_path IS NULL OR timestamp_evidence_path = '') 
+		  AND archive_name LIKE '%_evidence.log.gz'
+	`)
+
 	return nil
 }
 

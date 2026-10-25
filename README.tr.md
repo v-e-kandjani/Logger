@@ -253,6 +253,20 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.21** (5651 Sayılı Kanun Kanıt Mutabakatı Çözümü, Eksik Kanıt Otomatik Keşfi ve İndirme Desteği):
+  - **Kanıt Mutabakatı Otomatik Keşfi (`internal/archive/engine.go` & `internal/database/postgres/postgres.go`)**:
+    - PostgreSQL tablosunda `timestamp_evidence_path` alanı boş olan arşivlerde "Bekleyenleri Mühürle" veya tekil "Mühürle" butonuna tıklandığında işlemin tepkisiz kalması ve durumun değişmemesi sorunu giderildi.
+    - `ListPendingArchives` sorgusu `timestamp_evidence_path` alanı boş veya null olan arşivleri de içerecek şekilde güncellendi.
+    - `ReconcilePendingArchives` ve `ReconcileArchiveByID` fonksiyonları, diskte kök, kiracı ve tarih dizinlerinde halihazırda bulunan RFC 3161 zaman damgası kanıt dosyalarını (`.zd`, `.tst`, `_manifest.json.tst`) otomatik tespit ederek harici TSA çağrısı yapmadan anında ilişkilendirecek şekilde güçlendirildi.
+    - `EnsureEdgeSchema` içine otomatik onarım sorgusu eklenerek geçmiş kanıt arşivlerinin `timestamp_evidence_path` yolları otomatik olarak tamamlandı.
+  - **Dinamik Kanıt İndirme & Paketleme (`internal/api/handler.go`)**:
+    - `/api/v1/archives/download?type=evidence` uç noktası hem KamuSM `.zd` hem de TÜBİTAK Zamane KS `.tst` formatındaki zaman damgası kanıtlarını dinamik olarak sunacak şekilde güncellendi.
+    - Uyumluluk paketi zip oluşturucusu (`serveArchiveBundleZip`), dosya uzantısına bakılmaksızın ilgili kanıt ve manifest dosyasını zip içerisine ekleyecek biçimde revize edildi.
+    - Ham log indirme işlemlerinde oluşan çift `.gz.jsonl.gz` dosya adı uzantısı düzeltildi.
+  - **Kullanıcı Arayüzü İyileştirmeleri (`web/static/js/app.js`)**:
+    - Arşiv tablosundaki kanıt indirme butonu, dosya formatına göre dinamik olarak `🛡️ Evidence (.zd)` veya `🛡️ Evidence (.tst)` etiketi gösterecek şekilde güncellendi.
+    - Gerçek zamanlı durum yenileme döngüsüne eksik kanıt yolu kontrolü dahil edildi.
+
 - **v1.9.20** (5651 Sayılı Kanun Arka Planda Otomatik Arşiv Mühürleme & Kesintisiz Bütünlük Mutabakatı):
   - **Kesintisiz Arka Plan Otomatik Mühürleyicisi (`internal/archive/engine.go`)**:
     - Bekleyen, kesintiye uğrayan veya geçici ağ hatası alan tüm log arşivlerinin mühürleme ayarlarına (`internal`, `kamusm` veya otomatik geri çekilmeli `disabled`) göre arka planda sürekli ve otomatik olarak mühürlenmesi sağlandı.
