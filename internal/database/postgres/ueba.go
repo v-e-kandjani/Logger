@@ -178,7 +178,7 @@ func (db *DB) RecordUEBAAnomaly(ctx context.Context, a *models.UEBAAnomaly) erro
 func (db *DB) addRiskPoints(ctx context.Context, tenant, username string, points int, factor string) error {
 	query := `
 		INSERT INTO ueba_risk_scores (tenant_slug, username, risk_score, risk_level, risk_factors, trend, active_anomalies, last_evaluated_at, updated_at)
-		VALUES ($1, $2, LEAST(100, $3), 'MEDIUM', jsonb_build_array($4), 'INCREASING', 1, NOW(), NOW())
+		VALUES ($1, $2, LEAST(100, $3), 'MEDIUM', jsonb_build_array($4::text), 'INCREASING', 1, NOW(), NOW())
 		ON CONFLICT (tenant_slug, username) DO UPDATE SET
 			risk_score = LEAST(100, ueba_risk_scores.risk_score + $3),
 			risk_level = CASE
@@ -189,8 +189,8 @@ func (db *DB) addRiskPoints(ctx context.Context, tenant, username string, points
 			END,
 			risk_factors = CASE
 				WHEN jsonb_array_length(ueba_risk_scores.risk_factors) > 8
-				THEN ueba_risk_scores.risk_factors || jsonb_build_array($4)
-				ELSE ueba_risk_scores.risk_factors || jsonb_build_array($4)
+				THEN ueba_risk_scores.risk_factors || jsonb_build_array($4::text)
+				ELSE ueba_risk_scores.risk_factors || jsonb_build_array($4::text)
 			END,
 			trend = 'INCREASING',
 			active_anomalies = ueba_risk_scores.active_anomalies + 1,
@@ -268,7 +268,7 @@ func (db *DB) GetUEBARiskLeaderboard(ctx context.Context, tenant string, limit i
 	}
 	defer rows.Close()
 
-	var items []models.UEBARiskLeaderboardItem
+	items := make([]models.UEBARiskLeaderboardItem, 0)
 	for rows.Next() {
 		var item models.UEBARiskLeaderboardItem
 		if err := rows.Scan(
@@ -317,7 +317,7 @@ func (db *DB) ListUEBAAnomalies(ctx context.Context, tenant, username, anomalyTy
 	}
 	defer rows.Close()
 
-	var anomalies []models.UEBAAnomaly
+	anomalies := make([]models.UEBAAnomaly, 0)
 	for rows.Next() {
 		var a models.UEBAAnomaly
 		var evidenceJSON []byte
@@ -369,7 +369,7 @@ func (db *DB) ListUEBAProfiles(ctx context.Context, tenant, search string, limit
 	}
 	defer rows.Close()
 
-	var profiles []models.UEBAUserProfile
+	profiles := make([]models.UEBAUserProfile, 0)
 	for rows.Next() {
 		var p models.UEBAUserProfile
 		var hist []int
