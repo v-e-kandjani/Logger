@@ -20,11 +20,12 @@ var embeddedAgentBinary []byte
 
 const (
 	defaultInstallDir = `C:\Program Files\LOGGER Agent`
-	serviceName       = "LoggerAgent"
+	serviceName        = "LoggerAgent"
 	serviceDisplayName = "Valtrivo LogSeal Endpoint Agent"
 	serviceDescription = "Valtrivo LogSeal native endpoint security and continuous telemetry collection daemon."
-	version           = "v0.1.6"
 )
+
+var version = "v0.1.12"
 
 type Config struct {
 	ServerURL            string `json:"server_url"`
@@ -122,18 +123,41 @@ func runInstall(serverURL, token, targetDir string, insecure, silent bool) {
 		fatalMsg(silent, "Failed to create installation directory: %v", err)
 	}
 
-	// 2. Write embedded logger-agent.exe binary
+	// 2. Stop running service and terminate any running agent processes
+	logMsg(silent, "[*] Stopping existing Logger Agent service and active processes...")
+	_ = exec.Command("net.exe", "stop", serviceName).Run()
+	_ = exec.Command("sc.exe", "stop", serviceName).Run()
+	_ = exec.Command("taskkill.exe", "/F", "/IM", "logger-agent.exe", "/T").Run()
+
+	// Wait up to 5 seconds for file locks to be completely released
+	for i := 0; i < 10; i++ {
+		time.Sleep(500 * time.Millisecond)
+		if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+			break
+		}
+		if f, err := os.OpenFile(binaryPath, os.O_WRONLY, 0755); err == nil {
+			f.Close()
+			break
+		}
+		_ = exec.Command("taskkill.exe", "/F", "/IM", "logger-agent.exe", "/T").Run()
+	}
+
+	// Clean up any stale backup files
+	_ = os.Remove(binaryPath + ".old")
+	_ = os.Remove(binaryPath + ".new")
+
 	logMsg(silent, "[*] Extracting agent binary...")
 	if len(embeddedAgentBinary) == 0 {
 		fatalMsg(silent, "Embedded agent binary is empty. Please ensure logger-agent.exe was embedded during build.")
 	}
 
-	// Stop existing service if running before overwriting binary
-	exec.Command("sc.exe", "stop", serviceName).Run()
-	time.Sleep(1 * time.Second)
-
+	// Write agent binary, with fallback rename if still locked
 	if err := os.WriteFile(binaryPath, embeddedAgentBinary, 0755); err != nil {
-		fatalMsg(silent, "Failed to write agent binary to %s: %v", binaryPath, err)
+		oldBackup := fmt.Sprintf("%s.old.%d", binaryPath, time.Now().Unix())
+		_ = os.Rename(binaryPath, oldBackup)
+		if writeErr := os.WriteFile(binaryPath, embeddedAgentBinary, 0755); writeErr != nil {
+			fatalMsg(silent, "Failed to write agent binary to %s: %v", binaryPath, writeErr)
+		}
 	}
 
 	// Also copy installer itself as uninstaller
@@ -174,6 +198,7 @@ echo.
 echo [*] Stopping and removing LoggerAgent Windows Service...
 net stop LoggerAgent >nul 2>&1
 sc.exe stop LoggerAgent >nul 2>&1
+taskkill.exe /F /IM logger-agent.exe /T >nul 2>&1
 sc.exe delete LoggerAgent >nul 2>&1
 reg.exe delete "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\LoggerAgent" /f >nul 2>&1
 echo [✓] Windows Service and Registry entries successfully removed.
@@ -253,9 +278,11 @@ func runUninstall(targetDir string, silent bool) {
 		fmt.Println("[*] Stopping and removing LoggerAgent Windows Service...")
 	}
 
-	exec.Command("sc.exe", "stop", serviceName).Run()
+	_ = exec.Command("net.exe", "stop", serviceName).Run()
+	_ = exec.Command("sc.exe", "stop", serviceName).Run()
+	_ = exec.Command("taskkill.exe", "/F", "/IM", "logger-agent.exe", "/T").Run()
 	time.Sleep(1 * time.Second)
-	exec.Command("sc.exe", "delete", serviceName).Run()
+	_ = exec.Command("sc.exe", "delete", serviceName).Run()
 
 	// Clean registry
 	regBase := `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\` + serviceName

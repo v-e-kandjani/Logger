@@ -82,30 +82,56 @@ func ApplyUpgrade(ctx context.Context, serverURL, downloadPath, targetVersion st
 	log.Printf("[LOGGER Auto-Updater] Download completed (%d bytes). Applying binary replacement...", copied)
 
 	if runtime.GOOS == "windows" {
-		// Windows: running exe cannot be directly overwritten, but it CAN be renamed
-		oldPath := execPath + ".old"
-		_ = os.Remove(oldPath) // remove previous old backup if present
-
-		if err := os.Rename(execPath, oldPath); err != nil {
-			return fmt.Errorf("renaming running binary to .old: %w", err)
+		// Windows: running exe cannot be directly overwritten while running.
+		// Fast Path: Stage as .new first
+		newPath := execPath + ".new"
+		_ = os.Remove(newPath)
+		if err := installBinary(tempPath, newPath); err != nil {
+			return fmt.Errorf("staging new binary to %s: %w", newPath, err)
 		}
 
-		// Move or copy temp file to execPath
-		if err := installBinary(tempPath, execPath); err != nil {
-			// Rollback rename
+		// Try atomic rename to a unique timestamped .old file
+		oldPath := fmt.Sprintf("%s.old.%d", execPath, time.Now().Unix())
+		if renameErr := os.Rename(execPath, oldPath); renameErr == nil {
+			if installErr := installBinary(newPath, execPath); installErr == nil {
+				log.Printf("[LOGGER Auto-Updater] Binary successfully updated to %s! Triggering service/process restart...", targetVersion)
+				restartScript := fmt.Sprintf(`ping 127.0.0.1 -n 2 > nul & (net stop LoggerAgent && net start LoggerAgent) || start "" "%s"`, execPath)
+				_ = exec.Command("cmd.exe", "/C", restartScript).Start()
+				go func() {
+					time.Sleep(500 * time.Millisecond)
+					os.Exit(0)
+				}()
+				return nil
+			}
+			// Rollback if install failed
 			_ = os.Rename(oldPath, execPath)
-			return fmt.Errorf("installing new binary: %w", err)
 		}
 
-		log.Printf("[LOGGER Auto-Updater] Binary successfully updated to %s! Triggering service/process restart...", targetVersion)
+		// Robust Fallback: If in-process rename failed (Access is denied / file locked by service or another handle),
+		// launch detached updater batch helper that waits for current process to exit, swaps files, and restarts!
+		log.Printf("[LOGGER Auto-Updater] Direct rename locked; deploying detached Windows update helper...")
+		scriptPath := filepath.Join(filepath.Dir(execPath), "logger-updater.bat")
+		batchContent := fmt.Sprintf(`@echo off
+ping 127.0.0.1 -n 2 > nul
+taskkill /F /IM logger-agent.exe > nul 2>&1
+ping 127.0.0.1 -n 2 > nul
+move /Y "%s" "%s" > nul 2>&1
+del /F /Q "%s.old*" > nul 2>&1
+net start LoggerAgent > nul 2>&1 || start "" "%s"
+del "%%%%~f0" > nul 2>&1
+`, newPath, execPath, execPath, execPath)
+		if err := os.WriteFile(scriptPath, []byte(batchContent), 0755); err != nil {
+			return fmt.Errorf("writing updater batch helper: %w", err)
+		}
 
-		// Spawn helper to restart service or relaunch binary after this process exits
-		restartScript := fmt.Sprintf(`ping 127.0.0.1 -n 3 > nul & (net stop LoggerAgent && net start LoggerAgent) || start "" "%s"`, execPath)
-		cmd := exec.Command("cmd.exe", "/C", restartScript)
-		_ = cmd.Start()
+		cmd := exec.Command("cmd.exe", "/C", scriptPath)
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("starting updater script: %w", err)
+		}
 
+		log.Printf("[LOGGER Auto-Updater] Detached helper launched. Exiting current process for binary swap...")
 		go func() {
-			time.Sleep(1 * time.Second)
+			time.Sleep(300 * time.Millisecond)
 			os.Exit(0)
 		}()
 		return nil

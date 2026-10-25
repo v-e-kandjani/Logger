@@ -35,13 +35,15 @@ type Agent struct {
 	fimScanner    *fim.Scanner
 	dlpTicker     *time.Ticker
 	dlpScanner    *dlp.Scanner
-	edrTicker     *time.Ticker
-	edrScanner    *edr.Scanner
-	netmonTicker  *time.Ticker
-	netmonScanner *netmon.Scanner
-	ransomTicker  *time.Ticker
-	shield        *ransomware.Shield
-	isUpgrading   bool
+	edrTicker                *time.Ticker
+	edrScanner               *edr.Scanner
+	netmonTicker             *time.Ticker
+	netmonScanner            *netmon.Scanner
+	ransomTicker             *time.Ticker
+	shield                   *ransomware.Shield
+	isUpgrading              bool
+	lastUpgradeAttempt       time.Time
+	lastUpgradeFailedVersion string
 }
 
 // NewAgent initializes the agent with configuration and identity
@@ -322,14 +324,20 @@ func (a *Agent) sendHeartbeat(ctx context.Context) {
 		}
 	}
 
-	// Auto-Update check: server offers newer version
+	// Auto-Update check: server offers newer version (strictly newer, with failure cooldown)
 	if resp.UpgradeAvailable && resp.TargetVersion != "" && version.IsNewer(resp.TargetVersion, version.Version) && !a.isUpgrading {
+		if a.lastUpgradeFailedVersion == resp.TargetVersion && time.Since(a.lastUpgradeAttempt) < 15*time.Minute {
+			// Do not re-attempt failed upgrade continuously on every heartbeat
+			return
+		}
 		a.isUpgrading = true
+		a.lastUpgradeAttempt = time.Now()
 		go func() {
 			log.Printf("[LOGGER Agent] Server offered auto-upgrade to %s (Current: %s). Starting download...",
 				resp.TargetVersion, version.Version)
 			if err := updater.ApplyUpgrade(context.Background(), a.cfg.ServerURL, resp.DownloadURL, resp.TargetVersion); err != nil {
 				log.Printf("[LOGGER Auto-Updater] Upgrade failed: %v", err)
+				a.lastUpgradeFailedVersion = resp.TargetVersion
 				a.isUpgrading = false
 			}
 		}()
