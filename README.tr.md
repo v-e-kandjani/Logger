@@ -253,6 +253,17 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.14** (5651 Sayılı Kanun Bekleyen Arşiv Düzeltmesi, Dağıtık Kiralama Kurtarma & Uyarlanabilir Otomatik Yedekleme):
+  - **Arşiv Kiralama Kurtarma & Dayanıklılık Motoru (`ClaimNextArchiveJob` / `internal/database/postgres/postgres.go`)**:
+    - Dağıtık arka plan kiralama kurtarma koşulu genişletilerek kiralama süresi dolduğunda (`lease_until < NOW()`) askıda kalan `TSA_PENDING` ve `SEALED` durumundaki görevlerin otomatik olarak yeniden talep edilmesi sağlandı; sunucu yeniden başlatmaları veya ağ kesintilerinde mühürleme işlerinin takılı kalması engellendi.
+    - Hatalı işlerin sonsuz döngüye girmesini önlemek için güvenli deneme sınırı (`attempts < 5`) eklendi.
+  - **Deterministik Kanıt Mühürleyici Hata Toleransı (`internal/archive/sealer.go`)**:
+    - TÜBİTAK Zamane KS istemcisinde ağ zaman aşımı, hesap eksikliği veya alt süreç hatası yaşandığında `AdaptiveTimestampProvider` (Dahili Kriptografik HMAC-SHA256 Otoritesi) mekanizmasına otomatik ve kesintisiz geçiş entegre edildi.
+    - `UpdateArchiveTimestamp` çağrısı ile `timestamp_evidence_path` ve `timestamp_status = 'VERIFIED'` değerlerinin PostgreSQL'e tescil edilmesi garanti altına alındı; kanıt dosya yolu boş kaldığı için arayüzde "Pending" görünmesi sorunu çözüldü.
+  - **Otomatik Bekleyenleri Uzlaştırma & İsteğe Bağlı Yeniden Damgalama (`POST /api/v1/archives/reconcile` / `#pane-archives`)**:
+    - `ArchiveEngine` içine 1 dakikadan eski tamamlanmamış arşivleri tarayıp mühürleyen arka plan `ReconcilePendingArchives` motoru eklendi.
+    - Arşiv tablosu başlığına **🔄 Bekleyenleri Mühürle** butonu ve her satıra doğrudan mühürleme aksiyon butonu eklenerek yöneticilere anında tek tıkla onarım imkanı sağlandı.
+
 - **v1.9.13** (Tema & Görünüm Seçici, 2 Yeni Sade ve Modern Palet - Obsidian Mint & Nordic Frost, Ajan Güncelleme & Çalışırken İkili Değiştirme Düzeltmesi) / **Ajan v0.1.12**:
   - **Sistem & Yönetim Tema Seçici Arayüzü (`#nav-tab-appearance` / `#pane-appearance`)**:
     - Sistem & Yönetim yan menü grubu altına doğrudan **Tema & Görünüm** menü öğesi eklendi.

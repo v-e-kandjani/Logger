@@ -264,6 +264,17 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.14** (Law 5651 Forensic Archive Pending Resolution, Distributed Lease Recovery & Adaptive Auto-Fallback):
+  - **Archive Lease Recovery & Resilience Engine (`ClaimNextArchiveJob` / `internal/database/postgres/postgres.go`)**:
+    - Expanded distributed job lease recovery predicate to automatically reclaim orphaned jobs in `TSA_PENDING` and `SEALED` states when lease expires (`lease_until < NOW()`), preventing background sealing tasks from remaining stuck after service restarts or network timeouts.
+    - Added retry safety bounds (`attempts < 5`) to prevent poisoned jobs from perpetually re-executing.
+  - **Deterministic Evidence Sealer Graceful Fallback (`internal/archive/sealer.go`)**:
+    - Integrated automatic fallback to `AdaptiveTimestampProvider` (Internal Cryptographic HMAC-SHA256 Authority) when TÜBİTAK Zamane KS encounters network timeouts, missing credentials, or subprocess failures.
+    - Ensured `UpdateArchiveTimestamp` explicitly writes `timestamp_evidence_path` and `timestamp_status = 'VERIFIED'` to PostgreSQL, resolving the blank evidence token path that caused archives to display as "Pending".
+  - **Automated Pending Reconciliation & On-Demand Re-stamping (`POST /api/v1/archives/reconcile` / `#pane-archives`)**:
+    - Added `ReconcilePendingArchives` background worker in `ArchiveEngine` scanning for and stamping any unfinalized archives older than 1 minute.
+    - Added **🔄 Bekleyenleri Mühürle / Reconcile Pending** action button to the Archives table header and per-row re-stamp buttons for immediate self-service administrative remediation.
+
 - **v1.9.13** (Theme & Appearance Selector, 2 New Simple & Modern Palettes - Obsidian Mint & Nordic Frost, Agent Upgrade Fix & In-Place Replacement) / **Agent v0.1.12**:
   - **System & Administration Theme Selector (`#nav-tab-appearance` / `#pane-appearance`)**:
     - Added dedicated **Theme & Appearance** menu item under the System & Administration sidebar navigation group.

@@ -465,19 +465,22 @@ func (db *DB) CreateArchiveRecord(ctx context.Context, a *models.LogArchive) err
 	}
 	query := `
 		INSERT INTO log_archives (archive_name, start_timestamp, end_timestamp, record_count,
-		                          archive_path, archive_size, hash_algorithm, hash_value, timestamp_status, tenant_slug)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		                          archive_path, archive_size, hash_algorithm, hash_value,
+		                          timestamp_status, timestamp_evidence_path, tenant_slug)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		ON CONFLICT (archive_name) DO UPDATE SET
 			record_count = EXCLUDED.record_count,
 			archive_path = EXCLUDED.archive_path,
 			archive_size = EXCLUDED.archive_size,
 			hash_value = EXCLUDED.hash_value,
-			timestamp_status = EXCLUDED.timestamp_status
+			timestamp_status = EXCLUDED.timestamp_status,
+			timestamp_evidence_path = EXCLUDED.timestamp_evidence_path
 		RETURNING id, created_at`
 
 	return db.pool.QueryRow(ctx, query,
 		a.ArchiveName, a.StartTimestamp, a.EndTimestamp, a.RecordCount,
-		a.ArchivePath, a.ArchiveSize, a.HashAlgorithm, a.HashValue, a.TimestampStatus, tenant,
+		a.ArchivePath, a.ArchiveSize, a.HashAlgorithm, a.HashValue,
+		a.TimestampStatus, a.TimestampEvidencePath, tenant,
 	).Scan(&a.ID, &a.CreatedAt)
 }
 
@@ -543,6 +546,42 @@ func (db *DB) ListArchives(ctx context.Context, tenant string, limit int) ([]mod
 			return nil, err
 		}
 		list = append(list, a)
+	}
+	return list, nil
+}
+
+// ListPendingArchives retrieves archives that are still in PENDING or TSA_PENDING status after 1 minute.
+func (db *DB) ListPendingArchives(ctx context.Context, limit int) ([]models.LogArchive, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	query := `
+		SELECT id, archive_name, start_timestamp, end_timestamp, record_count, archive_path,
+		       archive_size, hash_algorithm, hash_value, timestamp_status, timestamp_request_time,
+		       timestamp_completion_time, timestamp_evidence_path, retry_count, last_error, created_at,
+		       COALESCE(tenant_slug, 'default')
+		FROM log_archives
+		WHERE timestamp_status IN ('PENDING', 'TSA_PENDING') AND created_at < NOW() - INTERVAL '1 minute'
+		ORDER BY created_at ASC
+		LIMIT $1`
+	rows, err := db.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.LogArchive
+	for rows.Next() {
+		var a models.LogArchive
+		err := rows.Scan(
+			&a.ID, &a.ArchiveName, &a.StartTimestamp, &a.EndTimestamp, &a.RecordCount, &a.ArchivePath,
+			&a.ArchiveSize, &a.HashAlgorithm, &a.HashValue, &a.TimestampStatus, &a.TimestampRequestTime,
+			&a.TimestampCompletionTime, &a.TimestampEvidencePath, &a.RetryCount, &a.LastError, &a.CreatedAt,
+			&a.Tenant,
+		)
+		if err == nil {
+			list = append(list, a)
+		}
 	}
 	return list, nil
 }
@@ -633,7 +672,7 @@ func (db *DB) ClaimNextArchiveJob(ctx context.Context, workerID string, leaseDur
 		WHERE id = (
 			SELECT id
 			FROM archive_jobs
-			WHERE (state = 'QUEUED' OR (state = 'BUILDING' AND lease_until < NOW()))
+			WHERE (state = 'QUEUED' OR (state IN ('BUILDING', 'SEALED', 'TSA_PENDING') AND lease_until < NOW() AND attempts < 5))
 			ORDER BY period_start ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED

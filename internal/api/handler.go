@@ -203,6 +203,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/unregistered/onboard-all", h.requireAuth(h.handleAutoOnboardAll))
 	mux.HandleFunc("/api/v1/archives", h.requireAuth(h.handleArchives))
 	mux.HandleFunc("/api/v1/archives/create", h.requireAuth(h.handleCreateArchiveNow))
+	mux.HandleFunc("/api/v1/archives/reconcile", h.requireAuth(h.handleReconcileArchives))
 	mux.HandleFunc("/api/v1/archives/download", h.requireAuth(h.handleDownloadArchive))
 	mux.HandleFunc("/api/v1/archives/manual", h.requireAuth(h.handleManualArchiveAPI))
 	mux.HandleFunc("/api/v1/archives/jobs", h.requireAuth(h.handleListArchiveJobsAPI))
@@ -1401,6 +1402,26 @@ func (h *Handler) handleCreateArchiveNow(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, arch)
+}
+
+func (h *Handler) handleReconcileArchives(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ctx, cancel := contextWithTimeout(r, 60*time.Second)
+	defer cancel()
+
+	reconciled := 0
+	if h.archEngine != nil {
+		reconciled = h.archEngine.ReconcilePendingArchives(ctx)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "success",
+		"reconciled": reconciled,
+		"message":    fmt.Sprintf("%d bekleyen arşiv yeniden damgalandı / %d pending archives reconciled", reconciled, reconciled),
+	})
 }
 
 func (h *Handler) handleTimestampCredit(w http.ResponseWriter, r *http.Request) {

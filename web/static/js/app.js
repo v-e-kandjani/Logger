@@ -1262,7 +1262,10 @@ async function loadArchives() {
                         ${isStamped && a.timestamp_evidence_path ? `
                         <a href="/api/v1/archives/download?id=${a.id}&type=evidence" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; text-decoration: none;" title="Download legal proof / KamuSM timestamp (.zd)" download>
                             ${t('btn_evidence_dl', '🛡️ Evidence (.zd)')}
-                        </a>` : ''}
+                        </a>` : `
+                        <button onclick="reconcileArchives()" class="btn btn-warning" style="padding: 3px 8px; font-size: 11px;" title="Bekleyen arşivi yeniden mühürle / Re-stamp pending archive">
+                            🔄 ${t('btn_restamp', 'Mühürle')}
+                        </button>`}
                     </div>
                 </td>
             </tr>
@@ -1271,6 +1274,23 @@ async function loadArchives() {
         tbody.innerHTML = `<tr><td colspan="10" class="text-center text-red">${t('archives_failed', 'Failed to load archives')}: ${e.message}</td></tr>`;
     }
 }
+
+window.reconcileArchives = async function() {
+    const t = (k, fb) => (window.i18n ? window.i18n.t(k) : (fb || k));
+    showToast(t('reconcile_starting', 'Bekleyen arşivler mühürleniyor...'), 'info');
+    try {
+        const res = await fetch('/api/v1/archives/reconcile', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+            showToast(`✓ ${data.message}`, 'success');
+            if (typeof loadArchives === 'function') loadArchives();
+        } else {
+            showToast(`Hata: ${data.message || 'Mühürleme başarısız'}`, 'error');
+        }
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    }
+};
 
 // Toast Notification System
 function showToast(message, type = 'info') {

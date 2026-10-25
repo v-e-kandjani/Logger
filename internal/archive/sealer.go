@@ -194,6 +194,12 @@ func (s *EvidenceSealer) ProcessJob(ctx context.Context, job *models.ArchiveJob)
 
 	tsResult, err := s.zamane.TimestampManifest(ctx, manifestPath)
 	if err != nil {
+		if s.tsProvider != nil {
+			log.Printf("[ArchiveSealer] Zamane KS failed (%v), falling back to Adaptive/Internal TimestampProvider...", err)
+			tsResult, err = s.tsProvider.Timestamp(ctx, manifestPath)
+		}
+	}
+	if err != nil {
 		_ = s.db.UpdateArchiveJobState(ctx, job.ID, "FAILED", "TSA stamping failed: "+err.Error())
 		return nil, err
 	}
@@ -202,6 +208,9 @@ func (s *EvidenceSealer) ProcessJob(ctx context.Context, job *models.ArchiveJob)
 	_ = s.db.UpdateArchiveJobState(ctx, job.ID, "VERIFIED", "Timestamp token acquired, validating cryptographic chain")
 
 	verifyErr := s.zamane.VerifyToken(ctx, manifestPath, tsResult.EvidenceFile)
+	if verifyErr != nil && s.tsProvider != nil {
+		verifyErr = s.tsProvider.Verify(ctx, manifestPath, tsResult.EvidenceFile)
+	}
 	verificationOutcome := "VERIFIED"
 	verificationDetails := "Token verified successfully against manifest SHA-256 imprint"
 	if verifyErr != nil {
@@ -237,6 +246,7 @@ func (s *EvidenceSealer) ProcessJob(ctx context.Context, job *models.ArchiveJob)
 	if err := s.db.CreateArchiveRecord(ctx, archiveRec); err != nil {
 		log.Printf("[ArchiveSealer] Error creating archive record: %v", err)
 	}
+	_ = s.db.UpdateArchiveTimestamp(ctx, archiveRec.ID, archiveRec.TimestampStatus, tsResult.EvidenceFile, verificationDetails)
 
 	// Save Manifest
 	archManifest := &models.ArchiveManifest{

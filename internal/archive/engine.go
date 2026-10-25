@@ -104,11 +104,52 @@ func (e *Engine) StartAutoArchiving(ctx context.Context, interval string, schedu
 						cancel()
 					}
 				}
+
+				// Periodic reconciliation for any stuck pending/interrupted archives
+				if utcNow.Second() < 30 {
+					reconcileCtx, rCancel := context.WithTimeout(context.Background(), 30*time.Second)
+					_ = e.ReconcilePendingArchives(reconcileCtx)
+					rCancel()
+				}
 			}
 		}
 	}()
 }
 
+// ReconcilePendingArchives scans PostgreSQL for any archives stuck in PENDING or TSA_PENDING
+// that are older than 1 minute and re-triggers timestamping.
+func (e *Engine) ReconcilePendingArchives(ctx context.Context) int {
+	if e.provider == nil || e.pgDB == nil {
+		return 0
+	}
+	pendingList, err := e.pgDB.ListPendingArchives(ctx, 20)
+	if err != nil || len(pendingList) == 0 {
+		return 0
+	}
+	reconciled := 0
+	for _, a := range pendingList {
+		if a.ArchivePath == "" {
+			continue
+		}
+		if _, err := os.Stat(a.ArchivePath); err != nil {
+			log.Printf("[Archive Engine] Pending archive %s file not found at %s: %v", a.ID, a.ArchivePath, err)
+			continue
+		}
+		res, err := e.provider.Timestamp(ctx, a.ArchivePath)
+		if err != nil {
+			_ = e.pgDB.UpdateArchiveTimestamp(ctx, a.ID, "FAILED", "", err.Error())
+		} else {
+			status := "STAMPED"
+			if res.EvidenceFile == "" {
+				status = "ARCHIVED_NO_STAMP"
+			}
+			_ = e.pgDB.UpdateArchiveTimestamp(ctx, a.ID, status, res.EvidenceFile, "")
+			reconciled++
+			log.Printf("[Archive Engine] Reconciled pending archive %s (%s) -> %s", a.ID, a.ArchiveName, status)
+		}
+	}
+	return reconciled
+}
 
 // CreateArchiveSlice queries an immutable time slice for default tenant
 func (e *Engine) CreateArchiveSlice(ctx context.Context, start, end time.Time) (*models.LogArchive, error) {
