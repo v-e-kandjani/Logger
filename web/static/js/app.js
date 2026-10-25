@@ -3348,7 +3348,13 @@ window.resetUserMFA = async (userId, username) => {
 };
 
 function escapeHtml(str) {
-    if (!str) return '';
+    if (str === null || str === undefined) return '';
+    if (typeof str !== 'string') {
+        if (typeof str === 'object') {
+            try { return JSON.stringify(str); } catch (_) { return String(str); }
+        }
+        str = String(str);
+    }
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
@@ -14231,9 +14237,10 @@ async function loadUEBALeaderboard() {
         }
 
         tbody.innerHTML = items.map((item, idx) => {
-            const lastTime = item.last_anomaly_at ? new Date(item.last_anomaly_at).toLocaleString() : '-';
+            const lastTime = (item.last_seen_at || item.last_anomaly_at) ? new Date(item.last_seen_at || item.last_anomaly_at).toLocaleString() : '-';
             const riskBadge = getUEBARiskBadge(item.risk_score, item.risk_level);
             const escapedUser = escapeHtml(item.username);
+            const anomCount = item.active_anomalies !== undefined ? item.active_anomalies : (item.anomaly_count || 0);
             return `
                 <tr>
                     <td style="font-weight: 600; color: var(--text-muted);">${idx + 1}</td>
@@ -14242,8 +14249,8 @@ async function loadUEBALeaderboard() {
                     </td>
                     <td><span class="badge badge-secondary">${escapeHtml(item.tenant_slug || 'default')}</span></td>
                     <td>${riskBadge}</td>
-                    <td><span style="font-weight: 600;">${item.risk_level || 'LOW'}</span></td>
-                    <td><span class="badge" style="background: var(--bg-card);">${item.anomaly_count || 0}</span></td>
+                    <td><span style="font-weight: 600;">${escapeHtml(item.risk_level || 'LOW')}</span></td>
+                    <td><span class="badge" style="background: var(--bg-card);">${anomCount}</span></td>
                     <td style="font-size: 11.5px; color: var(--text-muted);">${lastTime}</td>
                     <td>
                         <div style="display: flex; gap: 6px;">
@@ -14298,23 +14305,29 @@ async function loadUEBAAnomalies(page = 1) {
         }
 
         tbody.innerHTML = anomalies.map(a => {
-            const time = a.created_at ? new Date(a.created_at).toLocaleString() : '-';
+            const time = (a.detected_at || a.created_at) ? new Date(a.detected_at || a.created_at).toLocaleString() : '-';
+            const sev = (a.severity || 'low').toLowerCase();
             let sevColor = '#38bdf8';
-            if (a.severity === 'critical') sevColor = '#ef4444';
-            else if (a.severity === 'high') sevColor = '#f97316';
-            else if (a.severity === 'medium') sevColor = '#eab308';
+            if (sev === 'critical') sevColor = '#ef4444';
+            else if (sev === 'high') sevColor = '#f97316';
+            else if (sev === 'medium') sevColor = '#eab308';
 
             let typeBadge = `<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">${escapeHtml(a.anomaly_type)}</span>`;
             if (a.anomaly_type === 'IMPOSSIBLE_TRAVEL') {
                 typeBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">✈️ İmkansız Seyahat</span>`;
-            } else if (a.anomaly_type === 'OFF_HOURS_BURST') {
+            } else if (a.anomaly_type === 'OFF_HOURS' || a.anomaly_type === 'OFF_HOURS_BURST') {
                 typeBadge = `<span class="badge" style="background: rgba(249, 115, 22, 0.2); color: #f97316;">🌙 Mesai Dışı Admin</span>`;
-            } else if (a.anomaly_type === 'DORMANT_REACTIVATED') {
+            } else if (a.anomaly_type === 'DORMANT_ACCOUNT' || a.anomaly_type === 'DORMANT_REACTIVATED') {
                 typeBadge = `<span class="badge" style="background: rgba(234, 179, 8, 0.2); color: #eab308;">💤 Uyuyan Hesap Canlanması</span>`;
+            } else if (a.anomaly_type === 'PRIVILEGE_BURST') {
+                typeBadge = `<span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #a855f7;">⚡ Yetki Yükseltme</span>`;
             }
 
             const escapedUser = escapeHtml(a.username);
-            const evidence = escapeHtml(a.evidence || a.description || '-');
+            const desc = a.description || '';
+            const evidenceStr = typeof a.evidence === 'object' && a.evidence !== null ? JSON.stringify(a.evidence) : (a.evidence || '');
+            const evidenceDisplay = desc || evidenceStr || '-';
+            const evidenceEscaped = escapeHtml(evidenceDisplay);
 
             return `
                 <tr>
@@ -14322,9 +14335,9 @@ async function loadUEBAAnomalies(page = 1) {
                     <td><strong style="color: var(--accent); cursor: pointer;" onclick="jumpToLogSearch('${escapedUser}')">${escapedUser}</strong></td>
                     <td><span class="badge badge-secondary">${escapeHtml(a.tenant_slug || 'default')}</span></td>
                     <td>${typeBadge}</td>
-                    <td><span class="badge" style="border: 1px solid ${sevColor}; color: ${sevColor};">${escapeHtml(a.severity).toUpperCase()}</span></td>
-                    <td><strong style="color: #ef4444;">+${a.risk_points}</strong></td>
-                    <td style="font-size: 11.5px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${evidence}">${evidence}</td>
+                    <td><span class="badge" style="border: 1px solid ${sevColor}; color: ${sevColor}; font-weight: 600;">${escapeHtml(a.severity || 'LOW').toUpperCase()}</span></td>
+                    <td><strong style="color: #ef4444;">+${a.risk_points || 0}</strong></td>
+                    <td style="font-size: 11.5px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${evidenceEscaped}">${evidenceEscaped}</td>
                     <td>
                         <button class="btn btn-outline btn-sm" style="font-size: 11px; padding: 2px 6px;" onclick="jumpToLogSearch('${escapedUser}')">
                             🔍 Loglar
@@ -14380,10 +14393,12 @@ async function loadUEBAProfiles(page = 1) {
         }
 
         tbody.innerHTML = profiles.map(p => {
-            const firstSeen = p.first_seen ? new Date(p.first_seen).toLocaleDateString() : '-';
-            const lastSeen = p.last_seen ? new Date(p.last_seen).toLocaleString() : '-';
-            const ipCount = Array.isArray(p.known_ips) ? p.known_ips.length : 0;
-            const location = (p.last_city || p.last_country) ? `${p.last_city || ''}${p.last_city ? ', ' : ''}${p.last_country || ''}` : '-';
+            const firstSeen = (p.first_seen_at || p.first_seen) ? new Date(p.first_seen_at || p.first_seen).toLocaleDateString() : '-';
+            const lastSeen = (p.last_seen_at || p.last_seen) ? new Date(p.last_seen_at || p.last_seen).toLocaleString() : '-';
+            const workstation = p.primary_workstation || p.last_seen_ip || '-';
+            const location = (p.last_seen_city || p.last_seen_country || p.last_city || p.last_country) 
+                ? `${p.last_seen_city || p.last_city || ''}${(p.last_seen_city || p.last_city) ? ', ' : ''}${p.last_seen_country || p.last_country || ''}` 
+                : '-';
             const escapedUser = escapeHtml(p.username);
 
             return `
@@ -14393,7 +14408,7 @@ async function loadUEBAProfiles(page = 1) {
                     <td style="font-size: 11.5px; color: var(--text-muted);">${firstSeen}</td>
                     <td style="font-size: 11.5px; color: var(--text-muted);">${lastSeen}</td>
                     <td><strong>${(p.total_events || 0).toLocaleString()}</strong></td>
-                    <td><span class="badge" style="background: var(--bg-card);">${ipCount} IP</span></td>
+                    <td><span class="badge" style="background: var(--bg-card);">${escapeHtml(workstation)}</span></td>
                     <td style="font-size: 11.5px;">📍 ${escapeHtml(location)}</td>
                     <td>
                         <button class="btn btn-outline btn-sm" style="font-size: 11px; padding: 2px 6px;" onclick="jumpToLogSearch('${escapedUser}')">
