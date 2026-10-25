@@ -264,6 +264,14 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.19** (Law 5651 Single-Archive Reconcile Response Resolution & Nil-Guard Hardening):
+  - **Archive Reconcile Body Stream & Format Resolution (`web/static/js/app.js`)**:
+    - Resolved `Hata: Invalid response format from server (200)` when triggering on-demand archive stamping (`reconcileArchives`).
+    - Handled response bodies via single unified text stream reading followed by non-blocking JSON parsing, ensuring both legacy plain-text and structured JSON 200 OK responses are recognized without throwing exceptions.
+    - Added multilingual error message and status formatting (`Error` / `Hata`).
+  - **Backend Handler Guarding (`internal/api/handler.go`)**:
+    - Added safety guards around `ReconcileArchiveByID` return values to prevent nil pointer panics when formatting archive names.
+
 - **v1.9.18** (Security Alert Notification Center Bell Icon & Pop-up Bubble Elimination):
   - **In-App Toast Alert Bubble Elimination**:
     - Completely blocked intrusive pop-up alert bubbles (`showToast`) inside the application window that previously covered screen areas whenever real-time EDR network threats or SIEM incidents were detected.

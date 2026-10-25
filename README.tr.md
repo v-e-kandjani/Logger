@@ -253,6 +253,14 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.19** (5651 Sayılı Kanun Arşiv Mühürleme Yanıt Formatı Çözümü ve Arka Plan Güçlendirmesi):
+  - **Arşiv Mühürleme Yanıt Akışı & Biçim İyileştirmesi (`web/static/js/app.js`)**:
+    - İsteğe bağlı arşiv damgalama (`reconcileArchives` / "Seal Now") butonuna basıldığında tetiklenen `Hata: Invalid response format from server (200)` istisnası tamamen çözüldü.
+    - Yanıt gövdesi tekil metin akışı ile okunup ardından JSON çözümlemesine tabi tutularak, hem yapılandırılmış JSON hem de düz metin 200 OK durumlarının hatasız işlenmesi sağlandı.
+    - Durum ve hata bildirimleri aktif dile (`Error` / `Hata`) duyarlı hale getirildi.
+  - **Arka Plan Handler Güvenliği (`internal/api/handler.go`)**:
+    - `ReconcileArchiveByID` dönüş değerleri için nil gösterici korumaları eklenerek arşiv adlandırma panikleri engellendi.
+
 - **v1.9.18** (Güvenlik Uyarı Bildirim Merkezi Zil Simgesi ve Açılır Balon Bildirim Engellemesi):
   - **Uygulama İçi Balon Bildirim Pop-up'larının Kaldırılması**:
     - Gerçek zamanlı EDR ağ tehditleri veya SIEM olayları tetiklendiğinde ekranı kaplayan rahatsız edici toast/balon bildirim pop-up'ları tamamen engellendi.

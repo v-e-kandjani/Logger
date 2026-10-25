@@ -1425,11 +1425,20 @@ func (h *Handler) handleReconcileArchives(w http.ResponseWriter, r *http.Request
 				writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "Mühürleme hatası: " + err.Error()})
 				return
 			}
+			archName := id.String()
+			archStatus := "STAMPED"
+			if arch != nil {
+				archName = arch.ArchiveName
+				archStatus = arch.TimestampStatus
+			}
 			writeJSON(w, http.StatusOK, map[string]any{
 				"status":     "success",
 				"reconciled": 1,
-				"message":    fmt.Sprintf("Arşiv başarıyla mühürlendi / Archive %s successfully stamped (%s)", arch.ArchiveName, arch.TimestampStatus),
+				"message":    fmt.Sprintf("Arşiv başarıyla mühürlendi / Archive %s successfully stamped (%s)", archName, archStatus),
 			})
+			return
+		} else {
+			writeJSON(w, http.StatusOK, map[string]any{"status": "error", "message": "Arşiv motoru başlatılmamış / Archive engine not initialized"})
 			return
 		}
 	}

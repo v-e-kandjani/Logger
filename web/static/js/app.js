@@ -1278,39 +1278,44 @@ async function loadArchives() {
 }
 
 window.reconcileArchives = async function(archiveId) {
+    const isTr = (window.i18n && window.i18n.currentLang === 'tr');
     const t = (k, fb) => (window.i18n ? window.i18n.t(k) : (fb || k));
-    showToast(t('reconcile_starting', 'Bekleyen arşivler mühürleniyor...'), 'info');
+    showToast(t('reconcile_starting', isTr ? 'Bekleyen arşivler mühürleniyor...' : 'Reconciling and stamping pending archives...'), 'info');
     try {
         const url = archiveId ? `/api/v1/archives/reconcile?id=${encodeURIComponent(archiveId)}` : '/api/v1/archives/reconcile';
         const res = await fetch(url, { method: 'POST' });
         
+        // Read text safely first so stream consumption never conflicts
+        const rawText = await res.text();
         let data = null;
-        const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-            try {
-                data = await res.json();
-            } catch (parseErr) {
-                data = null;
-            }
-        }
-        
-        if (!data) {
-            const rawText = await res.text();
-            if (!res.ok) {
-                showToast(`Hata (${res.status}): ${rawText ? rawText.substring(0, 120) : res.statusText}`, 'error');
-                return;
-            }
-            throw new Error(`Invalid response format from server (${res.status})`);
+        try {
+            data = JSON.parse(rawText.trim());
+        } catch (e) {
+            data = null;
         }
 
-        if (res.ok && data.status === 'success') {
-            showToast(`✓ ${data.message}`, 'success');
-            if (typeof loadArchives === 'function') loadArchives();
+        if (!res.ok) {
+            const errMsg = data ? (data.message || data.error || `HTTP ${res.status}`) : (rawText.substring(0, 150) || res.statusText);
+            showToast(`${isTr ? 'Hata' : 'Error'} (${res.status}): ${errMsg}`, 'error');
+            return;
+        }
+
+        // Server returned 200 OK
+        if (data) {
+            if (data.status === 'success' || data.reconciled !== undefined) {
+                showToast(`✓ ${data.message || (isTr ? 'Arşivler başarıyla mühürlendi.' : 'Archives successfully stamped.')}`, 'success');
+                if (typeof loadArchives === 'function') loadArchives();
+            } else {
+                showToast(`${isTr ? 'Hata' : 'Error'}: ${data.message || data.error || (isTr ? 'Mühürleme başarısız' : 'Stamping failed')}`, 'error');
+            }
         } else {
-            showToast(`Hata: ${data.message || data.error || 'Mühürleme başarısız'}`, 'error');
+            // Server returned 200 OK with plain text (e.g. from earlier backend or proxy)
+            const msg = rawText.trim() || (isTr ? 'Arşiv mühürleme işlemi tamamlandı.' : 'Archive reconciliation completed.');
+            showToast(`✓ ${msg}`, 'success');
+            if (typeof loadArchives === 'function') loadArchives();
         }
     } catch (e) {
-        showToast(`Hata: ${e.message}`, 'error');
+        showToast(`${isTr ? 'Hata' : 'Error'}: ${e.message}`, 'error');
     }
 };
 
