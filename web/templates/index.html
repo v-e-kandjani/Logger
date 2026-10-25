@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=1.9.17">
-    <link rel="stylesheet" href="/static/css/theme.css?v=1.9.17">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.17">
-    <link rel="stylesheet" href="/static/css/components.css?v=1.9.17">
-    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.17">
-    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.17">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=1.9.18">
+    <link rel="stylesheet" href="/static/css/theme.css?v=1.9.18">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.18">
+    <link rel="stylesheet" href="/static/css/components.css?v=1.9.18">
+    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.18">
+    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.18">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
@@ -25,7 +25,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.17</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.18</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -329,6 +329,40 @@
                         <svg class="theme-icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
                         <svg class="theme-icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
                     </button>
+
+                    <!-- Security Alerts Notification Center -->
+                    <div class="header-alerts-wrapper" id="header-alerts-wrapper">
+                        <button class="theme-toggle-btn header-alerts-btn" id="header-alerts-btn" aria-label="Security Alerts" title="Güvenlik Uyarıları / Security Alerts">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            <span class="alerts-badge" id="header-alerts-badge" style="display: none;">0</span>
+                        </button>
+                        <!-- Alerts Dropdown Flyout -->
+                        <div class="alerts-dropdown-panel" id="header-alerts-dropdown" style="display: none;">
+                            <div class="alerts-dropdown-header">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-weight: 600; font-size: 13px;" data-i18n="alerts_center_title">Güvenlik Uyarıları</span>
+                                    <span class="badge badge-danger" id="alerts-dropdown-crit-count" style="font-size: 10px; display: none;">0 Critical</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <button class="btn btn-outline" id="btn-clear-alerts-badge" style="padding: 2px 7px; font-size: 10.5px; border-radius: 4px;" data-i18n="alerts_mark_read">Okundu Say</button>
+                                    <button id="btn-close-alerts-dropdown" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 0 4px; line-height: 1;" aria-label="Close">✕</button>
+                                </div>
+                            </div>
+                            <div class="alerts-dropdown-body" id="alerts-dropdown-list">
+                                <div class="alerts-dropdown-empty" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;" data-i18n="alerts_no_recent">
+                                    Yeni güvenlik uyarısı bulunmuyor.
+                                </div>
+                            </div>
+                            <div class="alerts-dropdown-footer">
+                                <a href="#siem" class="btn btn-outline btn-sm" id="btn-view-all-siem-alerts" style="width: 100%; text-align: center; display: block; padding: 6px; font-size: 11.5px; text-decoration: none;" data-i18n="alerts_view_all_siem">
+                                    🛡️ Tüm Uyarıları SIEM &amp; SOC'ta İncele
+                                </a>
+                            </div>
+                        </div>
+                    </div>
 
 
                     <button class="btn btn-primary btn-top-compact" id="btn-open-custom-export">
@@ -3923,7 +3957,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.17</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.18</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -8015,8 +8049,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.17"></script>
-    <script src="/static/js/translations.js?v=1.9.17"></script>
-    <script src="/static/js/app.js?v=1.9.17"></script>
+    <script src="/static/js/marked.min.js?v=1.9.18"></script>
+    <script src="/static/js/translations.js?v=1.9.18"></script>
+    <script src="/static/js/app.js?v=1.9.18"></script>
 </body>
 </html>

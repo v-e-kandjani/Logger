@@ -4919,6 +4919,169 @@ function drawSmoothAreaChart(canvasId, seriesList, options = {}) {
 }
 
 // ==========================================================================
+// Security Alerts Notification Center Controller
+// ==========================================================================
+let headerAlertsList = [];
+let headerAlertsUnreadCount = 0;
+
+function initAlertNotificationCenter() {
+    const btn = document.getElementById('header-alerts-btn');
+    const dropdown = document.getElementById('header-alerts-dropdown');
+    const btnClose = document.getElementById('btn-close-alerts-dropdown');
+    const btnClear = document.getElementById('btn-clear-alerts-badge');
+    const btnViewAll = document.getElementById('btn-view-all-siem-alerts');
+
+    if (!btn || !dropdown) return;
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.style.display !== 'none';
+        dropdown.style.display = isOpen ? 'none' : 'flex';
+        if (!isOpen) {
+            headerAlertsUnreadCount = 0;
+            updateAlertsBadge();
+        }
+    });
+
+    if (btnClose) {
+        btnClose.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.style.display = 'none';
+        });
+    }
+
+    if (btnClear) {
+        btnClear.addEventListener('click', (e) => {
+            e.stopPropagation();
+            headerAlertsUnreadCount = 0;
+            updateAlertsBadge();
+        });
+    }
+
+    if (btnViewAll) {
+        btnViewAll.addEventListener('click', (e) => {
+            e.preventDefault();
+            dropdown.style.display = 'none';
+            if (typeof switchTab === 'function') {
+                switchTab('siem');
+            }
+        });
+    }
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+        const wrapper = document.getElementById('header-alerts-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Initial fetch of recent alerts
+    loadInitialAlertsForNotificationCenter();
+}
+
+async function loadInitialAlertsForNotificationCenter() {
+    try {
+        const tenant = currentTenantContext || localStorage.getItem('active_tenant_slug') || 'default';
+        const res = await fetch(`/api/v1/siem/alerts?limit=15&tenant=${encodeURIComponent(tenant)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const alerts = data.alerts || [];
+        headerAlertsList = alerts;
+        headerAlertsUnreadCount = alerts.filter(a => a.severity === 'CRITICAL' || a.severity === 'HIGH').length;
+        renderHeaderAlertsDropdown();
+        updateAlertsBadge();
+    } catch (e) {
+        console.warn('Error fetching alerts for header notification center:', e);
+    }
+}
+
+function addAlertToNotificationCenter(alert) {
+    if (!alert) return;
+    if (alert.id) {
+        headerAlertsList = headerAlertsList.filter(a => a.id !== alert.id);
+    }
+    headerAlertsList.unshift(alert);
+    if (headerAlertsList.length > 30) headerAlertsList.pop();
+
+    headerAlertsUnreadCount++;
+    renderHeaderAlertsDropdown();
+    updateAlertsBadge();
+}
+
+function updateAlertsBadge() {
+    const badge = document.getElementById('header-alerts-badge');
+    const critBadge = document.getElementById('alerts-dropdown-crit-count');
+    if (badge) {
+        if (headerAlertsUnreadCount > 0) {
+            badge.textContent = headerAlertsUnreadCount > 99 ? '99+' : headerAlertsUnreadCount;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+    if (critBadge) {
+        const crits = headerAlertsList.filter(a => a.severity === 'CRITICAL').length;
+        if (crits > 0) {
+            critBadge.textContent = `${crits} Critical`;
+            critBadge.style.display = 'inline-block';
+        } else {
+            critBadge.style.display = 'none';
+        }
+    }
+}
+
+function renderHeaderAlertsDropdown() {
+    const container = document.getElementById('alerts-dropdown-list');
+    if (!container) return;
+
+    const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k, fallback) => fallback || k;
+    const isTr = (window.i18n && window.i18n.currentLang === 'tr');
+
+    if (!headerAlertsList || headerAlertsList.length === 0) {
+        container.innerHTML = `
+            <div class="alerts-dropdown-empty" style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                ${t('alerts_no_recent', isTr ? 'Yeni güvenlik uyarısı bulunmuyor.' : 'No recent security alerts.')}
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = headerAlertsList.map(a => {
+        const sev = (a.severity || 'low').toLowerCase();
+        const sevClass = sev === 'critical' ? 'badge-danger' : (sev === 'high' ? 'badge-warning' : (sev === 'medium' ? 'badge-info' : 'badge-secondary'));
+        const timeAgo = (typeof formatRelativeTime === 'function' && (a.created_at || a.timestamp)) ? formatRelativeTime(a.created_at || a.timestamp) : (isTr ? 'Yeni' : 'Recent');
+        const source = a.source_ip || a.source_device || (isTr ? 'Ağ Tehdidi' : 'Network Threat');
+        const ruleName = a.rule_name || a.title || 'Security Alert';
+
+        return `
+            <div class="alert-dropdown-item" onclick="onHeaderAlertClick('${escapeHtml(a.id || '')}')">
+                <div class="alert-dropdown-item-header">
+                    <span class="badge ${sevClass}" style="font-size: 9.5px; font-weight: 700; padding: 1px 5px;">${escapeHtml((a.severity || 'INFO').toUpperCase())}</span>
+                    <span style="font-size: 10px; color: var(--text-muted);">${escapeHtml(timeAgo)}</span>
+                </div>
+                <div class="alert-dropdown-item-title">${escapeHtml(ruleName)}</div>
+                <div class="alert-dropdown-item-meta">
+                    <span><i class="fas fa-network-wired" style="font-size: 10px; margin-right: 3px;"></i>${escapeHtml(source)}</span>
+                    <span style="color: var(--accent); font-weight: 500;">${isTr ? 'İncele &rarr;' : 'Inspect &rarr;'}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function onHeaderAlertClick(alertId) {
+    const dropdown = document.getElementById('header-alerts-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+
+    if (alertId && typeof openSIEMInvestigate === 'function') {
+        openSIEMInvestigate(alertId);
+    } else if (typeof switchTab === 'function') {
+        switchTab('siem');
+    }
+}
+
+// ==========================================================================
 // SIEM & Security Operations Center (SOC) Controller
 // ==========================================================================
 let siemFilterStatus = 'ALL';
@@ -4928,6 +5091,9 @@ let currentInvestigatingAlertID = null;
 let siemLiveSocket = null;
 
 function initSIEMManagement() {
+    // 0. Initialize Header Alert Notification Center
+    initAlertNotificationCenter();
+
     // 1. Initial overview count to populate badge
     loadSIEMOverview();
 
@@ -5672,9 +5838,10 @@ function connectSIEMLiveStream() {
 }
 
 function handleLiveIncomingAlert(alert) {
-    // Show toast for critical or high alerts
-    if (alert.severity === 'CRITICAL' || alert.severity === 'HIGH') {
-        showToast(`🚨 [${alert.severity}] ${alert.rule_name} (${alert.source_ip || 'Ağ'})`, 'warning');
+    // Blocked toast alert bubble pop-up inside app window per user requirement.
+    // Instead, register alert in the header Security Alerts notification center:
+    if (typeof addAlertToNotificationCenter === 'function') {
+        addAlertToNotificationCenter(alert);
     }
 
     // Refresh overview & counters

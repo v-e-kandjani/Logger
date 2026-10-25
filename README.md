@@ -264,6 +264,14 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.18** (Security Alert Notification Center Bell Icon & Pop-up Bubble Elimination):
+  - **In-App Toast Alert Bubble Elimination**:
+    - Completely blocked intrusive pop-up alert bubbles (`showToast`) inside the application window that previously covered screen areas whenever real-time EDR network threats or SIEM incidents were detected.
+  - **Header Security Alerts Notification Center (`#header-alerts-btn` & `#header-alerts-dropdown`)**:
+    - Added a sleek bell notification icon with a dynamic unread counter badge in the top navigation bar.
+    - Integrated an interactive flyout dropdown panel allowing operators to inspect recent alerts on-demand with severity badges, source devices, relative timestamps, quick inspection links, and a direct link to the SIEM & SOC investigation console.
+    - Added one-click "Mark as Read" action and responsive flyout dismissal on outside click.
+
 - **v1.9.17** (FIM Integrity Monitoring `isTr` ReferenceError Fix & Full Internationalization):
   - **FIM Runtime Exception Resolution (`web/static/js/app.js`)**:
     - Resolved `ReferenceError: isTr is not defined` inside `loadEndpointFIMEvents()`, which caused the FIM table to render a red error banner instead of displaying integrity events.

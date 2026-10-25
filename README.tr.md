@@ -253,6 +253,14 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.18** (Güvenlik Uyarı Bildirim Merkezi Zil Simgesi ve Açılır Balon Bildirim Engellemesi):
+  - **Uygulama İçi Balon Bildirim Pop-up'larının Kaldırılması**:
+    - Gerçek zamanlı EDR ağ tehditleri veya SIEM olayları tetiklendiğinde ekranı kaplayan rahatsız edici toast/balon bildirim pop-up'ları tamamen engellendi.
+  - **Üst Menü Güvenlik Uyarı Bildirim Merkezi (`#header-alerts-btn` ve `#header-alerts-dropdown`)**:
+    - Üst navigasyon çubuğuna dinamik okunmamış sayaç rozeti içeren şık bir zil ikonu eklendi.
+    - Operatörlerin son uyarıları önem derecesi, kaynak cihaz, zaman ve inceleme bağlantılarıyla açılır panel üzerinden isteğe bağlı görüntüleyebileceği flyout bildirim merkezi entegre edildi.
+    - Tek tıkla "Okundu Say" butonu ve SIEM & SOC ekranına doğrudan geçiş kısayolu eklendi.
+
 - **v1.9.17** (FIM Dosya Bütünlük İzleme `isTr` Referans Hatası Düzeltmesi ve Tam Çok Dilli Yerelleştirme):
   - **FIM Çalışma Zamanı Hatası Çözümü (`web/static/js/app.js`)**:
     - `loadEndpointFIMEvents()` fonksiyonu içerisindeki `ReferenceError: isTr is not defined` hatası giderildi; FIM tablosunda olayların listelenmesini engelleyen ve kırmızı hata mesajı basan istisna sonlandırıldı.
