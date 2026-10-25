@@ -34,6 +34,7 @@ import (
 	"github.com/syslog-platform/logger/internal/syslog/detector"
 	"github.com/syslog-platform/logger/internal/syslog/listener"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
+	"github.com/syslog-platform/logger/internal/ti"
 	"github.com/syslog-platform/logger/internal/timestamp"
 	"github.com/syslog-platform/logger/internal/version"
 )
@@ -63,6 +64,7 @@ type Handler struct {
 	cveSyncer        *cve.Syncer
 	soarEngine       *soar.Engine
 	siemEngine       *correlation.Engine
+	tiEngine         *ti.Engine
 
 	manualArchiving   atomic.Bool
 	archiveMu         sync.Mutex
@@ -92,6 +94,10 @@ func (h *Handler) SetSOAREngine(s *soar.Engine) {
 
 func (h *Handler) SetSIEMEngine(e *correlation.Engine) {
 	h.siemEngine = e
+}
+
+func (h *Handler) SetThreatIntelEngine(e *ti.Engine) {
+	h.tiEngine = e
 }
 
 func NewHandler(
@@ -361,6 +367,16 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/endpoint/ransomware/simulate", h.requireAuth(h.handleEndpointRansomwareSimulate))
 	mux.HandleFunc("/api/v1/endpoint/ransomware/config", h.requireAuth(h.handleEndpointHoneypotConfig))
 	mux.HandleFunc("/api/v1/endpoint/ransomware/arm", h.requireAuth(h.handleEndpointArmFleetCanaries))
+
+	// Cloud Threat Intelligence & External IOC Feeds (Phase Q)
+	mux.HandleFunc("/api/v1/ti/feeds", h.requireAuth(h.handleTIFeeds))
+	mux.HandleFunc("/api/v1/ti/feeds/", h.requireAuth(h.handleTIFeedDetail))
+	mux.HandleFunc("/api/v1/ti/feeds/sync-all", h.requireAuth(h.handleTIFeedsSyncAll))
+	mux.HandleFunc("/api/v1/ti/indicators", h.requireAuth(h.handleTIIndicators))
+	mux.HandleFunc("/api/v1/ti/indicators/", h.requireAuth(h.handleTIIndicatorDetail))
+	mux.HandleFunc("/api/v1/ti/matches", h.requireAuth(h.handleTIMatches))
+	mux.HandleFunc("/api/v1/ti/stats", h.requireAuth(h.handleTIStats))
+	mux.HandleFunc("/api/v1/ti/simulate", h.requireAuth(h.handleTISimulate))
 
 	mux.HandleFunc("/api/v1/endpoint/tasks", h.requireAuth(h.handleEndpointTasks))
 	mux.HandleFunc("/api/v1/endpoint/tasks/", h.requireAuth(h.handleEndpointTaskDetail))

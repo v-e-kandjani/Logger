@@ -8,14 +8,14 @@ import (
 )
 
 const (
-	DefaultVersion     = "v1.9.21"
+	DefaultVersion     = "v1.10.0"
 	DefaultBuildDate   = "2026-10-25"
 	DefaultCommitSHA   = "e406f5a"
 	LatestAgentVersion = "v0.1.12"
 )
 
 var (
-	Version   = "v1.9.21"
+	Version   = "v1.10.0"
 	BuildDate = "2026-10-25"
 	CommitSHA = "e406f5a"
 	Platform  = "Valtrivo LogSeal"

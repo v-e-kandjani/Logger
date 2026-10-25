@@ -29,6 +29,7 @@ import (
 	"github.com/syslog-platform/logger/internal/syslog/generator"
 	"github.com/syslog-platform/logger/internal/syslog/listener"
 	"github.com/syslog-platform/logger/internal/syslog/pipeline"
+	"github.com/syslog-platform/logger/internal/ti"
 	"github.com/syslog-platform/logger/internal/timestamp"
 )
 
@@ -142,6 +143,13 @@ func main() {
 		log.Println("[PostgreSQL] Anti-Ransomware Shield & Decoy Canary Defense (Phase P) schema verified")
 	}
 
+	// Verify & auto-migrate Threat Intelligence & External IOC Feeds (Phase Q) schema
+	if err := pgDB.EnsureThreatIntelSchema(context.Background()); err != nil {
+		log.Printf("[PostgreSQL] Warning ensuring Threat Intel schema: %v", err)
+	} else {
+		log.Println("[PostgreSQL] Cloud Threat Intelligence & External IOC Feeds (Phase Q) schema verified")
+	}
+
 	// 2. Initialize in-memory Device Cache
 	deviceCache := postgres.NewDeviceCache(pgDB)
 	log.Println("[DeviceCache] Initialized active device lookup cache")
@@ -224,6 +232,14 @@ func main() {
 	defer siemEngine.UnsubscribeAlerts(soarAlertCh)
 	log.Println("[SOAR] Automated Incident Playbook Engine active with live correlation triggers")
 
+	// Initialize Threat Intelligence & External IOC Feeds Engine (Phase Q)
+	tiEngine := ti.NewEngine(pgDB)
+	tiEngine.SetSIEMEngine(siemEngine)
+	tiEngine.Start(appCtx)
+	defer tiEngine.Stop()
+	pipe.SetThreatIntelEngine(tiEngine)
+	log.Println("[Threat Intel] Cloud Threat Intelligence & External IOC Feeds Engine active with sub-microsecond stream matching")
+
 	// Start background critical alert SMTP broadcast listener
 	go func() {
 		alertCh := siemEngine.SubscribeAlerts()
@@ -303,6 +319,7 @@ func main() {
 	apiHandler.SetResultCache(resultCache)
 	apiHandler.SetSOAREngine(soarEngine)
 	apiHandler.SetSIEMEngine(siemEngine)
+	apiHandler.SetThreatIntelEngine(tiEngine)
 	apiHandler.StartMitreAutoSync(appCtx)
 	apiHandler.StartSupportBundleCleaner(appCtx)
 	apiHandler.StartEdgeHealthMonitor(appCtx)

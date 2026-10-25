@@ -415,6 +415,7 @@ function switchTab(tab, targetSectionId = null) {
         if (tab === 'unregistered') loadUnregisteredSources();
         if (tab === 'archives') loadArchives();
         if (tab === 'reports') loadReportsView();
+        if (tab === 'threat-intel') loadThreatIntelView();
         if (tab === 'health') loadHealthTelemetry();
         if (tab === 'settings') {
             loadSettings();
@@ -3386,6 +3387,8 @@ window.onLanguageChanged = (lang) => {
         if (typeof loadUnregisteredSources === 'function') loadUnregisteredSources();
     } else if (activeTab === 'reports') {
         if (typeof loadReportsView === 'function') loadReportsView();
+    } else if (activeTab === 'threat-intel') {
+        if (typeof loadThreatIntelView === 'function') loadThreatIntelView();
     } else if (activeTab === 'endpoint') {
         loadEndpointDashboard();
         if (typeof currentEndpointSection !== 'undefined') {
@@ -13504,6 +13507,611 @@ window.ensureActiveNavSectionExpanded = ensureActiveNavSectionExpanded;
 window.setAppTheme = setAppTheme;
 window.getAppTheme = getAppTheme;
 window.initTheme = initTheme;
+
+// =========================================================================
+// PHASE Q: CLOUD THREAT INTELLIGENCE & EXTERNAL IOC FEEDS CONTROLLER
+// =========================================================================
+
+let currentTITab = 'feeds';
+let currentTIIndOffset = 0;
+const currentTIIndLimit = 50;
+let totalTIIndicators = 0;
+let cachedTIFeeds = [];
+
+async function loadThreatIntelView() {
+    loadTIStats();
+    if (currentTITab === 'feeds') {
+        loadTIFeeds();
+    } else if (currentTITab === 'indicators') {
+        loadTIIndicators(currentTIIndOffset);
+    } else if (currentTITab === 'matches') {
+        loadTIMatches();
+    }
+}
+
+async function loadTIStats() {
+    try {
+        const res = await fetch('/api/v1/ti/stats');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const activeFeedsEl = document.getElementById('ti-stat-active-feeds');
+        const totalIndEl = document.getElementById('ti-stat-total-indicators');
+        const matchesTodayEl = document.getElementById('ti-stat-matches-today');
+        const highCritEl = document.getElementById('ti-stat-high-critical');
+
+        if (activeFeedsEl) activeFeedsEl.textContent = (data.active_feeds || 0).toLocaleString();
+        if (totalIndEl) totalIndEl.textContent = (data.total_indicators || 0).toLocaleString();
+        if (matchesTodayEl) matchesTodayEl.textContent = (data.matches_today || 0).toLocaleString();
+        if (highCritEl) highCritEl.textContent = (data.high_critical_iocs || 0).toLocaleString();
+    } catch (e) {
+        console.warn('Error loading Threat Intel stats:', e);
+    }
+}
+
+function switchTITab(tabName) {
+    currentTITab = tabName;
+    ['feeds', 'indicators', 'matches'].forEach(t => {
+        const btn = document.getElementById(`ti-tab-btn-${t}`);
+        const view = document.getElementById(`ti-view-${t}`);
+        if (btn) {
+            btn.classList.toggle('active', t === tabName);
+            btn.style.borderBottom = t === tabName ? '2px solid var(--accent)' : 'none';
+        }
+        if (view) {
+            view.style.display = t === tabName ? 'block' : 'none';
+        }
+    });
+
+    if (tabName === 'feeds') loadTIFeeds();
+    else if (tabName === 'indicators') loadTIIndicators(0);
+    else if (tabName === 'matches') loadTIMatches();
+}
+
+async function loadTIFeeds() {
+    const tbody = document.getElementById('ti-feeds-tbody');
+    const badge = document.getElementById('ti-feeds-count-badge');
+    if (!tbody) return;
+
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+
+    try {
+        const res = await fetch('/api/v1/ti/feeds');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        cachedTIFeeds = data.feeds || [];
+
+        if (badge) badge.textContent = `${cachedTIFeeds.length} ${isTr ? 'Kaynak' : 'Feeds'}`;
+
+        if (cachedTIFeeds.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted);">${isTr ? 'Henüz yapılandırılmış tehdit feed\'i bulunmuyor.' : 'No threat intelligence feeds configured yet.'}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = cachedTIFeeds.map(f => {
+            let statusBadge = '<span class="badge badge-secondary">IDLE</span>';
+            if (f.last_status === 'SUCCESS') {
+                statusBadge = `<span class="badge badge-success"><span class="status-indicator status-online" style="margin-right: 4px;"></span>${isTr ? 'Aktif' : 'Active'}</span>`;
+            } else if (f.last_status === 'SYNCING') {
+                statusBadge = `<span class="badge badge-warning">🔄 ${isTr ? 'Eşitleniyor...' : 'Syncing...'}</span>`;
+            } else if (f.last_status === 'FAILED') {
+                statusBadge = `<span class="badge badge-danger" title="${escapeHtml(f.error_message || '')}">⚠️ ${isTr ? 'Hata' : 'Failed'}</span>`;
+            }
+
+            const lastSync = f.last_sync_at ? new Date(f.last_sync_at).toLocaleString() : (isTr ? 'Henüz Eşitlenmedi' : 'Never');
+
+            return `
+                <tr>
+                    <td style="font-weight: 600;">
+                        ${escapeHtml(f.name)}
+                        ${!f.is_enabled ? ` <span class="badge badge-secondary" style="font-size: 10px;">${isTr ? 'Devre Dışı' : 'Disabled'}</span>` : ''}
+                    </td>
+                    <td><span class="badge badge-outline mono-code">${escapeHtml(f.feed_type)}</span></td>
+                    <td><span class="badge badge-info" style="text-transform: uppercase;">${escapeHtml(f.indicator_type)}</span></td>
+                    <td><span style="font-size: 12px; color: var(--text-muted);">${escapeHtml(f.threat_category)}</span></td>
+                    <td><span class="badge ${f.default_confidence >= 90 ? 'badge-danger' : 'badge-warning'}">${f.default_confidence}%</span></td>
+                    <td><span style="font-size: 12px;">${f.poll_interval_minutes} dk</span></td>
+                    <td style="font-family: var(--font-mono); font-weight: 700; color: #38bdf8;">${(f.indicator_count || 0).toLocaleString()}</td>
+                    <td style="font-size: 11px; color: var(--text-muted);">${lastSync}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <div style="display: flex; gap: 4px;">
+                            <button class="btn btn-outline btn-sm" onclick="syncTIFeed(${f.id})" title="${isTr ? 'Şimdi Eşitle' : 'Sync Now'}" style="padding: 2px 8px; font-size: 11px;">🔄</button>
+                            <button class="btn btn-outline btn-sm" onclick="editTIFeed(${f.id})" title="${isTr ? 'Düzenle' : 'Edit'}" style="padding: 2px 8px; font-size: 11px;">✏️</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteTIFeed(${f.id}, '${escapeHtml(f.name)}')" title="${isTr ? 'Sil' : 'Delete'}" style="padding: 2px 8px; font-size: 11px;">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--danger);">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+async function syncTIFeed(feedID) {
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+    showToast(isTr ? 'İstihbarat beslemesi eşitleniyor...' : 'Synchronizing threat feed...', 'info');
+
+    try {
+        const res = await fetch(`/api/v1/ti/feeds/${feedID}/sync`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        showToast(isTr ? `✓ Besleme başarıyla eşitlendi: ${data.indicators_imported} gösterge işlendi.` : `✓ Feed synchronized: ${data.indicators_imported} indicators processed.`, 'success');
+        loadThreatIntelView();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+        loadTIFeeds();
+    }
+}
+
+async function syncAllTIFeeds() {
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+    const btn = document.getElementById('btn-ti-sync-all');
+    if (btn) btn.disabled = true;
+
+    showToast(isTr ? 'Tüm aktif tehdit beslemeleri arka planda eşitleniyor...' : 'Synchronizing all active threat feeds in background...', 'info');
+
+    try {
+        const res = await fetch('/api/v1/ti/feeds/sync-all', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        showToast(isTr ? '✓ Tüm aktif besleme kaynakları başarıyla eşitlendi!' : '✓ All active threat feeds synchronized successfully!', 'success');
+        loadThreatIntelView();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function loadTIIndicators(offset = 0) {
+    currentTIIndOffset = offset;
+    const tbody = document.getElementById('ti-indicators-tbody');
+    const badge = document.getElementById('ti-indicators-total-badge');
+    const pageInfo = document.getElementById('ti-ind-page-info');
+    const btnPrev = document.getElementById('btn-ti-ind-prev');
+    const btnNext = document.getElementById('btn-ti-ind-next');
+    if (!tbody) return;
+
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+    const type = document.getElementById('ti-ind-type-select')?.value || 'all';
+    const severity = document.getElementById('ti-ind-sev-select')?.value || 'all';
+    const query = document.getElementById('ti-ind-search-input')?.value || '';
+
+    try {
+        const params = new URLSearchParams({
+            limit: currentTIIndLimit,
+            offset: currentTIIndOffset,
+            type: type,
+            severity: severity,
+            q: query
+        });
+
+        const res = await fetch(`/api/v1/ti/indicators?${params.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        totalTIIndicators = data.total || 0;
+        const indicators = data.indicators || [];
+
+        if (badge) badge.textContent = `${totalTIIndicators.toLocaleString()} ${isTr ? 'Kayıt' : 'Records'}`;
+
+        const currentPage = Math.floor(currentTIIndOffset / currentTIIndLimit) + 1;
+        const totalPages = Math.max(1, Math.ceil(totalTIIndicators / currentTIIndLimit));
+        if (pageInfo) pageInfo.textContent = `${isTr ? 'Sayfa' : 'Page'} ${currentPage} / ${totalPages} (${totalTIIndicators} ${isTr ? 'gösterge' : 'indicators'})`;
+
+        if (btnPrev) btnPrev.disabled = currentTIIndOffset <= 0;
+        if (btnNext) btnNext.disabled = currentTIIndOffset + currentTIIndLimit >= totalTIIndicators;
+
+        if (indicators.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">${isTr ? 'Arama kriterine uygun tehdit göstergesi bulunamadı.' : 'No threat indicators match the current filter criteria.'}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = indicators.map(ind => {
+            let typeColor = '#38bdf8';
+            if (ind.indicator_type === 'ip') typeColor = '#38bdf8';
+            else if (ind.indicator_type === 'domain') typeColor = '#a855f7';
+            else if (ind.indicator_type === 'sha256' || ind.indicator_type === 'md5') typeColor = '#f59e0b';
+            else if (ind.indicator_type === 'url') typeColor = '#10b981';
+            else if (ind.indicator_type === 'cve') typeColor = '#ef4444';
+
+            let sevBadge = '<span class="badge badge-secondary">LOW</span>';
+            const s = (ind.severity || '').toLowerCase();
+            if (s === 'critical') sevBadge = '<span class="badge badge-danger">CRITICAL</span>';
+            else if (s === 'high') sevBadge = '<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);">HIGH</span>';
+            else if (s === 'medium') sevBadge = '<span class="badge badge-warning">MEDIUM</span>';
+
+            const lastSeen = ind.last_seen ? new Date(ind.last_seen).toLocaleString() : '-';
+
+            return `
+                <tr>
+                    <td><span class="badge" style="background: rgba(255,255,255,0.05); color: ${typeColor}; border: 1px solid ${typeColor}40; text-transform: uppercase;">${escapeHtml(ind.indicator_type)}</span></td>
+                    <td class="mono-code" style="font-weight: 700; color: #f1f5f9; word-break: break-all;">${escapeHtml(ind.indicator_value)}</td>
+                    <td><span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(ind.threat_category)}</span></td>
+                    <td>${sevBadge}</td>
+                    <td><span class="badge badge-outline">${ind.confidence}%</span></td>
+                    <td><span style="font-size: 12px; color: #94a3b8;">${escapeHtml(ind.source || ind.feed_name || 'Manual')}</span></td>
+                    <td style="font-size: 11px; color: var(--text-muted);">${lastSeen}</td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" onclick="deleteTIIndicator(${ind.id})" title="${isTr ? 'Katalogdan Kaldır' : 'Remove'}" style="padding: 2px 6px; font-size: 11px; color: var(--danger);">🗑️</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--danger);">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+function changeTIIndicatorPage(dir) {
+    const nextOffset = currentTIIndOffset + dir * currentTIIndLimit;
+    if (nextOffset >= 0 && nextOffset < totalTIIndicators) {
+        loadTIIndicators(nextOffset);
+    }
+}
+
+function resetTIIndicatorFilters() {
+    const typeSel = document.getElementById('ti-ind-type-select');
+    const sevSel = document.getElementById('ti-ind-sev-select');
+    const searchInp = document.getElementById('ti-ind-search-input');
+    if (typeSel) typeSel.value = 'all';
+    if (sevSel) sevSel.value = 'all';
+    if (searchInp) searchInp.value = '';
+    loadTIIndicators(0);
+}
+
+async function deleteTIIndicator(id) {
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+    if (!confirm(isTr ? 'Bu göstergeyi katalogdan kaldırmak istediğinizden emin misiniz?' : 'Are you sure you want to remove this indicator from the catalog?')) return;
+
+    try {
+        const res = await fetch(`/api/v1/ti/indicators/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showToast(isTr ? '✓ Gösterge katalogdan silindi.' : '✓ Indicator removed from catalog.', 'success');
+        loadTIIndicators(currentTIIndOffset);
+        loadTIStats();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    }
+}
+
+async function loadTIMatches() {
+    const tbody = document.getElementById('ti-matches-tbody');
+    if (!tbody) return;
+
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+
+    try {
+        const res = await fetch('/api/v1/ti/matches?limit=50');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const matches = data.matches || [];
+
+        if (matches.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted);">${isTr ? 'Henüz bir tehdit eşleşme kaydı tespit edilmedi.' : 'No threat matches detected yet.'}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = matches.map(m => {
+            const timeStr = m.matched_at ? new Date(m.matched_at).toLocaleString() : '-';
+
+            let sevBadge = '<span class="badge badge-danger">CRITICAL</span>';
+            const s = (m.severity || '').toLowerCase();
+            if (s === 'high') sevBadge = '<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);">HIGH</span>';
+            else if (s === 'medium') sevBadge = '<span class="badge badge-warning">MEDIUM</span>';
+
+            const target = m.device_name || m.host_identifier || m.destination_ip || '-';
+
+            return `
+                <tr>
+                    <td style="font-size: 11px; color: var(--text-muted);">${timeStr}</td>
+                    <td><span class="badge badge-outline" style="font-size: 10px;">${escapeHtml(m.tenant_slug || 'default')}</span></td>
+                    <td class="mono-code" style="font-weight: 700; color: #ef4444; word-break: break-all;">${escapeHtml(m.indicator_value)}</td>
+                    <td><span class="badge badge-secondary" style="font-size: 10px; text-transform: uppercase;">${escapeHtml(m.indicator_type)}</span></td>
+                    <td>${sevBadge}</td>
+                    <td><span class="badge badge-outline" style="font-size: 10px;">${escapeHtml(m.source_type)}</span></td>
+                    <td><span style="font-size: 12px; font-weight: 600;">${escapeHtml(target)}</span></td>
+                    <td style="font-size: 11px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(m.raw_event_summary || '')}">${escapeHtml(m.raw_event_summary || '-')}</td>
+                    <td><span class="badge badge-danger" style="font-size: 10px;">${escapeHtml(m.action_taken || 'ALERT')}</span></td>
+                    <td>
+                        <div style="display: flex; gap: 4px;">
+                            <button class="btn btn-outline btn-sm" onclick="jumpToLogSearch('${escapeHtml(m.indicator_value)}')" title="${isTr ? 'Loglarda Ara' : 'Search Logs'}" style="padding: 2px 6px; font-size: 11px;">🔍</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--danger);">Hata: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+// Modals: Feed Add/Edit
+function openTIFeedModal(feed = null) {
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+    const modal = document.getElementById('modal-ti-feed');
+    const title = document.getElementById('modal-ti-feed-title');
+    if (!modal) return;
+
+    if (feed) {
+        if (title) title.textContent = isTr ? `Besleme Kaynağını Düzenle: ${feed.name}` : `Edit Feed: ${feed.name}`;
+        document.getElementById('ti-feed-id').value = feed.id;
+        document.getElementById('ti-feed-name').value = feed.name || '';
+        document.getElementById('ti-feed-url').value = feed.url || '';
+        document.getElementById('ti-feed-type').value = feed.feed_type || 'plain_list';
+        document.getElementById('ti-feed-indicator-type').value = feed.indicator_type || 'ip';
+        document.getElementById('ti-feed-category').value = feed.threat_category || 'botnet_c2';
+        document.getElementById('ti-feed-interval').value = feed.poll_interval_minutes || 60;
+        document.getElementById('ti-feed-api-key').value = feed.api_key || '';
+        document.getElementById('ti-feed-enabled').checked = feed.is_enabled;
+    } else {
+        if (title) title.textContent = isTr ? 'Yeni Tehdit İstihbarat Beslemesi Ekle' : 'Add New Threat Intelligence Feed';
+        document.getElementById('ti-feed-id').value = '';
+        document.getElementById('ti-feed-name').value = '';
+        document.getElementById('ti-feed-url').value = '';
+        document.getElementById('ti-feed-type').value = 'plain_list';
+        document.getElementById('ti-feed-indicator-type').value = 'ip';
+        document.getElementById('ti-feed-category').value = 'botnet_c2';
+        document.getElementById('ti-feed-interval').value = '60';
+        document.getElementById('ti-feed-api-key').value = '';
+        document.getElementById('ti-feed-enabled').checked = true;
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeTIFeedModal() {
+    const modal = document.getElementById('modal-ti-feed');
+    if (modal) modal.style.display = 'none';
+}
+
+function editTIFeed(id) {
+    const feed = cachedTIFeeds.find(f => f.id === id);
+    if (feed) openTIFeedModal(feed);
+}
+
+async function saveTIFeed() {
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+    const idStr = document.getElementById('ti-feed-id')?.value;
+    const name = document.getElementById('ti-feed-name')?.value.trim();
+    const url = document.getElementById('ti-feed-url')?.value.trim();
+    const feedType = document.getElementById('ti-feed-type')?.value;
+    const indType = document.getElementById('ti-feed-indicator-type')?.value;
+    const category = document.getElementById('ti-feed-category')?.value.trim();
+    const interval = parseInt(document.getElementById('ti-feed-interval')?.value, 10) || 60;
+    const apiKey = document.getElementById('ti-feed-api-key')?.value.trim();
+    const isEnabled = document.getElementById('ti-feed-enabled')?.checked;
+
+    if (!name || !url) {
+        showToast(isTr ? 'Lütfen feed adı ve URL adresini girin.' : 'Please enter feed name and URL.', 'error');
+        return;
+    }
+
+    const payload = {
+        name: name,
+        url: url,
+        feed_type: feedType,
+        indicator_type: indType,
+        threat_category: category,
+        poll_interval_minutes: interval,
+        api_key: apiKey,
+        is_enabled: isEnabled,
+        default_confidence: 85
+    };
+
+    try {
+        let res;
+        if (idStr) {
+            res = await fetch(`/api/v1/ti/feeds/${idStr}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } else {
+            res = await fetch('/api/v1/ti/feeds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        closeTIFeedModal();
+        showToast(isTr ? '✓ Tehdit beslemesi başarıyla kaydedildi!' : '✓ Threat feed saved successfully!', 'success');
+        loadThreatIntelView();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    }
+}
+
+async function deleteTIFeed(id, name) {
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+    if (!confirm(isTr ? `'${name}' besleme kaynağını ve ilişkili tüm göstergeleri silmek istediğinizden emin misiniz?` : `Are you sure you want to delete '${name}' and all its indicators?`)) return;
+
+    try {
+        const res = await fetch(`/api/v1/ti/feeds/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        showToast(isTr ? '✓ Besleme kaynağı silindi.' : '✓ Feed source deleted.', 'success');
+        loadThreatIntelView();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    }
+}
+
+// Modals: Custom IOC Indicator Submission
+function openTIIndicatorModal() {
+    const modal = document.getElementById('modal-ti-indicator');
+    if (!modal) return;
+    document.getElementById('ti-new-ind-type').value = 'ip';
+    document.getElementById('ti-new-ind-value').value = '';
+    document.getElementById('ti-new-ind-sev').value = 'high';
+    document.getElementById('ti-new-ind-conf').value = '90';
+    document.getElementById('ti-new-ind-category').value = 'threat_intel';
+    document.getElementById('ti-new-ind-desc').value = '';
+    modal.style.display = 'flex';
+}
+
+function closeTIIndicatorModal() {
+    const modal = document.getElementById('modal-ti-indicator');
+    if (modal) modal.style.display = 'none';
+}
+
+async function saveTIIndicator() {
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+    const indType = document.getElementById('ti-new-ind-type')?.value;
+    const indVal = document.getElementById('ti-new-ind-value')?.value.trim();
+    const sev = document.getElementById('ti-new-ind-sev')?.value;
+    const conf = parseInt(document.getElementById('ti-new-ind-conf')?.value, 10) || 85;
+    const cat = document.getElementById('ti-new-ind-category')?.value.trim() || 'threat_intel';
+    const desc = document.getElementById('ti-new-ind-desc')?.value.trim();
+
+    if (!indVal) {
+        showToast(isTr ? 'Lütfen gösterge değerini girin.' : 'Please enter an indicator value.', 'error');
+        return;
+    }
+
+    const payload = {
+        indicator_type: indType,
+        indicator_value: indVal,
+        severity: sev,
+        confidence: conf,
+        threat_category: cat,
+        description: desc,
+        source: 'Manual Entry'
+    };
+
+    try {
+        const res = await fetch('/api/v1/ti/indicators', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        closeTIIndicatorModal();
+        showToast(isTr ? '✓ Özel IOC başarıyla kataloğa eklendi ve bellek içi filtreye yüklendi!' : '✓ Custom IOC added to catalog and loaded into memory matcher!', 'success');
+        if (currentTITab === 'indicators') loadTIIndicators(0);
+        loadTIStats();
+    } catch (e) {
+        showToast(`Hata: ${e.message}`, 'error');
+    }
+}
+
+// Modals: Threat Intelligence Simulation
+function openTISimulateModal() {
+    const modal = document.getElementById('modal-ti-simulate');
+    const resBox = document.getElementById('ti-sim-result-box');
+    if (!modal) return;
+    if (resBox) resBox.style.display = 'none';
+    document.getElementById('ti-sim-value').value = '198.51.100.42';
+    modal.style.display = 'flex';
+}
+
+function closeTISimulateModal() {
+    const modal = document.getElementById('modal-ti-simulate');
+    if (modal) modal.style.display = 'none';
+}
+
+async function executeTISimulation() {
+    const isTr = (window.i18n ? window.i18n.currentLang : 'tr') === 'tr';
+    const btn = document.getElementById('btn-ti-sim-run');
+    const resBox = document.getElementById('ti-sim-result-box');
+    const indType = document.getElementById('ti-sim-type')?.value || 'ip';
+    let indValue = document.getElementById('ti-sim-value')?.value.trim();
+
+    if (!indValue) {
+        if (indType === 'ip') indValue = '198.51.100.42';
+        else if (indType === 'domain') indValue = 'evil-c2-beacon.org';
+        else if (indType === 'sha256') indValue = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+    }
+
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/v1/ti/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                indicator_type: indType,
+                indicator_value: indValue
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        if (resBox) {
+            resBox.style.display = 'block';
+            resBox.style.background = 'rgba(16, 185, 129, 0.15)';
+            resBox.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+            resBox.style.color = '#34d399';
+            resBox.innerHTML = `
+                <div style="font-weight: 700; margin-bottom: 4px;">✓ ${isTr ? 'Tehdit Eşleşme Simülasyonu Başarılı!' : 'Threat Simulation Successful!'}</div>
+                <div>${isTr ? 'Gösterge' : 'Indicator'}: <code>${escapeHtml(indValue)}</code> (${indType.toUpperCase()})</div>
+                <div>${isTr ? 'Aksiyon' : 'Action'}: <b>SIEM Alarmı ve Bildirim Zili Tetiklendi</b></div>
+            `;
+        }
+
+        showToast(isTr ? '⚡ Canlı Tehdit Eşleşmesi ve SIEM Güvenlik Uyarısı başarıyla tetiklendi!' : '⚡ Live Threat Match and SIEM alert triggered successfully!', 'success');
+
+        // Refresh stats and matches
+        loadTIStats();
+        if (currentTITab === 'matches') loadTIMatches();
+    } catch (e) {
+        if (resBox) {
+            resBox.style.display = 'block';
+            resBox.style.background = 'rgba(239, 68, 68, 0.15)';
+            resBox.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+            resBox.style.color = '#f87171';
+            resBox.textContent = `Hata: ${e.message}`;
+        }
+        showToast(`Hata: ${e.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function jumpToLogSearch(term) {
+    if (!term) return;
+    switchTab('search');
+    const input = document.getElementById('search-query');
+    if (input) {
+        input.value = term;
+        document.getElementById('btn-search-exec')?.click();
+    }
+}
+
+window.loadThreatIntelView = loadThreatIntelView;
+window.switchTITab = switchTITab;
+window.loadTIFeeds = loadTIFeeds;
+window.syncTIFeed = syncTIFeed;
+window.syncAllTIFeeds = syncAllTIFeeds;
+window.loadTIIndicators = loadTIIndicators;
+window.changeTIIndicatorPage = changeTIIndicatorPage;
+window.resetTIIndicatorFilters = resetTIIndicatorFilters;
+window.deleteTIIndicator = deleteTIIndicator;
+window.loadTIMatches = loadTIMatches;
+window.openTIFeedModal = openTIFeedModal;
+window.closeTIFeedModal = closeTIFeedModal;
+window.editTIFeed = editTIFeed;
+window.saveTIFeed = saveTIFeed;
+window.deleteTIFeed = deleteTIFeed;
+window.openTIIndicatorModal = openTIIndicatorModal;
+window.closeTIIndicatorModal = closeTIIndicatorModal;
+window.saveTIIndicator = saveTIIndicator;
+window.openTISimulateModal = openTISimulateModal;
+window.closeTISimulateModal = closeTISimulateModal;
+window.executeTISimulation = executeTISimulation;
+window.jumpToLogSearch = jumpToLogSearch;
+
 
 
 

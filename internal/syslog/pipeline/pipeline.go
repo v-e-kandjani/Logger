@@ -15,6 +15,7 @@ import (
 	"github.com/syslog-platform/logger/internal/siem/correlation"
 	"github.com/syslog-platform/logger/internal/syslog/detector"
 	"github.com/syslog-platform/logger/internal/syslog/parser"
+	"github.com/syslog-platform/logger/internal/ti"
 )
 
 // RawPacket represents an incoming unparsed datagram or stream frame
@@ -55,6 +56,9 @@ type Pipeline struct {
 	// SIEM Detection & Normalization Engine
 	siemEngine *correlation.Engine
 	siemQueue  chan *models.LogEvent
+
+	// Threat Intelligence & External IOC Feeds Engine (Phase Q)
+	tiEngine *ti.Engine
 
 	// Cooldown cache for rate-limiting PostgreSQL device metadata writes
 	lastDeviceSeen sync.Map
@@ -106,6 +110,16 @@ func (p *Pipeline) SetSIEMEngine(engine *correlation.Engine) {
 // GetSIEMEngine returns the active SIEM correlation engine
 func (p *Pipeline) GetSIEMEngine() *correlation.Engine {
 	return p.siemEngine
+}
+
+// SetThreatIntelEngine connects the Threat Intelligence cross-matcher (Phase Q)
+func (p *Pipeline) SetThreatIntelEngine(engine *ti.Engine) {
+	p.tiEngine = engine
+}
+
+// GetThreatIntelEngine returns the active Threat Intelligence engine
+func (p *Pipeline) GetThreatIntelEngine() *ti.Engine {
+	return p.tiEngine
 }
 
 // Ingest submits a raw packet into the non-blocking ring buffer
@@ -295,6 +309,11 @@ func (p *Pipeline) workerLoop() {
 				default:
 					// Ring buffer saturated during heavy spike; avoid blocking ingestion pipeline
 				}
+			}
+
+			// 4. Stream Cross-Matching in Threat Intelligence Engine (Phase Q)
+			if p.tiEngine != nil {
+				p.tiEngine.ProcessSyslogMatch(context.Background(), event.Tenant, event.SourceIP.String(), "", event.Hostname, event.DeviceName, event.RawMessage)
 			}
 		}
 	}

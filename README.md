@@ -264,6 +264,29 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.10.0** (Phase Q: Cloud Threat Intelligence & External IOC Feeds):
+  - **In-Memory Lock-Free Threat Matcher (`internal/ti/matcher.go`)**:
+    - High-throughput atomic snapshot lookups supporting IP addresses (IPv4/IPv6), domain names (with wildcard parent/subdomain matching), URL paths, and cryptographic file hashes (MD5, SHA-1, SHA-256).
+    - Zero lock contention in hot ingestion paths with sub-microsecond evaluation per log event or network flow.
+  - **Automated Threat Feed Harvester (`internal/ti/harvester.go` & `internal/ti/engine.go`)**:
+    - Multi-format threat intelligence collectors supporting plain text lists, CSVs (URLhaus), JSON feeds, and CISA KEV vulnerability catalogs.
+    - Automatic periodic harvesting with configurable refresh intervals, rate limits, HTTP error handling, and manual on-demand feed synchronization.
+    - Seeded default feeds: CISA Known Exploited Vulnerabilities, URLhaus Malware URLs, Tor Project Exit Nodes, Emerging Threats Open IPs, and AbuseIPDB Blacklist.
+  - **Relational Threat Intel Store & Migrations (`internal/database/postgres/threat_intel.go`)**:
+    - PostgreSQL tables `ti_feeds`, `ti_indicators`, and `ti_matches` with composite uniqueness indexes and cascade pruning.
+    - Indicator batch upserting, paginated filtering by type, feed, severity, and active status, and real-time match telemetry.
+  - **Pipeline & EDR Ingestion Integration (`internal/syslog/pipeline/pipeline.go` & `internal/api/endpoint_network_routes.go`)**:
+    - Real-time IOC inspection in the syslog streaming ring buffer for client IPs, remote domains, and file hashes.
+    - Real-time endpoint network EDR inspection for outbound socket connections and DNS lookup telemetry.
+  - **SIEM Catalog & Alert Correlation (`internal/siem/catalog/catalog.go`)**:
+    - Added dedicated MITRE ATT&CK rules: `IOC-MATCH-MALICIOUS-IP` (P1 / Critical, T1071), `IOC-MATCH-SUSPICIOUS-DOMAIN` (P2 / High, T1584), and `IOC-MATCH-KNOWN-MALWARE-HASH` (P1 / Critical, T1204).
+    - Real-time SIEM alert emission upon IOC hit with indicator context, severity, and confidence metrics.
+  - **Threat Intelligence Web Operations Console (`web/templates/index.html` & `web/static/js/app.js`)**:
+    - Dedicated Threat Intel dashboard with real-time KPI cards (Active Feeds, Total Indicators, Matches Today, Sync Health).
+    - Interactive Feed Management, Indicator Search & Manual Addition, and Live Threat Matches explorer.
+    - Interactive Threat Simulator modal allowing operators to test and verify IOC matching against synthetic log messages.
+    - Full English and Turkish internationalization support (`web/static/js/translations.js`).
+
 - **v1.9.21** (Law 5651 Evidence Reconcile Resolution, Missing Evidence Auto-Discovery & Download Support):
   - **Evidence Reconcile Auto-Discovery (`internal/archive/engine.go` & `internal/database/postgres/postgres.go`)**:
     - Resolved issue where clicking "Reconcile Pending" or single-archive "Mühürle" resulted in no changes when archives had missing evidence paths in PostgreSQL.

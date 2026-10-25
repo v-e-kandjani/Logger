@@ -96,6 +96,13 @@ func (h *Handler) handleEndpointAgentNetwork(w http.ResponseWriter, r *http.Requ
 				}
 			}
 		}
+
+		// Cross-match connections against Threat Intelligence (Phase Q)
+		if h.tiEngine != nil {
+			for _, c := range req.Connections {
+				h.tiEngine.ProcessNetworkFlowMatch(r.Context(), tenantSlug, agentUUID, hostname, ipAddress, c.RemoteIP, "")
+			}
+		}
 	}
 
 	// 2. Process DNS Queries
@@ -143,6 +150,13 @@ func (h *Handler) handleEndpointAgentNetwork(w http.ResponseWriter, r *http.Requ
 					}
 					h.siemEngine.DispatchDirectAlert(alert)
 				}
+			}
+		}
+
+		// Cross-match DNS queries against Threat Intelligence (Phase Q)
+		if h.tiEngine != nil {
+			for _, q := range req.DNSQueries {
+				h.tiEngine.ProcessNetworkFlowMatch(r.Context(), tenantSlug, agentUUID, hostname, ipAddress, "", q.QueryDomain)
 			}
 		}
 	}

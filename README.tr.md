@@ -253,6 +253,29 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.10.0** (Faz Q: Bulut Tehdit İstihbaratı & Harici IOC Beslemeleri):
+  - **Bellek İçi Kilitsiz Tehdit Eşleştirici (`internal/ti/matcher.go`)**:
+    - IP adresleri (IPv4/IPv6), alan adları (joker karakterli üst/alt alan adı eşleştirme), URL yolları ve kriptografik dosya özetleri (MD5, SHA-1, SHA-256) için atomik anlık görüntü (atomic snapshot) tabanlı yüksek başarımlı arama motoru.
+    - Log akışlarında ve ağ akışlarında mikrosaniyenin altında gecikmeyle çalışan sıfır kilit çekişmeli (lock-free) mimari.
+  - **Otomatik Tehdit Besleme Toplayıcısı (`internal/ti/harvester.go` & `internal/ti/engine.go`)**:
+    - Düz metin listeleri, CSV (URLhaus), JSON ve CISA KEV zafiyet kataloglarını destekleyen çok formatlı tehdit istihbaratı toplayıcıları.
+    - Yapılandırılabilir yenileme aralıkları, hız sınırları, HTTP hata yönetimi ve operatör kontrollü isteğe bağlı besleme senkronizasyonu.
+    - Önceden tanımlı varsayılan beslemeler: CISA Bilinen İstismar Edilen Zafiyetler (KEV), URLhaus Zararlı URL'ler, Tor Project Çıkış Düğümleri, Emerging Threats Açık IP'leri ve AbuseIPDB Kara Listesi.
+  - **İlişkisel Tehdit İstihbaratı Deposu & Veritabanı Şeması (`internal/database/postgres/threat_intel.go`)**:
+    - Bileşik benzersizlik indeksleri ve basamaklı temizleme desteğiyle PostgreSQL `ti_feeds`, `ti_indicators` ve `ti_matches` tabloları.
+    - Toplu gösterge (batch upsert) ekleme, türe, beslemeye, önem derecesine ve duruma göre sayfalanmış filtreleme ve gerçek zamanlı eşleşme telemetrisi.
+  - **Log Hattı & EDR Veri Girişi Entegrasyonu (`internal/syslog/pipeline/pipeline.go` & `internal/api/endpoint_network_routes.go`)**:
+    - Syslog akış halka tamponunda istemci IP'leri, uzak alan adları ve dosya özetleri için gerçek zamanlı IOC denetimi.
+    - Uç nokta ağ EDR telemetrisinde giden soket bağlantıları ve DNS sorguları için gerçek zamanlı tehdit denetimi.
+  - **SIEM Kataloğu & Alarm Korelasyonu (`internal/siem/catalog/catalog.go`)**:
+    - Özel MITRE ATT&CK kuralları eklendi: `IOC-MATCH-MALICIOUS-IP` (P1 / Kritik, T1071), `IOC-MATCH-SUSPICIOUS-DOMAIN` (P2 / Yüksek, T1584) ve `IOC-MATCH-KNOWN-MALWARE-HASH` (P1 / Kritik, T1204).
+    - Tehdit göstergesi eşleştiğinde gösterge bağlamı, önem derecesi ve güven skoru içeren anlık SIEM güvenlik alarmı üretimi.
+  - **Tehdit İstihbaratı Web Operasyon Konsolu (`web/templates/index.html` & `web/static/js/app.js`)**:
+    - Gerçek zamanlı KPI kartları (Aktif Beslemeler, Toplam Göstergeler, Bugünkü Eşleşmeler, Senkronizasyon Sağlığı) içeren özel Tehdit İstihbaratı paneli.
+    - Etkileşimli Besleme Yönetimi, Gösterge Arama & Manuel Ekleme ve Canlı Tehdit Eşleşmeleri gezgini.
+    - Operatörlerin sentetik log mesajlarıyla IOC eşleştirmesini anında doğrulamasını sağlayan Tehdit Simülatörü modalı.
+    - Tam Türkçe ve İngilizce yerelleştirme desteği (`web/static/js/translations.js`).
+
 - **v1.9.21** (5651 Sayılı Kanun Kanıt Mutabakatı Çözümü, Eksik Kanıt Otomatik Keşfi ve İndirme Desteği):
   - **Kanıt Mutabakatı Otomatik Keşfi (`internal/archive/engine.go` & `internal/database/postgres/postgres.go`)**:
     - PostgreSQL tablosunda `timestamp_evidence_path` alanı boş olan arşivlerde "Bekleyenleri Mühürle" veya tekil "Mühürle" butonuna tıklandığında işlemin tepkisiz kalması ve durumun değişmemesi sorunu giderildi.
