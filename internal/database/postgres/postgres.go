@@ -1303,6 +1303,16 @@ func (db *DB) EnsureSIEMSchema(ctx context.Context) error {
 	ALTER TABLE siem_alerts ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
 	CREATE INDEX IF NOT EXISTS idx_siem_alerts_tenant ON siem_alerts(tenant_slug);
 
+	-- Enlarge string fields to prevent value too long (SQLSTATE 22001) from verbose network/device logs
+	ALTER TABLE siem_alerts ALTER COLUMN rule_name TYPE VARCHAR(255);
+	ALTER TABLE siem_alerts ALTER COLUMN username TYPE VARCHAR(255);
+	ALTER TABLE siem_alerts ALTER COLUMN device_name TYPE VARCHAR(255);
+	ALTER TABLE siem_alerts ALTER COLUMN source_ip TYPE VARCHAR(255);
+	ALTER TABLE siem_alerts ALTER COLUMN destination_ip TYPE VARCHAR(255);
+	ALTER TABLE siem_alerts ALTER COLUMN mitre_tactic TYPE VARCHAR(255);
+	ALTER TABLE siem_alerts ALTER COLUMN mitre_technique TYPE VARCHAR(255);
+	ALTER TABLE siem_alerts ALTER COLUMN category TYPE VARCHAR(128);
+
 	-- Multi-Tenant Log Archives Isolation
 	ALTER TABLE log_archives ADD COLUMN IF NOT EXISTS tenant_slug VARCHAR(64) NOT NULL DEFAULT 'default';
 	CREATE INDEX IF NOT EXISTS idx_log_archives_tenant ON log_archives(tenant_slug);
@@ -1567,6 +1577,26 @@ func (db *DB) CreateOrUpdateSIEMAlert(ctx context.Context, alert *models.SIEMAle
 		}
 	}
 
+	clamp := func(s string, limit int) string {
+		if len(s) > limit {
+			return s[:limit]
+		}
+		return s
+	}
+
+	ruleName := clamp(alert.RuleName, 255)
+	if ruleName == "" {
+		ruleName = alert.RuleID
+	}
+	username := clamp(alert.Username, 255)
+	deviceName := clamp(alert.DeviceName, 255)
+	srcIP := clamp(alert.SourceIP, 255)
+	dstIP := clamp(alert.DestinationIP, 255)
+	tactic := clamp(alert.MitreTactic, 255)
+	technique := clamp(alert.MitreTechnique, 255)
+	category := clamp(alert.Category, 128)
+	assignedTo := clamp(alert.AssignedTo, 128)
+
 	query := `
 		INSERT INTO siem_alerts (
 			id, rule_id, rule_name, severity, risk_score, category, status,
@@ -1583,10 +1613,10 @@ func (db *DB) CreateOrUpdateSIEMAlert(ctx context.Context, alert *models.SIEMAle
 		RETURNING id, created_at, updated_at`
 
 	err := db.pool.QueryRow(ctx, query,
-		alert.ID, alert.RuleID, alert.RuleName, alert.Severity, alert.RiskScore, alert.Category, alert.Status,
-		alert.SourceIP, alert.DestinationIP, alert.Username, alert.DeviceName, alert.EventCount,
-		alert.FirstSeen, alert.LastSeen, alert.MitreTactic, alert.MitreTechnique, alert.Summary,
-		evidenceJSON, alert.AssignedTo, tenant, alert.CreatedAt, alert.UpdatedAt,
+		alert.ID, alert.RuleID, ruleName, alert.Severity, alert.RiskScore, category, alert.Status,
+		srcIP, dstIP, username, deviceName, alert.EventCount,
+		alert.FirstSeen, alert.LastSeen, tactic, technique, alert.Summary,
+		evidenceJSON, assignedTo, tenant, alert.CreatedAt, alert.UpdatedAt,
 	).Scan(&alert.ID, &alert.CreatedAt, &alert.UpdatedAt)
 
 	return alert, err
