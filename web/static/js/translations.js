@@ -4,7 +4,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Aktif Kiracı",
-        app_version: "v1.9.10",
+        app_version: "v1.9.11",
         btn_dl_win_setup_exe: "🪟 Windows Setup (.exe) İndir",
         btn_dl_mac_dmg: "🍏 macOS Installer (.dmg) İndir",
         btn_dl_mac_pkg: "📦 macOS Paketi (.pkg) İndir",
@@ -1319,6 +1319,7 @@ const translations = {
         nav_sec_compliance: "Kanuni Uyum (5651)",
         nav_sec_system: "Sistem & Yönetim",
         nav_sec_support: "Destek & Kılavuz",
+        nav_theme_demo: "SIEM Tema & Bileşenler",
         btn_deploy_patch: "Uzaktan Yama Yükle",
         btn_remote_patch: "Uzaktan Yama Yükle",
         btn_redeploy_patch: "Yeniden Uzaktan Yükle",
@@ -1459,7 +1460,7 @@ const translations = {
         // Brand & Header
         app_name: "Valtrivo LogSeal",
         tenant_ctx_label: "Active Tenant",
-        app_version: "v1.9.10",
+        app_version: "v1.9.11",
         btn_dl_win_setup_exe: "🪟 Download Windows Setup (.exe)",
         btn_dl_mac_dmg: "🍏 Download macOS Installer (.dmg)",
         btn_dl_mac_pkg: "📦 Download macOS Package (.pkg)",
@@ -2774,6 +2775,7 @@ const translations = {
         nav_sec_compliance: "Compliance & Legal (5651)",
         nav_sec_system: "System & Administration",
         nav_sec_support: "Support & Help",
+        nav_theme_demo: "SIEM Theme & Components",
         btn_deploy_patch: "Deploy Remote Patch",
         btn_remote_patch: "Remote Patch",
         btn_redeploy_patch: "Force Re-Patch Remotely",

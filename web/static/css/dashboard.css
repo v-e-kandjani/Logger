@@ -1,18 +1,18 @@
 :root {
-    --bg-main: #0B0E14;
-    --bg-surface: #151922;
-    --bg-surface-elevated: #1E2330;
-    --border-color: #2D3343;
-    --text-main: #E2E8F0;
-    --text-muted: #8E9BB0;
+    --bg-main: var(--ls-bg, #0f172a);
+    --bg-surface: var(--ls-surface, #1e293b);
+    --bg-surface-elevated: var(--ls-surface-alt, #334155);
+    --border-color: var(--ls-border, #334155);
+    --text-main: var(--ls-text, #f1f5f9);
+    --text-muted: var(--ls-muted, #94a3b8);
     --primary: #3B82F6;
     --primary-hover: #2563EB;
-    --accent: #06B6D4;
-    --success: #10B981;
-    --warning: #F59E0B;
-    --danger: #EF4444;
-    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --accent: var(--ls-accent, #42c5d2);
+    --success: var(--ls-success, #10B981);
+    --warning: var(--ls-warning, #F59E0B);
+    --danger: var(--ls-danger, #EF4444);
+    --font-sans: var(--ls-font, 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif);
+    --font-mono: var(--ls-mono, 'JetBrains Mono', monospace);
 }
 
 * {
@@ -21,14 +21,43 @@
     padding: 0;
 }
 
-body.dark-theme {
+body, body.dark-theme, body.light-theme {
     background-color: var(--bg-main);
     color: var(--text-main);
     font-family: var(--font-sans);
     line-height: 1.5;
     height: 100vh;
     overflow: hidden;
+    transition: background-color 0.25s ease, color 0.25s ease;
 }
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    padding: 0;
+}
+
+.theme-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+[data-theme="light"] .theme-icon-moon { display: none !important; }
+[data-theme="light"] .theme-icon-sun { display: block !important; }
+[data-theme="dark"] .theme-icon-moon { display: block !important; }
+[data-theme="dark"] .theme-icon-sun { display: none !important; }
+
 
 .app-layout {
     display: flex;

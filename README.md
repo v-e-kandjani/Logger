@@ -264,6 +264,19 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.11** (LogSeal SIEM Design Tokens, Dark & Light Mode Theme Engine & Offline Component Demo):
+  - **Reusable SIEM Design Tokens (`tokens.css`)**:
+    - Established core design token system (`--ls-font`, `--ls-mono`, `--ls-space-1` to `--ls-space-6`, `--ls-radius`, `--ls-shadow`, `--ls-sidebar-width`).
+    - Configured professional security color palettes for both `[data-theme="dark"]` and `[data-theme="light"]`: deep navy (`#0f172a`), slate (`#1e293b`), teal (`#42c5d2` / `#087f8c`), crisp text (`#f1f5f9` / `#1e293b`), and accessible semantic severity accents.
+  - **Dynamic Theme Engine & Guarded Storage**:
+    - Implemented guarded persistent storage (`logseal-theme`) with automatic OS system preference fallback (`prefers-color-scheme: dark`).
+    - Added interactive Dark / Light Mode toggle in the top-bar (`#theme-toggle`) with animated SVG moon/sun indicators.
+    - Integrated early document bootstrap avoiding flash of unstyled content (FOUC) and dynamic system theme change listeners.
+  - **Standalone Offline SIEM Theme Demo (`/static/theme-demo/`)**:
+    - Created four standalone files: `tokens.css`, `theme.css`, `index.html`, and `demo.js`.
+    - Features responsive mobile navigation at 900px, single-column metrics at 560px, combined event search & severity filtering, empty state with filter reset, severity badges, and dismissible alert banners.
+    - Added direct navigation link in sidebar under Support & Help (`#nav-tab-theme-demo`).
+
 - **v1.9.10** (Collapsible & Foldable Sidebar Navigation Groups, Persistent State & Accessibility):
   - **Accordion Foldable Sidebar Navigation Groups**:
     - Converted all 6 primary navigation groups into independently collapsible accordion sections:

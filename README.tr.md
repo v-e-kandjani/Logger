@@ -253,6 +253,19 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.11** (LogSeal SIEM Tasarım Belirteçleri (Tokens), Açık & Koyu Tema Motoru & Çevrimdışı Bileşen Demosu):
+  - **Yeniden Kullanılabilir SIEM Tasarım Belirteçleri (`tokens.css`)**:
+    - Tipografi, boşluk, köşe yuvarlama ve gölge belirteçleri (`--ls-font`, `--ls-mono`, `--ls-space-1` - `--ls-space-6`, `--ls-radius`, `--ls-shadow`) sisteme kazandırıldı.
+    - `[data-theme="dark"]` ve `[data-theme="light"]` modları için derin lacivert (`#0f172a`), arduvaz kayrak gri (`#1e293b`), camgöbeği/turkuaz vurgu (`#42c5d2` / `#087f8c`) ve yüksek kontrastlı okunabilir metin renkleri tanımlandı.
+  - **Dinamik Tema Motoru & Güvenli Depolama**:
+    - Tarayıcı depolama koruması (`localStorage.getItem('logseal-theme')`) ve işletim sistemi tema tercihi (`prefers-color-scheme`) otomatik algılama ve geri çekilme desteği sağlandı.
+    - Üst çubuğa tek tıkla Açık / Koyu tema geçişi sağlayan animasyonlu SVG ay/güneş butonu (`#theme-toggle`) entegre edildi.
+    - Sayfa açılışlarında stil sıçramasını (FOUC) engelleyen erken başlatıcı ve işletim sistemi değişiklik dinleyicisi eklendi.
+  - **Bağımsız Çevrimdışı SIEM Tema Demosu (`/static/theme-demo/`)**:
+    - Dört bağımsız dosya oluşturuldu: `tokens.css`, `theme.css`, `index.html` ve `demo.js`.
+    - 900px mobil menü ve 560px tek sütun duyarlı düzen, anlık olay arama ve önem derecesi (severity) filtresi, boş durum ve sıfırlama, durum etiketleri ve kapatılabilir uyarı bandı içerir.
+    - Yan menü Destek & Kılavuz altına doğrudan demo bağlantısı (`#nav-tab-theme-demo`) yerleştirildi.
+
 - **v1.9.10** (Katlanabilir ve Akordeon Yan Menü Grupları, Kalıcı Durum Hafızası & Erişilebilirlik):
   - **Katlanabilir Akordeon Yan Menü (Sidebar) Grupları**:
     - Yan menüdeki 6 ana kategori bağımsız olarak katlanabilir/açılabilir (foldable accordion) hale getirildi:

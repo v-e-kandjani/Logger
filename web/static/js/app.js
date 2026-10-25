@@ -40,7 +40,66 @@ function t(k, fb) {
 }
 window.t = t;
 
+// LogSeal Theme Manager (Dark / Light with System Fallback & Guarded LocalStorage)
+function getAppTheme() {
+    try {
+        return localStorage.getItem('logseal-theme') ||
+               (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    } catch (e) {
+        return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+}
+
+function setAppTheme(theme) {
+    theme = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    if (document.body) {
+        document.body.classList.remove('dark-theme', 'light-theme');
+        document.body.classList.add(theme === 'dark' ? 'dark-theme' : 'light-theme');
+    }
+    const toggleBtn = document.getElementById('theme-toggle');
+    if (toggleBtn) {
+        toggleBtn.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+        toggleBtn.setAttribute('title', theme === 'dark' ? 'Açık Temaya Geç (Light)' : 'Koyu Temaya Geç (Dark)');
+    }
+    try {
+        localStorage.setItem('logseal-theme', theme);
+    } catch (e) {}
+}
+
+function initTheme() {
+    setAppTheme(getAppTheme());
+
+    const toggleBtn = document.getElementById('theme-toggle');
+    if (toggleBtn && !toggleBtn.dataset.themeBound) {
+        toggleBtn.dataset.themeBound = 'true';
+        toggleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            setAppTheme(current === 'dark' ? 'light' : 'dark');
+        });
+    }
+
+    try {
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                let hasStored = false;
+                try { hasStored = !!localStorage.getItem('logseal-theme'); } catch (_) {}
+                if (!hasStored) {
+                    setAppTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+        }
+    } catch (e) {}
+}
+
+// Early theme application to avoid FOUC
+try {
+    setAppTheme(getAppTheme());
+} catch (e) {}
+
 document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
     initAuthSession();
     initNavigation();
     initLiveStream();
@@ -12965,6 +13024,9 @@ window.executeRansomwareSimulation = executeRansomwareSimulation;
 window.toggleSidebarSection = toggleSidebarSection;
 window.initSidebarFoldableSections = initSidebarFoldableSections;
 window.ensureActiveNavSectionExpanded = ensureActiveNavSectionExpanded;
+window.setAppTheme = setAppTheme;
+window.getAppTheme = getAppTheme;
+window.initTheme = initTheme;
 
 
 

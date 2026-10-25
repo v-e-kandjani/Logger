@@ -1,0 +1,76 @@
+:root {
+  /* Typography */
+  --ls-font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --ls-mono: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  
+  /* Spacing */
+  --ls-space-1: 0.25rem;
+  --ls-space-2: 0.5rem;
+  --ls-space-3: 1rem;
+  --ls-space-4: 1.5rem;
+  --ls-space-5: 2rem;
+  --ls-space-6: 3rem;
+  
+  /* Radius */
+  --ls-radius: 4px;
+  
+  /* Sidebar */
+  --ls-sidebar-width: 240px;
+  
+  /* Shadow */
+  --ls-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] {
+  /* Color scheme */
+  color-scheme: light;
+  
+  /* Backgrounds */
+  --ls-bg: #ffffff;
+  --ls-surface: #f8fafc;
+  --ls-surface-alt: #e2e8f0;
+  
+  /* Text */
+  --ls-text: #1e293b;
+  --ls-muted: #64748b;
+  
+  /* Borders */
+  --ls-border: #cbd5e1;
+  
+  /* Accents */
+  --ls-accent: #087f8c;
+  --ls-accent-text: #ffffff;
+  
+  /* Status colors */
+  --ls-danger: #b91c1c;
+  --ls-warning: #92400e;
+  --ls-success: #166534;
+  --ls-info: #1e40af;
+}
+
+[data-theme="dark"] {
+  /* Color scheme */
+  color-scheme: dark;
+  
+  /* Backgrounds */
+  --ls-bg: #0f172a;
+  --ls-surface: #1e293b;
+  --ls-surface-alt: #334155;
+  
+  /* Text */
+  --ls-text: #f1f5f9;
+  --ls-muted: #94a3b8;
+  
+  /* Borders */
+  --ls-border: #334155;
+  
+  /* Accents */
+  --ls-accent: #42c5d2;
+  --ls-accent-text: #0f172a;
+  
+  /* Status colors */
+  --ls-danger: #fecaca;
+  --ls-warning: #fed7aa;
+  --ls-success: #bbf7d0;
+  --ls-info: #bfdbfe;
+}

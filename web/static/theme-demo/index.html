@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LogSeal - Security Operations Console</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body class="ls-app">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  
+  <button id="menu-toggle" class="ls-toggle" aria-controls="sidebar" aria-expanded="false">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <span>Toggle menu</span>
+  </button>
+
+  <aside id="sidebar" class="ls-sidebar">
+    <div class="ls-brand">
+      <h1>LogSeal</h1>
+      <p>Security Operations</p>
+    </div>
+    <nav>
+      <a href="#overview" class="ls-nav-link active" aria-current="page">Overview</a>
+      <a href="#events" class="ls-nav-link">Events</a>
+      <a href="#health" class="ls-nav-link">Health</a>
+      <a href="/" class="ls-nav-link" style="margin-top: 24px; border-top: 1px solid var(--ls-border); padding-top: 16px;">← Back to LogSeal</a>
+    </nav>
+  </aside>
+
+  <div class="ls-main">
+    <header class="ls-topbar">
+      <button id="theme-toggle" class="ls-toggle" aria-label="Toggle theme">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 3V5M12 19V21M5 12H3M19 12H21M6.41 17.59L4.29 15.47M19.71 8.53L17.59 6.41M6.41 6.41L4.29 8.53M19.71 15.47L17.59 17.59" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Toggle theme</span>
+      </button>
+    </header>
+
+    <main id="main-content" class="ls-content">
+      <section id="overview" class="ls-section">
+        <h2>Security overview</h2><p class="ls-demo-label">Demo workspace · Synthetic data · Last 60 minutes</p>
+        <div class="ls-metrics">
+          <div class="ls-card">
+            <h3>Events</h3>
+            <p class="ls-value">1,248</p>
+            <p class="ls-change">+12% from last hour</p>
+          </div>
+          <div class="ls-card">
+            <h3>Alerts</h3>
+            <p class="ls-value">42</p>
+            <p class="ls-change">-3% from last hour</p>
+          </div>
+          <div class="ls-card">
+            <h3>Threats</h3>
+            <p class="ls-value">3</p>
+            <p class="ls-change">+1 from last hour</p>
+          </div>
+          <div class="ls-card">
+            <h3>Collection uptime</h3>
+            <p class="ls-value">98.7%</p>
+            <p class="ls-change">+0.3% from last hour</p>
+          </div>
+        </div>
+
+        <div class="ls-grid">
+          <div class="ls-card">
+            <h3>Event Timeline</h3>
+            <div class="ls-timeline">
+              <div class="ls-timeline-item">
+                <div class="ls-timeline-time">10:45:22</div>
+                <div class="ls-timeline-content">Failed login attempt from 192.168.1.100</div>
+              </div>
+              <div class="ls-timeline-item">
+                <div class="ls-timeline-time">10:42:15</div>
+                <div class="ls-timeline-content">New user account created in security group</div>
+              </div>
+              <div class="ls-timeline-item">
+                <div class="ls-timeline-time">10:38:41</div>
+                <div class="ls-timeline-content">Security policy updated</div>
+              </div>
+              <div class="ls-timeline-item">
+                <div class="ls-timeline-time">10:35:10</div>
+                <div class="ls-timeline-content">System integrity check completed</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ls-card">
+            <h3>Ingestion Health</h3>
+            <div class="ls-status">
+              <strong>Core firewall</strong> <span class="ls-status-label healthy">Healthy</span>
+              <div class="ls-progress">
+                <div class="ls-progress-bar" style="width: 95%"></div>
+              </div>
+              <p>95% of expected event rate</p>
+            </div>
+            <div class="ls-status">
+              <strong>Branch collector</strong> <span class="ls-status-label degraded">Degraded</span>
+              <div class="ls-progress">
+                <div class="ls-progress-bar" style="width: 75%"></div>
+              </div>
+              <p>75% of expected event rate</p>
+            </div>
+            <div class="ls-status">
+              <strong>Lab endpoint</strong> <span class="ls-status-label offline">Offline</span>
+              <div class="ls-progress">
+                <div class="ls-progress-bar" style="width: 0%"></div>
+              </div>
+              <p>No events received</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="events" class="ls-section">
+        <div class="ls-card">
+          <h3>Event Log</h3>
+          <div class="ls-controls">
+            <label for="search">Search:</label>
+            <input type="search" id="search" placeholder="Search events...">
+            <label for="severity">Severity:</label>
+            <select id="severity">
+              <option value="all">All</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+              <option value="info">Info</option>
+            </select>
+            <button id="reset-filters">Reset</button>
+          </div>
+          <div class="ls-table-wrap" tabindex="0" role="region" aria-label="Security events, scroll horizontally on small screens">
+            <table>
+              <caption>Security Events</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Time</th>
+                  <th scope="col">Severity</th>
+                  <th scope="col">Event</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody id="event-rows">
+                <tr data-severity="critical">
+                  <td>2026-10-25 10:45:22</td>
+                  <td><span class="ls-badge critical">Critical</span></td>
+                  <td>Unauthorized access attempt</td>
+                  <td>192.168.1.100</td>
+                  <td>Resolved</td>
+                </tr>
+                <tr data-severity="high">
+                  <td>2026-10-25 10:42:15</td>
+                  <td><span class="ls-badge high">High</span></td>
+                  <td>User account created</td>
+                  <td>admin@example.test</td>
+                  <td>Active</td>
+                </tr>
+                <tr data-severity="medium">
+                  <td>2026-10-25 10:38:41</td>
+                  <td><span class="ls-badge medium">Medium</span></td>
+                  <td>Policy update notification</td>
+                  <td>policy-manager</td>
+                  <td>Active</td>
+                </tr>
+                <tr data-severity="low">
+                  <td>2026-10-25 10:35:10</td>
+                  <td><span class="ls-badge low">Low</span></td>
+                  <td>System integrity check</td>
+                  <td>system-checker</td>
+                  <td>Resolved</td>
+                </tr>
+                <tr data-severity="info">
+                  <td>2026-10-25 10:30:45</td>
+                  <td><span class="ls-badge info">Info</span></td>
+                  <td>Security scan initiated</td>
+                  <td>scanner</td>
+                  <td>Active</td>
+                </tr>
+                <tr data-severity="critical">
+                  <td>2026-10-25 10:25:30</td>
+                  <td><span class="ls-badge critical">Critical</span></td>
+                  <td>Malware detected</td>
+                  <td>endpoint-01</td>
+                  <td>Active</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="result-count" role="status">Showing 6 sample events</div>
+          <div id="empty-state" class="ls-empty" hidden>No events match your search criteria</div>
+        </div>
+      </section>
+
+      <section id="health" class="ls-section">
+        <div class="ls-card">
+          <h3>Query service health</h3>
+          <div class="ls-status">
+            <span class="ls-status-label healthy">Healthy</span>
+            <p>Query service is responding normally</p>
+          </div>
+        </div>
+      </section>
+
+      <div id="alert" class="ls-alert">
+        <p>Collector delay: branch collector is receiving 75% of its expected event rate. Review its connection.</p>
+        <button id="dismiss-alert" aria-label="Dismiss alert">×</button>
+      </div>
+    </main>
+
+    <footer class="ls-footer">
+      <small>LogSeal Security Operations Console - Synthetic demo data</small>
+    </footer>
+  </div>
+
+  <script src="demo.js" defer></script>
+</body>
+</html>
