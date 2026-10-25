@@ -1045,6 +1045,18 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Trigger immediate background auto-sealing sweep based on newly saved seal settings
+		if h.archEngine != nil {
+			go func() {
+				sweepCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				defer cancel()
+				reconciled := h.archEngine.ReconcilePendingArchives(sweepCtx)
+				if reconciled > 0 {
+					log.Printf("[Handler] Auto-sealed %d pending archives after seal settings update", reconciled)
+				}
+			}()
+		}
+
 		writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
 		return
 	}
@@ -1065,6 +1077,9 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, ok := settings["auto_fallback"]; !ok {
 		settings["auto_fallback"] = "true"
+	}
+	if _, ok := settings["auto_seal_pending"]; !ok {
+		settings["auto_seal_pending"] = "true"
 	}
 	if _, ok := settings["kamusm_server_url"]; !ok {
 		settings["kamusm_server_url"] = "http://zd.kamusm.gov.tr"

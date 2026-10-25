@@ -49,6 +49,18 @@ func (e *Engine) StartAutoArchiving(ctx context.Context, interval string, schedu
 	}
 	go func() {
 		log.Printf("[Archive Engine] Periodic auto-archiving scheduler started (interval: %s, schedule_minute: %d)", interval, scheduleMinute)
+		
+		// Immediate initial auto-sealing sweep on startup to clear any existing backlog
+		go func() {
+			time.Sleep(2 * time.Second)
+			sweepCtx, sCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer sCancel()
+			reconciled := e.ReconcilePendingArchives(sweepCtx)
+			if reconciled > 0 {
+				log.Printf("[Archive Engine] Initial startup auto-seal sweep processed %d pending archives", reconciled)
+			}
+		}()
+
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 
@@ -105,38 +117,66 @@ func (e *Engine) StartAutoArchiving(ctx context.Context, interval string, schedu
 					}
 				}
 
-				// Periodic reconciliation for any stuck pending/interrupted archives
-				if utcNow.Second() < 30 {
-					reconcileCtx, rCancel := context.WithTimeout(context.Background(), 30*time.Second)
-					_ = e.ReconcilePendingArchives(reconcileCtx)
-					rCancel()
-				}
+				// Continuous background auto-sealer for pending archives based on seal settings
+				reconcileCtx, rCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				_ = e.ReconcilePendingArchives(reconcileCtx)
+				rCancel()
 			}
 		}
 	}()
 }
 
-// ReconcilePendingArchives scans PostgreSQL for any archives stuck in PENDING or TSA_PENDING
-// that are older than 1 minute and re-triggers timestamping.
+// ReconcilePendingArchives scans PostgreSQL for any archives stuck in PENDING, TSA_PENDING,
+// TIMESTAMP_FAILED or retryable FAILED status and auto-seals them using the active timestamp provider.
 func (e *Engine) ReconcilePendingArchives(ctx context.Context) int {
 	if e.provider == nil || e.pgDB == nil {
 		return 0
 	}
-	pendingList, err := e.pgDB.ListPendingArchives(ctx, 20)
+
+	// Check if auto-seal has been explicitly turned off in system settings
+	settings, err := e.pgDB.GetSettings(ctx)
+	if err == nil && settings != nil {
+		if val, ok := settings["auto_seal_pending"]; ok && (val == "false" || val == "0") {
+			return 0
+		}
+	}
+
+	pendingList, err := e.pgDB.ListPendingArchives(ctx, 50)
 	if err != nil || len(pendingList) == 0 {
 		return 0
 	}
 	reconciled := 0
 	for _, a := range pendingList {
-		if a.ArchivePath == "" {
-			continue
+		archivePath := a.ArchivePath
+		if archivePath == "" {
+			archivePath = filepath.Join(e.baseDir, a.ArchiveName+".jsonl.gz")
 		}
-		if _, err := os.Stat(a.ArchivePath); err != nil {
-			log.Printf("[Archive Engine] Pending archive %s file not found at %s: %v", a.ID, a.ArchivePath, err)
-			continue
+		if _, err := os.Stat(archivePath); err != nil {
+			// Fallback check 1: BaseDir root
+			fallbackPath := filepath.Join(e.baseDir, filepath.Base(archivePath))
+			if _, fbErr := os.Stat(fallbackPath); fbErr == nil {
+				archivePath = fallbackPath
+			} else {
+				// Fallback check 2: Date-based path /archive/YYYY/MM/DD/
+				dateDir := filepath.Join(
+					e.baseDir,
+					fmt.Sprintf("%04d", a.StartTimestamp.Year()),
+					fmt.Sprintf("%02d", a.StartTimestamp.Month()),
+					fmt.Sprintf("%02d", a.StartTimestamp.Day()),
+				)
+				dateFallback := filepath.Join(dateDir, filepath.Base(archivePath))
+				if _, dfErr := os.Stat(dateFallback); dfErr == nil {
+					archivePath = dateFallback
+				} else {
+					log.Printf("[Archive Engine] Pending archive %s file not found at %s or fallback paths: %v", a.ID, a.ArchivePath, err)
+					continue
+				}
+			}
 		}
-		res, err := e.provider.Timestamp(ctx, a.ArchivePath)
+
+		res, err := e.provider.Timestamp(ctx, archivePath)
 		if err != nil {
+			log.Printf("[Archive Engine] Auto-seal error for archive %s (%s): %v", a.ID, a.ArchiveName, err)
 			_ = e.pgDB.UpdateArchiveTimestamp(ctx, a.ID, "FAILED", "", err.Error())
 		} else {
 			status := "STAMPED"
@@ -144,8 +184,9 @@ func (e *Engine) ReconcilePendingArchives(ctx context.Context) int {
 				status = "ARCHIVED_NO_STAMP"
 			}
 			_ = e.pgDB.UpdateArchiveTimestamp(ctx, a.ID, status, res.EvidenceFile, "")
+			_ = e.pgDB.SyncArchiveJobCommitted(ctx, a.Tenant, a.StartTimestamp, a.EndTimestamp)
 			reconciled++
-			log.Printf("[Archive Engine] Reconciled pending archive %s (%s) -> %s", a.ID, a.ArchiveName, status)
+			log.Printf("[Archive Engine] Auto-sealed pending archive %s (%s) -> %s (evidence: %s)", a.ID, a.ArchiveName, status, res.EvidenceFile)
 		}
 	}
 	return reconciled

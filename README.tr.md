@@ -253,6 +253,24 @@ Valtrivo LogSeal platformunu en son sürüme güncellemek için iki yöntem mevc
 - 🌐 [**Ağ Mimarisi ve Port Gereksinimleri**](docs/PORT_SPECIFICATIONS.tr.md) — Tam port matrisi, veritabanı loopback izolasyonu (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN çıkışı ve firewall kurulumu.
 - 🚀 [**Yükseltme ve Sıfır Veri Kaybı Bakım Kılavuzu**](UPGRADE.md) — Tek tıkla web güncellemeleri, otomatik yükseltme öncesi veritabanı anlık görüntüleri ve geri alma yönergeleri.
 
+- **v1.9.20** (5651 Sayılı Kanun Arka Planda Otomatik Arşiv Mühürleme & Kesintisiz Bütünlük Mutabakatı):
+  - **Kesintisiz Arka Plan Otomatik Mühürleyicisi (`internal/archive/engine.go`)**:
+    - Bekleyen, kesintiye uğrayan veya geçici ağ hatası alan tüm log arşivlerinin mühürleme ayarlarına (`internal`, `kamusm` veya otomatik geri çekilmeli `disabled`) göre arka planda sürekli ve otomatik olarak mühürlenmesi sağlandı.
+    - Servis başlangıcında önceki oturumlardan kalan birikmiş bekleyen arşivleri anında mühürleyen başlangıç taraması entegre edildi.
+    - Zamanlayıcı döngüsündeki kısıtlayıcı saniye kontrolleri kaldırılarak 30 saniyelik periyodik mutabakat döngüsü sağlandı.
+    - Arşiv dosyalarının kök dizin veya tarih bazlı alt klasörlerden bulunabilmesi için çok yollu (multi-path) dosya çözümlemesi eklendi.
+  - **Genişletilmiş Bekleyen Sorgusu & İş Senkronizasyonu (`internal/database/postgres/postgres.go`)**:
+    - `ListPendingArchives` sorgusu `PENDING`, `TSA_PENDING`, `TIMESTAMP_FAILED` ve tekrar denenebilir `FAILED` (deneme < 10) arşivlerini kapsayacak şekilde genişletildi.
+    - Zaman damgası üretildiğinde ilişkili dağıtık `archive_jobs` kayıtlarını otomatik olarak `COMMITTED` durumuna geçiren `SyncArchiveJobCommitted` fonksiyonu eklendi.
+    - `UpdateArchiveTimestamp` tamamlanma zamanı mantığı hem `STAMPED` hem de `VERIFIED` durumlarını kapsayacak şekilde güncellendi.
+  - **Ayar Entegrasyonu & Anında Tetikleme (`internal/api/handler.go`)**:
+    - `auto_seal_pending` sistem ayarı eklendi (varsayılan olarak devrede).
+    - Mühürleme ayarları kaydedildiğinde, güncellenen strateji ve kimlik bilgilerinin anında uygulanması için asenkron mutabakat süreci otomatik olarak tetiklenir.
+  - **Operatör Arayüzü Geliştirmeleri (`web/templates/index.html` & `web/static/js/app.js`)**:
+    - Arşivler ekranı başlığına arka plan mühürleyicisinin çalıştığını gösteren "Otomatik Mühürleme Devrede" nabız rozeti eklendi.
+    - 5651 Mühür Ayarları altına "Bekleyen Arşivleri Otomatik Mühürle" yapılandırma seçeneği eklendi.
+    - `loadArchives()` fonksiyonuna reaktif yenileme eklenerek bekleyen kayıtların gerçek zamanlı olarak `🛡️ STAMPED` / `🛡️ VERIFIED` rozetine dönüşmesi sağlandı.
+
 - **v1.9.19** (5651 Sayılı Kanun Arşiv Mühürleme Yanıt Formatı Çözümü ve Arka Plan Güçlendirmesi):
   - **Arşiv Mühürleme Yanıt Akışı & Biçim İyileştirmesi (`web/static/js/app.js`)**:
     - İsteğe bağlı arşiv damgalama (`reconcileArchives` / "Seal Now") butonuna basıldığında tetiklenen `Hata: Invalid response format from server (200)` istisnası tamamen çözüldü.

@@ -488,10 +488,10 @@ func (db *DB) UpdateArchiveTimestamp(ctx context.Context, id uuid.UUID, status, 
 	query := `
 		UPDATE log_archives
 		SET timestamp_status = $1::text,
-		    timestamp_completion_time = CASE WHEN $1::text = 'STAMPED' THEN NOW() ELSE timestamp_completion_time END,
+		    timestamp_completion_time = CASE WHEN $1::text IN ('STAMPED', 'VERIFIED') THEN NOW() ELSE timestamp_completion_time END,
 		    timestamp_evidence_path = $2,
 		    last_error = $3,
-		    retry_count = retry_count + CASE WHEN $1::text = 'FAILED' THEN 1 ELSE 0 END
+		    retry_count = retry_count + CASE WHEN $1::text IN ('FAILED', 'TIMESTAMP_FAILED') THEN 1 ELSE 0 END
 		WHERE id = $4`
 
 	_, err := db.pool.Exec(ctx, query, status, evidencePath, lastError, id)
@@ -550,10 +550,10 @@ func (db *DB) ListArchives(ctx context.Context, tenant string, limit int) ([]mod
 	return list, nil
 }
 
-// ListPendingArchives retrieves archives that are still in PENDING or TSA_PENDING status after 1 minute.
+// ListPendingArchives retrieves archives that are still in PENDING, TSA_PENDING, TIMESTAMP_FAILED or retryable FAILED status.
 func (db *DB) ListPendingArchives(ctx context.Context, limit int) ([]models.LogArchive, error) {
 	if limit <= 0 {
-		limit = 20
+		limit = 50
 	}
 	query := `
 		SELECT id, archive_name, start_timestamp, end_timestamp, record_count, archive_path,
@@ -561,7 +561,11 @@ func (db *DB) ListPendingArchives(ctx context.Context, limit int) ([]models.LogA
 		       timestamp_completion_time, timestamp_evidence_path, retry_count, last_error, created_at,
 		       COALESCE(tenant_slug, 'default')
 		FROM log_archives
-		WHERE timestamp_status IN ('PENDING', 'TSA_PENDING') AND created_at < NOW() - INTERVAL '1 minute'
+		WHERE (
+			timestamp_status IN ('PENDING', 'TSA_PENDING', 'TIMESTAMP_FAILED')
+			OR (timestamp_status = 'FAILED' AND retry_count < 10)
+		)
+		AND created_at < NOW() - INTERVAL '5 seconds'
 		ORDER BY created_at ASC
 		LIMIT $1`
 	rows, err := db.pool.Query(ctx, query, limit)
@@ -584,6 +588,19 @@ func (db *DB) ListPendingArchives(ctx context.Context, limit int) ([]models.LogA
 		}
 	}
 	return list, nil
+}
+
+// SyncArchiveJobCommitted updates any pending archive jobs for the given tenant and slice window to COMMITTED.
+func (db *DB) SyncArchiveJobCommitted(ctx context.Context, tenant string, start, end time.Time) error {
+	if tenant == "" {
+		tenant = "default"
+	}
+	query := `
+		UPDATE archive_jobs
+		SET state = 'COMMITTED', updated_at = NOW(), error_message = ''
+		WHERE tenant_slug = $1 AND period_start = $2 AND period_end = $3 AND state != 'COMMITTED'`
+	_, err := db.pool.Exec(ctx, query, tenant, start, end)
+	return err
 }
 
 func (db *DB) GetArchive(ctx context.Context, id uuid.UUID) (*models.LogArchive, error) {

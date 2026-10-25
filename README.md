@@ -264,6 +264,24 @@ curl -O -J "http://localhost:8080/api/v1/archives/download?id=<ARCHIVE_ID>&type=
 - 🌐 [**Network Architecture & Port Specifications**](docs/PORT_SPECIFICATIONS.md) — Complete port matrix, database loopback isolation (PostgreSQL 5432 & ClickHouse 8123/9000), edge proxy daemon WAN egress, and firewall setup.
 - 🚀 [**Upgrade & Zero-Data-Loss Maintenance Guide**](UPGRADE.md) — 1-click web upgrades, automated pre-upgrade database snapshots, and rollback instructions.
 
+- **v1.9.20** (Law 5651 Automated Background Archive Sealer & Continuous Integrity Reconciliation):
+  - **Continuous Background Auto-Sealer (`internal/archive/engine.go`)**:
+    - Automatically seals all pending, interrupted, or transiently failed archives continuously in the background based on active seal settings (`internal`, `kamusm`, or `disabled` with auto-fallback).
+    - Added an immediate startup sweep to process any backlog of pending archives upon service initialization.
+    - Removed arbitrary second-window restrictions in periodic scheduling to run 30-second continuous reconciliation passes.
+    - Added comprehensive multi-path resolution (root base directory and date-based subdirectories) to ensure zero orphaned archives.
+  - **Expanded Pending Query & Job Synchronization (`internal/database/postgres/postgres.go`)**:
+    - Expanded `ListPendingArchives` query to include `PENDING`, `TSA_PENDING`, `TIMESTAMP_FAILED`, and retryable `FAILED` archives (retry count < 10) after a short settling threshold.
+    - Added `SyncArchiveJobCommitted` to automatically advance corresponding distributed `archive_jobs` to `COMMITTED` when evidence is acquired.
+    - Updated `UpdateArchiveTimestamp` completion timestamp logic to recognize both `STAMPED` and `VERIFIED` statuses.
+  - **Settings Integration & Instant Sweep Trigger (`internal/api/handler.go`)**:
+    - Added `auto_seal_pending` setting toggle (enabled by default).
+    - Saving stamping settings immediately fires an asynchronous reconciliation sweep so newly updated credentials or strategy modes are applied instantaneously without manual intervention.
+  - **Operator UI Enhancements (`web/templates/index.html` & `web/static/js/app.js`)**:
+    - Added an "Auto-Seal Active" pulse indicator badge to the Archives view header.
+    - Added an "Auto-Seal Pending Archives Going Forward" configuration toggle under Law 5651 Stamping Settings.
+    - Implemented reactive polling refresh in `loadArchives()` when pending items are detected so that newly sealed records turn into `🛡️ STAMPED` / `🛡️ VERIFIED` in real-time.
+
 - **v1.9.19** (Law 5651 Single-Archive Reconcile Response Resolution & Nil-Guard Hardening):
   - **Archive Reconcile Body Stream & Format Resolution (`web/static/js/app.js`)**:
     - Resolved `Hata: Invalid response format from server (200)` when triggering on-demand archive stamping (`reconcileArchives`).

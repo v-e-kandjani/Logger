@@ -1272,6 +1272,17 @@ async function loadArchives() {
                 </td>
             </tr>
         `}).join('');
+
+        const hasPending = list.some(a => a.timestamp_status === 'PENDING' || a.timestamp_status === 'TSA_PENDING' || a.timestamp_status === 'TIMESTAMP_FAILED');
+        if (hasPending) {
+            if (window._archiveRefreshTimer) clearTimeout(window._archiveRefreshTimer);
+            window._archiveRefreshTimer = setTimeout(() => {
+                const pane = document.getElementById('pane-archives');
+                if (pane && pane.classList.contains('active')) {
+                    loadArchives();
+                }
+            }, 8000);
+        }
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="10" class="text-center text-red">${t('archives_failed', 'Failed to load archives')}: ${e.message}</td></tr>`;
     }
@@ -1774,6 +1785,11 @@ async function loadSettings() {
             fallbackEl.checked = s.auto_fallback !== 'false';
         }
 
+        const autoSealEl = document.getElementById('setting-auto-seal-pending');
+        if (autoSealEl) {
+            autoSealEl.checked = s.auto_seal_pending !== 'false';
+        }
+
         if (s.kamusm_server_url && document.getElementById('setting-server-url')) {
             document.getElementById('setting-server-url').value = s.kamusm_server_url;
         }
@@ -1914,6 +1930,20 @@ async function loadSettings() {
             }
         }
 
+        const autoSealBadge = document.getElementById('auto-seal-active-badge');
+        if (autoSealBadge) {
+            const isAutoSealActive = s.auto_seal_pending !== 'false' && s.stamping_mode !== 'disabled';
+            if (isAutoSealActive) {
+                autoSealBadge.className = 'badge badge-success';
+                autoSealBadge.style.display = 'inline-flex';
+                autoSealBadge.innerHTML = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span> <span data-i18n="badge_auto_seal_active">${typeof t === 'function' ? t('badge_auto_seal_active', 'Auto-Seal Active') : 'Auto-Seal Active'}</span>`;
+            } else {
+                autoSealBadge.className = 'badge badge-warning';
+                autoSealBadge.style.display = 'inline-flex';
+                autoSealBadge.innerHTML = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;"></span> <span data-i18n="badge_auto_seal_paused">${typeof t === 'function' ? t('badge_auto_seal_paused', 'Auto-Seal Paused') : 'Auto-Seal Paused'}</span>`;
+            }
+        }
+
         updateStampingUI();
         await loadHTTPSSettings();
         await loadFQDNSettings();
@@ -1972,11 +2002,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const stampingMode = document.getElementById('setting-stamping-mode') ? document.getElementById('setting-stamping-mode').value : 'internal';
             const autoFallback = document.getElementById('setting-auto-fallback') ? (document.getElementById('setting-auto-fallback').checked ? 'true' : 'false') : 'true';
+            const autoSealPending = document.getElementById('setting-auto-seal-pending') ? (document.getElementById('setting-auto-seal-pending').checked ? 'true' : 'false') : 'true';
             const strictFilter = document.getElementById('setting-strict-filtering') ? document.getElementById('setting-strict-filtering').value : 'false';
 
             const payload = {
                 stamping_mode: stampingMode,
                 auto_fallback: autoFallback,
+                auto_seal_pending: autoSealPending,
                 strict_device_filtering: strictFilter,
                 kamusm_server_url: document.getElementById('setting-server-url') ? document.getElementById('setting-server-url').value : '',
                 kamusm_server_port: document.getElementById('setting-server-port') ? document.getElementById('setting-server-port').value : '80',

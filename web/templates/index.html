@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Valtrivo LogSeal - Merkezi Log Yönetimi ve Zaman Damgalama</title>
     <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
-    <link rel="stylesheet" href="/static/css/tokens.css?v=1.9.19">
-    <link rel="stylesheet" href="/static/css/theme.css?v=1.9.19">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.19">
-    <link rel="stylesheet" href="/static/css/components.css?v=1.9.19">
-    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.19">
-    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.19">
+    <link rel="stylesheet" href="/static/css/tokens.css?v=1.9.20">
+    <link rel="stylesheet" href="/static/css/theme.css?v=1.9.20">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.9.20">
+    <link rel="stylesheet" href="/static/css/components.css?v=1.9.20">
+    <link rel="stylesheet" href="/static/css/endpoint.css?v=1.9.20">
+    <link rel="stylesheet" href="/static/css/reports.css?v=1.9.20">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
@@ -25,7 +25,7 @@
                     <img id="sidebar-brand-logo" src="/static/images/logo.svg" width="34" height="34" alt="Valtrivo LogSeal" style="display: block;">
                 </div>
                 <div class="brand-text">
-                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.19</span></h2>
+                    <h2>Valtrivo LogSeal <span class="badge badge-secondary" id="brand-version" style="font-size: 10px; font-weight: 600; vertical-align: middle;">v1.9.20</span></h2>
                     <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;" data-i18n="app_subtitle">Merkezi Log Yönetimi ve Zaman Damgalama</span>
                     <span style="font-size: 10px; color: var(--accent); display: block; font-style: italic; margin-top: 2px;" data-i18n="app_tagline">“Her kayıt, zamanıyla kanıt.”</span>
                 </div>
@@ -2536,6 +2536,10 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
             <section class="tab-pane" id="pane-archives">
                 <div class="section-actions" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                     <h3 data-i18n="archives_header" style="margin-right: auto;">Immutable Log Archives & KamuSM Zaman Damgası Evidence</h3>
+                    <span class="badge badge-success" id="auto-seal-active-badge" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; padding: 6px 12px; border-radius: 6px; font-weight: 500;" title="Otomatik mühürleme arka planda sürekli aktif / Background auto-sealer active">
+                        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span>
+                        <span data-i18n="badge_auto_seal_active">Auto-Seal Active</span>
+                    </span>
                     <button class="btn btn-outline" id="btn-reconcile-archives" onclick="reconcileArchives()" title="Bekleyen veya kesintiye uğrayan arşivleri yeniden damgala" data-i18n="btn_reconcile_archives">🔄 Bekleyenleri Mühürle</button>
                     <button class="btn btn-outline" id="btn-manual-archive-sealing" data-i18n="btn_manual_archive">+ 5651 Manuel Mühürleme (RFC 3161)</button>
                     <button class="btn btn-primary" id="btn-archives-custom-export" data-i18n="btn_custom_export">+ Özel Aralık Mühürle & İndir</button>
@@ -2978,6 +2982,17 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                                 </label>
                                 <p class="subtitle" style="font-size: 0.78rem; margin-top: 4px; color: var(--text-muted); padding-left: 28px;">
                                     Guarantees seamless archival operations: If TÜBİTAK account credentials are blank, expired, or the TSS server is unreachable, archives are automatically sealed with the internal cryptographic method instead of failing.
+                                </p>
+                            </div>
+
+                            <!-- Auto-Seal Pending Archives Checkbox -->
+                            <div class="form-group" style="margin-top: 6px;">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="setting-auto-seal-pending" checked>
+                                    <span><strong data-i18n="lbl_auto_seal_pending">Auto-Seal Pending Archives Going Forward:</strong> <span data-i18n="desc_auto_seal_pending">Continuously auto-seal any pending or unstamped archives in the background based on active seal settings</span></span>
+                                </label>
+                                <p class="subtitle" style="font-size: 0.78rem; margin-top: 4px; color: var(--text-muted); padding-left: 28px;" data-i18n="hint_auto_seal_pending">
+                                    Ensures that all pending items, retryable archives, and newly generated log slices are automatically sealed in the background without needing manual reconciliation.
                                 </p>
                             </div>
 
@@ -3957,7 +3972,7 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
                 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
                     <div class="stat-card">
                         <div class="stat-header" data-i18n="upd_stat_installed_ver">Installed Version</div>
-                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.19</div>
+                        <div class="stat-value" id="upd-current-version" style="font-size: 1.5rem;">v1.9.20</div>
                         <div class="stat-sub">Valtrivo LogSeal Platform</div>
                     </div>
                     <div class="stat-card">
@@ -8049,8 +8064,8 @@ sudo rm -rf /opt/logger-agent /etc/logger-agent /var/log/logger-agent</pre>
         </div>
     </div>
 
-    <script src="/static/js/marked.min.js?v=1.9.19"></script>
-    <script src="/static/js/translations.js?v=1.9.19"></script>
-    <script src="/static/js/app.js?v=1.9.19"></script>
+    <script src="/static/js/marked.min.js?v=1.9.20"></script>
+    <script src="/static/js/translations.js?v=1.9.20"></script>
+    <script src="/static/js/app.js?v=1.9.20"></script>
 </body>
 </html>
