@@ -108,24 +108,28 @@ func (db *DB) EnsureThreatIntelSchema(ctx context.Context) error {
 					url = EXCLUDED.url`,
 				f.name, f.feedType, f.url, f.pollMin, f.indType, f.category, f.confidence)
 		}
-
-		// Auto-migrate historical feeds to modern reliable endpoints
-		_, _ = db.pool.Exec(ctx, `
-			UPDATE ti_feeds SET 
-				name = 'URLhaus Active Malware URLs & Domains',
-				feed_type = 'plain_list',
-				url = 'https://raw.githubusercontent.com/curbengh/urlhaus-filter/master/urlhaus-filter-online.txt'
-			WHERE name = 'URLhaus Recent Malware URLs & Domains' OR url LIKE '%urlhaus.abuse.ch%';
-			
-			UPDATE ti_feeds SET
-				url = 'https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json'
-			WHERE url LIKE '%cisa.gov%known_exploited_vulnerabilities.json';
-
-			UPDATE ti_feeds SET
-				url = 'https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst'
-			WHERE url LIKE '%torproject.org%torbulkexitlist';
-		`)
 	}
+
+	// Always execute auto-migration for historical feeds to modern reliable endpoints
+	_, _ = db.pool.Exec(ctx, `
+		UPDATE ti_feeds SET 
+			name = 'URLhaus Active Malware URLs & Domains',
+			feed_type = 'plain_list',
+			url = 'https://raw.githubusercontent.com/curbengh/urlhaus-filter/master/urlhaus-filter-online.txt'
+		WHERE name = 'URLhaus Recent Malware URLs & Domains' OR url LIKE '%urlhaus.abuse.ch%';
+		
+		UPDATE ti_feeds SET
+			url = 'https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json'
+		WHERE url LIKE '%cisa.gov%known_exploited_vulnerabilities.json';
+
+		UPDATE ti_feeds SET
+			url = 'https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst'
+		WHERE url LIKE '%torproject.org%torbulkexitlist';
+
+		INSERT INTO ti_feeds (name, feed_type, url, poll_interval_minutes, is_enabled, indicator_type, threat_category, default_confidence)
+		VALUES ('Feodo Tracker Botnet C2 IP Blocklist', 'plain_list', 'https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt', 120, true, 'ip', 'botnet_c2', 95)
+		ON CONFLICT (name) DO UPDATE SET url = EXCLUDED.url;
+	`)
 
 	return nil
 }
